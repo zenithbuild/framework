@@ -96,15 +96,22 @@ jobs:
       - name: Detect Changed Packages
         id: detect
         run: |
-          # Check if this is a monorepo by looking for multiple package.json files
-          PACKAGES=$(find . -name "package.json" -not -path "*/node_modules/*" -not -path "*/.git/*" | xargs -I {} dirname {} | sed 's|^\./||' | grep -v "^$" | sort -u)
-          
-          # For single package repos
-          if [ $(echo "$PACKAGES" | wc -l) -eq 1 ] && [ "$PACKAGES" = "." ]; then
-            echo "packages=[\".\"]" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            exit 0
+          # First, check if this is a single-package repo (package.json in root)
+          if [ -f "./package.json" ]; then
+            # Count subdirectories with package.json (excluding node_modules)
+            SUB_PACKAGES=$(find . -mindepth 2 -name "package.json" -not -path "*/node_modules/*" | wc -l)
+            
+            if [ "$SUB_PACKAGES" -eq 0 ]; then
+              # Single package repo - always release from root
+              echo "Single package repository detected"
+              echo "packages=[\".\"]" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
           fi
+          
+          # Monorepo detection
+          PACKAGES=$(find . -name "package.json" -not -path "*/node_modules/*" -not -path "*/.git/*" | xargs -I {} dirname {} | sed 's|^\./||' | grep -v "^$" | sort -u)
           
           # For monorepos, detect which packages changed
           CHANGED_PACKAGES="[]"
@@ -139,6 +146,7 @@ jobs:
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
+
 
   # ==========================================================================
   # Release Job
