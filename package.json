@@ -1,58 +1,58 @@
 {
-    "name": "@zenithbuild/cli",
-    "version": "0.4.0",
-    "description": "CLI for Zenith framework - dev server, build tools, and plugin management",
-    "type": "module",
-    "bin": {
-        "zenith": "./bin/zenith"
-    },
-    "main": "./src/index.ts",
-    "types": "./src/index.ts",
-    "exports": {
-        ".": {
-            "types": "./src/index.ts",
-            "import": "./src/index.ts"
-        }
-    },
-    "files": [
-        "bin",
-        "src"
-    ],
-    "scripts": {
-        "dev": "bun dev",
-        "build": "bun build",
-        "start": "bun run build && bun run dev",
-        "test": "bun test",
-        "release": "bun run scripts/release.ts",
-        "release:dry": "bun run scripts/release.ts --dry-run",
-        "release:patch": "bun run scripts/release.ts --bump=patch",
-        "release:minor": "bun run scripts/release.ts --bump=minor",
-        "release:major": "bun run scripts/release.ts --bump=major"
-    },
-    "keywords": [
-        "zenith",
-        "cli",
-        "framework",
-        "ssg",
-        "ssr"
-    ],
-    "author": "Zenith Team",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "git@github.com:zenithbuild/zenith-cli.git"
-    },
-    "publishConfig": {
-        "access": "public"
-    },
-    "private": false,
-    "peerDependencies": {
-        "@zenithbuild/core": "^0.1.0"
-    },
-    "devDependencies": {
-        "@types/bun": "latest"
-    },
-    "dependencies": {
-        "picocolors": "^1.0.0"
+  "name": "@zenithbuild/cli",
+  "version": "0.4.1",
+  "description": "CLI for Zenith framework - dev server, build tools, and plugin management",
+  "type": "module",
+  "bin": {
+    "zenith": "./bin/zenith"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
     }
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "dev": "bun dev",
+    "build": "bun build",
+    "start": "bun run build && bun run dev",
+    "test": "bun test",
+    "release": "bun run scripts/release.ts",
+    "release:dry": "bun run scripts/release.ts --dry-run",
+    "release:patch": "bun run scripts/release.ts --bump=patch",
+    "release:minor": "bun run scripts/release.ts --bump=minor",
+    "release:major": "bun run scripts/release.ts --bump=major"
+  },
+  "keywords": [
+    "zenith",
+    "cli",
+    "framework",
+    "ssg",
+    "ssr"
+  ],
+  "author": "Zenith Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:zenithbuild/zenith-cli.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": false,
+  "peerDependencies": {
+    "@zenithbuild/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "picocolors": "^1.0.0"
+  }
 }
