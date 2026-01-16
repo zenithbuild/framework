@@ -405,7 +405,10 @@ async function setGitHubOutput(name: string, value: string): Promise<void> {
   const outputFile = process.env.GITHUB_OUTPUT;
   if (outputFile) {
     const output = `${name}=${value}\n`;
-    await Bun.write(outputFile, output, { append: true });
+    // Use Node.js appendFileSync for reliable GitHub Actions output
+    const { appendFileSync } = await import("fs");
+    appendFileSync(outputFile, output);
+    log(`Set output: ${name}=${value}`, "info");
   }
 }
 
