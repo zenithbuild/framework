@@ -140,10 +140,10 @@ async function getLastTag(): Promise<string | null> {
   }
 }
 
-async function tagExists(tag: string): Promise<boolean> {
+async function tagExists(version: string): Promise<boolean> {
   try {
-    await $`git rev-parse --verify refs/tags/${tag} 2>/dev/null`.quiet();
-    return true;
+    const result = await $`git tag -l "v${version}"`.text();
+    return result.trim() !== "";
   } catch {
     return false;
   }
@@ -491,10 +491,9 @@ async function main(): Promise<void> {
   const newVersion = bumpVersion(packageJson.version, determinedBumpType);
   log(`New version: ${newVersion}`, "success");
 
-  // Check if this version was already released
-  const newTag = `${config.tagPrefix}${newVersion}`;
-  if (await tagExists(newTag)) {
-    log(`Tag ${newTag} already exists. Skipping release to prevent duplicates.`, "warn");
+  // Check if this version already exists as a tag (fallback to prevent duplicates)
+  if (await tagExists(newVersion)) {
+    log(`Version v${newVersion} already exists as a tag. Skipping release.`, "warn");
     await setGitHubOutput("should_release", "false");
     return;
   }

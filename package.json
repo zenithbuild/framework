@@ -22,7 +22,12 @@
         "dev": "bun dev",
         "build": "bun build",
         "start": "bun run build && bun run dev",
-        "test": "bun test"
+        "test": "bun test",
+        "release": "bun run scripts/release.ts",
+        "release:dry": "bun run scripts/release.ts --dry-run",
+        "release:patch": "bun run scripts/release.ts --bump=patch",
+        "release:minor": "bun run scripts/release.ts --bump=minor",
+        "release:major": "bun run scripts/release.ts --bump=major"
     },
     "keywords": [
         "zenith",
@@ -36,6 +41,9 @@
     "repository": {
         "type": "git",
         "url": "git@github.com:zenithbuild/zenith-cli.git"
+    },
+    "publishConfig": {
+        "access": "public"
     },
     "private": false,
     "peerDependencies": {
