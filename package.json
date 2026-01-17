@@ -47,7 +47,7 @@
   },
   "private": false,
   "peerDependencies": {
-    "@zenithbuild/core": "^0.1.0"
+    "@zenithbuild/core": "^1.2.1"
   },
   "devDependencies": {
     "@types/bun": "latest"
