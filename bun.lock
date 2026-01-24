@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@zenith/cli",
+      "name": "@zenithbuild/cli",
       "dependencies": {
         "picocolors": "^1.0.0",
       },

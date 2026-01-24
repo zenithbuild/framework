@@ -42,9 +42,6 @@
     "type": "git",
     "url": "git@github.com:zenithbuild/zenith-cli.git"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "private": false,
   "peerDependencies": {
     "@zenithbuild/core": "^1.2.1"
