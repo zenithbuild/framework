@@ -129,7 +129,14 @@ jobs:
             # Match changed files to packages
             CHANGED_PKGS=""
             for pkg in $PACKAGES; do
-              if echo "$CHANGED_FILES" | grep -q "^$pkg/"; then
+              MATCHED=false
+              if [ "$pkg" = "." ]; then
+                if [ -n "$CHANGED_FILES" ]; then MATCHED=true; fi
+              elif echo "$CHANGED_FILES" | grep -q "^$pkg/"; then
+                MATCHED=true
+              fi
+
+              if [ "$MATCHED" = "true" ]; then
                 if [ -z "$CHANGED_PKGS" ]; then
                   CHANGED_PKGS="\"$pkg\""
                 else
