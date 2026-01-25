@@ -1,10 +1,13 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "0.4.1",
+  "version": "0.4.6",
   "description": "CLI for Zenith framework - dev server, build tools, and plugin management",
   "type": "module",
   "bin": {
-    "zenith": "./bin/zenith"
+    "zenith": "./dist/zenith.js",
+    "zen-dev": "./dist/zen-dev.js",
+    "zen-build": "./dist/zen-build.js",
+    "zen-preview": "./dist/zen-preview.js"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -19,8 +22,8 @@
     "src"
   ],
   "scripts": {
-    "dev": "bun dev",
-    "build": "bun build",
+    "dev": "bun run build && bin/zenith.ts dev",
+    "build": "bun build bin/zenith.ts bin/zen-dev.ts bin/zen-build.ts bin/zen-preview.ts --outdir dist --target bun --bundle && for f in dist/*.js; do echo '#!/usr/bin/env bun' | cat - \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\" && chmod +x \"$f\"; done",
     "start": "bun run build && bun run dev",
     "test": "bun test",
     "release": "bun run scripts/release.ts",
@@ -42,14 +45,19 @@
     "type": "git",
     "url": "git@github.com:zenithbuild/zenith-cli.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "private": false,
   "peerDependencies": {
-    "@zenithbuild/core": "^1.2.1"
+    "@zenithbuild/core": "latest"
   },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "dependencies": {
+    "@zenithbuild/compiler": "latest",
+    "@zenithbuild/router": "latest",
     "picocolors": "^1.0.0"
   }
 }
