@@ -50,14 +50,14 @@
   },
   "private": false,
   "peerDependencies": {
-    "@zenithbuild/core": "latest"
+    "@zenithbuild/core": "^1.2.13"
   },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "latest",
-    "@zenithbuild/router": "latest",
+    "@zenithbuild/compiler": "^1.0.14",
+    "@zenithbuild/router": "^1.0.7",
     "picocolors": "^1.0.0"
   }
 }

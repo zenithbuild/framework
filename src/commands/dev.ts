@@ -118,11 +118,11 @@ export async function dev(options: DevOptions = {}): Promise<void> {
     let compiledCss = ''
 
     if (globalsCssPath) {
-        console.log('[Zenith] Compiling CSS:', path.relative(rootDir, globalsCssPath))
+        logger.debug(`Compiling CSS: ${path.relative(rootDir, globalsCssPath)}`)
         const cssResult = await compileCssAsync({ input: globalsCssPath, output: ':memory:' })
         if (cssResult.success) {
             compiledCss = cssResult.css
-            console.log(`[Zenith] CSS compiled in ${cssResult.duration}ms`)
+            logger.debug(`CSS compiled in ${cssResult.duration}ms`)
         } else {
             console.error('[Zenith] CSS compilation failed:', cssResult.error)
         }
@@ -337,7 +337,7 @@ export async function dev(options: DevOptions = {}): Promise<void> {
 
             // Upgrade to WebSocket for HMR
             if (pathname === '/hmr') {
-                const upgraded = server.upgrade(req)
+                const upgraded = server.upgrade(req, { data: { timestamp: Date.now() } as any })
                 if (upgraded) return undefined
             }
 

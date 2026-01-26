@@ -44,3 +44,9 @@ export function route(method: string, path: string, status: number, totalMs: num
         `${pc.dim(`(compile: ${compileMs}ms, render: ${renderMs}ms)`)}`
     )
 }
+
+export function debug(message: string): void {
+    if (process.env.ZENITH_DEBUG === 'true') {
+        console.log(`${pc.gray('[debug]')} ${message}`)
+    }
+}
