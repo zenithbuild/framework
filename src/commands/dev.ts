@@ -77,7 +77,7 @@ export async function dev(options: DevOptions = {}): Promise<void> {
     // Clear any previously registered hooks (important for restarts)
     clearHooks()
 
-    console.log('[Zenith] Config plugins:', config.plugins?.length ?? 0)
+
 
     // ============================================
     // Plugin Registration (Unconditional)
@@ -85,7 +85,7 @@ export async function dev(options: DevOptions = {}): Promise<void> {
     // CLI registers ALL plugins without checking which ones exist.
     // Each plugin decides what hooks to register.
     for (const plugin of config.plugins || []) {
-        console.log('[Zenith] Registering plugin:', plugin.name)
+
         registry.register(plugin)
 
         // Let plugin register its CLI hooks (if it wants to)
@@ -217,7 +217,7 @@ export async function dev(options: DevOptions = {}): Promise<void> {
             // Combine: structured imports first, then cleaned script body
             const fullScript = (result.finalized.npmImports || '') + '\n\n' + jsWithoutImports
 
-            console.log('[Dev] Page Imports:', result.finalized.npmImports ? result.finalized.npmImports.split('\n').length : 0, 'lines')
+
 
             // Bundle ONLY if compiler emitted a BundlePlan (no inference)
             let bundledScript = fullScript
@@ -450,7 +450,7 @@ function findPageForRoute(route: string, pagesDir: string): string | null {
         const staticPart = segments.slice(0, i).join('/')
         const baseDir = staticPart ? path.join(pagesDir, staticPart) : pagesDir
 
-        // console.log(`[ZenithDev] Checking level ${i}: baseDir=${baseDir}`)
+
 
         // Check for [slug].zen (single segment catch)
         const singleDynamicPath = path.join(baseDir, '[slug].zen')
@@ -459,7 +459,7 @@ function findPageForRoute(route: string, pagesDir: string): string | null {
         // Check for [...slug].zen (catch-all)
         const catchAllPath = path.join(baseDir, '[...slug].zen')
         if (fs.existsSync(catchAllPath)) {
-            console.log(`[ZenithDev] MATCH! Found ${catchAllPath}`)
+
             return catchAllPath
         }
     }
