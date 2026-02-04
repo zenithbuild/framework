@@ -10,6 +10,7 @@ import { build, type BuildOptions } from './build'
 import { add, type AddOptions } from './add'
 import { remove } from './remove'
 import { create } from './create'
+import { lint, type LintOptions } from './lint'
 import * as logger from '../utils/logger'
 
 export interface Command {
@@ -83,6 +84,17 @@ export const commands: Command[] = [
                 process.exit(1)
             }
             await remove(pluginName)
+        }
+    },
+    {
+        name: 'lint',
+        description: 'Audit project for Zenith Contract compliance',
+        usage: 'zenith lint [--fix]',
+        async run(args, options) {
+            const opts: LintOptions = {}
+            if (options.fix) opts.fix = true
+            if (options.incremental) opts.incremental = true
+            await lint(args, opts)
         }
     }
 ]

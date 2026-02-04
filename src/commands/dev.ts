@@ -24,6 +24,7 @@ import { serve, type ServerWebSocket } from 'bun'
 import { requireProject } from '../utils/project'
 import * as logger from '../utils/logger'
 import * as brand from '../utils/branding'
+import { generateRuntime, type ZenManifest } from '@zenithbuild/bundler'
 import {
     compileZenSource,
     discoverLayouts,
@@ -61,7 +62,7 @@ const pageCache = new Map<string, CompiledPage>()
  * Bundle page script using Rolldown to resolve npm imports at compile time.
  * Only called when compiler emits a BundlePlan - bundler performs no inference.
  */
-import { bundlePageScript, type BundlePlan, generateRouteDefinition } from '@zenithbuild/compiler'
+import { bundlePageScript, type BundlePlan, generateRouteDefinition } from '../../../zenith-compiler/dist/index.js'
 
 export async function dev(options: DevOptions = {}): Promise<void> {
     const project = requireProject()
@@ -155,86 +156,23 @@ export async function dev(options: DevOptions = {}): Promise<void> {
             const layouts = discoverLayouts(layoutsDir)
             const source = fs.readFileSync(pagePath, 'utf-8')
 
-            let processedSource = source
-            let layoutToUse = layouts.get('DefaultLayout')
-
-            if (layoutToUse) processedSource = processLayout(source, layoutToUse)
-
-            const result = await compileZenSource(processedSource, pagePath, {
-                componentsDir: fs.existsSync(componentsDir) ? componentsDir : undefined
+            const result = await compileZenSource(source, pagePath, {
+                componentsDir: fs.existsSync(componentsDir) ? componentsDir : undefined,
+                components: layouts
             })
-            if (!result.finalized) throw new Error('Compilation failed')
+            if (!result.finalized || !result.finalized.manifest) throw new Error('Compilation failed')
 
             const routeDef = generateRouteDefinition(pagePath, pagesDir)
 
-
-
-            // Safely strip imports from the top of the script
-            // This relies on the fact that duplicate imports (from Rust codegen)
-            // appear at the beginning of result.finalized.js
-            let jsLines = result.finalized.js.split('\n')
-
-            // Remove lines from top that are imports, whitespace, or comments
-            while (jsLines.length > 0 && jsLines[0] !== undefined) {
-                const line = jsLines[0].trim()
-                if (
-                    line.startsWith('import ') ||
-                    line === '' ||
-                    line.startsWith('//') ||
-                    line.startsWith('/*') ||
-                    line.startsWith('*')
-                ) {
-                    jsLines.shift()
-                } else {
-                    break
-                }
-            }
-
-            let jsWithoutImports = jsLines.join('\n')
-
-            // PATCH: Fix unquoted keys with dashes (Rust codegen bug in jsx_lowerer)
-            // e.g. stroke-width: "1.5" -> "stroke-width": "1.5"
-            // We only apply this to the JS portions (Script and Expressions)
-            // to avoid corrupting the Styles section.
-            const stylesMarker = '// 6. Styles injection'
-            const parts = jsWithoutImports.split(stylesMarker)
-
-            if (parts.length > 1) {
-                // Apply patch only to the JS part
-                parts[0] = parts[0]!.replace(
-                    /(^|[{,])\s*([a-zA-Z][a-zA-Z0-9-]*-[a-zA-Z0-9-]*)\s*:/gm,
-                    '$1"$2":'
-                )
-                jsWithoutImports = parts.join(stylesMarker)
-            } else {
-                // Fallback if marker not found
-                jsWithoutImports = jsWithoutImports.replace(
-                    /(^|[{,])\s*([a-zA-Z][a-zA-Z0-9-]*-[a-zA-Z0-9-]*)\s*:/gm,
-                    '$1"$2":'
-                )
-            }
-
-            // Combine: structured imports first, then cleaned script body
-            const fullScript = (result.finalized.npmImports || '') + '\n\n' + jsWithoutImports
-
-
-
-            // Bundle ONLY if compiler emitted a BundlePlan (no inference)
-            let bundledScript = fullScript
-            if (result.finalized.bundlePlan) {
-                // Compiler decided bundling is needed - pass plan with proper resolve roots
-                const plan: BundlePlan = {
-                    ...result.finalized.bundlePlan,
-                    entry: fullScript,
-                    resolveRoots: [path.join(rootDir, 'node_modules'), 'node_modules']
-                }
-                bundledScript = await bundlePageScript(plan)
-            }
+            // Use the new bundler to generate the runtime + author script
+            // This replaces all the manual regex patching and string concatenation
+            const manifest: ZenManifest = result.finalized.manifest
+            const { code } = generateRuntime(manifest, true)
 
             return {
                 html: result.finalized.html,
-                script: bundledScript,
-                styles: result.finalized.styles,
+                script: code,
+                styles: [], // Styles are now injected via the script
                 route: routeDef.path,
                 lastModified: Date.now()
             }
@@ -245,22 +183,15 @@ export async function dev(options: DevOptions = {}): Promise<void> {
     }
 
     /**
-     * Generate dev HTML with plugin data envelope
-     * 
-     * CLI collects payloads from plugins via 'cli:runtime:collect' hook.
-     * It serializes blindly - never inspecting what's inside.
+     * Generate dev HTML
      */
     async function generateDevHTML(page: CompiledPage): Promise<string> {
-        // Single neutral injection point
-        const runtimeTag = `<script src="/runtime.js"></script>`
         const scriptTag = `<script type="module">\n${page.script}\n</script>`
-        const allScripts = `${runtimeTag}\n${scriptTag}`
 
         let html = page.html.includes('</body>')
-            ? page.html.replace('</body>', `${allScripts}\n</body>`)
-            : `${page.html}\n${allScripts}`
+            ? page.html.replace('</body>', `${scriptTag}\n</body>`)
+            : `${page.html}\n${scriptTag}`
 
-        // Ensure DOCTYPE is present to prevent Quirks Mode (critical for SVG namespace)
         if (!html.trimStart().toLowerCase().startsWith('<!doctype')) {
             html = `<!DOCTYPE html>\n${html}`
         }
