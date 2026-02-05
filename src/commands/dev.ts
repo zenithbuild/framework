@@ -25,24 +25,25 @@ import { requireProject } from '../utils/project'
 import * as logger from '../utils/logger'
 import * as brand from '../utils/branding'
 import { generateRuntime, type ZenManifest } from '@zenithbuild/bundler'
+import { compile } from '@zenithbuild/compiler'
+import { discoverLayouts } from '@zenithbuild/compiler/layouts'
+import { processLayout } from '@zenithbuild/compiler/transform'
+import { generateBundleJS } from '@zenithbuild/compiler/runtime'
+import { loadZenithConfig } from '@zenithbuild/compiler/config'
 import {
-    compileZenSource,
-    discoverLayouts,
-    processLayout,
-    generateBundleJS,
-    loadZenithConfig,
     PluginRegistry,
     createPluginContext,
-    getPluginDataByNamespace,
-    compileCssAsync,
-    resolveGlobalsCss,
+    getPluginDataByNamespace
+} from '@zenithbuild/compiler/registry'
+import { compileCssAsync, resolveGlobalsCss } from '@zenithbuild/compiler/css'
+import {
     createBridgeAPI,
     runPluginHooks,
     collectHookReturns,
     buildRuntimeEnvelope,
-    clearHooks,
-    type HookContext
-} from '@zenithbuild/compiler'
+    clearHooks
+} from '@zenithbuild/compiler/plugins'
+import type { HookContext } from '@zenithbuild/compiler/plugins'
 
 export interface DevOptions {
     port?: number
@@ -62,7 +63,9 @@ const pageCache = new Map<string, CompiledPage>()
  * Bundle page script using Rolldown to resolve npm imports at compile time.
  * Only called when compiler emits a BundlePlan - bundler performs no inference.
  */
-import { bundlePageScript, type BundlePlan, generateRouteDefinition } from '../../../zenith-compiler/dist/index.js'
+import { bundlePageScript } from '@zenithbuild/compiler/bundler'
+import { generateRouteDefinition } from '@zenithbuild/compiler/bundler'
+import type { BundlePlan } from '@zenithbuild/compiler'
 
 export async function dev(options: DevOptions = {}): Promise<void> {
     const project = requireProject()
@@ -156,7 +159,7 @@ export async function dev(options: DevOptions = {}): Promise<void> {
             const layouts = discoverLayouts(layoutsDir)
             const source = fs.readFileSync(pagePath, 'utf-8')
 
-            const result = await compileZenSource(source, pagePath, {
+            const result = await compile(source, pagePath, {
                 componentsDir: fs.existsSync(componentsDir) ? componentsDir : undefined,
                 components: layouts
             })
