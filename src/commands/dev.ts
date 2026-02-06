@@ -208,11 +208,31 @@ export async function dev(options: DevOptions = {}): Promise<void> {
      * Generate dev HTML
      */
     async function generateDevHTML(page: CompiledPage): Promise<string> {
-        const scriptTag = `<script type="module">\n${page.script}\n</script>`
+        // Injection Block
+        const injection = `
+    <!-- Zenith Dev Injection -->
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script>window.zenith = window.zenith || {};</script>
+    <script src="/runtime.js"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "zenith:core": "/zenith-core.js",
+        "@zenithbuild/core": "/zenith-core.js",
+        "@zenithbuild/runtime": "/zenith-core.js",
+        "@zenithbuild/router": "/zenith-router.js",
+        "gsap": "https://esm.sh/gsap"
+      }
+    }
+    </script>
+    <script type="module">
+${page.script}
+    </script>
+        `;
 
         let html = page.html.includes('</body>')
-            ? page.html.replace('</body>', `${scriptTag}\n</body>`)
-            : `${page.html}\n${scriptTag}`
+            ? page.html.replace('</body>', `${injection}\n</body>`)
+            : `${page.html}\n${injection}`
 
         if (!html.trimStart().toLowerCase().startsWith('<!doctype')) {
             html = `<!DOCTYPE html>\n${html}`
@@ -295,6 +315,27 @@ export async function dev(options: DevOptions = {}): Promise<void> {
             }
 
             // Handle Zenith assets
+            // 1. Intercept /assets/ requests and serve from disk (dist/assets or src/dist/assets)
+            if (pathname.startsWith('/assets/')) {
+                // Try standard dist/
+                let assetPath = path.join(rootDir, 'dist', pathname);
+                if (!fs.existsSync(assetPath)) {
+                    // Try src/dist/ (current project structure)
+                    assetPath = path.join(rootDir, 'src', 'dist', pathname);
+                }
+
+                if (fs.existsSync(assetPath)) {
+                    const content = fs.readFileSync(assetPath);
+                    const contentType = ext === '.css' ? 'text/css' :
+                        ext === '.js' ? 'application/javascript' :
+                            'application/octet-stream';
+
+                    return new Response(content, {
+                        headers: { 'Content-Type': contentType }
+                    });
+                }
+            }
+
             if (pathname === '/runtime.js') {
                 // Collect runtime payloads from ALL plugins
                 const payloads = await collectHookReturns('cli:runtime:collect', hookCtx)
@@ -307,8 +348,41 @@ export async function dev(options: DevOptions = {}): Promise<void> {
                 return response
             }
 
-            // Serve compiler-owned CSS (Tailwind compiled)
-            if (pathname === '/assets/styles.css') {
+            // DYNAMIC BUNDLING: Serve Core and Router directly from node_modules
+            if (pathname === '/zenith-core.js') {
+                try {
+                    const entry = require.resolve('@zenithbuild/core'); // or runtime/index.ts
+                    const build = await Bun.build({
+                        entrypoints: [entry],
+                        external: ['@zenithbuild/router'], // keep router external so it uses the map
+                        target: "browser",
+                        format: "esm"
+                    });
+                    if (build.success) {
+                        return new Response(build.outputs[0]);
+                    }
+                } catch (e) {
+                    logger.error('Failed to bundle zenith-core: ' + e);
+                }
+            }
+            if (pathname === '/zenith-router.js') {
+                try {
+                    const entry = require.resolve('@zenithbuild/router');
+                    const build = await Bun.build({
+                        entrypoints: [entry],
+                        target: "browser",
+                        format: "esm"
+                    });
+                    if (build.success) {
+                        return new Response(build.outputs[0]);
+                    }
+                } catch (e) {
+                    logger.error('Failed to bundle zenith-router: ' + e);
+                }
+            }
+
+            // Fallback: Serve compiler-owned CSS (Tailwind compiled) from memory if not on disk
+            if (pathname === '/assets/styles.css' && compiledCss) {
                 const response = new Response(compiledCss, {
                     headers: { 'Content-Type': 'text/css; charset=utf-8' }
                 })

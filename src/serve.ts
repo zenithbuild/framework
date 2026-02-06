@@ -15,6 +15,15 @@ import { serve } from "bun"
 import path from "path"
 
 const distDir = path.resolve(process.cwd(), "dist")
+const srcDistDir = path.resolve(process.cwd(), "src/dist")
+
+// Determine which dist to use
+const finalDistDir = (await Bun.file(path.join(distDir, "index.html")).exists())
+    ? distDir
+    : (await Bun.file(path.join(srcDistDir, "index.html")).exists())
+        ? srcDistDir
+        : distDir // Fallback to root dist
+
 
 // File extensions that should be served as static assets
 const STATIC_EXTENSIONS = new Set([
@@ -42,49 +51,47 @@ serve({
         const url = new URL(req.url)
         const pathname = url.pathname
 
-        // Get file extension
-        const ext = path.extname(pathname).toLowerCase()
-
-        // Check if this is a static asset request
-        if (STATIC_EXTENSIONS.has(ext)) {
-            const filePath = path.join(distDir, pathname)
-            const file = Bun.file(filePath)
-
-            // Check if file exists
+        // 1. Root Route -> dist/index.html
+        if (pathname === "/" || pathname === "/index.html") {
+            const indexPath = path.join(finalDistDir, "index.html")
+            const file = Bun.file(indexPath)
             if (await file.exists()) {
-                return new Response(file)
+                return new Response(file, {
+                    headers: { "Content-Type": "text/html; charset=utf-8" }
+                })
             }
-
-            // Static file not found
-            return new Response("Not found", { status: 404 })
-        }
-
-        // For all other routes, serve index.html (SPA fallback)
-        const indexPath = path.join(distDir, "index.html")
-        const indexFile = Bun.file(indexPath)
-
-        if (await indexFile.exists()) {
-            return new Response(indexFile, {
-                headers: {
-                    "Content-Type": "text/html; charset=utf-8"
+            // No index.html found - likely need to run build first
+            return new Response(
+                `<html>
+            <head><title>Zenith - Build Required</title></head>
+            <body style="font-family: system-ui; padding: 2rem; text-align: center;">
+            <h1>Build Required</h1>
+            <p>Run <code>zenith build</code> first to compile the pages.</p>
+            <p>Checked: ${finalDistDir}</p>
+            </body>
+        </html>`,
+                {
+                    status: 500,
+                    headers: { "Content-Type": "text/html; charset=utf-8" }
                 }
-            })
+            )
         }
 
-        // No index.html found - likely need to run build first
-        return new Response(
-            `<html>
-        <head><title>Zenith - Build Required</title></head>
-        <body style="font-family: system-ui; padding: 2rem; text-align: center;">
-          <h1>Build Required</h1>
-          <p>Run <code>zenith build</code> first to compile the pages.</p>
-        </body>
-      </html>`,
-            {
-                status: 500,
-                headers: { "Content-Type": "text/html; charset=utf-8" }
-            }
-        )
+        // 2. Static Assets (js, css, etc.)
+        const filePath = path.join(finalDistDir, pathname)
+        const file = Bun.file(filePath)
+
+        if (await file.exists()) {
+            // Force correct MIME types for critical files
+            const headers = new Headers();
+            if (pathname.endsWith(".css")) headers.set("Content-Type", "text/css");
+            if (pathname.endsWith(".js")) headers.set("Content-Type", "application/javascript");
+
+            return new Response(file, { headers })
+        }
+
+        // 3. 404 - Not Found (Do not fallback to SPA yet to verify strict static serving)
+        return new Response("Not Found", { status: 404 })
     }
 })
 

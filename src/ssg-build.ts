@@ -24,6 +24,7 @@
  */
 
 import fs from "fs"
+import path from 'path'
 import { compile } from "@zenithbuild/compiler"
 import { discoverComponents } from "./discovery/componentDiscovery"
 import { discoverPages, generateRouteDefinition } from "@zenithbuild/router/manifest"
