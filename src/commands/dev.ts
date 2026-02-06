@@ -24,18 +24,25 @@ import { serve, type ServerWebSocket } from 'bun'
 import { requireProject } from '../utils/project'
 import * as logger from '../utils/logger'
 import * as brand from '../utils/branding'
-import { generateRuntime, type ZenManifest } from '@zenithbuild/bundler'
+import {
+    generateRuntime,
+    generateBundleJS,
+    compileCssAsync,
+    resolveGlobalsCss,
+    bundlePageScript
+} from '@zenithbuild/bundler'
+import type { ZenManifest } from '@zenithbuild/bundler'
+import { generateRouteDefinition } from '@zenithbuild/router/manifest'
 import { compile } from '@zenithbuild/compiler'
-import { discoverLayouts } from '@zenithbuild/compiler/layouts'
+import { discoverLayouts } from '../discovery/layouts.ts'
+import { discoverComponents } from '../discovery/componentDiscovery.ts'
 import { processLayout } from '@zenithbuild/compiler/transform'
-import { generateBundleJS } from '@zenithbuild/compiler/runtime'
 import { loadZenithConfig } from '@zenithbuild/compiler/config'
 import {
     PluginRegistry,
     createPluginContext,
     getPluginDataByNamespace
 } from '@zenithbuild/compiler/registry'
-import { compileCssAsync, resolveGlobalsCss } from '@zenithbuild/compiler/css'
 import {
     createBridgeAPI,
     runPluginHooks,
@@ -63,8 +70,6 @@ const pageCache = new Map<string, CompiledPage>()
  * Bundle page script using Rolldown to resolve npm imports at compile time.
  * Only called when compiler emits a BundlePlan - bundler performs no inference.
  */
-import { bundlePageScript } from '@zenithbuild/compiler/bundler'
-import { generateRouteDefinition } from '@zenithbuild/compiler/bundler'
 import type { BundlePlan } from '@zenithbuild/compiler'
 
 export async function dev(options: DevOptions = {}): Promise<void> {
@@ -157,19 +162,33 @@ export async function dev(options: DevOptions = {}): Promise<void> {
             const layoutsDir = path.join(pagesDir, '../layouts')
             const componentsDir = path.join(pagesDir, '../components')
             const layouts = discoverLayouts(layoutsDir)
+
+            // Manual component discovery since compiler is pure
+            const components = new Map<string, any>([...layouts])
+            if (fs.existsSync(componentsDir)) {
+                const discovered = discoverComponents(componentsDir)
+                for (const [k, v] of discovered) {
+                    components.set(k, v)
+                }
+            }
+
             const source = fs.readFileSync(pagePath, 'utf-8')
 
             const result = await compile(source, pagePath, {
-                componentsDir: fs.existsSync(componentsDir) ? componentsDir : undefined,
-                components: layouts
+                components: components
             })
             if (!result.finalized || !result.finalized.manifest) throw new Error('Compilation failed')
+
 
             const routeDef = generateRouteDefinition(pagePath, pagesDir)
 
             // Use the new bundler to generate the runtime + author script
             // This replaces all the manual regex patching and string concatenation
-            const manifest: ZenManifest = result.finalized.manifest
+            const manifest: ZenManifest = {
+                routes: [routeDef],
+                layouts: {}, // Dev server handles layouts dynamically
+                components: {}
+            }
             const { code } = generateRuntime(manifest, true)
 
             return {
