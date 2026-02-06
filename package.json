@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "1.3.17",
+  "version": "1.3.18",
   "description": "CLI for Zenith framework - dev server, build tools, and plugin management",
   "type": "module",
   "bin": {

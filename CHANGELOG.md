@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.18] - 2026-02-06
+
+### 🐛 Bug Fixes
+
+- ****cli**: serve static files from dist** (20cbc50)
+
+### 📝 Other Changes
+
+- **
+8274a9ebe70d4a70d4928a8b06ca8846598cc70d** ()
+  > chore: update dependencies and version for release
+- **
+39b42fe4901cae2ddb7957052c4acc8194df84df** ()
+  > ssh 0531
+- **
+45abce06968e8a95d70274d28e22db7e57d9b9d0** ()
+  > ssh 0531
+- **
+1ea1e515a332d79049702062f1a084f46c32459d** ()
+  > Update to version
+- **
+5813e0a268d98c92f981aaf5ef5b227ac4beb303** ()
+  > chore: bump version to 1.3.1 and synchronize compiler dependency
+- **
+822dc8c16a1fa217ddbc68149fb797437a299570** ()
+  > feat(dev-server): implement Phase 6 - Zero-Copy Dev Server Integration|Implement a high-performance, in-memory development server architecture for the Zenith Framework.
+  > 
+  > - Phase 6 integration of Dev Server and AssetStore.
+  > - NAPI Controller and HMR loop implementation.
+  > - Workspace-wide alignment for Phase 6 completion.
+
 ## [0.4.9] - 2026-01-26
 
 ### 📝 Other Changes
