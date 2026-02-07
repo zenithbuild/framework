@@ -78,6 +78,9 @@ export async function dev(options: DevOptions = {}): Promise<void> {
     const pagesDir = project.pagesDir
     const rootDir = project.root
 
+
+
+
     // Load zenith.config.ts if present
     const config = await loadZenithConfig(rootDir)
     const registry = new PluginRegistry()
@@ -208,18 +211,21 @@ export async function dev(options: DevOptions = {}): Promise<void> {
      * Generate dev HTML
      */
     async function generateDevHTML(page: CompiledPage): Promise<string> {
+        // Strip any existing legacy runtime injection to prevent double-loading and syntax errors
+        // (Compiler or legacy bundler might have injected <script src="/runtime.js"></script>)
+        let cleanHtml = page.html.replace(/<script\s+src=["']\/runtime\.js["']\s*><\/script>/gi, '');
+
         // Injection Block
         const injection = `
     <!-- Zenith Dev Injection -->
     <link rel="stylesheet" href="/assets/styles.css">
-    <script>window.zenith = window.zenith || {};</script>
-    <script src="/runtime.js"></script>
+    <script type="module" src="/runtime.js"></script>
     <script type="importmap">
     {
       "imports": {
-        "zenith:core": "/zenith-core.js",
-        "@zenithbuild/core": "/zenith-core.js",
-        "@zenithbuild/runtime": "/zenith-core.js",
+        "zenith:core": "/runtime.js",
+        "@zenithbuild/core": "/runtime.js",
+        "@zenithbuild/runtime": "/runtime.js",
         "@zenithbuild/router": "/zenith-router.js",
         "gsap": "https://esm.sh/gsap"
       }
@@ -230,15 +236,53 @@ ${page.script}
     </script>
         `;
 
-        let html = page.html.includes('</body>')
-            ? page.html.replace('</body>', `${injection}\n</body>`)
-            : `${page.html}\n${injection}`
+        // Check if we have a valid shell
+        const hasShell = cleanHtml.includes('<html') && cleanHtml.includes('<body');
 
-        if (!html.trimStart().toLowerCase().startsWith('<!doctype')) {
-            html = `<!DOCTYPE html>\n${html}`
+        if (hasShell) {
+            // If shell exists, just inject the scripts/styles
+            let html = cleanHtml.includes('</body>')
+                ? cleanHtml.replace('</body>', `${injection}\n</body>`)
+                : `${cleanHtml}\n${injection}`;
+
+            if (!html.trimStart().toLowerCase().startsWith('<!doctype')) {
+                html = `<!DOCTYPE html>\n${html}`;
+            }
+            return html;
+        } else {
+            // No shell - wrap content in default shell with #app
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zenith Dev</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>body { margin: 0; font-family: system-ui, sans-serif; }</style>
+</head>
+<body>
+    <div id="app">${cleanHtml}</div>
+    <!-- Zenith Dev Injection -->
+    <script type="module" src="/runtime.js"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "zenith:core": "/runtime.js",
+        "@zenithbuild/core": "/runtime.js",
+        "@zenithbuild/runtime": "/runtime.js",
+        "@zenithbuild/router": "/zenith-router.js",
+        "gsap": "https://esm.sh/gsap"
+      }
+    }
+    </script>
+    <script type="module">
+${page.script}
+    </script>
+</body>
+</html>`;
         }
 
-        return html
+
     }
 
     // ============================================
@@ -367,11 +411,22 @@ ${page.script}
             }
             if (pathname === '/zenith-router.js') {
                 try {
-                    const entry = require.resolve('@zenithbuild/router');
+                    const entry = require.resolve('@zenithbuild/router/runtime');
                     const build = await Bun.build({
                         entrypoints: [entry],
                         target: "browser",
-                        format: "esm"
+                        format: "esm",
+                        plugins: [{
+                            name: 'mock-native-router',
+                            setup(build) {
+                                build.onLoad({ filter: /zenith-router\/index\.js$/ }, () => {
+                                    return {
+                                        contents: "export default { resolveRouteNative: () => null, generateRuntimeRouterNative: () => '' }; export const resolveRouteNative = () => null; export const generateRuntimeRouterNative = () => '';",
+                                        loader: "js"
+                                    }
+                                })
+                            }
+                        }]
                     });
                     if (build.success) {
                         return new Response(build.outputs[0]);
@@ -453,11 +508,33 @@ ${page.script}
     process.on('SIGINT', () => {
         watcher.close()
         server.stop()
+
+        // Robust Cleanup
+        logger.info('Shutting down development server...')
+
+        if (process.platform === 'win32') {
+            try {
+                // Windows: Taskkill /F (force) /T (tree) to get all children
+                require('child_process').execSync(`taskkill /pid ${process.pid} /T /F`);
+            } catch (e) {
+                // Ignore "process not found" if it already exited
+            }
+        } else {
+            // Posix: Kill process group to ensure children die
+            try {
+                // Use negative PID to kill the process group
+                process.kill(-process.pid, 'SIGINT');
+            } catch (e) {
+                // Fallback to standard exit if setpgrp wasn't used or permission denied
+                process.exit(0);
+            }
+        }
         process.exit(0)
     })
 
     await new Promise(() => { })
 }
+
 
 function findPageForRoute(route: string, pagesDir: string): string | null {
     // 1. Try exact match first (e.g., /about -> about.zen)
