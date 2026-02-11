@@ -16,7 +16,7 @@ async function createTestProject(files) {
     for (const file of files) {
         const fullPath = join(pagesDir, file);
         await mkdir(join(fullPath, '..'), { recursive: true });
-        await writeFile(fullPath, `<!-- ${file} -->`);
+        await writeFile(fullPath, `<div>${file}</div>`);
     }
 
     return { root, pagesDir, outDir };

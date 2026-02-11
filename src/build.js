@@ -19,6 +19,7 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { generateManifest } from './manifest.js';
+import { compile } from '@zenithbuild/compiler';
 
 /**
  * @typedef {{ html: string, js?: string, css?: string, hasExpressions: boolean }} PageBundle
@@ -26,19 +27,23 @@ import { generateManifest } from './manifest.js';
  */
 
 /**
- * Default stub compiler — returns a minimal IR.
- * Will be replaced with @zenithbuild/compiler in integration phase.
+ * Compiler bridge invocation.
+ * Calls the sealed Rust-backed compiler package.
  *
  * @param {string} filePath
  * @returns {Promise<object>}
  */
-export async function stubCompile(filePath) {
+export async function bridgeCompile(filePath) {
+    const output = compile(filePath);
     return {
         file: filePath,
-        ir: { type: 'page', file: filePath },
-        hasExpressions: false
+        ir: output,
+        hasExpressions: Array.isArray(output.expressions) && output.expressions.length > 0
     };
 }
+
+// Backward-compatible alias for existing imports.
+export const stubCompile = bridgeCompile;
 
 /**
  * Default stub bundler — returns static HTML.
@@ -104,7 +109,7 @@ export function routeToOutputPath(routePath) {
  */
 export async function build(options) {
     const { pagesDir, outDir, config = {} } = options;
-    const compile = options.toolchain?.compile || stubCompile;
+    const compilePage = options.toolchain?.compile || bridgeCompile;
     const bundle = options.toolchain?.bundle || stubBundle;
 
     // Clean output directory
@@ -119,7 +124,7 @@ export async function build(options) {
 
     for (const entry of manifest) {
         // 1. Compile
-        const ir = await compile(join(pagesDir, entry.file));
+        const ir = await compilePage(join(pagesDir, entry.file));
 
         // 2. Bundle
         const result = await bundle(ir);
