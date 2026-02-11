@@ -7,3 +7,4 @@ bun.lockb
 .env
 .env.*
 !.env.example
+bun.lock

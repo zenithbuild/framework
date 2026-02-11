@@ -1,66 +1,25 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "1.3.18",
-  "description": "CLI for Zenith framework - dev server, build tools, and plugin management",
-  "type": "module",
-  "bin": {
-    "zenith": "./dist/zenith.js",
-    "zen-dev": "./dist/zen-dev.js",
-    "zen-build": "./dist/zen-build.js",
-    "zen-preview": "./dist/zen-preview.js"
-  },
-  "main": "./dist/index.js",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.d.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "files": [
-    "bin",
-    "src"
-  ],
-  "scripts": {
-    "dev": "bun run build && bin/zenith.ts dev",
-    "build": "bun build bin/zenith.ts bin/zen-dev.ts bin/zen-build.ts bin/zen-preview.ts --outdir dist --target bun --bundle && cp ../zenith-router/zenith-router.node dist/ && for f in dist/*.js; do echo '#!/usr/bin/env bun' | cat - \"$f\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\" && chmod +x \"$f\"; done",
-    "start": "bun run build && bun run dev",
-    "test": "bun test",
-    "release": "bun run scripts/release.ts",
-    "release:dry": "bun run scripts/release.ts --dry-run",
-    "release:patch": "bun run scripts/release.ts --bump=patch",
-    "release:minor": "bun run scripts/release.ts --bump=minor",
-    "release:major": "bun run scripts/release.ts --bump=major"
-  },
-  "keywords": [
-    "zenith",
-    "cli",
-    "framework",
-    "ssg",
-    "ssr"
-  ],
-  "author": "Zenith Team",
+  "version": "1.0.0",
+  "description": "Deterministic project orchestrator for Zenith framework",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:zenithbuild/zenith-cli.git"
+  "type": "module",
+  "main": "./src/index.js",
+  "bin": {
+    "zenith": "./src/index.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
   },
   "publishConfig": {
     "access": "public"
   },
-  "private": false,
-  "peerDependencies": {
-    "@zenithbuild/core": "^1.3.17",
-    "@zenithbuild/compiler": "^1.3.17"
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.js --forceExit --runInBand"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@zenithbuild/compiler": "^1.3.17"
-  },
-  "dependencies": {
-    "@zenithbuild/bundler": "^1.3.17",
-    "@zenithbuild/router": "^1.3.17",
-    "glob": "^13.0.0",
-    "picocolors": "^1.0.0"
+    "@jest/globals": "^30.2.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0"
   }
 }
