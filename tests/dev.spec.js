@@ -177,6 +177,53 @@ describe('Preview Server', () => {
         const res = await httpGet(`http://localhost:${preview.port}/nothing`);
         expect(res.status).toBe(404);
     });
+
+    test('rewrites dynamic hard-load paths using build router manifest', async () => {
+        project = await createTestProject([
+            'index.zen',
+            'users/[id].zen'
+        ]);
+
+        await writeFile(
+            join(project.pagesDir, 'index.zen'),
+            '<main><a href="/users/42">User</a></main>',
+            'utf8'
+        );
+        await writeFile(
+            join(project.pagesDir, 'users/[id].zen'),
+            '<main><h1 id="user">{params.id}</h1></main>',
+            'utf8'
+        );
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: { router: true }
+        });
+
+        const manifest = JSON.parse(
+            await readFile(join(project.outDir, 'assets', 'router-manifest.json'), 'utf8')
+        );
+        const routePaths = Array.isArray(manifest.routes)
+            ? manifest.routes.map((entry) => entry.path).sort()
+            : [];
+        expect(routePaths).toEqual(['/', '/users/:id']);
+
+        preview = await createPreviewServer({
+            distDir: project.outDir,
+            port: 0
+        });
+
+        const dynamic = await httpGet(`http://localhost:${preview.port}/users/42`);
+        const unknown = await httpGet(`http://localhost:${preview.port}/unknown/42`);
+        const traversal = await httpGet(`http://localhost:${preview.port}/%2e%2e/%2e%2e/etc/passwd`);
+
+        expect(dynamic.status).toBe(200);
+        expect(dynamic.body).toContain('<!DOCTYPE html>');
+        expect(dynamic.body).toContain('data-zx-router');
+        expect(unknown.status).toBe(404);
+        expect(traversal.status).toBe(404);
+    });
 });
 
 describe('Contract Guardrails', () => {
