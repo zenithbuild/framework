@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
-use zenith_compiler::compiler::compile;
+use zenith_compiler::compiler::compile_structured;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -18,9 +18,16 @@ fn main() -> Result<()> {
     let content = fs::read_to_string(&cli.input)
         .with_context(|| format!("Could not read file `{}`", cli.input.display()))?;
 
-    let output = compile(&content);
+    let output = compile_structured(&content);
+    let json = serde_json::json!({
+        "html": output.html,
+        "expressions": output.expressions
+    });
 
-    println!("{}", output);
+    println!(
+        "{}",
+        serde_json::to_string(&json).context("Failed to serialize compiler output to JSON")?
+    );
 
     Ok(())
 }

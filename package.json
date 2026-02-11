@@ -1,0 +1,14 @@
+{
+  "name": "@zenithbuild/compiler",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "COMPILER_JS_BRIDGE_CONTRACT.md"
+  ],
+  "private": false
+}
