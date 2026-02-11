@@ -1,4 +1,4 @@
-use zenith_compiler::compiler::{compile, compile_structured, CompilerOutput};
+use zenith_compiler::compiler::{compile, compile_structured, CompilerOutput, IR_VERSION};
 
 // ============================================================
 // PHASE 13: PUBLIC COMPILER CONTRACT (BUNDLER INTERFACE)
@@ -10,6 +10,7 @@ use zenith_compiler::compiler::{compile, compile_structured, CompilerOutput};
 fn compile_structured_returns_correct_shape() {
     let result = compile_structured("<h1>{title}</h1>");
 
+    assert_eq!(result.ir_version, IR_VERSION);
     assert_eq!(result.expressions, vec!["title"]);
     assert!(result.html.contains("<h1"));
     assert!(result.html.contains("data-zx-e=\"0\""));
@@ -42,11 +43,19 @@ fn compile_structured_expressions_match_compile() {
 
 #[test]
 fn compiler_output_is_sealed_data_only() {
-    // CompilerOutput has exactly 2 fields: html and expressions
+    // CompilerOutput has deterministic data fields only.
     // This test ensures the struct shape at compile time
     let output = CompilerOutput {
+        ir_version: IR_VERSION,
         html: String::from("<div></div>"),
         expressions: vec![],
+        hoisted: Default::default(),
+        components_scripts: Default::default(),
+        component_instances: Default::default(),
+        signals: Default::default(),
+        expression_bindings: Default::default(),
+        marker_bindings: Default::default(),
+        event_bindings: Default::default(),
     };
 
     // Can clone and compare (derives enforced)

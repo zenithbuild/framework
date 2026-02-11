@@ -29,16 +29,26 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Node {
+        while let Token::Text(ref t) = self.current_token {
+            if t.trim().is_empty() {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
         let root = self.parse_node();
 
         // Check for multiple roots or trailing garbage
-        if self.current_token != Token::EOF {
-            // It might be whitespace text?
-            if let Token::Text(ref t) = self.current_token {
-                if t.trim().is_empty() {
-                    return root;
-                }
+        while let Token::Text(ref t) = self.current_token {
+            if t.trim().is_empty() {
+                self.advance();
+            } else {
+                break;
             }
+        }
+
+        if self.current_token != Token::EOF {
             panic!(
                 "Multiple root nodes detected or trailing content: {:?}",
                 self.current_token
