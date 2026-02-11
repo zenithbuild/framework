@@ -1,8 +1,0 @@
-/Users/judahsullivan/Personal/zenith/zenith-compiler/native/compiler-native/target/release/deps/oxc_ast_macros-a17baebb0b74af5e.d: /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/lib.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/ast.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/derived_traits.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/structs.rs
-
-/Users/judahsullivan/Personal/zenith/zenith-compiler/native/compiler-native/target/release/deps/liboxc_ast_macros-a17baebb0b74af5e.dylib: /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/lib.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/ast.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/derived_traits.rs /Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/structs.rs
-
-/Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/lib.rs:
-/Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/ast.rs:
-/Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/derived_traits.rs:
-/Users/judahsullivan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.110.0/src/generated/structs.rs:
