@@ -15,8 +15,7 @@ import { createServer } from 'node:http';
 import { watch } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
-import { generateManifest } from './manifest.js';
-import { build, stubCompile, stubBundle } from './build.js';
+import { build } from './build.js';
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -47,7 +46,7 @@ const HMR_CLIENT_SCRIPT = `
 /**
  * Create and start a development server.
  *
- * @param {{ pagesDir: string, outDir: string, port?: number, config?: object, toolchain?: object }} options
+ * @param {{ pagesDir: string, outDir: string, port?: number, config?: object }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createDevServer(options) {
@@ -55,8 +54,7 @@ export async function createDevServer(options) {
         pagesDir,
         outDir,
         port = 3000,
-        config = {},
-        toolchain = {}
+        config = {}
     } = options;
 
     /** @type {import('http').ServerResponse[]} */
@@ -64,7 +62,7 @@ export async function createDevServer(options) {
     let _watcher = null;
 
     // Initial build
-    await build({ pagesDir, outDir, toolchain, config });
+    await build({ pagesDir, outDir, config });
 
     const server = createServer(async (req, res) => {
         const url = new URL(req.url, `http://localhost:${port}`);
@@ -149,7 +147,7 @@ export async function createDevServer(options) {
                 if (!filename) return;
 
                 // Rebuild
-                await build({ pagesDir, outDir, toolchain, config });
+                await build({ pagesDir, outDir, config });
                 _broadcastReload();
             });
         } catch {
