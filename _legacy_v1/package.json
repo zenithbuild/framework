@@ -1,0 +1,54 @@
+{
+  "name": "@zenithbuild/compiler",
+  "version": "1.3.18",
+  "description": "The Iron Heart: Native Compiler for the Zenith Framework",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./config": "./dist/core/config/loader.js",
+    "./plugins": "./dist/core/plugins/bridge.js",
+    "./registry": "./dist/core/plugins/registry.js",
+    "./transform": "./dist/transform/layoutProcessor.js"
+  },
+  "files": [
+    "dist",
+    "native/compiler-native/index.js",
+    "native/compiler-native/index.d.ts",
+    "native/compiler-native/package.json",
+    "native/compiler-native/*.node"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --skipLibCheck && cd native/compiler-native && bun run build && cp compiler-native.node compiler-native.darwin-arm64.node 2>/dev/null || true",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "esbuild": "^0.20.0",
+    "ws": "^8.16.0",
+    "rolldown": "latest",
+    "@zenithbuild/router": "^1.3.17",
+    "acorn": "^8.15.0",
+    "es-module-lexer": "^2.0.0",
+    "marked": "^17.0.1",
+    "parse5": "^8.0.0",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2",
+    "glob": "^10.3.10"
+  },
+  "peerDependencies": {
+    "@zenithbuild/runtime": "^0.2.0"
+  },
+  "devDependencies": {
+    "@zenithbuild/runtime": "^0.1.9",
+    "@types/node": "^20.11.0",
+    "@types/acorn": "^6.0.4",
+    "@types/marked": "^6.0.0",
+    "@types/parse5": "^7.0.0",
+    "@types/prompts": "^2.4.9",
+    "typescript": "^5.3.3",
+    "bun-types": "latest"
+  }
+}

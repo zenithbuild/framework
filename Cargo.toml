@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "zenith_cli",
+    "zenith_compiler",
+]
+resolver = "2"

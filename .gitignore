@@ -1,5 +1,8 @@
 node_modules
-dist/
+/dist/*
+!/dist/
+!/dist/index.js
+_legacy_v1/dist/
 node_modules/
 .DS_Store
 *.log
