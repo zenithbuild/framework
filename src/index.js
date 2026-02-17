@@ -12,6 +12,7 @@
 
 import { resolve, join } from 'node:path';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 
 const COMMANDS = ['dev', 'build', 'preview'];
 
@@ -51,7 +52,9 @@ export async function cli(args, cwd) {
     }
 
     const projectRoot = resolve(cwd || process.cwd());
-    const pagesDir = join(projectRoot, 'pages');
+    const rootPagesDir = join(projectRoot, 'pages');
+    const srcPagesDir = join(projectRoot, 'src', 'pages');
+    const pagesDir = existsSync(rootPagesDir) ? rootPagesDir : srcPagesDir;
     const outDir = join(projectRoot, 'dist');
     const config = await loadConfig(projectRoot);
 
