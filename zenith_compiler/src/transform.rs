@@ -4,8 +4,8 @@ use regex::Regex;
 
 use crate::ast::{Attribute, ElementNode, Node};
 use crate::script::{
-    ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript,
-    SCRIPT_ID_ATTR, SCRIPT_PLACEHOLDER_TAG,
+    ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript, SCRIPT_ID_ATTR,
+    SCRIPT_PLACEHOLDER_TAG,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +30,13 @@ pub struct EventBinding {
     pub selector: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefBinding {
+    pub index: usize,
+    pub identifier: String,
+    pub selector: String,
+}
+
 pub fn transform(
     root: Node,
     scripts: &[HoistedScript],
@@ -41,11 +48,15 @@ pub fn transform(
     Vec<ComponentInstanceBinding>,
     Vec<MarkerBinding>,
     Vec<EventBinding>,
+    Vec<RefBinding>,
 ) {
     let mut transformer = Transformer::new(scripts);
     let transformed_root = transformer.transform_node(root);
     transformer.markers.sort_by(|a, b| a.index.cmp(&b.index));
     transformer.events.sort_by(|a, b| a.index.cmp(&b.index));
+    transformer
+        .ref_bindings
+        .sort_by(|a, b| a.index.cmp(&b.index));
     (
         transformed_root,
         transformer.expressions,
@@ -54,6 +65,7 @@ pub fn transform(
         transformer.component_instances,
         transformer.markers,
         transformer.events,
+        transformer.ref_bindings,
     )
 }
 
@@ -73,6 +85,8 @@ struct Transformer {
     component_instances: Vec<ComponentInstanceBinding>,
     markers: Vec<MarkerBinding>,
     events: Vec<EventBinding>,
+    ref_bindings: Vec<RefBinding>,
+    ref_counter: usize,
 }
 
 impl Transformer {
@@ -105,6 +119,8 @@ impl Transformer {
             component_instances: Vec::new(),
             markers: Vec::new(),
             events: Vec::new(),
+            ref_bindings: Vec::new(),
+            ref_counter: 0,
         }
     }
 
@@ -115,7 +131,11 @@ impl Transformer {
     }
 
     fn insert_marker(&mut self, marker: MarkerBinding) {
-        if self.markers.iter().any(|existing| existing.index == marker.index) {
+        if self
+            .markers
+            .iter()
+            .any(|existing| existing.index == marker.index)
+        {
             panic!(
                 "Duplicate marker index {} detected during transform",
                 marker.index
@@ -219,6 +239,20 @@ impl Transformer {
                 }
                 Attribute::Static { .. } => {
                     new_attributes.push(attr);
+                }
+                Attribute::Ref { identifier } => {
+                    let ref_index = self.ref_counter;
+                    self.ref_counter += 1;
+                    let selector = format!(r#"[data-zx-r="{}"]"#, ref_index);
+                    self.ref_bindings.push(RefBinding {
+                        index: ref_index,
+                        identifier,
+                        selector,
+                    });
+                    new_attributes.push(Attribute::Static {
+                        name: "data-zx-r".to_string(),
+                        value: ref_index.to_string(),
+                    });
                 }
             }
         }
@@ -334,7 +368,9 @@ impl Transformer {
         for (original, replacement) in &bindings {
             let pattern = Regex::new(&format!(r"\b{}\b", regex::escape(original))).unwrap();
 
-            rewritten = pattern.replace_all(&rewritten, replacement.as_str()).into_owned();
+            rewritten = pattern
+                .replace_all(&rewritten, replacement.as_str())
+                .into_owned();
         }
 
         rewritten

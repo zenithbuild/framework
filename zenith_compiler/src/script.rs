@@ -1,7 +1,7 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::collections::BTreeSet;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 pub const SCRIPT_PLACEHOLDER_TAG: &str = "zenith-script";
@@ -39,6 +39,7 @@ pub enum HoistedBindingKind {
     State,
     Function,
     Const,
+    Ref,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,9 +106,10 @@ impl HoistedOutput {
         for binding in &script.bindings {
             let value = match binding.kind {
                 HoistedBindingKind::Signal => binding.renamed.clone(),
-                HoistedBindingKind::State | HoistedBindingKind::Function | HoistedBindingKind::Const => {
-                    binding.renamed.clone()
-                }
+                HoistedBindingKind::State
+                | HoistedBindingKind::Function
+                | HoistedBindingKind::Const
+                | HoistedBindingKind::Ref => binding.renamed.clone(),
             };
 
             self.state_bindings.push(HoistedStateBinding {
@@ -295,7 +297,11 @@ fn count_script_tag_attr_occurrences(open_tag: &str, attr_name: &str) -> usize {
     re.find_iter(open_tag).count()
 }
 
-fn script_contract_error(source_path: &str, script_id: usize, reason: String) -> ScriptContractError {
+fn script_contract_error(
+    source_path: &str,
+    script_id: usize,
+    reason: String,
+) -> ScriptContractError {
     ScriptContractError::new(format!(
         "Zenith requires TypeScript scripts. Add lang=\"ts\".\nFile: {}#script{}\nReason: {}\nExample: <script lang=\"ts\">",
         source_path, script_id, reason
@@ -356,6 +362,14 @@ fn analyze_component_script(
         .is_match(tail)
         {
             HoistedBindingKind::State
+        } else if Regex::new(&format!(
+            r"^(?:const|let|var)\s+{}\s*=\s*ref\s*(?:<[^>]*>)?\s*\(",
+            regex::escape(&ident)
+        ))
+        .unwrap()
+        .is_match(tail)
+        {
+            HoistedBindingKind::Ref
         } else {
             HoistedBindingKind::Const
         };
@@ -377,7 +391,10 @@ fn analyze_component_script(
 
     let mut bindings = Vec::new();
     for (_, ident, kind) in declared {
-        if bindings.iter().any(|existing: &HoistedBinding| existing.original == ident) {
+        if bindings
+            .iter()
+            .any(|existing: &HoistedBinding| existing.original == ident)
+        {
             return Err(script_contract_error(
                 source_path,
                 id,
@@ -427,12 +444,8 @@ fn analyze_component_script(
         }
     }
 
-    let factory_code = generate_factory_code(
-        &factory_name,
-        &imports,
-        &source_without_imports,
-        &bindings,
-    );
+    let factory_code =
+        generate_factory_code(&factory_name, &imports, &source_without_imports, &bindings);
 
     Ok(HoistedScript {
         id,
@@ -496,7 +509,10 @@ fn sanitize_component_slug(source_path: &str) -> String {
 fn stable_hash_8(input: &str) -> String {
     let mut hash: i32 = 0;
     for byte in input.bytes() {
-        hash = hash.wrapping_shl(5).wrapping_sub(hash).wrapping_add(byte as i32);
+        hash = hash
+            .wrapping_shl(5)
+            .wrapping_sub(hash)
+            .wrapping_add(byte as i32);
     }
     let normalized = hash.wrapping_abs() as u32;
     format!("{normalized:08x}")
@@ -551,10 +567,16 @@ fn generate_factory_code(
     lines.push(format!(
         "export function {factory_name}(host, props, runtime) {{"
     ));
-    lines.push("  const __props = props && typeof props === 'object' ? props : Object.freeze({});".to_string());
-    lines.push("  const __runtime = runtime && typeof runtime === 'object' ? runtime : {};".to_string());
+    lines.push(
+        "  const __props = props && typeof props === 'object' ? props : Object.freeze({});"
+            .to_string(),
+    );
+    lines.push(
+        "  const __runtime = runtime && typeof runtime === 'object' ? runtime : {};".to_string(),
+    );
     lines.push("  const signal = __runtime.signal;".to_string());
     lines.push("  const state = __runtime.state;".to_string());
+    lines.push("  const ref = __runtime.ref;".to_string());
     lines.push("  const zeneffect = __runtime.zeneffect;".to_string());
     if !body.is_empty() {
         for line in body.lines() {
@@ -571,10 +593,20 @@ fn generate_factory_code(
     lines.push("    bindings: Object.freeze({".to_string());
     for binding in bindings {
         let value = match binding.kind {
-            HoistedBindingKind::Signal => format!("() => {}.get()", binding.original),
+            HoistedBindingKind::Signal => format!(
+                "() => (typeof {ident} === 'undefined' ? undefined : ({ident} && typeof {ident}.get === 'function' ? {ident}.get() : undefined))",
+                ident = binding.original
+            ),
+            HoistedBindingKind::Ref => format!(
+                "(typeof {ident} === 'undefined' ? undefined : {ident})",
+                ident = binding.original
+            ),
             HoistedBindingKind::State
             | HoistedBindingKind::Function
-            | HoistedBindingKind::Const => binding.original.clone(),
+            | HoistedBindingKind::Const => format!(
+                "(typeof {ident} === 'undefined' ? undefined : {ident})",
+                ident = binding.original
+            ),
         };
         lines.push(format!("      \"{}\": {},", binding.original, value));
     }

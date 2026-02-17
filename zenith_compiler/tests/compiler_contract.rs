@@ -73,6 +73,7 @@ fn compiler_output_is_sealed_data_only() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
         style_blocks: Vec::new(),
     };
 
