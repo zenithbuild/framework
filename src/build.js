@@ -75,7 +75,7 @@ function runCompiler(filePath) {
 /**
  * Run bundler process for one page envelope.
  *
- * @param {object} envelope
+ * @param {object|object[]} envelope
  * @param {string} outDir
  * @returns {Promise<void>}
  */
@@ -155,16 +155,20 @@ export async function build(options) {
 
     const manifest = await generateManifest(pagesDir);
 
+    const envelopes = [];
     for (const entry of manifest) {
         const sourceFile = join(pagesDir, entry.file);
         const ir = runCompiler(sourceFile);
-        const envelope = {
+        envelopes.push({
             route: entry.path,
             file: sourceFile,
             ir,
             router: routerEnabled
-        };
-        await runBundler(envelope, outDir);
+        });
+    }
+
+    if (envelopes.length > 0) {
+        await runBundler(envelopes, outDir);
     }
 
     const assets = await collectAssets(outDir);
