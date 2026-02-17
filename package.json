@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deterministic utility substrate for the Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,10 @@
     "./hash": "./src/hash.js",
     "./errors": "./src/errors.js",
     "./version": "./src/version.js",
-    "./guards": "./src/guards.js"
+    "./guards": "./src/guards.js",
+    "./schema": "./src/schema.js",
+    "./ir": "./src/ir/index.js",
+    "./core-template": "./src/core-template.js"
   },
   "files": [
     "src",
@@ -23,10 +26,17 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --config jest.config.js --forceExit --runInBand"
+    "test": "npm run contract:deps && npm run contract:scan && npm run contract:api && npm run contract:template && npm run contract:golden",
+    "test:legacy": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.js",
+    "contract:deps": "node dependency_contract.spec.js",
+    "contract:scan": "node contract-scan.mjs",
+    "contract:api": "node core_api_lock.spec.js",
+    "contract:template": "node template-contract.spec.js",
+    "contract:golden": "node golden-contract.spec.js"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
     "jest": "^30.2.0"
-  }
+  },
+  "private": false
 }
