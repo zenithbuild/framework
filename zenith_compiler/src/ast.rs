@@ -29,4 +29,5 @@ pub enum Attribute {
     Static { name: String, value: String },
     Expression { name: String, value: String },
     Event { name: String, handler: String },
+    Ref { identifier: String },
 }

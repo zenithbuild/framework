@@ -1,4 +1,9 @@
-use zenith_compiler::compiler::compile;
+use zenith_compiler::compiler::compile as compile_zen;
+
+fn compile(input: &str) -> String {
+    compile_zen(input).expect("compile should succeed")
+}
+
 
 // ============================================================
 // 6.3 ZERO SEMANTIC AWARENESS TESTS
@@ -28,7 +33,7 @@ fn no_component_definition_lookup() {
 #[test]
 fn tag_name_has_no_semantic_meaning() {
     // "script", "style", "head" — all treated identically to "div"
-    let script = compile("<script></script>");
+    let script = compile("<script lang=\"ts\"></script>");
     let div = compile("<div></div>");
 
     // Both produce empty expression tables

@@ -146,7 +146,26 @@ impl<'a> Parser<'a> {
                     if self.current_token == Token::Eq {
                         self.advance(); // Eat '='
 
-                        if self.current_token == Token::LBrace {
+                        if name == "ref" {
+                            // ref attribute: must be expression binding with single identifier
+                            if let Token::StringLiteral(_) = &self.current_token {
+                                panic!("ref attribute does not accept string values. Use ref={{identifier}} syntax instead of ref=\"...\"");
+                            }
+                            if self.current_token != Token::LBrace {
+                                panic!("ref attribute requires expression binding syntax: ref={{identifier}}");
+                            }
+                            self.advance(); // Eat '{'
+                            let identifier = match &self.current_token {
+                                Token::Identifier(v) => v.clone(),
+                                _ => panic!(
+                                    "ref attribute requires a single identifier, found {:?}",
+                                    self.current_token
+                                ),
+                            };
+                            self.advance();
+                            self.expect(Token::RBrace);
+                            attributes.push(Attribute::Ref { identifier });
+                        } else if self.current_token == Token::LBrace {
                             // Expression or Event
                             self.advance(); // Eat '{'
                             let value = match &self.current_token {

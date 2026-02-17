@@ -5,7 +5,7 @@ fn single_root_with_whitespace_and_comments_parses() {
     let input = r#"
 
 <!-- leading comment -->
-<script>
+<script lang="ts">
 const count = signal(0)
 </script>
 
@@ -15,15 +15,17 @@ const count = signal(0)
 
 "#;
 
-    let output = compile_structured(input);
+    let output = compile_structured(input).expect("single-root input should compile");
     assert!(output.html.contains("<main>"));
     assert!(output.html.contains("<h1>Hello</h1>"));
 }
 
 #[test]
-#[should_panic(expected = "Multiple root nodes detected or trailing content")]
 fn multiple_real_roots_fail() {
     let input = "<main>One</main><main>Two</main>";
-    let _ = compile_structured(input);
+    let err = compile_structured(input).expect_err("multiple roots should fail");
+    assert!(
+        err.contains("Multiple root nodes detected or trailing content"),
+        "unexpected error: {err}"
+    );
 }
-

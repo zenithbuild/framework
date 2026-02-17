@@ -2,7 +2,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
-use zenith_compiler::compiler::compile_structured_with_source;
+use zenith_compiler::compiler::{compile_structured_with_source, CompilerOutput};
+use zenith_compiler::deterministic::sha256_hex;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -18,7 +19,8 @@ fn main() -> Result<()> {
     let content = fs::read_to_string(&cli.input)
         .with_context(|| format!("Could not read file `{}`", cli.input.display()))?;
 
-    let output = compile_structured_with_source(&content, &cli.input.to_string_lossy());
+    let output = compile_structured_with_source(&content, &cli.input.to_string_lossy())
+        .map_err(anyhow::Error::msg)?;
     let hoisted_state = output
         .hoisted
         .state
@@ -97,8 +99,16 @@ fn main() -> Result<()> {
             }),
         );
     }
+    let graph_hash = compute_graph_hash(&output);
+
     let json = serde_json::json!({
         "ir_version": output.ir_version,
+        "graph_hash": graph_hash,
+        "graph_edges": output.graph_edges,
+        "graph_nodes": output.graph_nodes.iter().map(|node| serde_json::json!({
+            "id": node.id,
+            "hoist_id": node.hoist_id
+        })).collect::<Vec<_>>(),
         "html": output.html,
         "expressions": output.expressions,
         "hoisted": {
@@ -123,4 +133,38 @@ fn main() -> Result<()> {
     );
 
     Ok(())
+}
+
+fn compute_graph_hash(output: &CompilerOutput) -> String {
+    let mut hoist_ids = output
+        .components_scripts
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    hoist_ids.extend(
+        output
+            .component_instances
+            .iter()
+            .map(|instance| instance.hoist_id.clone()),
+    );
+    hoist_ids.sort();
+    hoist_ids.dedup();
+
+    let mut edges = output.graph_edges.clone();
+    edges.sort();
+    edges.dedup();
+
+    let mut seed = String::new();
+    for hoist_id in hoist_ids {
+        seed.push_str("id:");
+        seed.push_str(&hoist_id);
+        seed.push('\n');
+    }
+    for edge in edges {
+        seed.push_str("edge:");
+        seed.push_str(&edge);
+        seed.push('\n');
+    }
+
+    sha256_hex(seed.as_bytes())
 }

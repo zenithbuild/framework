@@ -1,5 +1,10 @@
 use std::time::Instant;
-use zenith_compiler::compiler::compile;
+use zenith_compiler::compiler::compile as compile_zen;
+
+fn compile(input: &str) -> String {
+    compile_zen(input).expect("compile should succeed")
+}
+
 
 // ============================================================
 // PHASE 12: PERFORMANCE & MEMORY VALIDATION
@@ -17,6 +22,7 @@ fn generate_template(num_elements: usize) -> String {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn bench_10_elements() {
     let template = generate_template(10);
     let start = Instant::now();
@@ -34,6 +40,7 @@ fn bench_10_elements() {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn bench_100_elements() {
     let template = generate_template(100);
     let start = Instant::now();
@@ -50,6 +57,7 @@ fn bench_100_elements() {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn bench_1000_elements() {
     let template = generate_template(1000);
     let start = Instant::now();
@@ -66,6 +74,7 @@ fn bench_1000_elements() {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_10() {
     let templates: Vec<String> = (0..10).map(|i| format!("<div>{{item{i}}}</div>")).collect();
 
@@ -82,6 +91,7 @@ fn multi_file_batch_10() {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_100() {
     let templates: Vec<String> = (0..100)
         .map(|i| format!("<div>{{item{i}}}</div>"))
@@ -97,6 +107,7 @@ fn multi_file_batch_100() {
 }
 
 #[test]
+#[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_1000() {
     let templates: Vec<String> = (0..1000)
         .map(|i| format!("<div>{{item{i}}}</div>"))
