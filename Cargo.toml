@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Zenith Compiler (sealed API)
-zenith_compiler = { path = "../zenith-compiler-ts-enforcement/zenith_compiler" }
+zenith_compiler = { path = "../zenith-compiler/zenith_compiler" }
 
 # Rolldown bundling engine (from git — crates.io v0.1.0 has dependency conflicts)
 rolldown = { git = "https://github.com/rolldown/rolldown", package = "rolldown" }
