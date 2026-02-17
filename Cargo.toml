@@ -14,12 +14,19 @@ path = "src/main.rs"
 
 [dependencies]
 # Zenith Compiler (sealed API)
-zenith_compiler = { path = "../zenith-compiler/zenith_compiler" }
+zenith_compiler = { path = "../zenith-compiler-ts-enforcement/zenith_compiler" }
 
 # Rolldown bundling engine (from git — crates.io v0.1.0 has dependency conflicts)
 rolldown = { git = "https://github.com/rolldown/rolldown", package = "rolldown" }
 rolldown_plugin = { git = "https://github.com/rolldown/rolldown", package = "rolldown_plugin" }
 rolldown_common = { git = "https://github.com/rolldown/rolldown", package = "rolldown_common" }
+
+# AST Rewriting (robust import transformation)
+oxc_allocator = "0.10"
+oxc_parser = "0.10"
+oxc_span = "0.10"
+oxc_codegen = "0.10"
+oxc_ast = "0.10"
 
 
 # Serialization (validation, diagnostics)

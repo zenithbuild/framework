@@ -10,11 +10,15 @@
 //! There is one graph, one emission flow, one source of truth.
 //! No inline bypass is permitted — determinism requires a unified pipeline.
 
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use regex::Regex;
 use rolldown::{BundlerBuilder, BundlerOptions, InputItem};
 use rolldown_common::OutputFormat;
+use zenith_compiler::compiler::CompilerOutput;
+use zenith_compiler::script::ExtractedStyleBlock;
 
 use crate::plugin::zenith_loader::{ZenithLoader, ZenithLoaderConfig};
 use crate::utils;
@@ -67,7 +71,6 @@ pub async fn execute_bundle(
     });
 
     let compiled_outputs = loader.compiled_outputs();
-    let css_cache = loader.css_cache();
 
     // Configure Rolldown — single-entry, ESM, browser
     let rolldown_options = BundlerOptions {
@@ -151,8 +154,34 @@ pub async fn execute_bundle(
         }
     }
 
-    // Collect CSS
-    let css = css_cache.get(&page_id);
+    let mut effective_style_blocks = compiled.style_blocks.clone();
+    if effective_style_blocks.is_empty() {
+        effective_style_blocks =
+            collect_graph_style_blocks(&compiled_outputs, &plan.page_path, &compiled);
+    }
+
+    // Process CSS and Anchor.
+    // For legacy fragment-only pages (no styles anchor), preserve previous behavior:
+    // still emit deterministic CSS bytes, but keep HTML untouched in this codepath.
+    let (processed_css, new_html) =
+        match utils::process_css(&effective_style_blocks, &compiled.html) {
+            Ok(value) => value,
+            Err(err)
+                if !effective_style_blocks.is_empty()
+                    && compiled.style_blocks.is_empty()
+                    && err.starts_with("Expected exactly one ZENITH_STYLES_ANCHOR, found") =>
+            {
+                let (css_only, _) = utils::process_css(
+                    &effective_style_blocks,
+                    "<!-- ZENITH_STYLES_ANCHOR -->",
+                )
+                .map_err(BundleError::ValidationError)?;
+                (css_only, compiled.html.clone())
+            }
+            Err(err) => return Err(BundleError::ValidationError(err)),
+        };
+
+    let css = processed_css.as_ref().map(|p| p.content.clone());
 
     diagnostics.push(Diagnostic {
         level: DiagnosticLevel::Info,
@@ -176,9 +205,9 @@ pub async fn execute_bundle(
         let js_path = pages_dir.join(format!("{}.js", page_id));
         tokio::fs::write(&js_path, &entry_js).await?;
 
-        if let Some(ref css_content) = css {
-            let css_path = pages_dir.join(format!("{}.css", page_id));
-            tokio::fs::write(&css_path, css_content).await?;
+        if let Some(ref css_data) = processed_css {
+            let css_path = pages_dir.join(format!("styles.{}.css", css_data.hash));
+            tokio::fs::write(&css_path, &css_data.content).await?;
         }
 
         diagnostics.push(Diagnostic {
@@ -191,7 +220,176 @@ pub async fn execute_bundle(
     Ok(BundleResult {
         entry_js,
         css,
+        html: new_html,
         expressions,
         diagnostics,
     })
+}
+
+fn collect_graph_style_blocks(
+    compiled_outputs: &dashmap::DashMap<String, CompilerOutput>,
+    entry_path: &str,
+    compiled_entry: &CompilerOutput,
+) -> Vec<ExtractedStyleBlock> {
+    let mut modules = BTreeMap::new();
+    for item in compiled_outputs.iter() {
+        modules.insert(item.key().clone(), item.value().clone());
+    }
+
+    if modules.is_empty() {
+        return Vec::new();
+    }
+
+    let mut resolved_entry = entry_path.to_string();
+    if !modules.contains_key(&resolved_entry) {
+        if let Ok(canon) = std::fs::canonicalize(entry_path) {
+            let candidate = canon.to_string_lossy().to_string();
+            if modules.contains_key(&candidate) {
+                resolved_entry = candidate;
+            }
+        }
+    }
+
+    if !modules.contains_key(&resolved_entry) {
+        modules.insert(resolved_entry.clone(), compiled_entry.clone());
+    }
+
+    let mut ordered = Vec::new();
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    dfs_modules(
+        &resolved_entry,
+        &modules,
+        &mut visiting,
+        &mut visited,
+        &mut ordered,
+    );
+
+    let mut blocks = Vec::new();
+    for module_id in ordered {
+        let Some(output) = modules.get(&module_id) else {
+            continue;
+        };
+        let module_blocks = extract_style_blocks_from_source_file(&module_id)
+            .unwrap_or_else(|| extract_style_blocks_from_html(&module_id, &output.html));
+        blocks.extend(module_blocks);
+    }
+
+    blocks
+}
+
+fn dfs_modules(
+    module_id: &str,
+    modules: &BTreeMap<String, CompilerOutput>,
+    visiting: &mut BTreeSet<String>,
+    visited: &mut BTreeSet<String>,
+    ordered: &mut Vec<String>,
+) {
+    if visited.contains(module_id) {
+        return;
+    }
+    if !visiting.insert(module_id.to_string()) {
+        return;
+    }
+
+    if let Some(module) = modules.get(module_id) {
+        for dep in extract_zen_imports(module_id, module) {
+            if modules.contains_key(&dep) {
+                dfs_modules(&dep, modules, visiting, visited, ordered);
+            }
+        }
+    }
+
+    visiting.remove(module_id);
+    visited.insert(module_id.to_string());
+    ordered.push(module_id.to_string());
+}
+
+fn extract_zen_imports(module_id: &str, module: &CompilerOutput) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    let import_re = Regex::new(r#"(?i)^\s*import\s+[^'"]*['"]([^'"]+)['"]"#).expect("valid regex");
+    for line in module
+        .hoisted
+        .imports
+        .iter()
+        .chain(module.imports.iter())
+    {
+        let Some(caps) = import_re.captures(line) else {
+            continue;
+        };
+        let Some(m) = caps.get(1) else {
+            continue;
+        };
+        let spec = m.as_str();
+        if !spec.ends_with(".zen") {
+            continue;
+        }
+        let resolved = resolve_relative_specifier(module_id, spec);
+        if seen.insert(resolved.clone()) {
+            out.push(resolved);
+        }
+    }
+
+    out
+}
+
+fn resolve_relative_specifier(module_id: &str, spec: &str) -> String {
+    let module_path = Path::new(module_id);
+
+    if spec.starts_with('/') {
+        return spec.to_string();
+    }
+
+    if spec.starts_with("./") || spec.starts_with("../") {
+        let parent = module_path.parent().unwrap_or_else(|| Path::new("."));
+        let joined = parent.join(spec);
+        if let Ok(canon) = std::fs::canonicalize(&joined) {
+            return canon.to_string_lossy().to_string();
+        }
+        return normalize_path(joined);
+    }
+
+    spec.to_string()
+}
+
+fn normalize_path(path: PathBuf) -> String {
+    path.components()
+        .collect::<PathBuf>()
+        .to_string_lossy()
+        .to_string()
+}
+
+fn extract_style_blocks_from_html(module_id: &str, html: &str) -> Vec<ExtractedStyleBlock> {
+    let style_re = Regex::new(r#"(?is)<style(?:\s[^>]*)?>(.*?)</style>"#).expect("valid regex");
+    let mut out = Vec::new();
+    for (idx, caps) in style_re.captures_iter(html).enumerate() {
+        let Some(content_match) = caps.get(1) else {
+            continue;
+        };
+        let content = content_match
+            .as_str()
+            .replace("\r\n", "\n")
+            .trim()
+            .to_string();
+        if content.is_empty() {
+            continue;
+        }
+        out.push(ExtractedStyleBlock {
+            module_id: module_id.to_string(),
+            order: idx as u32,
+            content,
+        });
+    }
+    out
+}
+
+fn extract_style_blocks_from_source_file(module_id: &str) -> Option<Vec<ExtractedStyleBlock>> {
+    let path = Path::new(module_id);
+    if !path.exists() {
+        return None;
+    }
+    let source = std::fs::read_to_string(path).ok()?;
+    Some(extract_style_blocks_from_html(module_id, &source))
 }

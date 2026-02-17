@@ -7,6 +7,15 @@
 use regex::Regex;
 
 use crate::{BundleError, CompilerOutput, Diagnostic, DiagnosticLevel};
+use std::collections::BTreeMap;
+use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::script::ExtractedStyleBlock;
+
+use oxc_allocator::Allocator;
+use oxc_ast::{ast, VisitMut};
+use oxc_codegen::{Codegen, CodegenOptions};
+use oxc_parser::Parser;
+use oxc_span::SourceType;
 
 // ---------------------------------------------------------------------------
 // Virtual Module IDs
@@ -141,6 +150,31 @@ pub fn escape_js_string(s: &str) -> String {
     out
 }
 
+/// Clean a path string by resolving . and .. components purely textually.
+/// Does NOT touch the filesystem.
+pub fn clean_path(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    let mut out = Vec::new();
+
+    for segment in path.split('/') {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            out.pop();
+        } else {
+            out.push(segment);
+        }
+    }
+
+    let result = out.join("/");
+    if path.starts_with('/') {
+        format!("/{}", result)
+    } else {
+        result
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Virtual Entry Generation
 // ---------------------------------------------------------------------------
@@ -153,6 +187,22 @@ pub fn escape_js_string(s: &str) -> String {
 /// - A default export function (hydration stub)
 pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
     let html_escaped = escape_js_template_literal(&output.html);
+    let mut seen_imports = std::collections::BTreeSet::new();
+    let mut import_lines: Vec<String> = Vec::new();
+    for line in output.imports.iter().chain(output.hoisted.imports.iter()) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let normalized = if trimmed.ends_with(';') {
+            trimmed.to_string()
+        } else {
+            format!("{trimmed};")
+        };
+        if seen_imports.insert(normalized.clone()) {
+            import_lines.push(normalized);
+        }
+    }
 
     let expr_items: Vec<String> = output
         .expressions
@@ -161,15 +211,20 @@ pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
         .collect();
 
     let expr_array = expr_items.join(", ");
+    let imports_prefix = if import_lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", import_lines.join("\n"))
+    };
 
     format!(
-        r#"export const __zenith_html = `{}`;
+        r#"{}export const __zenith_html = `{}`;
 export const __zenith_expr = [{}];
 export const __zenith_contract = "v0";
 export default function __zenith_page() {{
   return {{ html: __zenith_html, expressions: __zenith_expr, contract: __zenith_contract }};
 }}"#,
-        html_escaped, expr_array
+        imports_prefix, html_escaped, expr_array
     )
 }
 
@@ -259,6 +314,184 @@ pub fn validate_expressions(compiled: &[String], metadata: &[String]) -> Result<
 }
 
 // ---------------------------------------------------------------------------
+// CSS Processing
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessedCss {
+    pub hash: String,
+    pub content: String,
+}
+
+pub fn process_css(
+    style_blocks: &[ExtractedStyleBlock],
+    html: &str,
+) -> Result<(Option<ProcessedCss>, String), String> {
+    if style_blocks.is_empty() {
+        let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+        if html.contains(anchor) {
+            return Ok((None, html.replace(anchor, "")));
+        }
+        return Ok((None, html.to_string()));
+    }
+
+    let mut style_hashes = Vec::new();
+    let mut clean_content = Vec::new();
+
+    for block in style_blocks {
+        let seed = format!("{}:{}:{}", block.module_id, block.order, block.content);
+        let hash = sha256_hex(seed.as_bytes());
+        style_hashes.push(hash);
+        clean_content.push(block.content.clone());
+    }
+
+    let mut sorted_hashes = style_hashes.clone();
+    sorted_hashes.sort();
+    let bundle_seed = sorted_hashes.join("|");
+    let bundle_hash = sha256_hex(bundle_seed.as_bytes());
+
+    let final_content = clean_content.join("\n\n");
+
+    if final_content.trim().is_empty() {
+        return Err(
+            "Determinism violation: style_blocks > 0 but final CSS content is empty.".to_string(),
+        );
+    }
+
+    let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+    let count = html.matches(anchor).count();
+    if count != 1 {
+        return Err(format!(
+            "Expected exactly one ZENITH_STYLES_ANCHOR, found {}",
+            count
+        ));
+    }
+
+    let link_tag = format!(
+        "<link rel=\"stylesheet\" href=\"/assets/styles.{}.css\">",
+        bundle_hash
+    );
+    let new_html = html.replace(anchor, &link_tag);
+
+    Ok((
+        Some(ProcessedCss {
+            hash: bundle_hash,
+            content: final_content,
+        }),
+        new_html,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Hashing
+// ---------------------------------------------------------------------------
+
+/// Compute a stable 8-character hex hash from a string.
+/// Uses a simple polynomial rolling hash algorithm (Java-like) mixed to hex.
+/// This matches the behavior expected by Zenith's legacy hashing.
+pub fn stable_hash_8(content: &str) -> String {
+    let mut hash: i32 = 0;
+    for byte in content.bytes() {
+        hash = hash
+            .wrapping_shl(5)
+            .wrapping_sub(hash)
+            .wrapping_add(byte as i32);
+    }
+    let normalized = hash.wrapping_abs() as u32;
+    format!("{normalized:08x}")
+}
+
+// ---------------------------------------------------------------------------
+// AST Rewriting
+// ---------------------------------------------------------------------------
+
+/// Parse JS source and rewrite import specifiers based on a replacement map.
+///
+/// Use `oxc` for robust AST-based transformation.
+/// - Rewrites static `ImportDeclaration` sources.
+/// - Rewrites dynamic `import('...')` sources if they are string literals.
+/// - Preserves everything else (comments, formatting as much as codegen allows).
+struct ImportRewriter<'a> {
+    replacements: &'a BTreeMap<String, String>,
+}
+
+impl<'a> VisitMut<'a> for ImportRewriter<'a> {
+    fn visit_import_declaration(&mut self, decl: &mut ast::ImportDeclaration<'a>) {
+        let spec = decl.source.value.as_str();
+        if let Some(replacement) = self.replacements.get(spec) {
+            decl.source.value = oxc_span::Atom::from(replacement.as_str());
+        }
+    }
+
+    fn visit_export_named_declaration(&mut self, decl: &mut ast::ExportNamedDeclaration<'a>) {
+        if let Some(inner_decl) = &mut decl.declaration {
+            self.visit_declaration(inner_decl);
+        }
+        if let Some(source_lit) = &mut decl.source {
+            let spec = source_lit.value.as_str();
+            if let Some(replacement) = self.replacements.get(spec) {
+                source_lit.value = oxc_span::Atom::from(replacement.as_str());
+            }
+        }
+    }
+
+    fn visit_export_all_declaration(&mut self, decl: &mut ast::ExportAllDeclaration<'a>) {
+        let spec = decl.source.value.as_str();
+        if let Some(replacement) = self.replacements.get(spec) {
+            decl.source.value = oxc_span::Atom::from(replacement.as_str());
+        }
+    }
+
+    fn visit_import_expression(&mut self, expr: &mut ast::ImportExpression<'a>) {
+        if let ast::Expression::StringLiteral(lit) = &mut expr.source {
+            let spec = lit.value.as_str();
+            if let Some(replacement) = self.replacements.get(spec) {
+                lit.value = oxc_span::Atom::from(replacement.as_str());
+            }
+        }
+        self.visit_expression(&mut expr.source);
+        for argument in expr.arguments.iter_mut() {
+            self.visit_expression(argument);
+        }
+    }
+}
+
+pub fn rewrite_js_imports_ast(
+    source: &str,
+    replacements: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    if replacements.is_empty() {
+        return Ok(source.to_string());
+    }
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::default().with_module(true);
+
+    let parser = Parser::new(&allocator, source, source_type);
+    let parse_result = parser.parse();
+
+    if !parse_result.errors.is_empty() {
+        let errs = parse_result
+            .errors
+            .iter()
+            .map(|e| format!("{e}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(format!("Failed to parse JS for rewriting:\n{}", errs));
+    }
+
+    let mut program = parse_result.program;
+
+    let mut rewriter = ImportRewriter { replacements };
+    rewriter.visit_program(&mut program);
+
+    let codegen = Codegen::<false>::new(source, CodegenOptions::default());
+    let compiled = codegen.build(&program);
+
+    Ok(compiled.source_text)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -339,8 +572,15 @@ mod tests {
     fn test_generate_virtual_entry() {
         let output = CompilerOutput {
             ir_version: 1,
+            graph_hash: String::new(),
+            graph_edges: Vec::new(),
+            graph_nodes: Vec::new(),
             html: "<div data-zx-e=\"0\"></div>".into(),
             expressions: vec!["title".into()],
+            imports: Default::default(),
+            server_script: Default::default(),
+            prerender: false,
+            ssr_data: Default::default(),
             hoisted: Default::default(),
             components_scripts: Default::default(),
             component_instances: Default::default(),
@@ -348,6 +588,7 @@ mod tests {
             expression_bindings: Default::default(),
             marker_bindings: Default::default(),
             event_bindings: Default::default(),
+            style_blocks: Default::default(),
         };
         let entry = generate_virtual_entry(&output);
         assert!(entry.contains("__zenith_html"));
@@ -377,5 +618,20 @@ mod tests {
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("index 1"));
+    }
+
+    #[test]
+    fn test_rewrite_js_imports_ast_rewrites_static_export_and_dynamic() {
+        let source = "import { gsap } from 'gsap'; export { format } from 'date-fns'; export async function load() { return import('gsap'); }";
+        let mut replacements = BTreeMap::new();
+        replacements.insert("gsap".to_string(), "/assets/vendor.mock.js".to_string());
+        replacements.insert("date-fns".to_string(), "/assets/vendor.mock.js".to_string());
+
+        let rewritten = rewrite_js_imports_ast(source, &replacements).expect("rewrite source");
+        assert!(rewritten.contains("/assets/vendor.mock.js"));
+        assert!(!rewritten.contains("'gsap'"));
+        assert!(!rewritten.contains("\"gsap\""));
+        assert!(!rewritten.contains("'date-fns'"));
+        assert!(!rewritten.contains("\"date-fns\""));
     }
 }

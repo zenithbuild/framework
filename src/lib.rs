@@ -127,6 +127,8 @@ pub struct BundleResult {
     pub entry_js: String,
     /// Virtual collected CSS (if any).
     pub css: Option<String>,
+    /// The processed HTML with injected resources.
+    pub html: String,
     /// Expression table — must exactly match metadata if provided.
     pub expressions: Vec<String>,
     /// Diagnostics collected during the build.
@@ -140,7 +142,7 @@ pub struct BundleResult {
 /// Errors that abort the bundle.
 #[derive(Debug, Error)]
 pub enum BundleError {
-    #[error("Compiler error: {0}")]
+    #[error("{0}")]
     CompilerError(String),
 
     #[error("Expression mismatch: expected {expected} expressions, got {got}")]

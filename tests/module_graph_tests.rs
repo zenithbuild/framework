@@ -393,8 +393,15 @@ async fn strict_inline_and_rolldown_mirror_count() {
 
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(),
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
         expressions: vec!["title".into(), "extra".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -402,6 +409,7 @@ async fn strict_inline_and_rolldown_mirror_count() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let plan = BundlePlan {
@@ -436,8 +444,15 @@ async fn strict_inline_and_rolldown_mirror_content() {
 
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(),
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
         expressions: vec!["wrong_name".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -445,6 +460,7 @@ async fn strict_inline_and_rolldown_mirror_content() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let plan = BundlePlan {
@@ -648,4 +664,84 @@ async fn export_order_html_before_expr() {
         html_pos < expr_pos,
         "__zenith_html must appear before __zenith_expr in output"
     );
+}
+
+#[tokio::test]
+// Re-enabled: fixed potential hang by using pure path resolution in loader
+async fn deep_topo_css_order_a_b_c() {
+    // A -> B -> C
+    // Expected CSS: C, then B, then A
+    let dir = tempfile::tempdir().unwrap();
+    let path_a = dir.path().join("a.zen");
+    let path_b = dir.path().join("b.zen");
+    let path_c = dir.path().join("c.zen");
+
+    std::fs::write(
+        &path_c,
+        r#"
+        <div>
+            <div class="c">C</div>
+            <style>.c { color: blue; }</style>
+        </div>
+    "#,
+    )
+    .unwrap();
+
+    std::fs::write(
+        &path_b,
+        r#"
+        <script lang="ts">
+            import C from './c.zen';
+        </script>
+        <div>
+            <div class="b">B</div>
+            <C />
+            <style>.b { color: green; }</style>
+        </div>
+    "#,
+    )
+    .unwrap();
+
+    std::fs::write(
+        &path_a,
+        r#"
+        <script lang="ts">
+            import B from './b.zen';
+        </script>
+        <div>
+            <div class="a">A</div>
+            <B />
+            <style>.a { color: red; }</style>
+        </div>
+    "#,
+    )
+    .unwrap();
+
+    let plan = BundlePlan {
+        page_path: path_a.to_string_lossy().to_string(),
+        out_dir: None,
+        mode: BuildMode::Dev,
+    };
+    let result = bundle_page(plan, BundleOptions::default()).await.unwrap();
+
+    // Verify CSS presence and order
+    let css = result.css.expect("CSS should be present");
+
+    // Find indices of each style block
+    let idx_c = css.find(".c { color: blue; }").expect("Missing C styles");
+    let idx_b = css.find(".b { color: green; }").expect("Missing B styles");
+    let idx_a = css.find(".a { color: red; }").expect("Missing A styles");
+
+    assert!(
+        idx_c < idx_b,
+        "C styles must precede B styles (Dependency first)"
+    );
+    assert!(
+        idx_b < idx_a,
+        "B styles must precede A styles (Dependency first)"
+    );
+
+    // Also verify strict newline enforcement (CRLF -> LF)
+    // We already have a test for that, but checking here doesn't hurt.
+    assert!(!css.contains("\r\n"), "CSS must not contain CRLF");
 }

@@ -25,11 +25,27 @@ use rolldown_plugin::{
     HookTransformOutput, HookUsage, Plugin, SharedLoadPluginContext, SharedTransformPluginContext,
 };
 
-use zenith_compiler::compiler::{compile_structured, CompilerOutput};
+use zenith_compiler::compiler::{compile_structured_with_source, CompilerOutput};
 
 use crate::plugin::css_cache::CssCache;
 use crate::utils;
 use crate::{BundleError, ComponentDef};
+
+trait IntoCompilerResult {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String>;
+}
+
+impl IntoCompilerResult for CompilerOutput {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String> {
+        Ok(self)
+    }
+}
+
+impl IntoCompilerResult for Result<CompilerOutput, String> {
+    fn into_compiler_result(self) -> Result<CompilerOutput, String> {
+        self
+    }
+}
 
 /// Configuration for the Zenith loader plugin.
 #[derive(Debug, Clone)]
@@ -121,8 +137,34 @@ impl Plugin for ZenithLoader {
         async move {
             // Handle .zen files
             if specifier.ends_with(".zen") {
+                let resolved = if specifier.starts_with('.') {
+                    if let Some(importer_path) = args.importer.as_ref() {
+                        let p = std::path::Path::new(importer_path);
+                        if let Some(parent) = p.parent() {
+                            // Simple path join + clean (could use canonicalize but that requires file existence)
+                            // For tests, files exist. For robustness, we normalize.
+                            // But std::fs::canonicalize requires existence.
+                            // Let's rely on parent.join for now, assuming standard fs.
+                            let full_path = parent.join(&specifier);
+                            // Attempt to canonicalize to remove ../ and ./
+                            match full_path.canonicalize() {
+                                Ok(p) => p.to_string_lossy().to_string(),
+                                Err(_) => full_path.to_string_lossy().to_string(), // Fallback
+                            }
+                        } else {
+                            specifier
+                        }
+                    } else {
+                        // Relative import with no importer? Should not happen in graph but possible in entry
+                        specifier
+                    }
+                } else {
+                    // Absolute path or node_modules (not supported yet, assuming absolute)
+                    specifier
+                };
+
                 return Ok(Some(HookResolveIdOutput {
-                    id: ArcStr::from(specifier),
+                    id: ArcStr::from(resolved),
                     external: Some(ResolvedExternal::Bool(false)),
                     ..Default::default()
                 }));
@@ -176,12 +218,21 @@ impl Plugin for ZenithLoader {
 
             // Handle .zen files — compile via sealed compiler API
             if id.ends_with(".zen") {
-                let source = std::fs::read_to_string(&id)
-                    .map_err(|e| anyhow::anyhow!("Failed to read .zen file '{}': {}", id, e))?;
+                // Offload heavy compilation and file I/O to blocking thread specific to this task
+                // This prevents starving the async runtime during graph discovery
+                let id_clone = id.clone();
+                let config_clone = config.clone();
 
-                // Call the sealed compiler API
-                // Delegate to shared compilation function (handles normalization etc.)
-                let (js_code, compiled) = compile_zen_source(&source, &id, &config)?;
+                let (js_code, compiled) = tokio::task::spawn_blocking(move || -> Result<_, BundleError> {
+                    let source = std::fs::read_to_string(&id_clone)?;
+
+                    // Call the sealed compiler API
+                    compile_zen_source(&source, &id_clone, &config_clone)
+                })
+                .await
+                .map_err(|e| {
+                    BundleError::BuildError(format!("Compilation task join error: {}", e))
+                })??;
 
                 // Store compiled output for post-build validation
                 // CSS extraction (if any) would happen here or in transform
@@ -242,12 +293,14 @@ impl Plugin for ZenithLoader {
 /// Used by `bundle.rs` when reading files through tokio.
 pub fn compile_zen_source(
     source: &str,
-    _id: &str,
+    id: &str,
     _config: &ZenithLoaderConfig,
 ) -> Result<(String, CompilerOutput), BundleError> {
     // Normalize newlines to LF for determinism (CRLF -> LF)
     let source = source.replace("\r\n", "\n");
-    let compiled = compile_structured(&source);
+    let compiled = compile_structured_with_source(&source, id)
+        .into_compiler_result()
+        .map_err(BundleError::CompilerError)?;
 
     let js_code = utils::generate_virtual_entry(&compiled);
     Ok((js_code, compiled))
@@ -275,8 +328,15 @@ mod tests {
             components: None,
             metadata: Some(CompilerOutput {
                 ir_version: 1,
+                graph_hash: String::new(),
+                graph_edges: Vec::new(),
+                graph_nodes: Vec::new(),
                 html: String::new(),
                 expressions,
+                imports: Default::default(),
+                server_script: Default::default(),
+                prerender: false,
+                ssr_data: Default::default(),
                 hoisted: Default::default(),
                 components_scripts: Default::default(),
                 component_instances: Default::default(),
@@ -284,6 +344,7 @@ mod tests {
                 expression_bindings: Default::default(),
                 marker_bindings: Default::default(),
                 event_bindings: Default::default(),
+                style_blocks: Default::default(),
             }),
             strict: true,
             is_dev: false,
@@ -334,6 +395,19 @@ mod tests {
         .unwrap();
         assert_eq!(compiled.expressions, vec!["handler"]);
         assert!(js.contains("\"handler\""));
+    }
+
+    #[test]
+    fn compile_zen_source_preserves_compiler_contract_envelope() {
+        let config = loader_config_no_metadata();
+        let err = compile_zen_source("<script>const x = 1</script><main>{x}</main>", "page.zen", &config)
+            .expect_err("missing lang should fail");
+
+        let text = err.to_string();
+        assert!(text.starts_with("Zenith requires TypeScript scripts. Add lang=\"ts\"."));
+        assert!(text.contains("File: page.zen#script0"));
+        assert!(text.contains("Reason:"));
+        assert!(text.contains("Example: <script lang=\"ts\">"));
     }
 
     #[test]
