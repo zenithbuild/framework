@@ -1,4 +1,9 @@
-use zenith_compiler::compiler::compile;
+use zenith_compiler::compiler::compile as compile_zen;
+
+fn compile(input: &str) -> String {
+    compile_zen(input).expect("compile should succeed")
+}
+
 
 // ============================================================
 // PHASE 9: CODEGEN STABILITY LOCK

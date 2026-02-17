@@ -1,8 +1,37 @@
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::collections::BTreeSet;
+use std::fmt::{Display, Formatter};
 
 pub const SCRIPT_PLACEHOLDER_TAG: &str = "zenith-script";
 pub const SCRIPT_ID_ATTR: &str = "data-zx-script-id";
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ExtractedStyleBlock {
+    pub module_id: String,
+    pub order: u32,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptContractError {
+    pub message: String,
+}
+
+impl ScriptContractError {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+impl Display for ScriptContractError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl Error for ScriptContractError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HoistedBindingKind {
@@ -94,7 +123,10 @@ impl HoistedOutput {
     }
 }
 
-pub fn extract_script_blocks(input: &str, source_path: &str) -> (String, Vec<HoistedScript>) {
+pub fn extract_script_blocks(
+    input: &str,
+    source_path: &str,
+) -> Result<(String, Vec<HoistedScript>), ScriptContractError> {
     let mut output = String::new();
     let mut scripts = Vec::new();
 
@@ -108,33 +140,46 @@ pub fn extract_script_blocks(input: &str, source_path: &str) -> (String, Vec<Hoi
         output.push_str(prefix);
         update_tag_depth(prefix, &mut depth);
 
-        let open_end_rel = input[open_start..]
-            .find('>')
-            .unwrap_or_else(|| panic!("Malformed <script> tag: missing '>' in {}", source_path));
+        let open_end_rel = input[open_start..].find('>').ok_or_else(|| {
+            script_contract_error(
+                source_path,
+                script_id,
+                "malformed <script> tag: missing closing `>`".to_string(),
+            )
+        })?;
         let open_end = open_start + open_end_rel;
+        let open_tag = &input[open_start..=open_end];
+        validate_script_tag_contract(open_tag, source_path, script_id)?;
 
         let close_tag = "</script>";
-        let close_rel = input[(open_end + 1)..].find(close_tag).unwrap_or_else(|| {
-            panic!(
-                "Malformed <script> block: missing closing </script> in {}",
-                source_path
+        let close_rel = input[(open_end + 1)..].find(close_tag).ok_or_else(|| {
+            script_contract_error(
+                source_path,
+                script_id,
+                "malformed <script> block: missing closing </script>".to_string(),
             )
-        });
+        })?;
         let close_start = open_end + 1 + close_rel;
         let close_end = close_start + close_tag.len();
 
         let script_source = &input[(open_end + 1)..close_start];
         let component_path = format!("{source_path}#script{script_id}");
         let is_global = depth <= 0;
-        let analyzed = analyze_component_script(script_id, &component_path, script_source, is_global);
-        scripts.push(analyzed);
-
         if !is_global {
-            output.push_str(&format!(
-                "<{} {}=\"{}\"></{}>",
-                SCRIPT_PLACEHOLDER_TAG, SCRIPT_ID_ATTR, script_id, SCRIPT_PLACEHOLDER_TAG
+            return Err(script_contract_error(
+                source_path,
+                script_id,
+                "nested <script> tags inside markup are not supported".to_string(),
             ));
         }
+        let analyzed = analyze_component_script(
+            script_id,
+            source_path,
+            &component_path,
+            script_source,
+            is_global,
+        )?;
+        scripts.push(analyzed);
 
         cursor = close_end;
         script_id += 1;
@@ -145,19 +190,126 @@ pub fn extract_script_blocks(input: &str, source_path: &str) -> (String, Vec<Hoi
     // Preserve legacy structural behavior for script-only files.
     // Hoisting only activates when a script contributes to a non-script tree.
     if !scripts.is_empty() && output.trim().is_empty() {
-        return (input.to_string(), Vec::new());
+        return Ok((input.to_string(), Vec::new()));
     }
 
-    (output, scripts)
+    Ok((output, scripts))
+}
+
+fn validate_script_tag_contract(
+    open_tag: &str,
+    source_path: &str,
+    script_id: usize,
+) -> Result<(), ScriptContractError> {
+    let lang = extract_script_tag_attr_value(open_tag, "lang");
+    let setup = extract_script_tag_attr_value(open_tag, "setup");
+    let lang_attr_count = count_script_tag_attr_occurrences(open_tag, "lang");
+    let setup_attr_count = count_script_tag_attr_occurrences(open_tag, "setup");
+
+    if lang_attr_count > 1 {
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            "duplicate `lang` attribute on <script>".to_string(),
+        ));
+    }
+    if setup_attr_count > 1 {
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            "duplicate `setup` attribute on <script>".to_string(),
+        ));
+    }
+    if lang_attr_count > 0 && lang.is_none() {
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            "malformed `lang` attribute on <script>".to_string(),
+        ));
+    }
+    if setup_attr_count > 0 && setup.is_none() {
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            "malformed `setup` attribute on <script>".to_string(),
+        ));
+    }
+    if lang_attr_count > 0 && setup_attr_count > 0 {
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            "ambiguous script attributes: use either `lang` or `setup`, not both".to_string(),
+        ));
+    }
+
+    if let Some(value) = lang {
+        if value.eq_ignore_ascii_case("ts") {
+            return Ok(());
+        }
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            format!("invalid script language annotation lang=\"{}\"", value),
+        ));
+    }
+
+    if let Some(value) = setup {
+        if value.eq_ignore_ascii_case("ts") {
+            return Ok(());
+        }
+        return Err(script_contract_error(
+            source_path,
+            script_id,
+            format!("invalid script setup annotation setup=\"{}\"", value),
+        ));
+    }
+
+    Err(script_contract_error(
+        source_path,
+        script_id,
+        "missing lang=\"ts\" annotation on <script>".to_string(),
+    ))
+}
+
+fn extract_script_tag_attr_value(open_tag: &str, attr_name: &str) -> Option<String> {
+    let pattern = format!(
+        r#"(?i)\b{}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#,
+        regex::escape(attr_name)
+    );
+    let re = Regex::new(&pattern).unwrap();
+    let captures = re.captures(open_tag)?;
+
+    captures
+        .get(1)
+        .or_else(|| captures.get(2))
+        .or_else(|| captures.get(3))
+        .map(|m| m.as_str().trim().to_string())
+}
+
+fn count_script_tag_attr_occurrences(open_tag: &str, attr_name: &str) -> usize {
+    let pattern = format!(
+        r#"(?i)(?:^|[\s<]){}(?:\s*=|[\s>/])"#,
+        regex::escape(attr_name)
+    );
+    let re = Regex::new(&pattern).unwrap();
+    re.find_iter(open_tag).count()
+}
+
+fn script_contract_error(source_path: &str, script_id: usize, reason: String) -> ScriptContractError {
+    ScriptContractError::new(format!(
+        "Zenith requires TypeScript scripts. Add lang=\"ts\".\nFile: {}#script{}\nReason: {}\nExample: <script lang=\"ts\">",
+        source_path, script_id, reason
+    ))
 }
 
 fn analyze_component_script(
     id: usize,
+    source_path: &str,
     component_path: &str,
     source: &str,
     is_global: bool,
-) -> HoistedScript {
-    assert_no_forbidden_tokens(source, component_path);
+) -> Result<HoistedScript, ScriptContractError> {
+    assert_no_forbidden_tokens(source, source_path, id)?;
 
     let decl_re = Regex::new(r"\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=").unwrap();
     let fn_re = Regex::new(r"\bfunction\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(").unwrap();
@@ -226,10 +378,14 @@ fn analyze_component_script(
     let mut bindings = Vec::new();
     for (_, ident, kind) in declared {
         if bindings.iter().any(|existing: &HoistedBinding| existing.original == ident) {
-            panic!(
-                "Component script declaration collision in {}: `{}` declared multiple times",
-                component_path, ident
-            );
+            return Err(script_contract_error(
+                source_path,
+                id,
+                format!(
+                    "component script declaration collision: `{}` declared multiple times",
+                    ident
+                ),
+            ));
         }
 
         let renamed = format!(
@@ -278,7 +434,7 @@ fn analyze_component_script(
         &bindings,
     );
 
-    HoistedScript {
+    Ok(HoistedScript {
         id,
         component_path: component_path.to_string(),
         is_global,
@@ -291,7 +447,7 @@ fn analyze_component_script(
         functions,
         signals,
         bindings,
-    }
+    })
 }
 
 fn update_tag_depth(segment: &str, depth: &mut i32) {
@@ -430,7 +586,11 @@ fn generate_factory_code(
     lines.join("\n")
 }
 
-fn assert_no_forbidden_tokens(source: &str, component_path: &str) {
+fn assert_no_forbidden_tokens(
+    source: &str,
+    source_path: &str,
+    script_id: usize,
+) -> Result<(), ScriptContractError> {
     let forbidden = [
         (r"\bonMount\s*\(", "onMount() lifecycle hooks"),
         (r"\bdocument\.", "DOM access via document.*"),
@@ -446,10 +606,16 @@ fn assert_no_forbidden_tokens(source: &str, component_path: &str) {
     for (pattern, reason) in forbidden {
         let re = Regex::new(pattern).unwrap();
         if re.is_match(source) {
-            panic!(
-                "Component scripts cannot create runtime scope boundaries. Forbidden {} in {}",
-                reason, component_path
-            );
+            return Err(script_contract_error(
+                source_path,
+                script_id,
+                format!(
+                    "Component scripts cannot create runtime scope boundaries. Forbidden {}",
+                    reason
+                ),
+            ));
         }
     }
+
+    Ok(())
 }

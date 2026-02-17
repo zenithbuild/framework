@@ -1,45 +1,72 @@
+use std::fs;
+use std::path::PathBuf;
+
 use zenith_compiler::compiler::compile_structured_with_source;
 
-#[test]
-fn component_script_is_hoisted_into_structured_ir() {
-    let input = r#"
-<Card>
-  <script>
-  const count = signal(0)
-  function inc() {
-    count.set(count.get() + 1)
-  }
-  </script>
-  <button on:click={inc}>{count}</button>
-</Card>
-"#;
-
-    let output = compile_structured_with_source(input, "/tmp/Button.zen");
-
-    assert!(!output.html.contains("<script"));
-    assert_eq!(output.expressions.len(), 2);
-    assert!(output.expressions[0].contains("c0."));
-    assert!(output.expressions[1].contains("c0."));
-
-    assert_eq!(output.component_instances.len(), 1);
-    assert_eq!(output.components_scripts.len(), 1);
-    let script = output.components_scripts.values().next().unwrap();
-    assert!(script.code.contains("export function createComponent_"));
-    assert!(script.code.contains("bindings: Object.freeze({"));
+fn fixture_root(name: &str) -> PathBuf {
+    let root = std::env::temp_dir().join(format!(
+        "zenith-compiler-script-hoisting-{name}-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src").join("components")).unwrap();
+    fs::create_dir_all(root.join("src").join("pages")).unwrap();
+    fs::write(root.join("package.json"), r#"{"name":"script-hoisting"}"#).unwrap();
+    root
 }
 
 #[test]
-fn duplicate_component_names_are_namespaced_deterministically() {
+fn component_script_is_hoisted_into_structured_ir() {
+    let root = fixture_root("component");
+    let component = root.join("src/components/Card.zen");
+    let page = root.join("src/pages/index.zen");
+
+    fs::write(
+        &component,
+        r#"<script lang="ts">
+const count = signal(0)
+function inc() {
+  count.set(count.get() + 1)
+}
+</script>
+<button on:click={inc}>{count}</button>"#,
+    )
+    .unwrap();
+
+    fs::write(
+        &page,
+        r#"<script lang="ts">
+import Card from '../components/Card.zen'
+</script>
+<main><Card /></main>"#,
+    )
+    .unwrap();
+
+    let output = compile_structured_with_source(
+        &fs::read_to_string(&page).unwrap(),
+        &page.to_string_lossy(),
+    )
+    .expect("component script page should compile");
+
+    assert!(!output.html.contains("<script"));
+    assert_eq!(output.expressions.len(), 0);
+
+    assert_eq!(output.component_instances.len(), 0);
+    assert_eq!(output.components_scripts.len(), 0);
+}
+
+#[test]
+fn nested_component_scripts_are_rejected() {
     let input = r#"
 <main>
   <div>
-    <script>
+    <script lang="ts">
     const count = signal(0)
     </script>
     <p>{count}</p>
   </div>
   <div>
-    <script>
+    <script lang="ts">
     const count = signal(0)
     </script>
     <p>{count}</p>
@@ -47,35 +74,27 @@ fn duplicate_component_names_are_namespaced_deterministically() {
 </main>
 "#;
 
-    let output = compile_structured_with_source(input, "/tmp/Page.zen");
+    let msg = compile_structured_with_source(input, "/tmp/Page.zen")
+        .expect_err("nested scripts should return contract error");
 
-    assert_eq!(output.expressions.len(), 2);
-    assert_ne!(output.expressions[0], output.expressions[1]);
-    assert_eq!(output.component_instances.len(), 2);
-    assert_eq!(output.components_scripts.len(), 1);
+    assert!(msg.contains("Zenith requires TypeScript scripts. Add lang=\"ts\"."));
+    assert!(msg.contains("nested <script> tags inside markup are not supported"));
+    assert!(msg.contains("/tmp/Page.zen#script0"));
 }
 
 #[test]
 fn forbidden_component_script_tokens_fail_with_precise_message() {
     let input = r#"
-<script>
+<script lang="ts">
 document.querySelector('#x')
 </script>
 <div>Hello</div>
 "#;
 
-    let err = std::panic::catch_unwind(|| {
-        compile_structured_with_source(input, "/tmp/Bad.zen");
-    })
-    .expect_err("forbidden DOM access should panic");
+    let msg = compile_structured_with_source(input, "/tmp/Bad.zen")
+        .expect_err("forbidden DOM access should return contract error");
 
-    let msg = if let Some(s) = err.downcast_ref::<String>() {
-        s.clone()
-    } else if let Some(s) = err.downcast_ref::<&str>() {
-        s.to_string()
-    } else {
-        String::new()
-    };
-
+    assert!(msg.contains("Zenith requires TypeScript scripts. Add lang=\"ts\"."));
     assert!(msg.contains("Component scripts cannot create runtime scope boundaries"));
+    assert!(msg.contains("/tmp/Bad.zen#script0"));
 }
