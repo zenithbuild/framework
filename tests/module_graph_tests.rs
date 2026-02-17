@@ -409,6 +409,7 @@ async fn strict_inline_and_rolldown_mirror_count() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
         style_blocks: Default::default(),
     };
 
@@ -460,6 +461,7 @@ async fn strict_inline_and_rolldown_mirror_content() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
         style_blocks: Default::default(),
     };
 

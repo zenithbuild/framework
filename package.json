@@ -4,7 +4,10 @@
   "scripts": {
     "build": "tsc && napi build --platform --release",
     "artifacts": "napi artifacts",
-    "version": "napi version"
+    "version": "napi version",
+    "contract:deps": "node dependency_contract.spec.js",
+    "contract:scan": "node contract-scan.mjs",
+    "contract:imports": "node --test tests/template_import_boundary.test.js"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1",
@@ -19,6 +22,7 @@
   },
   "files": [
     "src",
+    "scripts",
     "dist",
     "index.js",
     "index.node",
@@ -27,6 +31,9 @@
     "README.md"
   ],
   "dependencies": {
+    "@zenithbuild/core": "^1.0.0",
+    "@zenithbuild/router": "^1.0.0",
+    "@zenithbuild/runtime": "^1.0.0",
     "chokidar": "^5.0.0",
     "esbuild": "^0.27.3",
     "express": "^4.21.2",

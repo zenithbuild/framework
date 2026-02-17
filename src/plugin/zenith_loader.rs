@@ -223,16 +223,17 @@ impl Plugin for ZenithLoader {
                 let id_clone = id.clone();
                 let config_clone = config.clone();
 
-                let (js_code, compiled) = tokio::task::spawn_blocking(move || -> Result<_, BundleError> {
-                    let source = std::fs::read_to_string(&id_clone)?;
+                let (js_code, compiled) =
+                    tokio::task::spawn_blocking(move || -> Result<_, BundleError> {
+                        let source = std::fs::read_to_string(&id_clone)?;
 
-                    // Call the sealed compiler API
-                    compile_zen_source(&source, &id_clone, &config_clone)
-                })
-                .await
-                .map_err(|e| {
-                    BundleError::BuildError(format!("Compilation task join error: {}", e))
-                })??;
+                        // Call the sealed compiler API
+                        compile_zen_source(&source, &id_clone, &config_clone)
+                    })
+                    .await
+                    .map_err(|e| {
+                        BundleError::BuildError(format!("Compilation task join error: {}", e))
+                    })??;
 
                 // Store compiled output for post-build validation
                 // CSS extraction (if any) would happen here or in transform
@@ -344,6 +345,7 @@ mod tests {
                 expression_bindings: Default::default(),
                 marker_bindings: Default::default(),
                 event_bindings: Default::default(),
+                ref_bindings: Default::default(),
                 style_blocks: Default::default(),
             }),
             strict: true,
@@ -400,8 +402,12 @@ mod tests {
     #[test]
     fn compile_zen_source_preserves_compiler_contract_envelope() {
         let config = loader_config_no_metadata();
-        let err = compile_zen_source("<script>const x = 1</script><main>{x}</main>", "page.zen", &config)
-            .expect_err("missing lang should fail");
+        let err = compile_zen_source(
+            "<script>const x = 1</script><main>{x}</main>",
+            "page.zen",
+            &config,
+        )
+        .expect_err("missing lang should fail");
 
         let text = err.to_string();
         assert!(text.starts_with("Zenith requires TypeScript scripts. Add lang=\"ts\"."));

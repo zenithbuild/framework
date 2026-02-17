@@ -88,8 +88,15 @@ async fn strict_mode_matching_metadata_passes() {
     // Provide matching metadata
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(), // HTML not used for expression comparison
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(), // HTML not used for expression comparison
         expressions: vec!["title".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -97,6 +104,8 @@ async fn strict_mode_matching_metadata_passes() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let opts = BundleOptions {
@@ -121,8 +130,15 @@ async fn strict_mode_mismatched_count_fails() {
     // Provide wrong metadata (expects 2 expressions)
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(),
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
         expressions: vec!["title".into(), "extra".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -130,6 +146,8 @@ async fn strict_mode_mismatched_count_fails() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let opts = BundleOptions {
@@ -161,8 +179,15 @@ async fn strict_mode_mismatched_content_fails() {
     // Right count, wrong content
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(),
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
         expressions: vec!["wrong_name".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -170,6 +195,8 @@ async fn strict_mode_mismatched_content_fails() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let opts = BundleOptions {
@@ -281,4 +308,23 @@ async fn no_post_concat_in_bundle() {
     // Must NOT contain bare script injection patterns
     assert!(!result.entry_js.contains("<script"));
     assert!(!result.entry_js.contains("document.write"));
+}
+
+#[tokio::test]
+#[ignore = "Legacy integration test; opt-in via cargo test --test integration -- --ignored"]
+async fn bundle_style_extraction() {
+    let file = create_temp_zen(r#"<div class="red">Hi</div><style>.red { color: red; }</style>"#);
+    let plan = BundlePlan {
+        page_path: file.path().to_string_lossy().to_string(),
+        out_dir: None,
+        mode: BuildMode::Dev,
+    };
+    let opts = BundleOptions::default();
+
+    let result = bundle_page(plan, opts).await.unwrap();
+
+    assert!(result.css.is_some());
+    let css = result.css.unwrap();
+    // Verify CSS content
+    assert!(css.contains(".red { color: red; }"));
 }

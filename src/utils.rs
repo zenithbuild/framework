@@ -187,22 +187,6 @@ pub fn clean_path(path: &str) -> String {
 /// - A default export function (hydration stub)
 pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
     let html_escaped = escape_js_template_literal(&output.html);
-    let mut seen_imports = std::collections::BTreeSet::new();
-    let mut import_lines: Vec<String> = Vec::new();
-    for line in output.imports.iter().chain(output.hoisted.imports.iter()) {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let normalized = if trimmed.ends_with(';') {
-            trimmed.to_string()
-        } else {
-            format!("{trimmed};")
-        };
-        if seen_imports.insert(normalized.clone()) {
-            import_lines.push(normalized);
-        }
-    }
 
     let expr_items: Vec<String> = output
         .expressions
@@ -211,20 +195,15 @@ pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
         .collect();
 
     let expr_array = expr_items.join(", ");
-    let imports_prefix = if import_lines.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n", import_lines.join("\n"))
-    };
 
     format!(
-        r#"{}export const __zenith_html = `{}`;
+        r#"export const __zenith_html = `{}`;
 export const __zenith_expr = [{}];
 export const __zenith_contract = "v0";
 export default function __zenith_page() {{
   return {{ html: __zenith_html, expressions: __zenith_expr, contract: __zenith_contract }};
 }}"#,
-        imports_prefix, html_escaped, expr_array
+        html_escaped, expr_array
     )
 }
 
@@ -588,6 +567,7 @@ mod tests {
             expression_bindings: Default::default(),
             marker_bindings: Default::default(),
             event_bindings: Default::default(),
+            ref_bindings: Default::default(),
             style_blocks: Default::default(),
         };
         let entry = generate_virtual_entry(&output);

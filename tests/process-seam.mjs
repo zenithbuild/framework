@@ -75,6 +75,16 @@ assert.equal(fs.existsSync(outDir), true, 'out dir must exist');
 
 const htmlPath = path.join(outDir, 'index.html');
 assert.equal(fs.existsSync(htmlPath), true, 'index.html must be written');
+const manifestPath = path.join(outDir, 'manifest.json');
+assert.equal(fs.existsSync(manifestPath), true, 'manifest.json must be written');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+assert.equal(typeof manifest.core, 'string', 'manifest.core must be present');
+assert.ok(/^\/assets\/core\.[0-9a-f]{8}\.js$/.test(manifest.core), 'manifest.core must point to emitted core asset');
+assert.equal(
+  fs.existsSync(path.join(outDir, manifest.core.replace(/^\/+/, ''))),
+  true,
+  'manifest.core asset must exist'
+);
 
 const tree = listTree(outDir);
 console.log('DIST TREE:');
@@ -83,6 +93,17 @@ for (const line of tree) {
 }
 
 const html = fs.readFileSync(htmlPath, 'utf8');
+const styleLinks = html.match(/<link\b[^>]*rel="stylesheet"[^>]*>/g) || [];
+const moduleScripts = html.match(/<script\b[^>]*type="module"[^>]*>/g) || [];
+assert.equal(styleLinks.length, 1, 'index.html must include exactly one stylesheet link');
+assert.equal(moduleScripts.length, 1, 'index.html must include exactly one module script');
+assert.ok(styleLinks[0].includes('/assets/styles.'), 'stylesheet link must target emitted manifest CSS');
+assert.equal(
+  html.includes('<!-- ZENITH_STYLES_ANCHOR -->'),
+  false,
+  'styles anchor must not remain after build'
+);
+
 if (Array.isArray(ir.expressions) && ir.expressions.length > 0) {
   const jsAssets = tree.filter((entry) => entry.endsWith('.js'));
   assert.ok(jsAssets.length > 0, 'JS asset expected when expressions exist');
@@ -93,13 +114,19 @@ if (Array.isArray(ir.expressions) && ir.expressions.length > 0) {
 
   const runtimeAssets = tree.filter((entry) => /^assets\/runtime\.[0-9a-f]{8}\.js$/.test(entry));
   assert.equal(runtimeAssets.length, 1, 'exactly one runtime asset must be emitted');
+  const coreAssets = tree.filter((entry) => /^assets\/core\.[0-9a-f]{8}\.js$/.test(entry));
+  assert.equal(coreAssets.length, 1, 'exactly one core asset must be emitted');
 
-  const pageAssets = tree.filter((entry) => /^assets\/[0-9a-f]{8}\.js$/.test(entry));
+  const pageAssets = tree.filter((entry) => /^assets\/(?!runtime\.|router\.|core\.).+\.js$/.test(entry));
   assert.ok(pageAssets.length >= 1, 'at least one page module asset must be emitted');
 
   const pageSource = fs.readFileSync(path.join(outDir, pageAssets[0]), 'utf8');
   assert.equal(pageSource.includes('@zenithbuild/runtime'), false, 'page bundle must not contain bare runtime import');
-  assert.ok(pageSource.includes("import { hydrate } from './runtime."), 'page bundle must import emitted runtime asset relatively');
+  assert.equal(pageSource.includes('.zen'), false, 'page bundle must not contain .zen references');
+  assert.ok(
+    pageSource.includes("from './runtime.") && pageSource.includes('hydrate'),
+    'page bundle must import emitted runtime asset relatively'
+  );
   assert.ok(pageSource.includes('const __zenith_events = ['), 'page bundle must include frozen event table');
   assert.ok(pageSource.includes('const __zenith_markers = ['), 'page bundle must include frozen marker table');
   assert.equal((pageSource.match(/hydrate\(\{/g) || []).length, 1, 'page bundle must contain exactly one hydrate bootstrap call');
@@ -109,6 +136,9 @@ if (Array.isArray(ir.expressions) && ir.expressions.length > 0) {
 
 const routerAssets = tree.filter((entry) => /^assets\/router\.[0-9a-f]{8}\.js$/.test(entry));
 assert.equal(routerAssets.length, 1, 'exactly one router asset must be emitted when router=true');
+const routerSource = fs.readFileSync(path.join(outDir, routerAssets[0]), 'utf8');
+assert.equal(routerSource.includes('.zen'), false, 'router bundle must not contain .zen references');
+assert.equal(routerSource.includes('fetch('), false, 'router bundle must not perform runtime fetch');
 assert.equal(
   fs.existsSync(path.join(outDir, 'assets', 'router-manifest.json')),
   true,
@@ -118,5 +148,42 @@ assert.ok(
   html.includes('<script type="module" src="/assets/router.'),
   'index.html must include router runtime script when router=true'
 );
+
+const jsAssets = tree.filter((entry) => entry.endsWith('.js'));
+const staticImportRe = /\bimport\s+(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+const dynamicImportRe = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const exportFromRe = /\bexport\s+[^'"\n;]*?\s+from\s+['"]([^'"]+)['"]/g;
+
+for (const rel of jsAssets) {
+  const abs = path.join(outDir, rel);
+  const source = fs.readFileSync(abs, 'utf8');
+  if (source.includes('zenith:')) {
+    throw new Error(`runtime purity violation: emitted asset contains zenith:* specifier: ${rel}`);
+  }
+  const specs = new Set();
+
+  for (const re of [staticImportRe, dynamicImportRe, exportFromRe]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(source)) !== null) {
+      specs.add(m[1]);
+    }
+  }
+
+  for (const spec of specs) {
+    let target;
+    if (spec.startsWith('./') || spec.startsWith('../')) {
+      target = path.resolve(path.dirname(abs), spec);
+    } else if (spec.startsWith('/')) {
+      target = path.join(outDir, spec.replace(/^\/+/, ''));
+    } else {
+      throw new Error(`unresolved bare import in emitted asset ${rel}: ${spec}`);
+    }
+
+    if (!fs.existsSync(target)) {
+      throw new Error(`unresolved emitted import in ${rel}: ${spec} -> ${target}`);
+    }
+  }
+}
 
 console.log('Process seam validation passed');

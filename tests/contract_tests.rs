@@ -275,8 +275,15 @@ async fn golden_e2e_with_strict_metadata() {
 
     let metadata = CompilerOutput {
         ir_version: 1,
-        html: String::new(),
+        graph_hash: String::new(),
+        graph_edges: Vec::new(),
+        graph_nodes: Vec::new(),
+        html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
         expressions: vec!["title".into(), "body".into()],
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -284,6 +291,8 @@ async fn golden_e2e_with_strict_metadata() {
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let plan = BundlePlan {

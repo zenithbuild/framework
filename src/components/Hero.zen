@@ -1,0 +1,11 @@
+<script lang="ts">
+const heroRef = ref<HTMLElement>();
+
+zenMount(({ cleanup }) => {
+  void heroRef.current;
+  cleanup(() => {});
+});
+</script>
+<section ref={heroRef} data-hero>
+  <h1>Hero</h1>
+</section>

@@ -1,0 +1,8 @@
+<script lang="ts">
+zenMount(({ cleanup }) => {
+  cleanup(() => {});
+});
+</script>
+<div data-widget>
+  <span>Widget</span>
+</div>

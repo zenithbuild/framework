@@ -1,13 +1,19 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read};
-use std::path::PathBuf;
-use std::process;
+use std::path::{Path, PathBuf};
+use std::process::{self, Command};
 
 use regex::Regex;
+
 use serde::{Deserialize, Serialize};
 use zenith_bundler::CompilerOutput;
+use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::script::ExtractedStyleBlock;
+
+mod template_bridge;
+mod vendor;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -23,6 +29,12 @@ struct BundlerInput {
 #[serde(deny_unknown_fields)]
 struct CompilerIr {
     ir_version: u32,
+    #[serde(default)]
+    graph_hash: Option<String>,
+    #[serde(default)]
+    graph_edges: Vec<String>,
+    #[serde(default)]
+    graph_nodes: Vec<CompilerGraphNode>,
     html: String,
     expressions: Vec<String>,
     #[serde(default)]
@@ -32,6 +44,16 @@ struct CompilerIr {
     #[serde(default)]
     component_instances: Vec<CompilerComponentInstance>,
     #[serde(default)]
+    imports: Vec<CompilerImport>,
+    #[serde(default)]
+    modules: Vec<CompilerModule>,
+    #[serde(default)]
+    server_script: Option<CompilerServerScript>,
+    #[serde(default)]
+    prerender: bool,
+    #[serde(default)]
+    ssr_data: Option<serde_json::Value>,
+    #[serde(default)]
     signals: Vec<CompilerSignal>,
     #[serde(default)]
     expression_bindings: Vec<CompilerExpressionBinding>,
@@ -39,6 +61,10 @@ struct CompilerIr {
     marker_bindings: Vec<MarkerBinding>,
     #[serde(default)]
     event_bindings: Vec<EventBinding>,
+    #[serde(default)]
+    ref_bindings: Vec<CompilerRefBinding>,
+    #[serde(default)]
+    style_blocks: Vec<ExtractedStyleBlock>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -46,10 +72,13 @@ struct CompilerIr {
 struct CompilerHoisted {
     #[serde(default)]
     imports: Vec<String>,
+    #[allow(dead_code)]
     #[serde(default)]
     declarations: Vec<String>,
+    #[allow(dead_code)]
     #[serde(default)]
     functions: Vec<String>,
+    #[allow(dead_code)]
     #[serde(default)]
     signals: Vec<String>,
     #[serde(default)]
@@ -61,6 +90,7 @@ struct CompilerHoisted {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CompilerStateBinding {
+    #[allow(dead_code)]
     key: String,
     value: String,
 }
@@ -69,18 +99,77 @@ struct CompilerStateBinding {
 #[serde(deny_unknown_fields)]
 struct CompilerComponentScript {
     hoist_id: String,
+    #[serde(default)]
+    module_id: String,
     factory: String,
     #[serde(default)]
     imports: Vec<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    deps: Vec<String>,
     code: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerModule {
+    id: String,
+    source: String,
+    #[serde(default)]
+    deps: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CompilerComponentInstance {
     instance: String,
+    #[serde(default)]
+    instance_id: usize,
     hoist_id: String,
+    #[serde(default)]
+    import_index: Option<usize>,
+    #[serde(default)]
+    marker_index: usize,
     selector: String,
+    #[serde(default)]
+    props: Vec<CompilerComponentProp>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerImport {
+    local: String,
+    spec: String,
+    hoist_id: String,
+    file_hash: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerServerScript {
+    source: String,
+    prerender: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerGraphNode {
+    id: String,
+    hoist_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerComponentProp {
+    name: String,
+    #[serde(rename = "type")]
+    prop_type: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<serde_json::Value>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +209,14 @@ struct RouterRouteEntry {
     output: String,
     html: String,
     expressions: Vec<String>,
+    #[serde(default)]
+    page_asset: Option<String>,
+    #[serde(default)]
+    server_script: Option<String>,
+    #[serde(default)]
+    prerender: bool,
+    #[serde(default)]
+    ssr_data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,6 +244,14 @@ struct EventBinding {
     selector: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+struct CompilerRefBinding {
+    index: usize,
+    identifier: String,
+    selector: String,
+}
+
 fn main() {
     if let Err(err) = run() {
         eprintln!("[zenith-bundler] {}", err);
@@ -156,6 +261,15 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let out_dir = parse_out_dir()?;
+    let out_dir_tmp = out_dir.with_extension("tmp"); // dist_tmp
+
+    // Clean temp dir if exists
+    if out_dir_tmp.exists() {
+        fs::remove_dir_all(&out_dir_tmp)
+            .map_err(|e| format!("failed to clean temp dir '{}': {e}", out_dir_tmp.display()))?;
+    }
+    fs::create_dir_all(&out_dir_tmp)
+        .map_err(|e| format!("failed to create temp dir '{}': {e}", out_dir_tmp.display()))?;
 
     let mut stdin_payload = String::new();
     io::stdin()
@@ -166,102 +280,511 @@ fn run() -> Result<(), String> {
         return Err("stdin payload is empty".into());
     }
 
-    let payload: BundlerInput =
-        serde_json::from_str(&stdin_payload).map_err(|e| format!("invalid input JSON: {e}"))?;
-    validate_payload(&payload)?;
+    // 1. Parse Batch Input
+    // Supports both single object (legacy/test) and array (batch)
+    let inputs: Vec<BundlerInput> = if stdin_payload.trim().starts_with('[') {
+        serde_json::from_str(&stdin_payload).map_err(|e| format!("invalid batch JSON: {e}"))?
+    } else {
+        let single: BundlerInput =
+            serde_json::from_str(&stdin_payload).map_err(|e| format!("invalid input JSON: {e}"))?;
+        vec![single]
+    };
 
-    let mut html = ensure_document_html(&payload.ir.html);
+    if inputs.is_empty() {
+        return Ok(());
+    }
 
-    fs::create_dir_all(&out_dir)
-        .map_err(|e| format!("failed to create output dir '{}': {e}", out_dir.display()))?;
+    let template_assets = template_bridge::render_assets(&template_bridge::RenderAssetsRequest {
+        manifest_json: "{}".to_string(),
+        runtime_import: String::new(),
+        core_import: String::new(),
+    })?;
+    let expected_ir_version = template_assets.ir_version;
 
-    let runtime_required =
-        !payload.ir.expressions.is_empty() || !payload.ir.component_instances.is_empty();
-    if runtime_required {
-        let (markers, events) = if payload.ir.marker_bindings.is_empty() {
-            derive_binding_tables(&payload.ir)?
+    // Validate all inputs
+    for input in &inputs {
+        validate_payload(input, expected_ir_version)?;
+    }
+
+    let router_enabled = inputs.iter().any(|i| i.router);
+
+    // 2. Build Global Graph (In-Memory)
+    // We must deduplicate modules and edges across all pages to form a single authority.
+    let global_graph = build_global_graph(&inputs)?;
+    let global_graph_hash = compute_global_graph_hash(&global_graph);
+    let project_root = env::current_dir()
+        .map_err(|e| format!("failed to resolve current working directory: {e}"))?;
+    let project_root = fs::canonicalize(&project_root).map_err(|e| {
+        format!(
+            "failed to canonicalize current working directory '{}': {e}",
+            project_root.display()
+        )
+    })?;
+
+    let mut processed_htmls = Vec::with_capacity(inputs.len());
+    for input in &inputs {
+        let html = ensure_document_html(&input.ir.html);
+        let (_processed_css, html_stripped) =
+            zenith_bundler::utils::process_css(&input.ir.style_blocks, &html)
+                .map_err(|e| format!("CSS processing failed for {}: {e}", input.route))?;
+
+        let html_for_emission = if input.ir.style_blocks.is_empty() {
+            // Preserve existing anchor behavior for pages without compiler-emitted style blocks.
+            html
+        } else {
+            html_stripped
+        };
+        processed_htmls.push(html_for_emission);
+    }
+    let final_css_content = build_css_bundle(&inputs, &project_root)?;
+
+    // 3b. Vendor Bundling (Rolldown)
+    // We must run this before emitting JS assets so we can rewrite imports.
+    let vendor_result = {
+        let rt = tokio::runtime::Runtime::new().expect("failed to init tokio runtime");
+        rt.block_on(vendor::bundle_vendor(&inputs, &out_dir_tmp))
+            .map_err(|e| format!("Vendor bundling failed: {}", e))?
+    };
+
+    let vendor_map = if let Some(meta) = &vendor_result {
+        println!(
+            "[zenith] Vendor bundle: {} ({} specifiers matched)",
+            meta.filename,
+            meta.specifiers.len()
+        );
+        let replacement = format!("/assets/{}", meta.filename);
+        meta.specifiers
+            .iter()
+            .map(|s| (s.clone(), replacement.clone()))
+            .collect::<BTreeMap<_, _>>()
+    } else {
+        BTreeMap::new()
+    };
+
+    // Rewrite Imports in Inputs (if vendor bundle exists)
+    let mut inputs = inputs; // Shadow as mutable for rewriting
+    for input in &mut inputs {
+        for block in &mut input.ir.hoisted.code {
+            *block = strip_zen_import_statements(&strip_css_import_statements(block));
+        }
+    }
+    if !vendor_map.is_empty() {
+        for input in &mut inputs {
+            // Rewrite modules (source code)
+            for module in &mut input.ir.modules {
+                if !is_browser_js_module(&module.id) {
+                    continue;
+                }
+                module.source =
+                    zenith_bundler::utils::rewrite_js_imports_ast(&module.source, &vendor_map)
+                        .map_err(|e| format!("Rewrite failed for module {}: {}", module.id, e))?;
+            }
+            // Rewrite component scripts (compiled components)
+            for script in input.ir.components_scripts.values_mut() {
+                script.code =
+                    zenith_bundler::utils::rewrite_js_imports_ast(&script.code, &vendor_map)
+                        .map_err(|e| {
+                            format!(
+                                "Rewrite failed for component script {}: {}",
+                                script.hoist_id, e
+                            )
+                        })?;
+                for import_line in &mut script.imports {
+                    if let Some(spec) = extract_static_import_specifier(import_line) {
+                        if let Some(replacement) = vendor_map.get(&spec) {
+                            *import_line =
+                                rewrite_import_specifier_literal(import_line, &spec, replacement)?;
+                        }
+                    }
+                }
+            }
+            // Rewrite hoisted code blocks that are spliced directly into page entry assets.
+            for block in &mut input.ir.hoisted.code {
+                *block = zenith_bundler::utils::rewrite_js_imports_ast(block, &vendor_map)
+                    .map_err(|e| format!("Rewrite failed for hoisted block: {}", e))?;
+            }
+            // Rewrite imports list (for virtual entry generation)
+            for imp in &mut input.ir.imports {
+                if let Some(replacement) = vendor_map.get(&imp.spec) {
+                    imp.spec = replacement.clone();
+                }
+            }
+            // Rewrite hoisted imports
+            for entry in &mut input.ir.hoisted.imports {
+                if let Some(spec) = extract_static_import_specifier(entry) {
+                    if let Some(replacement) = vendor_map.get(&spec) {
+                        *entry = rewrite_import_specifier_literal(entry, &spec, replacement)?;
+                        continue;
+                    }
+                }
+                if let Some(replacement) = vendor_map.get(entry) {
+                    *entry = replacement.clone();
+                }
+            }
+        }
+    }
+
+    // Emit Global CSS
+    let css_hash = stable_hash_8(&final_css_content);
+    let css_rel = format!("assets/styles.{}.css", css_hash);
+    let css_path = out_dir_tmp.join(&css_rel);
+    write_file(&css_path, &final_css_content)?;
+
+    // 4. Generate Runtime & Assets
+    let runtime_rel = ensure_runtime_asset(&out_dir_tmp, &template_assets.runtime_source)?;
+    let runtime_import_spec = runtime_import_specifier(&runtime_rel)?;
+    let (core_rel, core_hash) = ensure_core_asset(&out_dir_tmp, &runtime_rel)?;
+    let core_import_spec = format!("/{}", core_rel);
+
+    // Collect all component scripts from inputs
+    let mut all_component_scripts = BTreeMap::new();
+    for input in &inputs {
+        for (id, script) in &input.ir.components_scripts {
+            all_component_scripts.insert(id.clone(), script.clone());
+        }
+    }
+    let module_registry = build_module_registry(&inputs)?;
+
+    // Collect all ref bindings across pages for component wiring
+    let mut all_ref_bindings = Vec::new();
+    for input in &inputs {
+        all_ref_bindings.extend(input.ir.ref_bindings.iter().cloned());
+    }
+
+    // Emit Components
+    let component_assets = emit_component_assets(
+        &out_dir_tmp,
+        &all_component_scripts,
+        &runtime_import_spec,
+        &module_registry,
+        &core_import_spec,
+        &all_ref_bindings,
+    )?;
+
+    // 5. Generate Manifest Struct (In-Memory)
+    let mut manifest_chunks = BTreeMap::new();
+    let mut page_assets = Vec::new();
+
+    // Process each page
+    for (input, html_stripped) in inputs.iter().zip(processed_htmls) {
+        let (markers, events) = if input.ir.marker_bindings.is_empty() {
+            derive_binding_tables(&input.ir)?
         } else {
             (
-                payload.ir.marker_bindings.clone(),
-                payload.ir.event_bindings.clone(),
+                input.ir.marker_bindings.clone(),
+                input.ir.event_bindings.clone(),
             )
         };
-        let runtime_rel = ensure_runtime_asset(&out_dir)?;
-        let runtime_script_src = format!("/{runtime_rel}");
-        let runtime_import_spec = runtime_import_specifier(&runtime_rel)?;
-        let component_assets = emit_component_assets(
-            &out_dir,
-            &payload.ir.components_scripts,
-            &runtime_import_spec,
-        )?;
+
+        // SSR Data
+        let prerender_ssr_data = if input.ir.prerender {
+            if let Some(existing) = &input.ir.ssr_data {
+                Some(existing.clone())
+            } else {
+                run_server_script(&input.ir.server_script, &BTreeMap::new())?
+            }
+        } else {
+            input.ir.ssr_data.clone()
+        };
+
         let js = generate_entry_js(
-            &payload.ir,
+            &input.ir,
             &runtime_import_spec,
             &markers,
             &events,
             &component_assets,
+            &input.route,
+            prerender_ssr_data.as_ref(),
+            &global_graph_hash,
+            router_enabled,
         )?;
+
+        // Hash depends on Global Graph Hash + Content
         let js_hash = stable_hash_8(&js);
-        let js_rel = format!("assets/{js_hash}.js");
-        let js_path = out_dir.join(&js_rel);
-        if let Some(parent) = js_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("failed to create asset dir '{}': {e}", parent.display()))?;
-        }
-        fs::write(&js_path, js)
-            .map_err(|e| format!("failed to write asset '{}': {e}", js_path.display()))?;
+        let js_rel = format!(
+            "assets/{}.{}.js",
+            sanitize_route_to_token(&input.route),
+            js_hash
+        );
 
-        html = inject_script_once(&html, &runtime_script_src, "data-zx-runtime");
-        html = inject_script_once(&html, &format!("/{js_rel}"), "data-zx-page");
+        if has_runtime_zen_reference(&js) {
+            return Err(format!(
+                "Runtime graph purity violation: page bundle for route '{}' contains a .zen module specifier",
+                input.route
+            ));
+        }
+
+        let js_path = out_dir_tmp.join(&js_rel);
+        write_file(&js_path, &js)?;
+
+        manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
+        page_assets.push((
+            input.route.clone(),
+            html_stripped.clone(),
+            js_rel,
+            input.ir.expressions.clone(),
+            input
+                .ir
+                .server_script
+                .as_ref()
+                .map(|script| script.source.clone()),
+            input.ir.prerender,
+            prerender_ssr_data.clone(),
+        ));
     }
 
-    if payload.router {
-        let output_path = route_to_output_path(&payload.route)
-            .to_string_lossy()
-            .replace('\\', "/");
+    // 6. Generate Router & Manifest
+    let mut router_rel_path = None;
+    let manifest_hash = compute_manifest_hash(&global_graph_hash, &core_hash, &manifest_chunks);
+    let manifest_json_str = {
+        let manifest = Manifest {
+            entry: format!("/{}", runtime_rel),
+            vendor: vendor_result
+                .as_ref()
+                .map(|m| format!("/assets/{}", m.filename)),
+            css: format!("/{}", css_rel),
+            core: format!("/{}", core_rel),
+            chunks: manifest_chunks.clone(),
+            hash: manifest_hash.clone(),
+            router: None, // Circular dependency if we hash router here. Router needs manifest.
+        };
+        // We serialize WITHOUT router first to generate the manifest for injection.
+        // Wait, the router needs the manifest.
+        // The manifest contains the chunks.
+        // The router script is part of the bundle.
+        // The MANIFEST file should contain the router path.
+        // This is a cycle: Router -> needs Manifest -> needs Router Path -> needs Router Hash -> needs Router Content -> needs Manifest.
+        // BREAK THE CYCLE:
+        // 1. Generate Manifest (chunks, css, entry).
+        // 2. Inject Manifest into Router.
+        // 3. Hash Router.
+        // 4. Update Manifest with Router Path.
+        // 5. Write Manifest.
+        serde_json::to_string(&manifest).expect("failed to serialize partial manifest")
+    };
 
-        upsert_router_manifest(
-            &out_dir,
-            RouterRouteEntry {
-                path: payload.route.clone(),
-                output: output_path,
-                html: payload.ir.html.clone(),
-                expressions: payload.ir.expressions.clone(),
-            },
-        )?;
-
-        let router_js = generate_router_runtime_js();
-        let router_hash = stable_hash_8(&router_js);
-        let router_rel = format!("assets/router.{router_hash}.js");
-        let router_path = out_dir.join(&router_rel);
-        if let Some(parent) = router_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!(
-                    "failed to create router asset dir '{}': {e}",
-                    parent.display()
-                )
+    if router_enabled {
+        let rendered_assets =
+            template_bridge::render_assets(&template_bridge::RenderAssetsRequest {
+                manifest_json: manifest_json_str.clone(),
+                runtime_import: format!("/{}", runtime_rel),
+                core_import: format!("/{}", core_rel),
             })?;
+        let router_source = rendered_assets.router_source;
+
+        if has_runtime_zen_reference(&router_source) {
+            return Err(
+                "Runtime graph purity violation: router bundle contains a .zen module specifier"
+                    .into(),
+            );
         }
-        fs::write(&router_path, router_js).map_err(|e| {
-            format!(
-                "failed to write router asset '{}': {e}",
-                router_path.display()
-            )
-        })?;
+        if router_source.contains("zenith:") {
+            return Err(
+                "Runtime graph purity violation: router bundle contains a zenith:* specifier"
+                    .into(),
+            );
+        }
+        if router_source.contains("fetch(") {
+            return Err("Runtime graph purity violation: router bundle contains 'fetch('".into());
+        }
 
-        html = inject_script_once(&html, &format!("/{router_rel}"), "data-zx-router");
+        let router_hash = stable_hash_8(&router_source);
+        let r_rel = format!("assets/router.{}.js", router_hash);
+        router_rel_path = Some(format!("/{}", r_rel));
+        write_file(&out_dir_tmp.join(&r_rel), &router_source)?;
     }
 
-    let html_rel = route_to_output_path(&payload.route);
-    let html_path = out_dir.join(html_rel);
-    if let Some(parent) = html_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create html dir '{}': {e}", parent.display()))?;
+    verify_emitted_js_imports(&out_dir_tmp)?;
+
+    // Final Manifest with Router
+    let final_manifest = Manifest {
+        entry: format!("/{}", runtime_rel),
+        vendor: vendor_result
+            .as_ref()
+            .map(|m| format!("/assets/{}", m.filename)),
+        css: format!("/{}", css_rel),
+        core: format!("/{}", core_rel),
+        chunks: manifest_chunks,
+        hash: manifest_hash,
+        router: router_rel_path.clone(),
+    };
+    let final_manifest_json = serde_json::to_string_pretty(&final_manifest)
+        .map_err(|e| format!("failed to serialize manifest: {e}"))?;
+    write_file(&out_dir_tmp.join("manifest.json"), &final_manifest_json)?;
+
+    if router_enabled {
+        let mut router_manifest = RouterManifest::default();
+        for (route, _html_tpl, js_rel, expressions, server_script, prerender, ssr_data) in
+            &page_assets
+        {
+            let output = format!(
+                "/{}",
+                route_to_output_path(route)
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            );
+            router_manifest.routes.push(RouterRouteEntry {
+                path: route.clone(),
+                output,
+                html: route.clone(),
+                expressions: expressions.clone(),
+                page_asset: Some(js_rel.clone()),
+                server_script: server_script.clone(),
+                prerender: *prerender,
+                ssr_data: ssr_data.clone(),
+            });
+        }
+        router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
+        let router_manifest_json = serde_json::to_string(&router_manifest)
+            .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
+        write_file(
+            &out_dir_tmp.join("assets/router-manifest.json"),
+            &router_manifest_json,
+        )?;
     }
-    fs::write(&html_path, html)
-        .map_err(|e| format!("failed to write html '{}': {e}", html_path.display()))?;
+
+    // 7. Write HTML Files (Injecting Manifest Paths)
+    for (route, html_tpl, js_rel, _expressions, _server_script, _prerender, _ssr_data) in
+        page_assets
+    {
+        let mut html = inject_stylesheet_link_once(&html_tpl, &css_rel, &route)?;
+
+        if let Some(r_path) = &router_rel_path {
+            // Router mode: single module entry point in HTML.
+            html = inject_script_once(&html, r_path, "data-zx-router");
+        } else {
+            // Non-router mode: page module is the single module entry point.
+            html = inject_script_once(&html, &format!("/{}", js_rel), "data-zx-page");
+        }
+
+        let module_script_count = html.matches("<script type=\"module\"").count();
+        if module_script_count != 1 {
+            return Err(format!(
+                "Route '{}' must contain exactly one module entry script, found {}",
+                route, module_script_count
+            ));
+        }
+        let stylesheet_link_count = html.matches("rel=\"stylesheet\"").count();
+        if stylesheet_link_count != 1 {
+            return Err(format!(
+                "Route '{}' must contain exactly one stylesheet link, found {}",
+                route, stylesheet_link_count
+            ));
+        }
+
+        // Output HTML
+        let html_rel = route_to_output_path(&route);
+        let html_path = out_dir_tmp.join(html_rel);
+        write_file(&html_path, &html)?;
+    }
+
+    // 8. Atomic Swap
+    // dist_tmp -> dist
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir)
+            .map_err(|e| format!("failed to remove existing out_dir: {e}"))?;
+    }
+    fs::rename(&out_dir_tmp, &out_dir)
+        .map_err(|e| format!("failed to rename temp dir to output dir: {e}"))?;
 
     Ok(())
+}
+
+// Data Structures
+
+#[derive(Debug, Serialize)]
+struct Manifest {
+    entry: String,
+    vendor: Option<String>,
+    router: Option<String>,
+    css: String,
+    core: String,
+    hash: String,
+    chunks: BTreeMap<String, String>,
+}
+
+struct GlobalGraph {
+    nodes: Vec<CompilerGraphNode>,
+    edges: Vec<String>,
+}
+
+fn build_global_graph(inputs: &[BundlerInput]) -> Result<GlobalGraph, String> {
+    let mut nodes = BTreeMap::new(); // hoist_id -> node
+    let mut edges = Vec::new();
+
+    for input in inputs {
+        for node in &input.ir.graph_nodes {
+            nodes.entry(node.hoist_id.clone()).or_insert(node.clone());
+        }
+        edges.extend(input.ir.graph_edges.clone());
+    }
+
+    // Topo Sort / Deterministic Order
+    // For now, since we just need hash stability and emission list,
+    // sorting by hoist_id keys is sufficient for current architecture.
+    // Real topo-sort would require adjacency list, but since modules are self-contained
+    // and just need consistent hashing, sorting keys works.
+    let mut sorted_nodes: Vec<CompilerGraphNode> = nodes.into_values().collect();
+    sorted_nodes.sort_by(|a, b| a.hoist_id.cmp(&b.hoist_id));
+
+    edges.sort();
+    edges.dedup();
+
+    Ok(GlobalGraph {
+        nodes: sorted_nodes,
+        edges,
+    })
+}
+
+fn compute_global_graph_hash(graph: &GlobalGraph) -> String {
+    let mut seed = String::new();
+    for node in &graph.nodes {
+        seed.push_str("node:");
+        seed.push_str(&node.hoist_id);
+        seed.push('\n');
+    }
+    for edge in &graph.edges {
+        seed.push_str("edge:");
+        seed.push_str(edge);
+        seed.push('\n');
+    }
+    sha256_hex(seed.as_bytes())
+}
+
+fn build_module_registry(
+    inputs: &[BundlerInput],
+) -> Result<BTreeMap<String, CompilerModule>, String> {
+    let mut modules = BTreeMap::<String, CompilerModule>::new();
+    for input in inputs {
+        for module in &input.ir.modules {
+            if let Some(existing) = modules.get(&module.id) {
+                if existing.source != module.source || existing.deps != module.deps {
+                    return Err(format!(
+                        "module registry conflict for '{}': multiple source/dependency variants discovered",
+                        module.id
+                    ));
+                }
+                continue;
+            }
+            modules.insert(module.id.clone(), module.clone());
+        }
+    }
+    Ok(modules)
+}
+
+fn write_file(path: &PathBuf, content: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("failed to create dir: {e}"))?;
+    }
+    fs::write(path, content).map_err(|e| format!("failed to write file '{}': {e}", path.display()))
+}
+
+fn sanitize_route_to_token(route: &str) -> String {
+    let s = route.replace('/', "_");
+    if s == "_" {
+        return "index".to_string();
+    }
+    s.trim_start_matches('_').to_string()
 }
 
 fn parse_out_dir() -> Result<PathBuf, String> {
@@ -287,11 +810,11 @@ fn parse_out_dir() -> Result<PathBuf, String> {
     out_dir.ok_or_else(|| "required flag missing: --out-dir <path>".to_string())
 }
 
-fn validate_payload(payload: &BundlerInput) -> Result<(), String> {
-    if payload.ir.ir_version != 1 {
+fn validate_payload(payload: &BundlerInput, expected_ir_version: u32) -> Result<(), String> {
+    if payload.ir.ir_version != expected_ir_version {
         return Err(format!(
-            "unsupported input.ir.ir_version {} (expected 1)",
-            payload.ir.ir_version
+            "unsupported input.ir.ir_version {} (expected {})",
+            payload.ir.ir_version, expected_ir_version
         ));
     }
     if payload.route.trim().is_empty() {
@@ -305,6 +828,31 @@ fn validate_payload(payload: &BundlerInput) -> Result<(), String> {
     }
     if payload.ir.html.trim().is_empty() {
         return Err("input.ir.html must be a non-empty string".into());
+    }
+    let incoming_graph_hash = payload
+        .ir
+        .graph_hash
+        .as_ref()
+        .ok_or_else(|| "input.ir.graph_hash must be provided".to_string())?;
+    if incoming_graph_hash.trim().is_empty() {
+        return Err("input.ir.graph_hash must be non-empty".into());
+    }
+    let recomputed = recompute_graph_hash(payload);
+    if recomputed != *incoming_graph_hash {
+        return Err(format!(
+            "ERROR: graph_hash mismatch. IR graph_hash={}, recomputed={}.\nPayload rejected.",
+            incoming_graph_hash, recomputed
+        ));
+    }
+    for (idx, node) in payload.ir.graph_nodes.iter().enumerate() {
+        if node.id.trim().is_empty() {
+            return Err(format!("input.ir.graph_nodes[{idx}].id must be non-empty"));
+        }
+        if node.hoist_id.trim().is_empty() {
+            return Err(format!(
+                "input.ir.graph_nodes[{idx}].hoist_id must be non-empty"
+            ));
+        }
     }
     if !payload.ir.expression_bindings.is_empty()
         && payload.ir.expression_bindings.len() != payload.ir.expressions.len()
@@ -384,7 +932,49 @@ fn validate_payload(payload: &BundlerInput) -> Result<(), String> {
                 hoist_id, script.hoist_id
             ));
         }
+        if script.module_id.trim().is_empty() {
+            return Err(format!(
+                "input.ir.components_scripts['{}'].module_id must be non-empty",
+                hoist_id
+            ));
+        }
     }
+    let mut seen_module_ids = BTreeMap::new();
+    for (index, module) in payload.ir.modules.iter().enumerate() {
+        if module.id.trim().is_empty() {
+            return Err(format!("input.ir.modules[{index}].id must be non-empty"));
+        }
+        if module.source.trim().is_empty() {
+            return Err(format!(
+                "input.ir.modules[{index}].source must be non-empty"
+            ));
+        }
+        if seen_module_ids.insert(module.id.clone(), true).is_some() {
+            return Err(format!(
+                "input.ir.modules contains duplicate id '{}'",
+                module.id
+            ));
+        }
+    }
+    for (index, import) in payload.ir.imports.iter().enumerate() {
+        if import.local.trim().is_empty() {
+            return Err(format!("input.ir.imports[{index}].local must be non-empty"));
+        }
+        if import.spec.trim().is_empty() {
+            return Err(format!("input.ir.imports[{index}].spec must be non-empty"));
+        }
+        if import.hoist_id.trim().is_empty() {
+            return Err(format!(
+                "input.ir.imports[{index}].hoist_id must be non-empty"
+            ));
+        }
+        if import.file_hash.trim().is_empty() {
+            return Err(format!(
+                "input.ir.imports[{index}].file_hash must be non-empty"
+            ));
+        }
+    }
+    let mut seen_instance_ids = BTreeMap::new();
     for instance in &payload.ir.component_instances {
         if instance.instance.trim().is_empty() {
             return Err("input.ir.component_instances[].instance must be non-empty".into());
@@ -401,6 +991,78 @@ fn validate_payload(payload: &BundlerInput) -> Result<(), String> {
                 "input.ir.component_instances references unknown hoist_id '{}'",
                 instance.hoist_id
             ));
+        }
+        if seen_instance_ids
+            .insert(instance.instance_id, true)
+            .is_some()
+        {
+            return Err(format!(
+                "input.ir.component_instances contains duplicate instance_id {}",
+                instance.instance_id
+            ));
+        }
+        if let Some(import_index) = instance.import_index {
+            if import_index >= payload.ir.imports.len() {
+                return Err(format!(
+                    "input.ir.component_instances['{}'].import_index out of bounds: {}",
+                    instance.instance, import_index
+                ));
+            }
+        }
+        let mut seen_prop_names = BTreeMap::new();
+        for prop in &instance.props {
+            if prop.name.trim().is_empty() {
+                return Err("input.ir.component_instances props name must be non-empty".into());
+            }
+            if seen_prop_names.insert(prop.name.clone(), true).is_some() {
+                return Err(format!(
+                    "input.ir.component_instances['{}'] contains duplicate prop '{}'",
+                    instance.instance, prop.name
+                ));
+            }
+
+            match prop.prop_type.as_str() {
+                "static" => {
+                    if prop.value.is_none() {
+                        return Err(format!(
+                            "input.ir.component_instances['{}'].props['{}'] static prop must include value",
+                            instance.instance, prop.name
+                        ));
+                    }
+                }
+                "signal" => {
+                    let Some(index) = prop.index else {
+                        return Err(format!(
+                            "input.ir.component_instances['{}'].props['{}'] signal prop must include index",
+                            instance.instance, prop.name
+                        ));
+                    };
+                    if index >= payload.ir.signals.len() {
+                        return Err(format!(
+                            "input.ir.component_instances['{}'].props['{}'] signal index out of bounds: {}",
+                            instance.instance, prop.name, index
+                        ));
+                    }
+                }
+                other => {
+                    return Err(format!(
+                        "input.ir.component_instances['{}'].props['{}'] unsupported type '{}'",
+                        instance.instance, prop.name, other
+                    ));
+                }
+            }
+        }
+    }
+
+    if payload.ir.prerender && payload.ir.server_script.is_none() {
+        return Err("input.ir.prerender=true requires input.ir.server_script".into());
+    }
+    if let Some(server_script) = &payload.ir.server_script {
+        if server_script.source.trim().is_empty() {
+            return Err("input.ir.server_script.source must be non-empty".into());
+        }
+        if server_script.prerender != payload.ir.prerender {
+            return Err("input.ir.server_script.prerender must match input.ir.prerender".into());
         }
     }
 
@@ -447,6 +1109,99 @@ fn inject_script_once(html: &str, script_src: &str, marker_attr: &str) -> String
     format!("{html}{script_tag}")
 }
 
+fn inject_stylesheet_link_once(html: &str, css_rel: &str, route: &str) -> Result<String, String> {
+    let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
+    let css_link = format!("<link href=\"/{}\" rel=\"stylesheet\">", css_rel);
+    let anchor_count = html.matches(anchor).count();
+
+    let updated = match anchor_count {
+        1 => html.replacen(anchor, &css_link, 1),
+        0 => {
+            let stylesheet_count = count_stylesheet_links(html)?;
+            match stylesheet_count {
+                1 => replace_single_stylesheet_link(html, &css_link)?,
+                0 => {
+                    // Fallback: anchor was stripped by compiler (HTML comments are not preserved
+                    // in AST). Inject the stylesheet link into <head> or append before </head>.
+                    if html.contains("</head>") {
+                        html.replacen("</head>", &format!("{}\n</head>", css_link), 1)
+                    } else if html.contains("<head>") {
+                        html.replacen("<head>", &format!("<head>\n{}", css_link), 1)
+                    } else {
+                        // Fragment-only case: prepend the link
+                        format!("{}\n{}", css_link, html)
+                    }
+                }
+                _ => {
+                    return Err(format!(
+                        "Route '{}' must contain exactly one ZENITH_STYLES_ANCHOR or one stylesheet link before emission, found anchors={} stylesheets={}",
+                        route, anchor_count, stylesheet_count
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(format!(
+                "Route '{}' must contain exactly one ZENITH_STYLES_ANCHOR before emission, found {}",
+                route, anchor_count
+            ));
+        }
+    };
+
+    if updated.contains(anchor) {
+        return Err(format!(
+            "Route '{}' retained ZENITH_STYLES_ANCHOR after stylesheet injection",
+            route
+        ));
+    }
+    let stylesheet_count = count_stylesheet_links(&updated)?;
+    if stylesheet_count != 1 {
+        return Err(format!(
+            "Route '{}' must contain exactly one stylesheet link, found {}",
+            route, stylesheet_count
+        ));
+    }
+    if updated.matches(&format!("href=\"/{}\"", css_rel)).count() != 1 {
+        return Err(format!(
+            "Route '{}' must contain exactly one stylesheet link for '{}'",
+            route, css_rel
+        ));
+    }
+
+    Ok(updated)
+}
+
+fn count_stylesheet_links(html: &str) -> Result<usize, String> {
+    let stylesheet_re = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*['"]stylesheet['"][^>]*>"#)
+        .map_err(|e| format!("failed to compile stylesheet link regex: {e}"))?;
+    Ok(stylesheet_re.find_iter(html).count())
+}
+
+fn replace_single_stylesheet_link(html: &str, replacement: &str) -> Result<String, String> {
+    let stylesheet_re = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*['"]stylesheet['"][^>]*>"#)
+        .map_err(|e| format!("failed to compile stylesheet link rewrite regex: {e}"))?;
+
+    let mut replaced = false;
+    let rewritten = stylesheet_re
+        .replace_all(html, |captures: &regex::Captures| {
+            if replaced {
+                captures
+                    .get(0)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default()
+            } else {
+                replaced = true;
+                replacement.to_string()
+            }
+        })
+        .into_owned();
+
+    if !replaced {
+        return Err("expected existing stylesheet link to rewrite".to_string());
+    }
+    Ok(rewritten)
+}
+
 fn route_to_output_path(route_path: &str) -> PathBuf {
     if route_path == "/" {
         return PathBuf::from("index.html");
@@ -477,7 +1232,321 @@ fn stable_hash_8(content: &str) -> String {
     format!("{normalized:08x}")
 }
 
-fn derive_binding_tables(ir: &CompilerIr) -> Result<(Vec<MarkerBinding>, Vec<EventBinding>), String> {
+fn compute_manifest_hash(
+    global_graph_hash: &str,
+    core_hash: &str,
+    chunks: &BTreeMap<String, String>,
+) -> String {
+    let mut seed = String::new();
+    seed.push_str(global_graph_hash);
+    seed.push('\n');
+    seed.push_str(core_hash);
+    seed.push('\n');
+    for chunk_path in chunks.values() {
+        seed.push_str(chunk_path);
+        seed.push('\n');
+    }
+    sha256_hex(seed.as_bytes())
+}
+
+fn has_runtime_zen_reference(js: &str) -> bool {
+    let specifier_re = Regex::new(
+        r#"(?m)(?:from\s+['"][^'"]*\.zen['"]|import\s*\(\s*['"][^'"]*\.zen['"]\s*\)|require\s*\(\s*['"][^'"]*\.zen['"]\s*\))"#,
+    )
+    .expect("valid .zen specifier regex");
+    specifier_re.is_match(js)
+}
+
+fn verify_emitted_js_imports(out_dir: &PathBuf) -> Result<(), String> {
+    let assets_dir = out_dir.join("assets");
+    if !assets_dir.exists() {
+        return Ok(());
+    }
+
+    for file in list_js_assets(&assets_dir)? {
+        let source = fs::read_to_string(&file)
+            .map_err(|e| format!("failed to read emitted asset '{}': {e}", file.display()))?;
+
+        if source.contains("zenith:") {
+            return Err(format!(
+                "ERROR: Emission failed - unresolved import\n  unresolved_specifier: zenith:*\n  referenced_from_asset: {}\n  recommended_action: all zenith:* imports must be rewritten at bundle time",
+                file.display()
+            ));
+        }
+
+        for expression in collect_dynamic_import_expressions(&source) {
+            let trimmed = expression.trim();
+            let is_literal = (trimmed.starts_with('"') && trimmed.ends_with('"'))
+                || (trimmed.starts_with('\'') && trimmed.ends_with('\''));
+            let allowed_manifest_dynamic = trimmed == "__ZENITH_MANIFEST__.chunks[route]";
+            if !is_literal && !allowed_manifest_dynamic {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: import({trimmed})\n  referenced_from_asset: {}\n  recommended_action: dynamic imports must be string literals or manifest chunk lookups",
+                    file.display()
+                ));
+            }
+        }
+
+        let specs = collect_js_import_specifiers(&source);
+
+        for spec in specs {
+            if spec.starts_with("zenith:") {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: all zenith:* imports must be rewritten at bundle time",
+                    file.display()
+                ));
+            }
+            let resolved = if spec.starts_with("./") || spec.starts_with("../") {
+                file.parent()
+                    .map(|parent| parent.join(&spec))
+                    .ok_or_else(|| {
+                        format!(
+                            "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: emit the referenced module or inline it before writing assets",
+                            file.display()
+                        )
+                    })?
+            } else if spec.starts_with('/') {
+                out_dir.join(spec.trim_start_matches('/'))
+            } else {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: bare imports must be rewritten to emitted assets (vendor or relative module) before finalization",
+                    file.display()
+                ));
+            };
+
+            if !resolved.exists() || !resolved.is_file() {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: ensure the target asset exists in dist and is emitted before finalization",
+                    file.display()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn list_js_assets(dir: &PathBuf) -> Result<Vec<PathBuf>, String> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.clone()];
+
+    while let Some(current) = stack.pop() {
+        let entries = fs::read_dir(&current)
+            .map_err(|e| format!("failed to read assets dir '{}': {e}", current.display()))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| {
+                format!(
+                    "failed to read assets entry in '{}': {e}",
+                    current.display()
+                )
+            })?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("js"))
+                .unwrap_or(false)
+            {
+                out.push(path);
+            }
+        }
+    }
+
+    out.sort();
+    Ok(out)
+}
+
+fn recompute_graph_hash(payload: &BundlerInput) -> String {
+    let mut hoist_ids = payload
+        .ir
+        .graph_nodes
+        .iter()
+        .map(|node| node.hoist_id.clone())
+        .collect::<Vec<_>>();
+    if hoist_ids.is_empty() {
+        hoist_ids = payload
+            .ir
+            .components_scripts
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        hoist_ids.extend(
+            payload
+                .ir
+                .imports
+                .iter()
+                .map(|entry| entry.hoist_id.clone()),
+        );
+        hoist_ids.extend(
+            payload
+                .ir
+                .component_instances
+                .iter()
+                .map(|entry| entry.hoist_id.clone()),
+        );
+    }
+    hoist_ids.sort();
+    hoist_ids.dedup();
+
+    let mut edges = payload.ir.graph_edges.clone();
+    edges.sort();
+    edges.dedup();
+
+    let mut seed = String::new();
+    for hoist_id in hoist_ids {
+        seed.push_str("id:");
+        seed.push_str(&hoist_id);
+        seed.push('\n');
+    }
+    for edge in edges {
+        seed.push_str("edge:");
+        seed.push_str(&edge);
+        seed.push('\n');
+    }
+    sha256_hex(seed.as_bytes())
+}
+
+fn run_server_script(
+    server_script: &Option<CompilerServerScript>,
+    params: &BTreeMap<String, String>,
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(server_script) = server_script else {
+        return Ok(None);
+    };
+
+    let params_json =
+        serde_json::to_string(params).map_err(|e| format!("failed to serialize params: {e}"))?;
+    let runner = r#"
+import vm from 'node:vm';
+const source = process.env.ZENITH_SERVER_SOURCE || '';
+const params = JSON.parse(process.env.ZENITH_SERVER_PARAMS || '{}');
+const moduleSource = `${source}\nexport default Object.freeze({` +
+  `ssr_data: typeof ssr_data === 'undefined' ? undefined : ssr_data,` +
+  `props: typeof props === 'undefined' ? undefined : props,` +
+  `ssr: typeof ssr === 'undefined' ? undefined : ssr` +
+  `});`;
+const context = vm.createContext({
+  params: Object.freeze({ ...params }),
+  fetch: globalThis.fetch
+});
+const mod = new vm.SourceTextModule(moduleSource, {
+  context,
+  initializeImportMeta(meta) { meta.url = 'zenith:server-script'; }
+});
+await mod.link((specifier) => {
+  throw new Error(`[zenith-bundler] server script imports are not allowed: ${specifier}`);
+});
+await mod.evaluate();
+const namespaceKeys = Object.keys(mod.namespace).filter((key) => key !== 'default');
+const allowed = new Set(['ssr_data', 'props', 'ssr', 'prerender']);
+for (const key of namespaceKeys) {
+  if (!allowed.has(key)) {
+    throw new Error(`[zenith-bundler] unsupported server export '${key}'`);
+  }
+}
+const exported = mod.namespace.default && typeof mod.namespace.default === 'object'
+  ? mod.namespace.default
+  : null;
+if (!exported) {
+  process.stdout.write('null');
+  process.exit(0);
+}
+for (const key of Object.keys(exported)) {
+  if (!allowed.has(key)) {
+    throw new Error(`[zenith-bundler] unsupported server export '${key}'`);
+  }
+}
+const hasSsrData = Object.prototype.hasOwnProperty.call(exported, 'ssr_data') && exported.ssr_data !== undefined;
+const hasSsr = Object.prototype.hasOwnProperty.call(exported, 'ssr') && exported.ssr !== undefined;
+const hasProps = Object.prototype.hasOwnProperty.call(exported, 'props') && exported.props !== undefined;
+let payload = null;
+if (hasSsrData) {
+  payload = exported.ssr_data;
+} else if (hasSsr) {
+  payload = exported.ssr;
+}
+if (hasProps) {
+  if (payload === null || payload === undefined) {
+    payload = { props: exported.props };
+  } else if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    payload = { ...payload, props: exported.props };
+  } else {
+    throw new Error('[zenith-bundler] `props` export requires object-compatible payload');
+  }
+}
+process.stdout.write(JSON.stringify(payload === undefined ? null : payload));
+"#;
+
+    let result = Command::new("node")
+        .arg("--experimental-vm-modules")
+        .arg("--input-type=module")
+        .arg("-e")
+        .arg(runner)
+        .env("ZENITH_SERVER_SOURCE", &server_script.source)
+        .env("ZENITH_SERVER_PARAMS", params_json)
+        .output()
+        .map_err(|e| format!("failed to run server script runner: {e}"))?;
+
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        return Err(format!(
+            "server script execution failed (status {}): {}",
+            result.status, stderr
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&result.stdout).trim().to_string();
+    if stdout.is_empty() || stdout == "null" {
+        return Ok(None);
+    }
+
+    let value: serde_json::Value =
+        serde_json::from_str(&stdout).map_err(|e| format!("invalid server script JSON: {e}"))?;
+    if !value.is_object() {
+        return Err("server script must resolve to an object payload".into());
+    }
+    validate_server_payload(&value, "ssr_data")?;
+    Ok(Some(value))
+}
+
+fn validate_server_payload(value: &serde_json::Value, path: &str) -> Result<(), String> {
+    match value {
+        serde_json::Value::Null => Ok(()),
+        serde_json::Value::Bool(_) => Ok(()),
+        serde_json::Value::String(_) => Ok(()),
+        serde_json::Value::Number(number) => {
+            if let Some(float) = number.as_f64() {
+                if !float.is_finite() {
+                    return Err(format!(
+                        "server payload contains non-finite number at '{}'",
+                        path
+                    ));
+                }
+            }
+            Ok(())
+        }
+        serde_json::Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                validate_server_payload(item, &format!("{path}[{index}]"))?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Object(map) => {
+            for (key, item) in map {
+                validate_server_payload(item, &format!("{path}.{key}"))?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn derive_binding_tables(
+    ir: &CompilerIr,
+) -> Result<(Vec<MarkerBinding>, Vec<EventBinding>), String> {
     let expression_count = ir.expressions.len();
     if expression_count == 0 {
         return Ok((Vec::new(), Vec::new()));
@@ -567,7 +1636,11 @@ fn derive_binding_tables(ir: &CompilerIr) -> Result<(Vec<MarkerBinding>, Vec<Eve
     Ok((markers, event_bindings))
 }
 
-fn parse_expression_index(raw: &str, expression_count: usize, context: &str) -> Result<usize, String> {
+fn parse_expression_index(
+    raw: &str,
+    expression_count: usize,
+    context: &str,
+) -> Result<usize, String> {
     let parsed = raw
         .parse::<usize>()
         .map_err(|_| format!("invalid expression index '{raw}' in {context}"))?;
@@ -612,8 +1685,22 @@ fn runtime_import_specifier(runtime_rel: &str) -> Result<String, String> {
     Ok(format!("./{file_name}"))
 }
 
-fn ensure_runtime_asset(out_dir: &PathBuf) -> Result<String, String> {
-    let runtime_js = generate_runtime_module_js();
+fn ensure_runtime_asset(out_dir: &PathBuf, runtime_js: &str) -> Result<String, String> {
+    if has_runtime_zen_reference(runtime_js) {
+        return Err(
+            "Runtime graph purity violation: runtime bundle contains a .zen module specifier"
+                .into(),
+        );
+    }
+    if runtime_js.contains("zenith:") {
+        return Err(
+            "Runtime graph purity violation: runtime bundle contains a zenith:* specifier".into(),
+        );
+    }
+    if runtime_js.contains("fetch(") {
+        return Err("Runtime graph purity violation: runtime bundle contains 'fetch('".into());
+    }
+
     let runtime_hash = stable_hash_8(&runtime_js);
     let runtime_rel = format!("assets/runtime.{runtime_hash}.js");
     let runtime_path = out_dir.join(&runtime_rel);
@@ -638,31 +1725,202 @@ fn ensure_runtime_asset(out_dir: &PathBuf) -> Result<String, String> {
     Ok(runtime_rel)
 }
 
+fn ensure_core_asset(out_dir: &PathBuf, runtime_rel: &str) -> Result<(String, String), String> {
+    let runtime_spec = runtime_import_specifier(runtime_rel)?;
+    let core_js = generate_core_module_js(&runtime_spec);
+    let core_hash = stable_hash_8(&core_js);
+    let core_rel = format!("assets/core.{core_hash}.js");
+    let core_path = out_dir.join(&core_rel);
+
+    if !core_path.exists() {
+        if let Some(parent) = core_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "failed to create core asset dir '{}': {e}",
+                    parent.display()
+                )
+            })?;
+        }
+        fs::write(&core_path, core_js)
+            .map_err(|e| format!("failed to write core asset '{}': {e}", core_path.display()))?;
+    }
+
+    Ok((core_rel, core_hash))
+}
+
 fn emit_component_assets(
     out_dir: &PathBuf,
     components: &BTreeMap<String, CompilerComponentScript>,
     runtime_import_spec: &str,
+    module_registry: &BTreeMap<String, CompilerModule>,
+    core_import_spec: &str,
+    ref_bindings: &[CompilerRefBinding],
 ) -> Result<BTreeMap<String, String>, String> {
     let mut out = BTreeMap::new();
+    let mut emitted_helper_assets = BTreeMap::<String, String>::new();
+
     for (hoist_id, component) in components {
+        let owner_module_id = component_owner_module_id(&component.module_id);
         let mut module_source = String::new();
         for import_line in &component.imports {
-            module_source.push_str(import_line.trim());
+            let import_line_trimmed = import_line.trim();
+            if import_line_trimmed.is_empty() {
+                continue;
+            }
+
+            let Some(spec) = extract_static_import_specifier(import_line_trimmed) else {
+                return Err(format!(
+                    "Emission error: unsupported component import declaration '{}' in component module '{}'",
+                    import_line_trimmed, component.module_id
+                ));
+            };
+
+            if spec.ends_with(".zen") {
+                // Component/template imports are compile-time only and should not leak into runtime assets.
+                continue;
+            }
+
+            if spec == "zenith:core" {
+                let rewritten =
+                    rewrite_import_specifier_literal(import_line_trimmed, &spec, core_import_spec)?;
+                module_source.push_str(&rewritten);
+                module_source.push('\n');
+                continue;
+            }
+            if spec.starts_with("zenith:") {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: only zenith:core is supported at runtime; all other zenith:* imports are prohibited",
+                    component.module_id, component.module_id
+                ));
+            }
+            if is_css_specifier(&spec) {
+                continue;
+            }
+
+            if !is_relative_or_absolute_specifier(&spec) {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                    component.module_id, component.module_id
+                ));
+            }
+            if spec.starts_with('/') {
+                // Absolute emitted-asset imports (for example vendor bundle paths) are already finalized.
+                module_source.push_str(import_line_trimmed);
+                module_source.push('\n');
+                continue;
+            }
+
+            let target_module_id = resolve_module_id_for_spec(module_registry, &owner_module_id, &spec)
+                .ok_or_else(|| {
+                    format!(
+                        "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                        component.module_id, component.module_id
+                    )
+                })?;
+
+            let helper_rel = emit_helper_module_recursive(
+                out_dir,
+                module_registry,
+                &target_module_id,
+                &mut emitted_helper_assets,
+                &mut vec![component.module_id.clone()],
+                core_import_spec,
+            )?;
+
+            let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
+            let rewritten =
+                rewrite_import_specifier_literal(import_line_trimmed, &spec, &helper_spec)?;
+
+            module_source.push_str(&rewritten);
             module_source.push('\n');
         }
+        let mut rewritten_component_code =
+            strip_zen_import_statements(&strip_css_import_statements(&component.code));
+        for spec in collect_js_import_specifiers(&rewritten_component_code) {
+            if spec.ends_with(".zen") {
+                continue;
+            }
+            if spec == "zenith:core" {
+                rewritten_component_code = rewrite_js_import_specifiers(
+                    &rewritten_component_code,
+                    &spec,
+                    core_import_spec,
+                )?;
+                continue;
+            }
+            if spec.starts_with("zenith:") {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: zenith:* imports are only allowed as compile-time top-level component imports",
+                    component.module_id, component.module_id
+                ));
+            }
+            if !is_relative_or_absolute_specifier(&spec) {
+                return Err(format!(
+                    "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                    component.module_id, component.module_id
+                ));
+            }
+            if spec.starts_with('/') {
+                // Already points at an emitted asset path (for example /assets/vendor.<hash>.js).
+                continue;
+            }
+            let target_module_id =
+                resolve_module_id_for_spec(module_registry, &owner_module_id, &spec).ok_or_else(
+                    || {
+                        format!(
+                            "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <component:{hoist_id}>\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                            component.module_id, component.module_id
+                        )
+                    },
+                )?;
+            let helper_rel = emit_helper_module_recursive(
+                out_dir,
+                module_registry,
+                &target_module_id,
+                &mut emitted_helper_assets,
+                &mut vec![component.module_id.clone()],
+                core_import_spec,
+            )?;
+            let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
+            rewritten_component_code =
+                rewrite_js_import_specifiers(&rewritten_component_code, &spec, &helper_spec)?;
+        }
+
+        let component_template = extract_component_template_markup(component, &owner_module_id)?;
+        if !component_template.trim().is_empty() {
+            let template_json = serde_json::to_string(&component_template).map_err(|e| {
+                format!(
+                    "failed to serialize component template for '{}': {e}",
+                    hoist_id
+                )
+            })?;
+            module_source.push_str(&format!(
+                "const __zenith_component_template = {};\n",
+                template_json
+            ));
+            rewritten_component_code = inject_component_template_mount(&rewritten_component_code)?;
+            rewritten_component_code = inject_ref_wiring(&rewritten_component_code, ref_bindings)?;
+        }
+
+        rewritten_component_code = inject_runtime_hook_aliases(&rewritten_component_code);
+        rewritten_component_code = guard_component_bindings(&rewritten_component_code)?;
         module_source.push_str(&format!(
-            "import {{ signal, state, zeneffect }} from '{}';\n",
+            "import {{ signal, state, ref, zeneffect, zenEffect, zenMount }} from '{}';\n",
             runtime_import_spec
         ));
         module_source.push_str(&format!(
-            "const __zenith_runtime = Object.freeze({{ signal, state, zeneffect }});\n"
+            "const __zenith_runtime = Object.freeze({{ signal, state, ref, zeneffect, zenEffect, zenMount }});\n"
         ));
 
-        module_source.push_str(&component.code);
+        module_source.push_str(&rewritten_component_code);
         module_source.push('\n');
 
         let module_hash = stable_hash_8(&module_source);
-        let rel = format!("assets/component.{}.{}.js", sanitize_asset_token(hoist_id), module_hash);
+        let rel = format!(
+            "assets/component.{}.{}.js",
+            sanitize_asset_token(hoist_id),
+            module_hash
+        );
         let path = out_dir.join(&rel);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
@@ -672,22 +1930,869 @@ fn emit_component_assets(
                 )
             })?;
         }
-        fs::write(&path, module_source).map_err(|e| {
-            format!(
-                "failed to write component asset '{}': {e}",
-                path.display()
-            )
-        })?;
+        fs::write(&path, module_source)
+            .map_err(|e| format!("failed to write component asset '{}': {e}", path.display()))?;
 
         out.insert(hoist_id.clone(), rel);
     }
     Ok(out)
 }
 
+fn emit_helper_module_recursive(
+    out_dir: &PathBuf,
+    module_registry: &BTreeMap<String, CompilerModule>,
+    module_id: &str,
+    emitted_helper_assets: &mut BTreeMap<String, String>,
+    stack: &mut Vec<String>,
+    core_import_spec: &str,
+) -> Result<String, String> {
+    if let Some(existing) = emitted_helper_assets.get(module_id) {
+        return Ok(existing.clone());
+    }
+    if stack.iter().any(|current| current == module_id) {
+        let mut cycle = stack.clone();
+        cycle.push(module_id.to_string());
+        return Err(format!(
+            "ERROR: Emission failed - module cycle while emitting helper assets\n  dependency_chain:\n    {}",
+            cycle.join(" -> ")
+        ));
+    }
+
+    let module = module_registry.get(module_id).ok_or_else(|| {
+        format!(
+            "ERROR: Emission failed - missing module source for '{}'\n  recommended_action: ensure compiler IR includes this module in ir.modules",
+            module_id
+        )
+    })?;
+
+    if !is_browser_js_module(module_id) {
+        return Err(format!(
+            "ERROR: Emission failed - non-JS helper module cannot be emitted in runtime graph\n  module_id: {module_id}\n  recommended_action: transpile or inline this dependency before bundling"
+        ));
+    }
+
+    let mut rewritten_source =
+        strip_zen_import_statements(&strip_css_import_statements(&module.source));
+
+    stack.push(module_id.to_string());
+    for spec in collect_js_import_specifiers(&rewritten_source) {
+        if spec == "zenith:core" {
+            rewritten_source =
+                rewrite_js_import_specifiers(&rewritten_source, &spec, core_import_spec)?;
+            continue;
+        }
+        if spec.starts_with("zenith:") {
+            return Err(format!(
+                "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: zenith:* imports are not allowed inside emitted helper modules; move the import to a component script or inline runtime primitives",
+                module_id, module_id, stack.join(" -> ")
+            ));
+        }
+        if !is_relative_or_absolute_specifier(&spec) {
+            return Err(format!(
+                "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                module_id, module_id, stack.join(" -> ")
+            ));
+        }
+        if spec.starts_with('/') {
+            // Absolute imports already reference emitted assets and must remain untouched.
+            continue;
+        }
+
+        let dep_id = resolve_module_id_for_spec(module_registry, module_id, &spec).ok_or_else(|| {
+            format!(
+                "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
+                module_id, module_id, stack.join(" -> ")
+            )
+        })?;
+
+        emit_helper_module_recursive(
+            out_dir,
+            module_registry,
+            &dep_id,
+            emitted_helper_assets,
+            stack,
+            core_import_spec,
+        )?;
+
+        let dep_rel = helper_asset_rel_path(&dep_id)?;
+        let dep_spec = format!("/{}", dep_rel.replace('\\', "/"));
+        rewritten_source = rewrite_js_import_specifiers(&rewritten_source, &spec, &dep_spec)?;
+    }
+    stack.pop();
+
+    let rel = helper_asset_rel_path(module_id)?;
+    let path = out_dir.join(&rel);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create helper asset dir '{}': {e}",
+                parent.display()
+            )
+        })?;
+    }
+    fs::write(&path, &rewritten_source)
+        .map_err(|e| format!("failed to write helper asset '{}': {e}", path.display()))?;
+    emitted_helper_assets.insert(module_id.to_string(), rel.clone());
+    Ok(rel)
+}
+
+fn helper_asset_rel_path(module_id: &str) -> Result<String, String> {
+    let normalized = normalize_module_id(module_id);
+    if normalized.starts_with('/') || normalized.contains("../") {
+        return Err(format!(
+            "invalid helper module id '{}' (path traversal is not allowed)",
+            module_id
+        ));
+    }
+    Ok(format!("assets/modules/{normalized}"))
+}
+
+fn helper_asset_specifier_from_rel(rel: &str) -> Result<String, String> {
+    let rel_assets = rel
+        .strip_prefix("assets/")
+        .ok_or_else(|| format!("invalid helper asset path '{rel}'"))?;
+    Ok(format!("./{}", rel_assets.replace('\\', "/")))
+}
+
+fn component_owner_module_id(component_module_id: &str) -> String {
+    component_module_id
+        .split_once(":script")
+        .map(|(base, _)| base.to_string())
+        .unwrap_or_else(|| component_module_id.to_string())
+}
+
+fn extract_component_template_markup(
+    component: &CompilerComponentScript,
+    owner_module_id: &str,
+) -> Result<String, String> {
+    let source_module_id = component_owner_module_id(&component.module_id);
+    let source_path = PathBuf::from(&source_module_id);
+    let source = fs::read_to_string(&source_path).map_err(|e| {
+        format!(
+            "failed to read component source '{}' for template extraction: {e}",
+            source_path.display()
+        )
+    })?;
+
+    let mut template = strip_component_script_blocks(&source)?;
+    template = inline_component_template_imports(template, component, owner_module_id)?;
+    Ok(template.trim().to_string())
+}
+
+fn strip_component_script_blocks(source: &str) -> Result<String, String> {
+    let script_re = Regex::new(r"(?is)<script\b[^>]*>.*?</script>")
+        .map_err(|e| format!("failed to compile component script strip regex: {e}"))?;
+    Ok(script_re.replace_all(source, "").trim().to_string())
+}
+
+fn inline_component_template_imports(
+    template: String,
+    component: &CompilerComponentScript,
+    owner_module_id: &str,
+) -> Result<String, String> {
+    let default_zen_import_re = Regex::new(
+        r#"^\s*import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s+['"]([^'"]+\.zen)['"]\s*;?\s*$"#,
+    )
+    .map_err(|e| format!("failed to compile component template import regex: {e}"))?;
+
+    let mut resolved_template = template;
+    for import_line in &component.imports {
+        let Some(captures) = default_zen_import_re.captures(import_line) else {
+            continue;
+        };
+
+        let Some(alias_match) = captures.get(1) else {
+            continue;
+        };
+        let Some(spec_match) = captures.get(2) else {
+            continue;
+        };
+
+        let alias = alias_match.as_str();
+        let spec = spec_match.as_str();
+        let import_path = resolve_component_template_import_path(owner_module_id, spec);
+        let partial_source = fs::read_to_string(&import_path).map_err(|e| {
+            format!(
+                "failed to read nested component template '{}' referenced by '{}': {e}",
+                import_path.display(),
+                owner_module_id
+            )
+        })?;
+        let partial_template = strip_component_script_blocks(&partial_source)?;
+        if partial_template.trim().is_empty() {
+            continue;
+        }
+
+        resolved_template =
+            replace_component_tag_markup(&resolved_template, alias, partial_template.trim())?;
+    }
+
+    Ok(resolved_template)
+}
+
+fn resolve_component_template_import_path(owner_module_id: &str, specifier: &str) -> PathBuf {
+    if specifier.starts_with('/') {
+        return PathBuf::from(specifier.trim_start_matches('/'));
+    }
+
+    let owner_path = PathBuf::from(owner_module_id);
+    owner_path
+        .parent()
+        .map(|parent| parent.join(specifier))
+        .unwrap_or_else(|| PathBuf::from(specifier))
+}
+
+fn replace_component_tag_markup(
+    template: &str,
+    tag_name: &str,
+    replacement: &str,
+) -> Result<String, String> {
+    let escaped_tag = regex::escape(tag_name);
+    let self_closing_re = Regex::new(&format!(r#"<{escaped_tag}\b[^>]*\/>"#))
+        .map_err(|e| format!("failed to compile self-closing component tag regex: {e}"))?;
+    let paired_re = Regex::new(&format!(r#"<{escaped_tag}\b[^>]*>\s*</{escaped_tag}\s*>"#))
+        .map_err(|e| format!("failed to compile paired component tag regex: {e}"))?;
+
+    let with_self_closing = self_closing_re
+        .replace_all(template, replacement)
+        .to_string();
+    Ok(paired_re
+        .replace_all(&with_self_closing, replacement)
+        .to_string())
+}
+
+fn inject_component_template_mount(component_code: &str) -> Result<String, String> {
+    let mount_re = Regex::new(r"mount\s*\(\)\s*\{")
+        .map_err(|e| format!("failed to compile component mount injection regex: {e}"))?;
+    let mount_match = mount_re.find(component_code).ok_or_else(|| {
+        "component mount injection failed: missing mount() declaration in component factory"
+            .to_string()
+    })?;
+
+    let mut injected = String::with_capacity(component_code.len() + 196);
+    injected.push_str(&component_code[..mount_match.end()]);
+    injected.push_str(
+        "\n      if (host && host.innerHTML.trim().length === 0) {\n        host.innerHTML = __zenith_component_template;\n      }",
+    );
+    injected.push_str(&component_code[mount_match.end()..]);
+    Ok(injected)
+}
+
+/// Inject ref wiring code into a component factory's mount() method.
+///
+/// For each ref binding, generates code that queries `[data-zx-r="<index>"]` within
+/// the component host and assigns `.current` to the matching element.
+/// This runs after template injection but before any user-defined side effects.
+fn inject_ref_wiring(
+    component_code: &str,
+    ref_bindings: &[CompilerRefBinding],
+) -> Result<String, String> {
+    if ref_bindings.is_empty() {
+        return Ok(component_code.to_string());
+    }
+
+    let mount_re = Regex::new(r"mount\s*\(\)\s*\{")
+        .map_err(|e| format!("failed to compile ref wiring mount regex: {e}"))?;
+    let mount_match = mount_re.find(component_code).ok_or_else(|| {
+        "ref wiring injection failed: missing mount() declaration in component factory".to_string()
+    })?;
+
+    // Find the insertion point — after the template injection guard if present,
+    // otherwise right after mount() {
+    let insert_after = if let Some(guard_end) =
+        component_code[mount_match.end()..].find("host.innerHTML = __zenith_component_template;")
+    {
+        // Find the closing brace of the if block after the template assignment
+        let after_guard =
+            mount_match.end() + guard_end + "host.innerHTML = __zenith_component_template;".len();
+        // Skip to after the closing `}`
+        if let Some(brace_pos) = component_code[after_guard..].find('}') {
+            after_guard + brace_pos + 1
+        } else {
+            mount_match.end()
+        }
+    } else {
+        mount_match.end()
+    };
+
+    let mut wiring_code = String::new();
+    wiring_code.push_str("\n      // [zenith:ref-wiring] deterministic ref assignment\n");
+    for binding in ref_bindings {
+        wiring_code.push_str(&format!(
+            "      if (typeof {ident} !== 'undefined' && {ident} && host) {{ var __rn = host.querySelector('[data-zx-r=\"{idx}\"]'); if (__rn) {ident}.current = __rn; }}\n",
+            ident = binding.identifier,
+            idx = binding.index,
+        ));
+    }
+
+    let mut injected = String::with_capacity(component_code.len() + wiring_code.len());
+    injected.push_str(&component_code[..insert_after]);
+    injected.push_str(&wiring_code);
+    injected.push_str(&component_code[insert_after..]);
+    Ok(injected)
+}
+
+fn extract_static_import_specifier(import_line: &str) -> Option<String> {
+    let re = Regex::new(r#"^\s*import(?:\s+[^'"]+?\s+from)?\s*['"]([^'"]+)['"]\s*;?\s*$"#).unwrap();
+    re.captures(import_line)
+        .and_then(|cap| cap.get(1))
+        .map(|m| m.as_str().to_string())
+}
+
+fn rewrite_import_specifier_literal(
+    import_line: &str,
+    old_specifier: &str,
+    new_specifier: &str,
+) -> Result<String, String> {
+    let single = format!("'{}'", old_specifier);
+    if import_line.contains(&single) {
+        return Ok(import_line.replacen(&single, &format!("'{}'", new_specifier), 1));
+    }
+    let double = format!("\"{}\"", old_specifier);
+    if import_line.contains(&double) {
+        return Ok(import_line.replacen(&double, &format!("\"{}\"", new_specifier), 1));
+    }
+    Err(format!(
+        "failed to rewrite import specifier '{}' in line '{}'",
+        old_specifier, import_line
+    ))
+}
+
+fn rewrite_js_import_specifiers(
+    source: &str,
+    old_specifier: &str,
+    new_specifier: &str,
+) -> Result<String, String> {
+    if old_specifier == new_specifier {
+        return Ok(source.to_string());
+    }
+
+    let escaped = regex::escape(old_specifier);
+    let mut updated = source.to_string();
+    let mut replaced_any = false;
+
+    let patterns = [
+        format!(
+            r#"(?m)(\bimport\s+[^'"\n;]*?\s+from\s*['"]){}(['"])"#,
+            escaped
+        ),
+        format!(r#"(?m)(\bimport\s*['"]){}(['"])"#, escaped),
+        format!(r#"(?m)(\bimport\s*\(\s*['"]){}(['"]\s*\))"#, escaped),
+        format!(
+            r#"(?m)(\bexport\s+[^'"\n;]*?\s+from\s*['"]){}(['"])"#,
+            escaped
+        ),
+    ];
+
+    for pattern in patterns {
+        let re = Regex::new(&pattern)
+            .map_err(|err| format!("failed to compile import rewrite pattern: {err}"))?;
+        let next = re
+            .replace_all(&updated, |caps: &regex::Captures| {
+                format!("{}{}{}", &caps[1], new_specifier, &caps[2])
+            })
+            .into_owned();
+        if next != updated {
+            replaced_any = true;
+            updated = next;
+        }
+    }
+
+    if !replaced_any {
+        return Err(format!(
+            "failed to rewrite import specifier '{}' in module source",
+            old_specifier
+        ));
+    }
+
+    Ok(updated)
+}
+
+fn resolve_module_id_for_spec(
+    module_registry: &BTreeMap<String, CompilerModule>,
+    owner_module_id: &str,
+    specifier: &str,
+) -> Option<String> {
+    let owner = normalize_module_id(owner_module_id);
+    let owner_dir = owner.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("");
+    let mut candidates = Vec::new();
+    if specifier.starts_with('/') {
+        candidates.push(normalize_module_id(specifier.trim_start_matches('/')));
+    } else {
+        let joined = if owner_dir.is_empty() {
+            specifier.to_string()
+        } else {
+            format!("{owner_dir}/{specifier}")
+        };
+        candidates.push(normalize_module_id(&joined));
+    }
+
+    if let Some(base) = candidates.first().cloned() {
+        if !has_module_extension(&base) {
+            for ext in ["js", "mjs", "cjs", "ts", "tsx", "jsx", "zen"] {
+                candidates.push(format!("{base}.{ext}"));
+            }
+            for ext in ["js", "mjs", "cjs", "ts", "tsx", "jsx", "zen"] {
+                candidates.push(format!("{base}/index.{ext}"));
+            }
+        }
+    }
+
+    candidates
+        .into_iter()
+        .find(|candidate| module_registry.contains_key(candidate))
+}
+
+fn normalize_module_id(raw: &str) -> String {
+    let normalized = raw.replace('\\', "/");
+    let mut segments = Vec::new();
+    for segment in normalized.split('/') {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            segments.pop();
+            continue;
+        }
+        segments.push(segment);
+    }
+    segments.join("/")
+}
+
+fn has_module_extension(module_id: &str) -> bool {
+    let last = module_id.rsplit('/').next().unwrap_or(module_id);
+    last.rsplit_once('.')
+        .map(|(_, ext)| !ext.is_empty())
+        .unwrap_or(false)
+}
+
+fn is_relative_or_absolute_specifier(specifier: &str) -> bool {
+    specifier.starts_with("./") || specifier.starts_with("../") || specifier.starts_with('/')
+}
+
+fn is_css_specifier(specifier: &str) -> bool {
+    let without_query = specifier.split('?').next().unwrap_or(specifier);
+    let without_hash = without_query.split('#').next().unwrap_or(without_query);
+    without_hash.ends_with(".css")
+}
+
+fn is_browser_js_module(module_id: &str) -> bool {
+    let normalized = normalize_module_id(module_id);
+    normalized.ends_with(".js")
+        || normalized.ends_with(".mjs")
+        || normalized.ends_with(".cjs")
+        || normalized.ends_with(".jsx")
+}
+
+fn strip_css_import_statements(source: &str) -> String {
+    let css_import_re = Regex::new(
+        r#"(?m)^\s*import(?:\s+[^'"\n;]*?\s+from)?\s*['"][^'"]+\.css(?:[?#][^'"]*)?['"]\s*;?\s*$"#,
+    )
+    .unwrap();
+    css_import_re.replace_all(source, "").to_string()
+}
+
+fn strip_zen_import_statements(source: &str) -> String {
+    let zen_import_re = Regex::new(
+        r#"(?m)^\s*import(?:\s+[^'"\n;]*?\s+from)?\s*['"][^'"]+\.zen(?:[?#][^'"]*)?['"]\s*;?\s*$"#,
+    )
+    .unwrap();
+    zen_import_re.replace_all(source, "").to_string()
+}
+
+fn collect_js_import_specifiers(source: &str) -> Vec<String> {
+    let static_import_re =
+        Regex::new(r#"(?m)\bimport\s+(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]"#).unwrap();
+    let dynamic_import_re = Regex::new(r#"(?m)\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)"#).unwrap();
+    let export_from_re =
+        Regex::new(r#"(?m)\bexport\s+[^'"\n;]*?\s+from\s+['"]([^'"]+)['"]"#).unwrap();
+
+    let mut out = Vec::new();
+    for captures in static_import_re.captures_iter(source) {
+        if let Some(spec) = captures.get(1) {
+            let value = spec.as_str().to_string();
+            if !out.contains(&value) {
+                out.push(value);
+            }
+        }
+    }
+    for captures in dynamic_import_re.captures_iter(source) {
+        if let Some(spec) = captures.get(1) {
+            let value = spec.as_str().to_string();
+            if !out.contains(&value) {
+                out.push(value);
+            }
+        }
+    }
+    for captures in export_from_re.captures_iter(source) {
+        if let Some(spec) = captures.get(1) {
+            let value = spec.as_str().to_string();
+            if !out.contains(&value) {
+                out.push(value);
+            }
+        }
+    }
+    out
+}
+
+fn collect_dynamic_import_expressions(source: &str) -> Vec<String> {
+    let dynamic_import_any_re = Regex::new(r#"(?m)\bimport\s*\(\s*([^)]+?)\s*\)"#).unwrap();
+    let mut out = Vec::new();
+    for captures in dynamic_import_any_re.captures_iter(source) {
+        if let Some(expr) = captures.get(1) {
+            let value = expr.as_str().trim().to_string();
+            if !out.contains(&value) {
+                out.push(value);
+            }
+        }
+    }
+    out
+}
+
+#[derive(Debug, Clone)]
+struct CssFragment {
+    source_module_id: String,
+    order: usize,
+    content: String,
+}
+
+fn build_css_bundle(inputs: &[BundlerInput], project_root: &Path) -> Result<String, String> {
+    let mut ordered_inputs: Vec<&BundlerInput> = inputs.iter().collect();
+    ordered_inputs.sort_by(|a, b| {
+        a.route.cmp(&b.route).then_with(|| {
+            normalize_path_for_contract(Path::new(&a.file))
+                .cmp(&normalize_path_for_contract(Path::new(&b.file)))
+        })
+    });
+
+    let mut fragments = Vec::<CssFragment>::new();
+    for input in ordered_inputs {
+        let page_fragments = collect_css_fragments_for_input(input, project_root)?;
+        fragments.extend(page_fragments);
+    }
+
+    // Ordering contract: CSS bytes are deterministic by sorted module id, then stable order index.
+    fragments.sort_by(|a, b| {
+        a.source_module_id
+            .cmp(&b.source_module_id)
+            .then_with(|| a.order.cmp(&b.order))
+    });
+
+    let merged = fragments
+        .iter()
+        .map(|fragment| fragment.content.as_str())
+        .collect::<Vec<_>>()
+        .join("\n/* ---- */\n");
+
+    if !fragments.is_empty() && merged.trim().is_empty() {
+        return Err(
+            "Determinism violation: CSS inputs were discovered but merged CSS content is empty."
+                .to_string(),
+        );
+    }
+
+    Ok(merged)
+}
+
+fn collect_css_fragments_for_input(
+    input: &BundlerInput,
+    project_root: &Path,
+) -> Result<Vec<CssFragment>, String> {
+    let mut fragments = Vec::<CssFragment>::new();
+    let mut known_css_module_ids = BTreeSet::<String>::new();
+    let mut known_css_paths = BTreeSet::<String>::new();
+    let mut import_order = 0usize;
+
+    let page_key = format!(
+        "{}::{}",
+        input.route,
+        normalize_path_for_contract(Path::new(&input.file))
+    );
+
+    let html_for_css = ensure_document_html(&input.ir.html);
+    let (processed_css, _html_stripped) =
+        zenith_bundler::utils::process_css(&input.ir.style_blocks, &html_for_css)
+            .map_err(|e| format!("CSS processing failed for {}: {e}", input.route))?;
+    if let Some(css) = processed_css {
+        fragments.push(CssFragment {
+            source_module_id: format!("{}::__compiler_style_blocks", page_key),
+            order: 0,
+            content: normalize_text_newlines(&css.content),
+        });
+    }
+
+    let page_root = Path::new(&input.file)
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    for block in &input.ir.style_blocks {
+        let module_id = normalize_module_id(&block.module_id);
+        known_css_module_ids.insert(module_id.clone());
+        let candidate = page_root.join(&module_id);
+        if candidate.exists() {
+            if let Ok(canonical) = fs::canonicalize(&candidate) {
+                if canonical.starts_with(project_root) {
+                    known_css_paths.insert(normalize_path_for_contract(&canonical));
+                }
+            }
+        }
+    }
+
+    let page_module_id = detect_page_module_id(input);
+
+    for module in &input.ir.modules {
+        if is_css_specifier(&module.id) {
+            continue;
+        }
+        collect_css_imports_from_source(
+            &module.source,
+            &module.id,
+            project_root,
+            page_root,
+            &page_key,
+            &mut import_order,
+            &mut known_css_module_ids,
+            &mut known_css_paths,
+            &mut fragments,
+        )?;
+    }
+
+    for import_line in &input.ir.hoisted.imports {
+        collect_css_imports_from_source(
+            import_line,
+            &page_module_id,
+            project_root,
+            page_root,
+            &page_key,
+            &mut import_order,
+            &mut known_css_module_ids,
+            &mut known_css_paths,
+            &mut fragments,
+        )?;
+    }
+
+    for block in &input.ir.hoisted.code {
+        collect_css_imports_from_source(
+            block,
+            &page_module_id,
+            project_root,
+            page_root,
+            &page_key,
+            &mut import_order,
+            &mut known_css_module_ids,
+            &mut known_css_paths,
+            &mut fragments,
+        )?;
+    }
+
+    for script in input.ir.components_scripts.values() {
+        let owner_module_id = component_owner_module_id(&script.module_id);
+        for import_line in &script.imports {
+            collect_css_imports_from_source(
+                import_line,
+                &owner_module_id,
+                project_root,
+                page_root,
+                &page_key,
+                &mut import_order,
+                &mut known_css_module_ids,
+                &mut known_css_paths,
+                &mut fragments,
+            )?;
+        }
+        collect_css_imports_from_source(
+            &script.code,
+            &owner_module_id,
+            project_root,
+            page_root,
+            &page_key,
+            &mut import_order,
+            &mut known_css_module_ids,
+            &mut known_css_paths,
+            &mut fragments,
+        )?;
+    }
+
+    Ok(fragments)
+}
+
+fn detect_page_module_id(input: &BundlerInput) -> String {
+    if let Some(module) = input
+        .ir
+        .modules
+        .iter()
+        .find(|module| module.id.ends_with(".zen"))
+    {
+        return normalize_module_id(&module.id);
+    }
+
+    Path::new(&input.file)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(normalize_module_id)
+        .unwrap_or_else(|| "index.zen".to_string())
+}
+
+fn collect_css_imports_from_source(
+    source: &str,
+    owner_module_id: &str,
+    project_root: &Path,
+    page_root: &Path,
+    page_key: &str,
+    import_order: &mut usize,
+    known_css_module_ids: &mut BTreeSet<String>,
+    known_css_paths: &mut BTreeSet<String>,
+    fragments: &mut Vec<CssFragment>,
+) -> Result<(), String> {
+    for specifier in collect_js_import_specifiers(source) {
+        let normalized_specifier = strip_import_suffix(&specifier);
+        if is_css_bare_import(&normalized_specifier) {
+            return Err(format!(
+                "CSS import contract violation: bare CSS imports are not supported.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  reason: import a local precompiled CSS file (for example ./styles/output.css)"
+            ));
+        }
+
+        if !is_css_specifier(&specifier) {
+            continue;
+        }
+
+        if !is_relative_or_absolute_specifier(&normalized_specifier) {
+            return Err(format!(
+                "CSS import contract violation: CSS imports must be local files.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  reason: local CSS imports must start with ./, ../, or /"
+            ));
+        }
+
+        let resolved_path = resolve_css_import_path(
+            project_root,
+            page_root,
+            owner_module_id,
+            &normalized_specifier,
+        );
+        if !resolved_path.exists() {
+            return Err(format!(
+                "CSS import contract violation: failed to resolve imported CSS file.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  reason: file does not exist",
+                resolved_path.display()
+            ));
+        }
+
+        let canonical_path = fs::canonicalize(&resolved_path).map_err(|err| {
+            format!(
+                "CSS import contract violation: failed to canonicalize imported CSS file.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  reason: {err}",
+                resolved_path.display()
+            )
+        })?;
+        if !canonical_path.starts_with(project_root) {
+            return Err(format!(
+                "CSS import contract violation: imported CSS path escapes project root.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  project_root: {}",
+                canonical_path.display(),
+                project_root.display()
+            ));
+        }
+
+        let canonical_key = normalize_path_for_contract(&canonical_path);
+        if known_css_paths.contains(&canonical_key) {
+            continue;
+        }
+
+        let resolved_module_id = canonical_path
+            .strip_prefix(project_root)
+            .map(normalize_path_for_contract)
+            .map_err(|_| {
+                format!(
+                    "CSS import contract violation: could not derive project-relative module id.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  project_root: {}",
+                    canonical_path.display(),
+                    project_root.display()
+                )
+            })?;
+        if known_css_module_ids.contains(&resolved_module_id) {
+            known_css_paths.insert(canonical_key);
+            continue;
+        }
+
+        let bytes = fs::read(&canonical_path).map_err(|err| {
+            format!(
+                "CSS import contract violation: failed to read imported CSS file.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  reason: {err}",
+                canonical_path.display()
+            )
+        })?;
+        let content = String::from_utf8(bytes).map_err(|err| {
+            format!(
+                "CSS import contract violation: imported CSS must be UTF-8.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}\n  reason: {err}",
+                canonical_path.display()
+            )
+        })?;
+
+        fragments.push(CssFragment {
+            source_module_id: format!("{}::{}", page_key, resolved_module_id.clone()),
+            order: *import_order,
+            content: normalize_text_newlines(&content),
+        });
+        known_css_module_ids.insert(resolved_module_id);
+        known_css_paths.insert(canonical_key);
+        *import_order += 1;
+    }
+
+    Ok(())
+}
+
+fn resolve_css_import_path(
+    project_root: &Path,
+    page_root: &Path,
+    owner_module_id: &str,
+    specifier: &str,
+) -> PathBuf {
+    if specifier.starts_with('/') {
+        return project_root.join(specifier.trim_start_matches('/'));
+    }
+    let owner_module_path = {
+        let owner = Path::new(owner_module_id);
+        if owner.is_absolute() {
+            owner.to_path_buf()
+        } else if owner_module_id.contains('/') || owner_module_id.contains('\\') {
+            project_root.join(normalize_module_id(owner_module_id))
+        } else {
+            page_root.join(normalize_module_id(owner_module_id))
+        }
+    };
+    let owner_dir = owner_module_path.parent().unwrap_or(page_root);
+    owner_dir.join(specifier)
+}
+
+fn normalize_text_newlines(value: &str) -> String {
+    value.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+fn normalize_path_for_contract(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+fn is_css_bare_import(specifier: &str) -> bool {
+    !is_relative_or_absolute_specifier(specifier) && is_css_package_specifier(specifier)
+}
+
+fn is_css_package_specifier(specifier: &str) -> bool {
+    let normalized = specifier.strip_prefix("npm:").unwrap_or(specifier);
+    normalized == "tailwindcss" || normalized.ends_with("/css") || is_css_specifier(normalized)
+}
+
+fn strip_import_suffix(specifier: &str) -> String {
+    let without_query = specifier.split('?').next().unwrap_or(specifier);
+    without_query
+        .split('#')
+        .next()
+        .unwrap_or(without_query)
+        .to_string()
+}
+
 fn sanitize_asset_token(input: &str) -> String {
     input
         .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' { ch } else { '_' })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -697,11 +2802,29 @@ fn generate_entry_js(
     markers: &[MarkerBinding],
     events: &[EventBinding],
     component_assets: &BTreeMap<String, String>,
+    route_pattern: &str,
+    ssr_data: Option<&serde_json::Value>,
+    global_graph_hash: &str,
+    router_enabled: bool,
 ) -> Result<String, String> {
     let compiler_output = CompilerOutput {
         ir_version: ir.ir_version,
+        graph_hash: global_graph_hash.to_string(),
+        graph_edges: ir.graph_edges.clone(),
+        graph_nodes: ir
+            .graph_nodes
+            .iter()
+            .map(|node| zenith_compiler::compiler::GraphNodePayload {
+                id: node.id.clone(),
+                hoist_id: node.hoist_id.clone(),
+            })
+            .collect(),
         html: ir.html.clone(),
         expressions: ir.expressions.clone(),
+        imports: Default::default(),
+        server_script: Default::default(),
+        prerender: false,
+        ssr_data: Default::default(),
         hoisted: Default::default(),
         components_scripts: Default::default(),
         component_instances: Default::default(),
@@ -709,6 +2832,8 @@ fn generate_entry_js(
         expression_bindings: Default::default(),
         marker_bindings: Default::default(),
         event_bindings: Default::default(),
+        ref_bindings: Default::default(),
+        style_blocks: Default::default(),
     };
 
     let markers_json = serde_json::to_string(markers)
@@ -725,14 +2850,8 @@ fn generate_entry_js(
             js.push('\n');
         }
     }
-    js.push_str(&format!(
-        "\nconst __zenith_markers = {};\n",
-        markers_json
-    ));
-    js.push_str(&format!(
-        "const __zenith_events = {};\n",
-        events_json
-    ));
+    js.push_str(&format!("\nconst __zenith_markers = {};\n", markers_json));
+    js.push_str(&format!("const __zenith_events = {};\n", events_json));
     let signals_json = serde_json::to_string(&ir.signals)
         .map_err(|e| format!("failed to serialize signal table: {e}"))?;
     let expression_bindings_json = if ir.expression_bindings.is_empty() {
@@ -743,9 +2862,11 @@ fn generate_entry_js(
     };
 
     js.push_str(&generate_state_table_js(&ir.hoisted.state)?);
+    js.push_str(&format!("const __zenith_ir_version = {};\n", ir.ir_version));
     js.push_str(&format!(
-        "const __zenith_ir_version = {};\n",
-        ir.ir_version
+        "const __zenith_graph_hash = {};\n",
+        serde_json::to_string(global_graph_hash)
+            .map_err(|e| format!("failed to serialize graph hash: {e}"))?
     ));
     js.push_str(&format!(
         "const __zenith_signals = Object.freeze({});\n",
@@ -755,26 +2876,126 @@ fn generate_entry_js(
         "const __zenith_expression_bindings = Object.freeze({});\n",
         expression_bindings_json
     ));
+    let ssr_json = serde_json::to_string(
+        ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
+    )
+    .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
+    js.push_str(&format!(
+        "const __zenith_static_ssr_data = Object.freeze({});\n",
+        ssr_json
+    ));
+    js.push_str("function __zenith_read_ssr_data(staticValue) {\n");
+    js.push_str("  const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;\n");
+    js.push_str("  if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {\n");
+    js.push_str("    return Object.freeze(runtimeValue);\n");
+    js.push_str("  }\n");
+    js.push_str("  try {\n");
+    js.push_str("    const url = new URL(import.meta.url);\n");
+    js.push_str("    const encoded = url.searchParams.get('__zenith_ssr');\n");
+    js.push_str("    if (!encoded) {\n");
+    js.push_str("      return staticValue;\n");
+    js.push_str("    }\n");
+    js.push_str("    const decoded = JSON.parse(decodeURIComponent(encoded));\n");
+    js.push_str("    if (decoded && typeof decoded === 'object' && !Array.isArray(decoded)) {\n");
+    js.push_str("      return Object.freeze(decoded);\n");
+    js.push_str("    }\n");
+    js.push_str("  } catch {\n");
+    js.push_str("    // Fallback to static compile-time SSR payload.\n");
+    js.push_str("  }\n");
+    js.push_str("  return staticValue;\n");
+    js.push_str("}\n");
+    js.push_str("const __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);\n");
     let (component_imports, components_table) =
         generate_component_bootstrap_js(ir, component_assets)?;
     if !component_imports.is_empty() {
         js.push_str(&component_imports);
     }
     js.push_str(&format!(
-        "import {{ hydrate, signal, state, zeneffect }} from '{}';\n",
+        "import {{ hydrate, signal, state, zeneffect, zenEffect, zenMount }} from '{}';\n",
         runtime_import_spec
     ));
-    js.push_str(&format!("const __zenith_components = {};\n", components_table));
-    js.push_str("hydrate({\n");
-    js.push_str("  root: document,\n");
-    js.push_str("  ir_version: __zenith_ir_version,\n");
-    js.push_str("  expressions: __zenith_expression_bindings,\n");
-    js.push_str("  markers: __zenith_markers,\n");
-    js.push_str("  events: __zenith_events,\n");
-    js.push_str("  state_values: __zenith_state_values,\n");
-    js.push_str("  signals: __zenith_signals,\n");
-    js.push_str("  components: __zenith_components\n");
-    js.push_str("});\n");
+    let route_pattern_json = serde_json::to_string(route_pattern)
+        .map_err(|e| format!("failed to serialize route pattern: {e}"))?;
+    js.push_str(&format!(
+        "const __zenith_route_pattern = {};\n",
+        route_pattern_json
+    ));
+    js.push_str("function __zenith_split_path(pathname) {\n");
+    js.push_str("  return String(pathname || '/').split('/').filter(Boolean);\n");
+    js.push_str("}\n");
+    js.push_str("function __zenith_resolve_params(pattern, pathname) {\n");
+    js.push_str("  const patternSegs = __zenith_split_path(pattern);\n");
+    js.push_str("  const valueSegs = __zenith_split_path(pathname);\n");
+    js.push_str("  if (patternSegs.length !== valueSegs.length) {\n");
+    js.push_str("    return Object.freeze({});\n");
+    js.push_str("  }\n");
+    js.push_str("  const params = Object.create(null);\n");
+    js.push_str("  for (let i = 0; i < patternSegs.length; i++) {\n");
+    js.push_str("    const patternSeg = patternSegs[i];\n");
+    js.push_str("    const valueSeg = valueSegs[i];\n");
+    js.push_str("    if (patternSeg.startsWith(':')) {\n");
+    js.push_str("      params[patternSeg.slice(1)] = valueSeg;\n");
+    js.push_str("      continue;\n");
+    js.push_str("    }\n");
+    js.push_str("    if (patternSeg !== valueSeg) {\n");
+    js.push_str("      return Object.freeze({});\n");
+    js.push_str("    }\n");
+    js.push_str("  }\n");
+    js.push_str("  return Object.freeze(params);\n");
+    js.push_str("}\n");
+    js.push_str(&format!(
+        "const __zenith_components = {};\n",
+        components_table
+    ));
+    js.push_str("const __zenith_has_route_html = true;\n");
+    js.push_str("function __zenith_apply_route_html(root) {\n");
+    js.push_str("  if (typeof __zenith_html !== 'string' || __zenith_html.length === 0) {\n");
+    js.push_str("    return;\n");
+    js.push_str("  }\n");
+    js.push_str("  if (typeof Document === 'undefined' || !(root instanceof Document)) {\n");
+    js.push_str("    return;\n");
+    js.push_str("  }\n");
+    js.push_str("  if (typeof DOMParser === 'undefined') {\n");
+    js.push_str("    return;\n");
+    js.push_str("  }\n");
+    js.push_str("  const parser = new DOMParser();\n");
+    js.push_str("  const parsed = parser.parseFromString(__zenith_html, 'text/html');\n");
+    js.push_str("  const currentApp = root.getElementById('app');\n");
+    js.push_str("  const nextApp = parsed.getElementById('app');\n");
+    js.push_str("  if (currentApp && nextApp) {\n");
+    js.push_str("    currentApp.replaceWith(nextApp);\n");
+    js.push_str("    return;\n");
+    js.push_str("  }\n");
+    js.push_str("  if (root.body && parsed.body) {\n");
+    js.push_str("    root.body.replaceChildren(...parsed.body.children);\n");
+    js.push_str("  }\n");
+    js.push_str("}\n");
+    js.push_str("export function __zenith_mount(root = document, params = Object.freeze({})) {\n");
+    js.push_str("  if (__zenith_has_route_html === true) {\n");
+    js.push_str("    __zenith_apply_route_html(root);\n");
+    js.push_str("  }\n");
+    js.push_str("  return hydrate({\n");
+    js.push_str("    root,\n");
+    js.push_str("    ir_version: __zenith_ir_version,\n");
+    js.push_str("    graph_hash: __zenith_graph_hash,\n");
+    js.push_str("    expressions: __zenith_expression_bindings,\n");
+    js.push_str("    markers: __zenith_markers,\n");
+    js.push_str("    events: __zenith_events,\n");
+    js.push_str("    state_values: __zenith_state_values,\n");
+    js.push_str("    signals: __zenith_signals,\n");
+    js.push_str("    components: __zenith_components,\n");
+    js.push_str("    route: __zenith_route_pattern,\n");
+    js.push_str("    ssr_data: __zenith_ssr_data,\n");
+    js.push_str("    params\n");
+    js.push_str("  });\n");
+    js.push_str("}\n");
+    if !router_enabled {
+        js.push_str("const __zenith_initial_path = typeof location === 'object' && typeof location.pathname === 'string'\n");
+        js.push_str("  ? location.pathname\n");
+        js.push_str("  : '/';\n");
+        js.push_str("const __zenith_initial_params = __zenith_resolve_params(__zenith_route_pattern, __zenith_initial_path);\n");
+        js.push_str("__zenith_mount(document, __zenith_initial_params);\n");
+    }
 
     Ok(js)
 }
@@ -822,15 +3043,45 @@ fn generate_component_bootstrap_js(
 
     let mut aliases = BTreeMap::new();
     let mut imports = String::new();
-    for (hoist_id, rel) in component_assets {
-        let alias = format!("__zenith_component_{}", sanitize_asset_token(hoist_id));
+    let mut seen_hoist_ids = BTreeSet::new();
+    let mut ordered_hoist_ids = Vec::new();
+    for instance in &ir.component_instances {
+        if seen_hoist_ids.insert(instance.hoist_id.clone()) {
+            ordered_hoist_ids.push(instance.hoist_id.clone());
+        }
+    }
+
+    for hoist_id in ordered_hoist_ids {
+        let rel = component_assets.get(&hoist_id).ok_or_else(|| {
+            format!(
+                "missing component asset mapping for hoist_id '{}'",
+                hoist_id
+            )
+        })?;
+        let alias = format!("__zenith_component_{}", sanitize_asset_token(&hoist_id));
+        let script = ir.components_scripts.get(&hoist_id).ok_or_else(|| {
+            format!(
+                "missing component script metadata for hoist_id '{}'",
+                hoist_id
+            )
+        })?;
+        let factory_name = script.factory.trim();
+        if factory_name.is_empty() {
+            return Err(format!(
+                "component script '{}' has empty factory export name",
+                hoist_id
+            ));
+        }
         let component_path = PathBuf::from(rel);
         let file_name = component_path
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| format!("invalid component asset path '{rel}'"))?;
-        imports.push_str(&format!("import {} from './{}';\n", alias, file_name));
-        aliases.insert(hoist_id.clone(), alias);
+        imports.push_str(&format!(
+            "import {{ {} as {} }} from './{}';\n",
+            factory_name, alias, file_name
+        ));
+        aliases.insert(hoist_id, alias);
     }
 
     let mut components = String::from("[");
@@ -850,8 +3101,20 @@ fn generate_component_bootstrap_js(
             .map_err(|e| format!("failed to serialize component selector: {e}"))?;
         let hoist_json = serde_json::to_string(&instance.hoist_id)
             .map_err(|e| format!("failed to serialize component hoist id: {e}"))?;
+        let module_rel = component_assets.get(&instance.hoist_id).ok_or_else(|| {
+            format!(
+                "missing component module path for hoist_id '{}'",
+                instance.hoist_id
+            )
+        })?;
+        let module_json = serde_json::to_string(&format!("/{}", module_rel))
+            .map_err(|e| format!("failed to serialize component module path: {e}"))?;
+        let props_json = serde_json::to_string(&instance.props)
+            .map_err(|e| format!("failed to serialize component props: {e}"))?;
         components.push_str(&format!(
-            "{{instance:{instance_json},selector:{selector_json},hoist_id:{hoist_json},create:{create_alias}}}"
+            "{{instance:{instance_json},instance_id:{},marker_index:{},selector:{selector_json},hoist_id:{hoist_json},module:{module_json},props:{props_json},create:{create_alias}}}",
+            instance.instance_id,
+            instance.marker_index
         ));
     }
     components.push(']');
@@ -859,659 +3122,138 @@ fn generate_component_bootstrap_js(
     Ok((imports, components))
 }
 
-fn generate_runtime_module_js() -> String {
-    r#"const BOOLEAN_ATTRIBUTES = new Set(['disabled', 'checked', 'readonly', 'required', 'selected', 'open', 'hidden']);
-const __listeners = [];
-const __components = [];
-
-function cleanup() {
-  for (let i = 0; i < __components.length; i++) {
-    const instance = __components[i];
-    if (instance && typeof instance.destroy === 'function') {
-      instance.destroy();
+fn inject_runtime_hook_aliases(component_code: &str) -> String {
+    let hook_anchor = "const zeneffect = __runtime.zeneffect;";
+    if component_code.contains(hook_anchor) {
+        return component_code.replacen(
+            hook_anchor,
+            "const zeneffect = __runtime.zeneffect;\n  const zenEffect = __runtime.zenEffect || __runtime.zeneffect;\n  const zenMount = __runtime.zenMount;\n  const ref = __runtime.ref;",
+            1,
+        );
     }
-  }
-  __components.length = 0;
 
-  for (let i = 0; i < __listeners.length; i++) {
-    const item = __listeners[i];
-    item.node.removeEventListener(item.event, item.handler);
-  }
-  __listeners.length = 0;
+    component_code.to_string()
 }
 
-function __coerceText(value) {
-  if (value === null || value === undefined || value === false) return '';
-  return String(value);
+fn guard_component_bindings(component_code: &str) -> Result<String, String> {
+    let anchor_re = Regex::new(r"bindings\s*:\s*Object\.freeze\(\{")
+        .map_err(|error| format!("failed to compile component bindings anchor regex: {error}"))?;
+    let binding_value_re =
+        Regex::new(r#"(?m)(['"][^'"]+['"]\s*:\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*,?)"#)
+            .map_err(|error| format!("failed to compile component binding guard regex: {error}"))?;
+
+    let mut cursor = 0usize;
+    let mut rewritten = String::with_capacity(component_code.len());
+
+    while let Some(anchor_match) = anchor_re.find(&component_code[cursor..]) {
+        let anchor_end = cursor + anchor_match.end();
+        let open_brace_index = anchor_end
+            .checked_sub(1)
+            .ok_or_else(|| "component bindings rewrite failed: invalid anchor range".to_string())?;
+        let close_brace_index =
+            find_matching_brace(component_code, open_brace_index).ok_or_else(|| {
+                "component bindings rewrite failed: unterminated Object.freeze({ ... })".to_string()
+            })?;
+
+        rewritten.push_str(&component_code[cursor..anchor_end]);
+
+        let body = &component_code[anchor_end..close_brace_index];
+        let guarded_body = binding_value_re.replace_all(body, |captures: &regex::Captures| {
+            let prefix = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+            let ident = captures.get(2).map(|m| m.as_str()).unwrap_or("");
+            let suffix = captures.get(3).map(|m| m.as_str()).unwrap_or("");
+            format!("{prefix}(typeof {ident} === 'undefined' ? undefined : {ident}){suffix}")
+        });
+        rewritten.push_str(&guarded_body);
+        rewritten.push('}');
+
+        cursor = close_brace_index + 1;
+    }
+
+    rewritten.push_str(&component_code[cursor..]);
+    Ok(rewritten)
 }
 
-function __applyAttribute(node, attrName, value) {
-  if (attrName === 'class' || attrName === 'className') {
-    node.className = value === null || value === undefined || value === false ? '' : String(value);
-    return;
-  }
-
-  if (attrName === 'style') {
-    if (value === null || value === undefined || value === false) {
-      node.removeAttribute('style');
-      return;
-    }
-    if (typeof value === 'string') {
-      node.setAttribute('style', value);
-      return;
-    }
-    if (typeof value === 'object') {
-      const entries = Object.entries(value);
-      let styleText = '';
-      for (let i = 0; i < entries.length; i++) {
-        styleText += entries[i][0] + ': ' + entries[i][1] + ';';
-      }
-      node.setAttribute('style', styleText);
-      return;
-    }
-    node.setAttribute('style', String(value));
-    return;
-  }
-
-  if (BOOLEAN_ATTRIBUTES.has(attrName)) {
-    if (value) {
-      node.setAttribute(attrName, '');
-    } else {
-      node.removeAttribute(attrName);
-    }
-    return;
-  }
-
-  if (value === null || value === undefined || value === false) {
-    node.removeAttribute(attrName);
-    return;
-  }
-
-  node.setAttribute(attrName, String(value));
-}
-
-function __getComponentBinding(bindingsByInstance, instance, binding) {
-  if (!bindingsByInstance || typeof bindingsByInstance !== 'object') return undefined;
-  const instanceBindings = bindingsByInstance[instance];
-  if (!instanceBindings || typeof instanceBindings !== 'object') return undefined;
-  return instanceBindings[binding];
-}
-
-function __evaluateExpression(binding, stateValues, signalMap, componentBindings, mode) {
-  if (!binding || typeof binding !== 'object') {
-    throw new Error('[Zenith Runtime] expression binding must be an object');
-  }
-
-  if (!Number.isInteger(binding.marker_index) || binding.marker_index < 0) {
-    throw new Error('[Zenith Runtime] expression binding requires marker_index');
-  }
-
-  if (binding.signal_index !== null && binding.signal_index !== undefined) {
-    if (!Number.isInteger(binding.signal_index)) {
-      throw new Error('[Zenith Runtime] expression.signal_index must be an integer');
-    }
-    const signalValue = signalMap.get(binding.signal_index);
-    if (!signalValue || typeof signalValue.get !== 'function') {
-      throw new Error('[Zenith Runtime] expression.signal_index did not resolve to a signal');
-    }
-    return mode === 'event' ? signalValue : signalValue.get();
-  }
-
-  if (binding.state_index !== null && binding.state_index !== undefined) {
-    if (!Number.isInteger(binding.state_index) || binding.state_index < 0 || binding.state_index >= stateValues.length) {
-      throw new Error('[Zenith Runtime] expression.state_index out of bounds');
-    }
-    const resolved = stateValues[binding.state_index];
-    if (mode !== 'event' && typeof resolved === 'function') {
-      return resolved();
-    }
-    return resolved;
-  }
-
-  if (typeof binding.component_instance === 'string' && typeof binding.component_binding === 'string') {
-    const resolved = __getComponentBinding(componentBindings, binding.component_instance, binding.component_binding);
-    if (mode !== 'event' && typeof resolved === 'function') {
-      return resolved();
-    }
-    return resolved;
-  }
-
-  if (binding.literal !== null && binding.literal !== undefined) {
-    return binding.literal;
-  }
-
-  return '';
-}
-
-function __resolveNodes(root, selector, index, kind) {
-  const nodes = root.querySelectorAll(selector);
-  if (!nodes || nodes.length === 0) {
-    throw new Error('[Zenith Runtime] unresolved ' + kind + ' marker index ' + index + ' for selector "' + selector + '"');
-  }
-  return nodes;
-}
-
-export function hydrate(payload) {
-  cleanup();
-
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires an object payload');
-  }
-  if (payload.ir_version !== 1) {
-    throw new Error('[Zenith Runtime] unsupported ir_version (expected 1)');
-  }
-  if (!payload.root || typeof payload.root.querySelectorAll !== 'function') {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires payload.root with querySelectorAll');
-  }
-  if (!Array.isArray(payload.expressions)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires expressions[]');
-  }
-  if (!Array.isArray(payload.markers)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires markers[]');
-  }
-  if (!Array.isArray(payload.events)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires events[]');
-  }
-  if (!Array.isArray(payload.state_values)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires state_values[]');
-  }
-  if (!Array.isArray(payload.signals)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires signals[]');
-  }
-  if (payload.components !== undefined && !Array.isArray(payload.components)) {
-    throw new Error('[Zenith Runtime] hydrate(payload) requires components[] when provided');
-  }
-  if (payload.markers.length !== payload.expressions.length) {
-    throw new Error('[Zenith Runtime] marker/expression mismatch: markers=' + payload.markers.length + ', expressions=' + payload.expressions.length);
-  }
-
-  const root = payload.root;
-  const expressions = payload.expressions;
-  const markers = payload.markers;
-  const events = payload.events;
-  const stateValues = payload.state_values;
-  const signals = payload.signals;
-  const components = Array.isArray(payload.components) ? payload.components : [];
-  const componentBindings = Object.create(null);
-  const signalMap = new Map();
-
-  const runtimeApi = Object.freeze({ signal, state, zeneffect });
-  for (let i = 0; i < components.length; i++) {
-    const component = components[i];
-    if (!component || typeof component !== 'object') {
-      throw new Error('[Zenith Runtime] component at position ' + i + ' must be an object');
-    }
-    if (typeof component.selector !== 'string' || component.selector.length === 0) {
-      throw new Error('[Zenith Runtime] component at position ' + i + ' requires selector');
-    }
-    if (typeof component.instance !== 'string' || component.instance.length === 0) {
-      throw new Error('[Zenith Runtime] component at position ' + i + ' requires instance');
-    }
-    if (typeof component.create !== 'function') {
-      throw new Error('[Zenith Runtime] component at position ' + i + ' requires create() function');
+fn find_matching_brace(source: &str, open_brace_index: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    if open_brace_index >= bytes.len() || bytes[open_brace_index] != b'{' {
+        return None;
     }
 
-    const hosts = __resolveNodes(root, component.selector, i, 'component');
-    for (let j = 0; j < hosts.length; j++) {
-      const instance = component.create(hosts[j], Object.freeze({}), runtimeApi);
-      if (!instance || typeof instance !== 'object') {
-        throw new Error('[Zenith Runtime] component factory for ' + component.instance + ' must return an object');
-      }
-      if (typeof instance.mount === 'function') {
-        instance.mount();
-      }
-      if (typeof instance.destroy === 'function') {
-        __components.push({ destroy: instance.destroy.bind(instance) });
-      }
-      if (instance.bindings && typeof instance.bindings === 'object') {
-        componentBindings[component.instance] = instance.bindings;
-      }
-    }
-  }
+    let mut depth = 0usize;
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut in_backtick = false;
+    let mut escaped = false;
 
-  const signalIds = new Set();
-  for (let i = 0; i < signals.length; i++) {
-    const entry = signals[i];
-    if (!entry || typeof entry !== 'object') {
-      throw new Error('[Zenith Runtime] signal descriptor at position ' + i + ' must be an object');
-    }
-    if (entry.kind !== 'signal') {
-      throw new Error('[Zenith Runtime] signal descriptor at position ' + i + ' requires kind=\"signal\"');
-    }
-    if (!Number.isInteger(entry.id) || entry.id < 0) {
-      throw new Error('[Zenith Runtime] signal descriptor at position ' + i + ' requires non-negative id');
-    }
-    if (signalIds.has(entry.id)) {
-      throw new Error('[Zenith Runtime] duplicate signal id ' + entry.id);
-    }
-    signalIds.add(entry.id);
-    if (!Number.isInteger(entry.state_index) || entry.state_index < 0 || entry.state_index >= stateValues.length) {
-      throw new Error('[Zenith Runtime] signal descriptor at position ' + i + ' has out-of-bounds state_index');
-    }
+    for (index, byte) in bytes.iter().enumerate().skip(open_brace_index) {
+        let ch = *byte;
 
-    const candidate = stateValues[entry.state_index];
-    if (!candidate || typeof candidate !== 'object' || typeof candidate.get !== 'function' || typeof candidate.subscribe !== 'function') {
-      throw new Error('[Zenith Runtime] signal descriptor id ' + entry.id + ' did not resolve to a signal object');
-    }
-    signalMap.set(entry.id, candidate);
-  }
-
-  const expressionMarkerIndices = new Set();
-  for (let i = 0; i < expressions.length; i++) {
-    const expression = expressions[i];
-    if (!expression || typeof expression !== 'object') {
-      throw new Error('[Zenith Runtime] expression at position ' + i + ' must be an object');
-    }
-    if (!Number.isInteger(expression.marker_index) || expression.marker_index < 0 || expression.marker_index >= expressions.length) {
-      throw new Error('[Zenith Runtime] expression at position ' + i + ' has invalid marker_index');
-    }
-    if (expression.marker_index !== i) {
-      throw new Error('[Zenith Runtime] expression table out of order at position ' + i + ': marker_index=' + expression.marker_index);
-    }
-    if (expressionMarkerIndices.has(expression.marker_index)) {
-      throw new Error('[Zenith Runtime] duplicate expression marker_index ' + expression.marker_index);
-    }
-    expressionMarkerIndices.add(expression.marker_index);
-  }
-
-  const markerIndices = new Set();
-  const markerByIndex = new Map();
-  const markerNodesByIndex = new Map();
-  for (let i = 0; i < markers.length; i++) {
-    const marker = markers[i];
-    if (!marker || typeof marker !== 'object') {
-      throw new Error('[Zenith Runtime] marker at position ' + i + ' must be an object');
-    }
-    if (!Number.isInteger(marker.index) || marker.index < 0 || marker.index >= expressions.length) {
-      throw new Error('[Zenith Runtime] marker at position ' + i + ' has out-of-bounds index');
-    }
-    if (marker.index !== i) {
-      throw new Error('[Zenith Runtime] marker table out of order at position ' + i + ': index=' + marker.index);
-    }
-    if (markerIndices.has(marker.index)) {
-      throw new Error('[Zenith Runtime] duplicate marker index ' + marker.index);
-    }
-    markerIndices.add(marker.index);
-    markerByIndex.set(marker.index, marker);
-
-    if (marker.kind === 'event') {
-      continue;
-    }
-
-    if (typeof marker.selector !== 'string' || marker.selector.length === 0) {
-      throw new Error('[Zenith Runtime] marker at position ' + i + ' requires selector');
-    }
-
-    const nodes = __resolveNodes(root, marker.selector, marker.index, marker.kind);
-    markerNodesByIndex.set(marker.index, nodes);
-    const value = __evaluateExpression(expressions[marker.index], stateValues, signalMap, componentBindings, marker.kind);
-
-    for (let j = 0; j < nodes.length; j++) {
-      if (marker.kind === 'text') {
-        nodes[j].textContent = __coerceText(value);
-      } else if (marker.kind === 'attr') {
-        if (typeof marker.attr !== 'string' || marker.attr.length === 0) {
-          throw new Error('[Zenith Runtime] attr marker at position ' + i + ' requires attr');
+        if escaped {
+            escaped = false;
+            continue;
         }
-        __applyAttribute(nodes[j], marker.attr, value);
-      } else {
-        throw new Error('[Zenith Runtime] marker at position ' + i + ' has invalid kind');
-      }
-    }
-  }
 
-  for (let i = 0; i < expressions.length; i++) {
-    if (!markerIndices.has(i)) {
-      throw new Error('[Zenith Runtime] missing marker index ' + i);
-    }
-  }
+        if in_single_quote {
+            if ch == b'\\' {
+                escaped = true;
+            } else if ch == b'\'' {
+                in_single_quote = false;
+            }
+            continue;
+        }
+        if in_double_quote {
+            if ch == b'\\' {
+                escaped = true;
+            } else if ch == b'"' {
+                in_double_quote = false;
+            }
+            continue;
+        }
+        if in_backtick {
+            if ch == b'\\' {
+                escaped = true;
+            } else if ch == b'`' {
+                in_backtick = false;
+            }
+            continue;
+        }
 
-  function renderMarkerByIndex(index) {
-    const marker = markerByIndex.get(index);
-    if (!marker || marker.kind === 'event') return;
-    const nodes = markerNodesByIndex.get(index) || __resolveNodes(root, marker.selector, marker.index, marker.kind);
-    markerNodesByIndex.set(index, nodes);
-
-    const value = __evaluateExpression(expressions[index], stateValues, signalMap, componentBindings, marker.kind);
-    for (let j = 0; j < nodes.length; j++) {
-      if (marker.kind === 'text') {
-        nodes[j].textContent = __coerceText(value);
-      } else if (marker.kind === 'attr') {
-        __applyAttribute(nodes[j], marker.attr, value);
-      }
-    }
-  }
-
-  const dependentMarkersBySignal = new Map();
-  for (let i = 0; i < expressions.length; i++) {
-    const binding = expressions[i];
-    if (!binding || typeof binding !== 'object') continue;
-    if (!Number.isInteger(binding.signal_index)) continue;
-    if (!dependentMarkersBySignal.has(binding.signal_index)) {
-      dependentMarkersBySignal.set(binding.signal_index, []);
-    }
-    dependentMarkersBySignal.get(binding.signal_index).push(binding.marker_index);
-  }
-
-  for (const [signalId, markerIndicesForSignal] of dependentMarkersBySignal.entries()) {
-    const targetSignal = signalMap.get(signalId);
-    if (!targetSignal) {
-      throw new Error('[Zenith Runtime] expression references unknown signal id ' + signalId);
-    }
-    const unsubscribe = targetSignal.subscribe(() => {
-      for (let i = 0; i < markerIndicesForSignal.length; i++) {
-        renderMarkerByIndex(markerIndicesForSignal[i]);
-      }
-    });
-    if (typeof unsubscribe === 'function') {
-      __components.push({ destroy: unsubscribe });
-    }
-  }
-
-  const eventIndices = new Set();
-  for (let i = 0; i < events.length; i++) {
-    const binding = events[i];
-    if (!binding || typeof binding !== 'object') {
-      throw new Error('[Zenith Runtime] event binding at position ' + i + ' must be an object');
-    }
-    if (!Number.isInteger(binding.index) || binding.index < 0 || binding.index >= expressions.length) {
-      throw new Error('[Zenith Runtime] event binding at position ' + i + ' has out-of-bounds index');
-    }
-    if (eventIndices.has(binding.index)) {
-      throw new Error('[Zenith Runtime] duplicate event index ' + binding.index);
-    }
-    eventIndices.add(binding.index);
-    if (typeof binding.event !== 'string' || binding.event.length === 0) {
-      throw new Error('[Zenith Runtime] event binding at position ' + i + ' requires event name');
-    }
-    if (typeof binding.selector !== 'string' || binding.selector.length === 0) {
-      throw new Error('[Zenith Runtime] event binding at position ' + i + ' requires selector');
+        match ch {
+            b'\'' => in_single_quote = true,
+            b'"' => in_double_quote = true,
+            b'`' => in_backtick = true,
+            b'{' => depth += 1,
+            b'}' => {
+                if depth == 0 {
+                    return None;
+                }
+                depth -= 1;
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
     }
 
-    const nodes = __resolveNodes(root, binding.selector, binding.index, 'event');
-    const handler = __evaluateExpression(expressions[binding.index], stateValues, signalMap, componentBindings, 'event');
-    if (typeof handler !== 'function') {
-      throw new Error('[Zenith Runtime] event binding at index ' + binding.index + ' did not resolve to a function');
-    }
-
-    for (let j = 0; j < nodes.length; j++) {
-      nodes[j].addEventListener(binding.event, handler);
-      __listeners.push({ node: nodes[j], event: binding.event, handler });
-    }
-  }
-
-  return cleanup;
+    None
 }
 
-export function signal(initialValue) {
-  let value = initialValue;
-  const subscribers = new Set();
-  return {
-    get() { return value; },
-    set(nextValue) {
-      if (Object.is(value, nextValue)) return value;
-      value = nextValue;
-      const snapshot = [...subscribers];
-      for (let i = 0; i < snapshot.length; i++) snapshot[i](value);
-      return value;
-    },
-    subscribe(fn) {
-      if (typeof fn !== 'function') {
-        throw new Error('[Zenith Runtime] signal.subscribe(fn) requires a function');
-      }
-      subscribers.add(fn);
-      return function unsubscribe() { subscribers.delete(fn); };
-    }
-  };
-}
+fn generate_core_module_js(runtime_import_spec: &str) -> String {
+    format!(
+        r#"import {{ signal, state, zeneffect, zenEffect as __zenithZenEffect, zenMount as __zenithZenMount }} from '{runtime_import_spec}';
 
-export function state(initialValue) {
-  if (!initialValue || typeof initialValue !== 'object' || Array.isArray(initialValue)) {
-    throw new Error('[Zenith Runtime] state(initial) requires a plain object');
-  }
-  let current = Object.freeze({ ...initialValue });
-  const subscribers = new Set();
-  return {
-    get() { return current; },
-    set(nextPatch) {
-      const nextValue = typeof nextPatch === 'function'
-        ? nextPatch(current)
-        : { ...current, ...nextPatch };
-      if (!nextValue || typeof nextValue !== 'object' || Array.isArray(nextValue)) {
-        throw new Error('[Zenith Runtime] state.set(next) must resolve to a plain object');
-      }
-      const frozen = Object.freeze({ ...nextValue });
-      if (Object.is(current, frozen)) return current;
-      current = frozen;
-      const snapshot = [...subscribers];
-      for (let i = 0; i < snapshot.length; i++) snapshot[i](current);
-      return current;
-    },
-    subscribe(fn) {
-      if (typeof fn !== 'function') {
-        throw new Error('[Zenith Runtime] state.subscribe(fn) requires a function');
-      }
-      subscribers.add(fn);
-      return function unsubscribe() { subscribers.delete(fn); };
-    }
-  };
-}
+export const zenSignal = signal;
+export const zenState = state;
+export const zenEffect = __zenithZenEffect;
+export const zenMount = __zenithZenMount;
 
-export function zeneffect(dependencies, fn) {
-  if (!Array.isArray(dependencies) || dependencies.length === 0) {
-    throw new Error('[Zenith Runtime] zeneffect(deps, fn) requires non-empty deps');
-  }
-  if (typeof fn !== 'function') {
-    throw new Error('[Zenith Runtime] zeneffect(deps, fn) requires fn');
-  }
-  const unsubscribers = dependencies.map((dep, index) => {
-    if (!dep || typeof dep.subscribe !== 'function') {
-      throw new Error('[Zenith Runtime] zeneffect dependency at index ' + index + ' must expose subscribe(fn)');
-    }
-    return dep.subscribe(() => fn());
-  });
-  fn();
-  return function dispose() {
-    for (let i = 0; i < unsubscribers.length; i++) unsubscribers[i]();
-  };
-}
+export function zenOnMount(callback) {{
+  return __zenithZenMount(callback);
+}}
+
+export {{ signal, state, zeneffect }};
 "#
-    .to_string()
-}
-
-fn upsert_router_manifest(out_dir: &PathBuf, entry: RouterRouteEntry) -> Result<(), String> {
-    let manifest_path = out_dir.join("assets").join("router-manifest.json");
-    if let Some(parent) = manifest_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            format!(
-                "failed to create router manifest dir '{}': {e}",
-                parent.display()
-            )
-        })?;
-    }
-
-    let mut manifest = if manifest_path.exists() {
-        let source = fs::read_to_string(&manifest_path).map_err(|e| {
-            format!(
-                "failed to read router manifest '{}': {e}",
-                manifest_path.display()
-            )
-        })?;
-        serde_json::from_str::<RouterManifest>(&source)
-            .map_err(|e| format!("invalid router manifest '{}': {e}", manifest_path.display()))?
-    } else {
-        RouterManifest::default()
-    };
-
-    if let Some(existing) = manifest
-        .routes
-        .iter_mut()
-        .find(|route| route.path == entry.path)
-    {
-        *existing = entry;
-    } else {
-        manifest.routes.push(entry);
-    }
-
-    manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
-
-    let json = serde_json::to_string(&manifest)
-        .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
-    fs::write(&manifest_path, json).map_err(|e| {
-        format!(
-            "failed to write router manifest '{}': {e}",
-            manifest_path.display()
-        )
-    })?;
-
-    Ok(())
-}
-
-fn generate_router_runtime_js() -> String {
-    r#"(function() {
-  const MANIFEST_URL = '/assets/router-manifest.json';
-  let manifestPromise = null;
-
-  function loadManifest() {
-    if (!manifestPromise) {
-      manifestPromise = fetch(MANIFEST_URL, { cache: 'no-store' })
-        .then((res) => (res.ok ? res.json() : { routes: [] }))
-        .catch(() => ({ routes: [] }));
-    }
-    return manifestPromise;
-  }
-
-  function splitPath(path) {
-    return path.split('/').filter(Boolean);
-  }
-
-  function matchRoute(pathname, routes) {
-    const segments = splitPath(pathname);
-    for (let i = 0; i < routes.length; i++) {
-      const route = routes[i];
-      const routeSegs = splitPath(route.path);
-      if (routeSegs.length !== segments.length) continue;
-
-      const params = {};
-      let matched = true;
-      for (let j = 0; j < routeSegs.length; j++) {
-        const routeSeg = routeSegs[j];
-        const seg = segments[j];
-        if (routeSeg.startsWith(':')) {
-          params[routeSeg.slice(1)] = seg;
-          continue;
-        }
-        if (routeSeg !== seg) {
-          matched = false;
-          break;
-        }
-      }
-      if (matched) return { route, params };
-    }
-    return null;
-  }
-
-  function resolveExpression(expr, params) {
-    const match = /^params\.([A-Za-z_$][\w$]*)$/.exec(expr);
-    if (!match) return '';
-    const value = params[match[1]];
-    return value == null ? '' : String(value);
-  }
-
-  function renderRoute(match) {
-    const template = document.createElement('template');
-    template.innerHTML = match.route.html;
-
-    const nodes = template.content.querySelectorAll('[data-zx-e]');
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const raw = node.getAttribute('data-zx-e') || '';
-      const parts = raw.split(/\s+/).filter(Boolean);
-      let text = '';
-
-      for (let j = 0; j < parts.length; j++) {
-        const idx = Number(parts[j]);
-        if (!Number.isInteger(idx)) continue;
-        if (idx < 0 || idx >= match.route.expressions.length) continue;
-        text += resolveExpression(match.route.expressions[idx], match.params);
-      }
-
-      node.textContent = text;
-    }
-
-    const all = template.content.querySelectorAll('*');
-    for (let i = 0; i < all.length; i++) {
-      const attrs = all[i].attributes;
-      for (let j = attrs.length - 1; j >= 0; j--) {
-        const name = attrs[j].name;
-        if (name.startsWith('data-zx-on-')) {
-          all[i].removeAttribute(name);
-        }
-      }
-    }
-
-    const container = document.getElementById('app');
-    if (container) {
-      container.innerHTML = '';
-      container.appendChild(template.content.cloneNode(true));
-      return;
-    }
-
-    document.body.innerHTML = '';
-    document.body.appendChild(template.content.cloneNode(true));
-  }
-
-  async function resolvePath(pathname) {
-    const manifest = await loadManifest();
-    const routes = Array.isArray(manifest.routes) ? manifest.routes : [];
-    const matched = matchRoute(pathname, routes);
-    if (!matched) return false;
-    renderRoute(matched);
-    return true;
-  }
-
-  function isInternalLink(anchor) {
-    if (!anchor || anchor.target || anchor.hasAttribute('download')) return false;
-    const href = anchor.getAttribute('href');
-    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
-      return false;
-    }
-    const url = new URL(anchor.href, window.location.href);
-    return url.origin === window.location.origin;
-  }
-
-  async function navigate(pathname) {
-    const ok = await resolvePath(pathname);
-    if (!ok) {
-      window.location.assign(pathname);
-      return;
-    }
-    history.pushState({}, '', pathname);
-  }
-
-  document.addEventListener('click', function(event) {
-    const target = event.target && event.target.closest ? event.target.closest('a[href]') : null;
-    if (!isInternalLink(target)) return;
-
-    const url = new URL(target.href, window.location.href);
-    const nextPath = url.pathname;
-    if (nextPath === window.location.pathname) return;
-
-    event.preventDefault();
-    navigate(nextPath);
-  });
-
-  window.addEventListener('popstate', function() {
-    resolvePath(window.location.pathname);
-  });
-
-  loadManifest().then((manifest) => {
-    const routes = Array.isArray(manifest.routes) ? manifest.routes : [];
-    const initial = matchRoute(window.location.pathname, routes);
-    if (initial && initial.route && typeof initial.route.path === 'string' && initial.route.path.includes(':')) {
-      renderRoute(initial);
-    }
-  });
-})();"#
-        .to_string()
+    )
 }

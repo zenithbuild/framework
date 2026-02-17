@@ -10,14 +10,13 @@
 //! There is one graph, one emission flow, one source of truth.
 //! No inline bypass is permitted — determinism requires a unified pipeline.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use regex::Regex;
 use rolldown::{BundlerBuilder, BundlerOptions, InputItem};
 use rolldown_common::OutputFormat;
-use zenith_compiler::compiler::CompilerOutput;
 use zenith_compiler::script::ExtractedStyleBlock;
 
 use crate::plugin::zenith_loader::{ZenithLoader, ZenithLoaderConfig};
@@ -156,8 +155,7 @@ pub async fn execute_bundle(
 
     let mut effective_style_blocks = compiled.style_blocks.clone();
     if effective_style_blocks.is_empty() {
-        effective_style_blocks =
-            collect_graph_style_blocks(&compiled_outputs, &plan.page_path, &compiled);
+        effective_style_blocks = collect_graph_style_blocks(&plan.page_path);
     }
 
     // Process CSS and Anchor.
@@ -226,61 +224,29 @@ pub async fn execute_bundle(
     })
 }
 
-fn collect_graph_style_blocks(
-    compiled_outputs: &dashmap::DashMap<String, CompilerOutput>,
-    entry_path: &str,
-    compiled_entry: &CompilerOutput,
-) -> Vec<ExtractedStyleBlock> {
-    let mut modules = BTreeMap::new();
-    for item in compiled_outputs.iter() {
-        modules.insert(item.key().clone(), item.value().clone());
-    }
-
-    if modules.is_empty() {
-        return Vec::new();
-    }
-
-    let mut resolved_entry = entry_path.to_string();
-    if !modules.contains_key(&resolved_entry) {
-        if let Ok(canon) = std::fs::canonicalize(entry_path) {
-            let candidate = canon.to_string_lossy().to_string();
-            if modules.contains_key(&candidate) {
-                resolved_entry = candidate;
-            }
-        }
-    }
-
-    if !modules.contains_key(&resolved_entry) {
-        modules.insert(resolved_entry.clone(), compiled_entry.clone());
-    }
+fn collect_graph_style_blocks(entry_path: &str) -> Vec<ExtractedStyleBlock> {
+    let resolved_entry = if let Ok(canon) = std::fs::canonicalize(entry_path) {
+        canon.to_string_lossy().to_string()
+    } else {
+        entry_path.to_string()
+    };
 
     let mut ordered = Vec::new();
     let mut visiting = BTreeSet::new();
     let mut visited = BTreeSet::new();
-    dfs_modules(
-        &resolved_entry,
-        &modules,
-        &mut visiting,
-        &mut visited,
-        &mut ordered,
-    );
+    dfs_source_modules(&resolved_entry, &mut visiting, &mut visited, &mut ordered);
 
     let mut blocks = Vec::new();
     for module_id in ordered {
-        let Some(output) = modules.get(&module_id) else {
-            continue;
-        };
-        let module_blocks = extract_style_blocks_from_source_file(&module_id)
-            .unwrap_or_else(|| extract_style_blocks_from_html(&module_id, &output.html));
+        let module_blocks = extract_style_blocks_from_source_file(&module_id).unwrap_or_default();
         blocks.extend(module_blocks);
     }
 
     blocks
 }
 
-fn dfs_modules(
+fn dfs_source_modules(
     module_id: &str,
-    modules: &BTreeMap<String, CompilerOutput>,
     visiting: &mut BTreeSet<String>,
     visited: &mut BTreeSet<String>,
     ordered: &mut Vec<String>,
@@ -292,12 +258,8 @@ fn dfs_modules(
         return;
     }
 
-    if let Some(module) = modules.get(module_id) {
-        for dep in extract_zen_imports(module_id, module) {
-            if modules.contains_key(&dep) {
-                dfs_modules(&dep, modules, visiting, visited, ordered);
-            }
-        }
+    for dep in extract_zen_imports_from_source_file(module_id) {
+        dfs_source_modules(&dep, visiting, visited, ordered);
     }
 
     visiting.remove(module_id);
@@ -305,17 +267,17 @@ fn dfs_modules(
     ordered.push(module_id.to_string());
 }
 
-fn extract_zen_imports(module_id: &str, module: &CompilerOutput) -> Vec<String> {
+fn extract_zen_imports_from_source_file(module_id: &str) -> Vec<String> {
+    let source = match std::fs::read_to_string(module_id) {
+        Ok(value) => value,
+        Err(_) => return Vec::new(),
+    };
+
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
 
     let import_re = Regex::new(r#"(?i)^\s*import\s+[^'"]*['"]([^'"]+)['"]"#).expect("valid regex");
-    for line in module
-        .hoisted
-        .imports
-        .iter()
-        .chain(module.imports.iter())
-    {
+    for line in source.lines() {
         let Some(caps) = import_re.captures(line) else {
             continue;
         };

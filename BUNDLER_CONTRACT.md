@@ -135,3 +135,26 @@ The bundler is a **pure structural transformer**.
 - Whitespace changes in source expressions **change the final hash**.
 - Bundler **does not canonicalize** JavaScript expressions.
 
+---
+
+## 11. Vendor Bundling Contract
+
+- Vendor bundling supports **third-party ESM libraries** (for example `gsap`, `three`, `date-fns`).
+- Vendor bundling **does not imply framework interop**. React/Vue/Svelte/Solid/etc. are out-of-scope until an explicit adapter/islands layer exists.
+- Framework imports are a hard error:
+  - `react`, `react-dom`, `vue`, `svelte`, `solid-js`, `preact`, `lit`, `@angular/core` (including subpaths)
+  - Diagnostic text:
+    - `Framework interop imports are not supported yet. If you want this, we need an explicit adapter/islands layer.`
+- Vendor filename hash is deterministic and seeded from:
+  - lockfile content hash
+  - pinned Rolldown revision
+  - sorted external specifiers
+  - emitted vendor chunk code
+- Manifest always exposes vendor as top-level deterministic path when externals exist:
+  - `vendor: "/assets/vendor.<hash>.js"`
+
+## 12. CSS Input Contract
+
+- Zenith bundles local `.css` files deterministically as opaque input.
+- CSS framework processors (for example Tailwind) are out-of-band pre-steps in this phase.
+- Import the compiled CSS artifact (for example `./styles/output.css`) and Zenith will include it in the deterministic CSS pipeline and single injected stylesheet link.

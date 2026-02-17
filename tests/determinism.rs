@@ -309,7 +309,6 @@ async fn os_independent_hash_snapshot() {
     );
 }
 
-
 #[tokio::test]
 async fn hash_stays_stable_when_compiler_normalizes_expression_whitespace() {
     // Process boundary contract: bundler consumes compiler IR as-is.
