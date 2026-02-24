@@ -1,5 +1,8 @@
 # @zenithbuild/cli ⚡
 
+> **⚠️ Internal API:** This package is an internal implementation detail of the Zenith framework. It is not intended for public use and its API may break without warning. Please use `@zenithbuild/core` instead.
+
+
 The command-line interface for developing and building Zenith applications.
 
 ## Overview

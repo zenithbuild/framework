@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "0.5.0-beta.2",
+  "version": "0.5.0-beta.2.3",
   "description": "Deterministic project orchestrator for Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -11,17 +11,20 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "dist/**",
+    "package.json"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "mkdir -p dist && cp -a src/* dist/",
-    "test": "node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand"
+    "test": "node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.5.0-beta.1"
+    "@zenithbuild/compiler": "0.5.0-beta.2.3"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
