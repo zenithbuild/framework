@@ -98,28 +98,62 @@ test('router click contract uses single-click push+navigate flow', async () => {
     const clickStart = routerSource.indexOf("document.addEventListener('click'");
     assert.ok(clickStart >= 0, 'router must attach delegated click handler');
     const preventDefaultIdx = routerSource.indexOf('event.preventDefault();', clickStart);
-    const clickNavigateIdx = routerSource.indexOf('navigate(nextPath, true)', clickStart);
+    const targetIdx = routerSource.indexOf("closest('a[data-zen-link]')", clickStart);
+    const assignIdx = routerSource.indexOf('window.location.assign(url.href)', clickStart);
+    const pushStateIdx = routerSource.indexOf('pushState(');
+    const replaceStateIdx = routerSource.indexOf('replaceState(');
     assert.ok(preventDefaultIdx >= 0, 'click flow must call preventDefault');
-    assert.ok(clickNavigateIdx >= 0, 'click flow must call navigate(nextPath, true)');
+    assert.ok(targetIdx >= 0, 'click flow must target a[data-zen-link]');
+    assert.ok(assignIdx >= 0, 'click flow must call window.location.assign(url.href)');
+    assert.strictEqual(pushStateIdx, -1, 'router runtime must not call pushState');
+    assert.strictEqual(replaceStateIdx, -1, 'router runtime must not call replaceState');
     assert.ok(
-        preventDefaultIdx < clickNavigateIdx,
-        'preventDefault must execute before click navigation'
+        preventDefaultIdx < assignIdx,
+        'preventDefault must execute before assign'
     );
 
-    const navigateStart = routerSource.indexOf('async function navigate(pathname, push)');
-    const pushStateIdx = routerSource.indexOf("history.pushState({}, '', pathname);", navigateStart);
-    const mountIdx = routerSource.indexOf('await mountRoute(next.route, next.params, navigationToken);', navigateStart);
-    assert.ok(navigateStart >= 0, 'router must define navigate(pathname, push)');
-    assert.ok(pushStateIdx >= 0, 'navigate must pushState when push=true');
+    const navigateStart = routerSource.indexOf('async function navigate(pathname');
+    const mountIdx = routerSource.indexOf('await mountRoute(next.route, next.params, token);', navigateStart);
+    const scrollIdx = routerSource.indexOf('window.scrollTo(0, 0);', navigateStart);
+    assert.ok(navigateStart >= 0, 'router must define navigate(pathname');
     assert.ok(mountIdx >= 0, 'navigate must mount route');
-    assert.ok(pushStateIdx < mountIdx, 'navigate must pushState before mountRoute');
+    assert.ok(scrollIdx >= 0, 'navigate must reset scroll after successful route mount');
+    assert.ok(mountIdx < scrollIdx, 'navigate must reset scroll after mountRoute');
 
     assert.ok(
-        routerSource.includes('navigate(window.location.pathname, false)'),
+        routerSource.includes("history.scrollRestoration = 'manual';"),
+        'router must disable browser scroll restoration for deterministic SPA navigation'
+    );
+
+    assert.ok(
+        routerSource.includes('navigate(window.location.pathname, null)'),
         'router must perform initial route mount on first load'
     );
     assert.ok(
         routerSource.includes('window.location.assign(url.href);'),
         'click navigation failures must hard-navigate as fallback'
     );
+});
+
+test('router asset is not injected when soft navigation is disabled', async () => {
+    cleanup();
+
+    const payload = [
+        {
+            route: '/',
+            file: 'pages/index.zen',
+            router: false,
+            ir: baseIr(
+                '<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><main>Home</main></body></html>',
+                'mod_home',
+                '14e6e24af0adb2103ad152405e46035b6ec731b2dd34c53e6798265c9e11e540'
+            )
+        }
+    ];
+
+    const res = runBundler(payload);
+    assert.strictEqual(res.status, 0, 'bundler should succeed');
+
+    const manifest = JSON.parse(readFileSync(join(TEST_DIR, 'dist/manifest.json'), 'utf8'));
+    assert.ok(!manifest.router, 'manifest.router should be omitted when soft navigation is disabled');
 });

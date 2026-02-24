@@ -149,6 +149,8 @@ struct CompilerImport {
 struct CompilerServerScript {
     source: String,
     prerender: bool,
+    #[serde(default)]
+    source_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -213,6 +215,8 @@ struct RouterRouteEntry {
     page_asset: Option<String>,
     #[serde(default)]
     server_script: Option<String>,
+    #[serde(default)]
+    server_script_path: Option<String>,
     #[serde(default)]
     prerender: bool,
     #[serde(default)]
@@ -399,9 +403,15 @@ fn run() -> Result<(), String> {
                 }
             }
             // Rewrite hoisted code blocks that are spliced directly into page entry assets.
-            for block in &mut input.ir.hoisted.code {
+            for (index, block) in input.ir.hoisted.code.iter_mut().enumerate() {
                 *block = zenith_bundler::utils::rewrite_js_imports_ast(block, &vendor_map)
-                    .map_err(|e| format!("Rewrite failed for hoisted block: {}", e))?;
+                    .map_err(|e| {
+                        let preview: String = block.chars().take(220).collect();
+                        format!(
+                            "Rewrite failed for hoisted block #{index} ({route}): {e}\n--- hoisted preview ---\n{preview}",
+                            route = input.route
+                        )
+                    })?;
             }
             // Rewrite imports list (for virtual entry generation)
             for imp in &mut input.ir.imports {
@@ -445,12 +455,6 @@ fn run() -> Result<(), String> {
     }
     let module_registry = build_module_registry(&inputs)?;
 
-    // Collect all ref bindings across pages for component wiring
-    let mut all_ref_bindings = Vec::new();
-    for input in &inputs {
-        all_ref_bindings.extend(input.ir.ref_bindings.iter().cloned());
-    }
-
     // Emit Components
     let component_assets = emit_component_assets(
         &out_dir_tmp,
@@ -458,11 +462,11 @@ fn run() -> Result<(), String> {
         &runtime_import_spec,
         &module_registry,
         &core_import_spec,
-        &all_ref_bindings,
     )?;
 
     // 5. Generate Manifest Struct (In-Memory)
     let mut manifest_chunks = BTreeMap::new();
+    let mut server_runtime_routes = BTreeSet::new();
     let mut page_assets = Vec::new();
 
     // Process each page
@@ -518,6 +522,9 @@ fn run() -> Result<(), String> {
         write_file(&js_path, &js)?;
 
         manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
+        if input.ir.server_script.is_some() && !input.ir.prerender {
+            server_runtime_routes.insert(input.route.clone());
+        }
         page_assets.push((
             input.route.clone(),
             html_stripped.clone(),
@@ -528,6 +535,11 @@ fn run() -> Result<(), String> {
                 .server_script
                 .as_ref()
                 .map(|script| script.source.clone()),
+            input
+                .ir
+                .server_script
+                .as_ref()
+                .and_then(|script| script.source_path.clone()),
             input.ir.prerender,
             prerender_ssr_data.clone(),
         ));
@@ -545,6 +557,7 @@ fn run() -> Result<(), String> {
             css: format!("/{}", css_rel),
             core: format!("/{}", core_rel),
             chunks: manifest_chunks.clone(),
+            server_routes: server_runtime_routes.clone(),
             hash: manifest_hash.clone(),
             router: None, // Circular dependency if we hash router here. Router needs manifest.
         };
@@ -605,6 +618,7 @@ fn run() -> Result<(), String> {
         css: format!("/{}", css_rel),
         core: format!("/{}", core_rel),
         chunks: manifest_chunks,
+        server_routes: server_runtime_routes,
         hash: manifest_hash,
         router: router_rel_path.clone(),
     };
@@ -612,40 +626,55 @@ fn run() -> Result<(), String> {
         .map_err(|e| format!("failed to serialize manifest: {e}"))?;
     write_file(&out_dir_tmp.join("manifest.json"), &final_manifest_json)?;
 
-    if router_enabled {
-        let mut router_manifest = RouterManifest::default();
-        for (route, _html_tpl, js_rel, expressions, server_script, prerender, ssr_data) in
-            &page_assets
-        {
-            let output = format!(
-                "/{}",
-                route_to_output_path(route)
-                    .to_string_lossy()
-                    .replace('\\', "/")
-            );
-            router_manifest.routes.push(RouterRouteEntry {
-                path: route.clone(),
-                output,
-                html: route.clone(),
-                expressions: expressions.clone(),
-                page_asset: Some(js_rel.clone()),
-                server_script: server_script.clone(),
-                prerender: *prerender,
-                ssr_data: ssr_data.clone(),
-            });
-        }
-        router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
-        let router_manifest_json = serde_json::to_string(&router_manifest)
-            .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
-        write_file(
-            &out_dir_tmp.join("assets/router-manifest.json"),
-            &router_manifest_json,
-        )?;
+    let mut router_manifest = RouterManifest::default();
+    for (
+        route,
+        _html_tpl,
+        js_rel,
+        expressions,
+        server_script,
+        server_script_path,
+        prerender,
+        ssr_data,
+    ) in &page_assets
+    {
+        let output = format!(
+            "/{}",
+            route_to_output_path(route)
+                .to_string_lossy()
+                .replace('\\', "/")
+        );
+        router_manifest.routes.push(RouterRouteEntry {
+            path: route.clone(),
+            output,
+            html: route.clone(),
+            expressions: expressions.clone(),
+            page_asset: Some(js_rel.clone()),
+            server_script: server_script.clone(),
+            server_script_path: server_script_path.clone(),
+            prerender: *prerender,
+            ssr_data: ssr_data.clone(),
+        });
     }
+    router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
+    let router_manifest_json = serde_json::to_string(&router_manifest)
+        .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
+    write_file(
+        &out_dir_tmp.join("assets/router-manifest.json"),
+        &router_manifest_json,
+    )?;
 
     // 7. Write HTML Files (Injecting Manifest Paths)
-    for (route, html_tpl, js_rel, _expressions, _server_script, _prerender, _ssr_data) in
-        page_assets
+    for (
+        route,
+        html_tpl,
+        js_rel,
+        _expressions,
+        _server_script,
+        _server_script_path,
+        _prerender,
+        _ssr_data,
+    ) in page_assets
     {
         let mut html = inject_stylesheet_link_once(&html_tpl, &css_rel, &route)?;
 
@@ -701,6 +730,8 @@ struct Manifest {
     core: String,
     hash: String,
     chunks: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    server_routes: BTreeSet<String>,
 }
 
 struct GlobalGraph {
@@ -784,7 +815,35 @@ fn sanitize_route_to_token(route: &str) -> String {
     if s == "_" {
         return "index".to_string();
     }
-    s.trim_start_matches('_').to_string()
+    let trimmed = s.trim_start_matches('_');
+    let mut normalized = String::with_capacity(trimmed.len());
+    let mut last_was_underscore = false;
+
+    for ch in trimmed.chars() {
+        let safe = if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+            ch
+        } else {
+            '_'
+        };
+
+        if safe == '_' {
+            if last_was_underscore {
+                continue;
+            }
+            last_was_underscore = true;
+        } else {
+            last_was_underscore = false;
+        }
+
+        normalized.push(safe);
+    }
+
+    let cleaned = normalized.trim_matches('_');
+    if cleaned.is_empty() {
+        "index".to_string()
+    } else {
+        cleaned.to_string()
+    }
 }
 
 fn parse_out_dir() -> Result<PathBuf, String> {
@@ -1088,8 +1147,22 @@ fn validate_payload(payload: &BundlerInput, expected_ir_version: u32) -> Result<
 }
 
 fn ensure_document_html(fragment_or_doc: &str) -> String {
-    if fragment_or_doc.contains("<html") {
-        return fragment_or_doc.to_string();
+    // Diagnostic: warn if PascalCase component tags survived expansion
+    let pascal_re = regex::Regex::new(r"<([A-Z][a-zA-Z0-9]+)[\s/>]").unwrap();
+    for cap in pascal_re.captures_iter(fragment_or_doc) {
+        eprintln!(
+            "[zenith-bundler] WARNING: unresolved component tag <{}> in HTML emission. \
+             The CLI did not expand all component references.",
+            &cap[1]
+        );
+    }
+
+    let lower = fragment_or_doc.to_ascii_lowercase();
+    if lower.contains("<html") {
+        if lower.contains("<!doctype") {
+            return fragment_or_doc.to_string();
+        }
+        return format!("<!DOCTYPE html>{fragment_or_doc}");
     }
     format!(
         "<!DOCTYPE html><html><head></head><body>{}</body></html>",
@@ -1209,9 +1282,15 @@ fn route_to_output_path(route_path: &str) -> PathBuf {
 
     let mut out = PathBuf::new();
     for segment in route_path.split('/').filter(|s| !s.is_empty()) {
-        if segment.starts_with(':') {
-            // Dynamic segments are rewritten by preview/router to this static shell.
-            // Example: /users/:id -> dist/users/index.html
+        if let Some(name) = segment.strip_prefix(':') {
+            // Keep dynamic routes distinct from their static siblings.
+            // Example: /blog/:slug -> dist/blog/__param_slug/index.html
+            out.push(format!("__param_{}", name));
+            continue;
+        }
+        if let Some(raw_name) = segment.strip_prefix('*') {
+            let name = raw_name.strip_suffix('?').unwrap_or(raw_name);
+            out.push(format!("__splat_{}", name));
             continue;
         }
         out.push(segment);
@@ -1424,14 +1503,37 @@ fn run_server_script(
 import vm from 'node:vm';
 const source = process.env.ZENITH_SERVER_SOURCE || '';
 const params = JSON.parse(process.env.ZENITH_SERVER_PARAMS || '{}');
-const moduleSource = `${source}\nexport default Object.freeze({` +
+const sourcePath = process.env.ZENITH_SERVER_SOURCE_PATH || '';
+const requestUrl = process.env.ZENITH_SERVER_REQUEST_URL || 'http://localhost/';
+const routePattern = process.env.ZENITH_SERVER_ROUTE_PATTERN || '';
+const routeId = process.env.ZENITH_SERVER_ROUTE_ID || routePattern || '';
+const routeFile = process.env.ZENITH_SERVER_ROUTE_FILE || sourcePath || '';
+
+const ctx = {
+  params: { ...params },
+  url: new URL(requestUrl),
+  request: new Request(requestUrl, { method: 'GET' }),
+  route: {
+    id: routeId,
+    pattern: routePattern,
+    file: routeFile
+  }
+};
+
+const moduleSource = `${source}\nexport default {` +
+  `data: typeof data === 'undefined' ? undefined : data,` +
+  `load: typeof load === 'undefined' ? undefined : load,` +
   `ssr_data: typeof ssr_data === 'undefined' ? undefined : ssr_data,` +
   `props: typeof props === 'undefined' ? undefined : props,` +
-  `ssr: typeof ssr === 'undefined' ? undefined : ssr` +
+  `ssr: typeof ssr === 'undefined' ? undefined : ssr,` +
+  `prerender: typeof prerender === 'undefined' ? undefined : prerender` +
   `});`;
 const context = vm.createContext({
-  params: Object.freeze({ ...params }),
-  fetch: globalThis.fetch
+  params: { ...params },
+  ctx,
+  fetch: globalThis.fetch,
+  Request: globalThis.Request,
+  URL
 });
 const mod = new vm.SourceTextModule(moduleSource, {
   context,
@@ -1442,7 +1544,7 @@ await mod.link((specifier) => {
 });
 await mod.evaluate();
 const namespaceKeys = Object.keys(mod.namespace).filter((key) => key !== 'default');
-const allowed = new Set(['ssr_data', 'props', 'ssr', 'prerender']);
+const allowed = new Set(['data', 'load', 'ssr_data', 'props', 'ssr', 'prerender']);
 for (const key of namespaceKeys) {
   if (!allowed.has(key)) {
     throw new Error(`[zenith-bundler] unsupported server export '${key}'`);
@@ -1460,25 +1562,112 @@ for (const key of Object.keys(exported)) {
     throw new Error(`[zenith-bundler] unsupported server export '${key}'`);
   }
 }
+const hasData = Object.prototype.hasOwnProperty.call(exported, 'data') && exported.data !== undefined;
+const hasLoad = Object.prototype.hasOwnProperty.call(exported, 'load') && typeof exported.load === 'function';
 const hasSsrData = Object.prototype.hasOwnProperty.call(exported, 'ssr_data') && exported.ssr_data !== undefined;
 const hasSsr = Object.prototype.hasOwnProperty.call(exported, 'ssr') && exported.ssr !== undefined;
 const hasProps = Object.prototype.hasOwnProperty.call(exported, 'props') && exported.props !== undefined;
-let payload = null;
-if (hasSsrData) {
-  payload = exported.ssr_data;
-} else if (hasSsr) {
-  payload = exported.ssr;
+const hasPrerender = Object.prototype.hasOwnProperty.call(exported, 'prerender') && exported.prerender !== undefined;
+
+try {
+  if (hasPrerender && typeof exported.prerender !== 'boolean') {
+    throw new Error('[zenith-bundler] prerender export must be a boolean');
+  }
+  if (hasData && hasLoad) {
+    throw new Error('[zenith-bundler] server script cannot export both data and load');
+  }
+  if (hasData && (hasSsrData || hasSsr || hasProps)) {
+    throw new Error('[zenith-bundler] data cannot be combined with legacy ssr_data/ssr/props exports');
+  }
+  if (hasLoad && (hasSsrData || hasSsr || hasProps)) {
+    throw new Error('[zenith-bundler] load(ctx) cannot be combined with legacy ssr_data/ssr/props exports');
+  }
+  if (hasSsrData && hasSsr) {
+    throw new Error('[zenith-bundler] server script cannot export both ssr_data and ssr');
+  }
+  if (hasLoad && exported.load.length !== 1) {
+    throw new Error('[zenith-bundler] load(ctx) must accept exactly one argument');
+  }
+
+  let payload = null;
+  if (hasLoad) {
+    payload = await exported.load(ctx);
+  } else if (hasData) {
+    payload = exported.data;
+  } else if (hasSsrData) {
+    payload = exported.ssr_data;
+  } else if (hasSsr) {
+    payload = exported.ssr;
+  }
+
+  if (hasProps) {
+    if (payload === null || payload === undefined) {
+      payload = { props: exported.props };
+    } else if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      payload = { ...payload, props: exported.props };
+    } else {
+      throw new Error('[zenith-bundler] `props` export requires object-compatible payload');
+    }
+  }
+
+  assertJsonSerializable(payload, '$', new Set());
+  process.stdout.write(JSON.stringify(payload === undefined ? null : payload));
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stdout.write(JSON.stringify({
+    __zenith_error: {
+      status: 500,
+      code: 'LOAD_FAILED',
+      message
+    }
+  }));
 }
-if (hasProps) {
-  if (payload === null || payload === undefined) {
-    payload = { props: exported.props };
-  } else if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    payload = { ...payload, props: exported.props };
-  } else {
-    throw new Error('[zenith-bundler] `props` export requires object-compatible payload');
+
+function assertJsonSerializable(value, path, seen) {
+  if (value === null || value === undefined) {
+    return;
+  }
+  const t = typeof value;
+  if (t === 'string' || t === 'boolean') return;
+  if (t === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`[zenith-bundler] non-serializable value at ${path}: non-finite number`);
+    }
+    return;
+  }
+  if (t === 'function' || t === 'symbol' || t === 'bigint') {
+    throw new Error(`[zenith-bundler] non-serializable value at ${path}: ${t}`);
+  }
+  if (t !== 'object') {
+    throw new Error(`[zenith-bundler] non-serializable value at ${path}: ${t}`);
+  }
+  if (seen.has(value)) {
+    throw new Error(`[zenith-bundler] non-serializable value at ${path}: circular reference`);
+  }
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        assertJsonSerializable(value[i], `${path}[${i}]`, seen);
+      }
+      return;
+    }
+    if (value instanceof Date || value instanceof Map || value instanceof Set || value instanceof RegExp || value instanceof URL) {
+      throw new Error(`[zenith-bundler] non-serializable value at ${path}: unsupported instance`);
+    }
+    const proto = Object.getPrototypeOf(value);
+    const ctor = proto && proto.constructor;
+    const isPlainObject = proto === null || proto === Object.prototype || (typeof ctor === 'function' && ctor.name === 'Object');
+    if (!isPlainObject) {
+      throw new Error(`[zenith-bundler] non-serializable value at ${path}: class instance`);
+    }
+    for (const key of Object.keys(value)) {
+      assertJsonSerializable(value[key], `${path}.${key}`, seen);
+    }
+  } finally {
+    seen.delete(value);
   }
 }
-process.stdout.write(JSON.stringify(payload === undefined ? null : payload));
 "#;
 
     let result = Command::new("node")
@@ -1488,6 +1677,17 @@ process.stdout.write(JSON.stringify(payload === undefined ? null : payload));
         .arg(runner)
         .env("ZENITH_SERVER_SOURCE", &server_script.source)
         .env("ZENITH_SERVER_PARAMS", params_json)
+        .env(
+            "ZENITH_SERVER_SOURCE_PATH",
+            server_script.source_path.clone().unwrap_or_default(),
+        )
+        .env("ZENITH_SERVER_REQUEST_URL", "http://localhost/")
+        .env("ZENITH_SERVER_ROUTE_PATTERN", "")
+        .env(
+            "ZENITH_SERVER_ROUTE_FILE",
+            server_script.source_path.clone().unwrap_or_default(),
+        )
+        .env("ZENITH_SERVER_ROUTE_ID", "")
         .output()
         .map_err(|e| format!("failed to run server script runner: {e}"))?;
 
@@ -1754,7 +1954,6 @@ fn emit_component_assets(
     runtime_import_spec: &str,
     module_registry: &BTreeMap<String, CompilerModule>,
     core_import_spec: &str,
-    ref_bindings: &[CompilerRefBinding],
 ) -> Result<BTreeMap<String, String>, String> {
     let mut out = BTreeMap::new();
     let mut emitted_helper_assets = BTreeMap::<String, String>::new();
@@ -1886,22 +2085,6 @@ fn emit_component_assets(
                 rewrite_js_import_specifiers(&rewritten_component_code, &spec, &helper_spec)?;
         }
 
-        let component_template = extract_component_template_markup(component, &owner_module_id)?;
-        if !component_template.trim().is_empty() {
-            let template_json = serde_json::to_string(&component_template).map_err(|e| {
-                format!(
-                    "failed to serialize component template for '{}': {e}",
-                    hoist_id
-                )
-            })?;
-            module_source.push_str(&format!(
-                "const __zenith_component_template = {};\n",
-                template_json
-            ));
-            rewritten_component_code = inject_component_template_mount(&rewritten_component_code)?;
-            rewritten_component_code = inject_ref_wiring(&rewritten_component_code, ref_bindings)?;
-        }
-
         rewritten_component_code = inject_runtime_hook_aliases(&rewritten_component_code);
         rewritten_component_code = guard_component_bindings(&rewritten_component_code)?;
         module_source.push_str(&format!(
@@ -1909,7 +2092,7 @@ fn emit_component_assets(
             runtime_import_spec
         ));
         module_source.push_str(&format!(
-            "const __zenith_runtime = Object.freeze({{ signal, state, ref, zeneffect, zenEffect, zenMount }});\n"
+            "const __zenith_runtime = {{ signal, state, ref, zeneffect, zenEffect, zenMount }};\n"
         ));
 
         module_source.push_str(&rewritten_component_code);
@@ -2059,177 +2242,6 @@ fn component_owner_module_id(component_module_id: &str) -> String {
         .split_once(":script")
         .map(|(base, _)| base.to_string())
         .unwrap_or_else(|| component_module_id.to_string())
-}
-
-fn extract_component_template_markup(
-    component: &CompilerComponentScript,
-    owner_module_id: &str,
-) -> Result<String, String> {
-    let source_module_id = component_owner_module_id(&component.module_id);
-    let source_path = PathBuf::from(&source_module_id);
-    let source = fs::read_to_string(&source_path).map_err(|e| {
-        format!(
-            "failed to read component source '{}' for template extraction: {e}",
-            source_path.display()
-        )
-    })?;
-
-    let mut template = strip_component_script_blocks(&source)?;
-    template = inline_component_template_imports(template, component, owner_module_id)?;
-    Ok(template.trim().to_string())
-}
-
-fn strip_component_script_blocks(source: &str) -> Result<String, String> {
-    let script_re = Regex::new(r"(?is)<script\b[^>]*>.*?</script>")
-        .map_err(|e| format!("failed to compile component script strip regex: {e}"))?;
-    Ok(script_re.replace_all(source, "").trim().to_string())
-}
-
-fn inline_component_template_imports(
-    template: String,
-    component: &CompilerComponentScript,
-    owner_module_id: &str,
-) -> Result<String, String> {
-    let default_zen_import_re = Regex::new(
-        r#"^\s*import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s+['"]([^'"]+\.zen)['"]\s*;?\s*$"#,
-    )
-    .map_err(|e| format!("failed to compile component template import regex: {e}"))?;
-
-    let mut resolved_template = template;
-    for import_line in &component.imports {
-        let Some(captures) = default_zen_import_re.captures(import_line) else {
-            continue;
-        };
-
-        let Some(alias_match) = captures.get(1) else {
-            continue;
-        };
-        let Some(spec_match) = captures.get(2) else {
-            continue;
-        };
-
-        let alias = alias_match.as_str();
-        let spec = spec_match.as_str();
-        let import_path = resolve_component_template_import_path(owner_module_id, spec);
-        let partial_source = fs::read_to_string(&import_path).map_err(|e| {
-            format!(
-                "failed to read nested component template '{}' referenced by '{}': {e}",
-                import_path.display(),
-                owner_module_id
-            )
-        })?;
-        let partial_template = strip_component_script_blocks(&partial_source)?;
-        if partial_template.trim().is_empty() {
-            continue;
-        }
-
-        resolved_template =
-            replace_component_tag_markup(&resolved_template, alias, partial_template.trim())?;
-    }
-
-    Ok(resolved_template)
-}
-
-fn resolve_component_template_import_path(owner_module_id: &str, specifier: &str) -> PathBuf {
-    if specifier.starts_with('/') {
-        return PathBuf::from(specifier.trim_start_matches('/'));
-    }
-
-    let owner_path = PathBuf::from(owner_module_id);
-    owner_path
-        .parent()
-        .map(|parent| parent.join(specifier))
-        .unwrap_or_else(|| PathBuf::from(specifier))
-}
-
-fn replace_component_tag_markup(
-    template: &str,
-    tag_name: &str,
-    replacement: &str,
-) -> Result<String, String> {
-    let escaped_tag = regex::escape(tag_name);
-    let self_closing_re = Regex::new(&format!(r#"<{escaped_tag}\b[^>]*\/>"#))
-        .map_err(|e| format!("failed to compile self-closing component tag regex: {e}"))?;
-    let paired_re = Regex::new(&format!(r#"<{escaped_tag}\b[^>]*>\s*</{escaped_tag}\s*>"#))
-        .map_err(|e| format!("failed to compile paired component tag regex: {e}"))?;
-
-    let with_self_closing = self_closing_re
-        .replace_all(template, replacement)
-        .to_string();
-    Ok(paired_re
-        .replace_all(&with_self_closing, replacement)
-        .to_string())
-}
-
-fn inject_component_template_mount(component_code: &str) -> Result<String, String> {
-    let mount_re = Regex::new(r"mount\s*\(\)\s*\{")
-        .map_err(|e| format!("failed to compile component mount injection regex: {e}"))?;
-    let mount_match = mount_re.find(component_code).ok_or_else(|| {
-        "component mount injection failed: missing mount() declaration in component factory"
-            .to_string()
-    })?;
-
-    let mut injected = String::with_capacity(component_code.len() + 196);
-    injected.push_str(&component_code[..mount_match.end()]);
-    injected.push_str(
-        "\n      if (host && host.innerHTML.trim().length === 0) {\n        host.innerHTML = __zenith_component_template;\n      }",
-    );
-    injected.push_str(&component_code[mount_match.end()..]);
-    Ok(injected)
-}
-
-/// Inject ref wiring code into a component factory's mount() method.
-///
-/// For each ref binding, generates code that queries `[data-zx-r="<index>"]` within
-/// the component host and assigns `.current` to the matching element.
-/// This runs after template injection but before any user-defined side effects.
-fn inject_ref_wiring(
-    component_code: &str,
-    ref_bindings: &[CompilerRefBinding],
-) -> Result<String, String> {
-    if ref_bindings.is_empty() {
-        return Ok(component_code.to_string());
-    }
-
-    let mount_re = Regex::new(r"mount\s*\(\)\s*\{")
-        .map_err(|e| format!("failed to compile ref wiring mount regex: {e}"))?;
-    let mount_match = mount_re.find(component_code).ok_or_else(|| {
-        "ref wiring injection failed: missing mount() declaration in component factory".to_string()
-    })?;
-
-    // Find the insertion point — after the template injection guard if present,
-    // otherwise right after mount() {
-    let insert_after = if let Some(guard_end) =
-        component_code[mount_match.end()..].find("host.innerHTML = __zenith_component_template;")
-    {
-        // Find the closing brace of the if block after the template assignment
-        let after_guard =
-            mount_match.end() + guard_end + "host.innerHTML = __zenith_component_template;".len();
-        // Skip to after the closing `}`
-        if let Some(brace_pos) = component_code[after_guard..].find('}') {
-            after_guard + brace_pos + 1
-        } else {
-            mount_match.end()
-        }
-    } else {
-        mount_match.end()
-    };
-
-    let mut wiring_code = String::new();
-    wiring_code.push_str("\n      // [zenith:ref-wiring] deterministic ref assignment\n");
-    for binding in ref_bindings {
-        wiring_code.push_str(&format!(
-            "      if (typeof {ident} !== 'undefined' && {ident} && host) {{ var __rn = host.querySelector('[data-zx-r=\"{idx}\"]'); if (__rn) {ident}.current = __rn; }}\n",
-            ident = binding.identifier,
-            idx = binding.index,
-        ));
-    }
-
-    let mut injected = String::with_capacity(component_code.len() + wiring_code.len());
-    injected.push_str(&component_code[..insert_after]);
-    injected.push_str(&wiring_code);
-    injected.push_str(&component_code[insert_after..]);
-    Ok(injected)
 }
 
 fn extract_static_import_specifier(import_line: &str) -> Option<String> {
@@ -2842,6 +2854,22 @@ fn generate_entry_js(
         .map_err(|e| format!("failed to serialize event table: {e}"))?;
 
     let mut js = zenith_bundler::utils::generate_virtual_entry(&compiler_output);
+    js.push_str("\nconst __zenith_component_bootstraps = [];\n");
+    let ssr_json = serde_json::to_string(
+        ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
+    )
+    .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
+    js.push_str(&format!("const __zenith_static_ssr_data = {};\n", ssr_json));
+    js.push_str("function __zenith_read_ssr_data(staticValue) {\n");
+    js.push_str("  const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;\n");
+    js.push_str("  if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {\n");
+    js.push_str("    return runtimeValue;\n");
+    js.push_str("  }\n");
+    js.push_str("  return staticValue;\n");
+    js.push_str("}\n");
+    js.push_str("const __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);\n");
+    js.push_str("const data = __zenith_ssr_data;\n");
+    js.push_str("const ssr_data = __zenith_ssr_data;\n");
     for block in &ir.hoisted.code {
         let trimmed = block.trim();
         if !trimmed.is_empty() {
@@ -2862,56 +2890,25 @@ fn generate_entry_js(
     };
 
     js.push_str(&generate_state_table_js(&ir.hoisted.state)?);
+    js.push_str(&generate_state_keys_js(&ir.hoisted.state)?);
     js.push_str(&format!("const __zenith_ir_version = {};\n", ir.ir_version));
     js.push_str(&format!(
         "const __zenith_graph_hash = {};\n",
         serde_json::to_string(global_graph_hash)
             .map_err(|e| format!("failed to serialize graph hash: {e}"))?
     ));
+    js.push_str(&format!("const __zenith_signals = {};\n", signals_json));
     js.push_str(&format!(
-        "const __zenith_signals = Object.freeze({});\n",
-        signals_json
-    ));
-    js.push_str(&format!(
-        "const __zenith_expression_bindings = Object.freeze({});\n",
+        "const __zenith_expression_bindings = {};\n",
         expression_bindings_json
     ));
-    let ssr_json = serde_json::to_string(
-        ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
-    )
-    .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
-    js.push_str(&format!(
-        "const __zenith_static_ssr_data = Object.freeze({});\n",
-        ssr_json
-    ));
-    js.push_str("function __zenith_read_ssr_data(staticValue) {\n");
-    js.push_str("  const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;\n");
-    js.push_str("  if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {\n");
-    js.push_str("    return Object.freeze(runtimeValue);\n");
-    js.push_str("  }\n");
-    js.push_str("  try {\n");
-    js.push_str("    const url = new URL(import.meta.url);\n");
-    js.push_str("    const encoded = url.searchParams.get('__zenith_ssr');\n");
-    js.push_str("    if (!encoded) {\n");
-    js.push_str("      return staticValue;\n");
-    js.push_str("    }\n");
-    js.push_str("    const decoded = JSON.parse(decodeURIComponent(encoded));\n");
-    js.push_str("    if (decoded && typeof decoded === 'object' && !Array.isArray(decoded)) {\n");
-    js.push_str("      return Object.freeze(decoded);\n");
-    js.push_str("    }\n");
-    js.push_str("  } catch {\n");
-    js.push_str("    // Fallback to static compile-time SSR payload.\n");
-    js.push_str("  }\n");
-    js.push_str("  return staticValue;\n");
-    js.push_str("}\n");
-    js.push_str("const __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);\n");
     let (component_imports, components_table) =
         generate_component_bootstrap_js(ir, component_assets)?;
     if !component_imports.is_empty() {
         js.push_str(&component_imports);
     }
     js.push_str(&format!(
-        "import {{ hydrate, signal, state, zeneffect, zenEffect, zenMount }} from '{}';\n",
+        "import {{ hydrate, signal, state, ref, zeneffect, zenEffect, zenMount }} from '{}';\n",
         runtime_import_spec
     ));
     let route_pattern_json = serde_json::to_string(route_pattern)
@@ -2923,25 +2920,55 @@ fn generate_entry_js(
     js.push_str("function __zenith_split_path(pathname) {\n");
     js.push_str("  return String(pathname || '/').split('/').filter(Boolean);\n");
     js.push_str("}\n");
+    js.push_str("function __zenith_normalize_catch_all(segments) {\n");
+    js.push_str("  return segments.filter(Boolean).join('/');\n");
+    js.push_str("}\n");
     js.push_str("function __zenith_resolve_params(pattern, pathname) {\n");
     js.push_str("  const patternSegs = __zenith_split_path(pattern);\n");
     js.push_str("  const valueSegs = __zenith_split_path(pathname);\n");
-    js.push_str("  if (patternSegs.length !== valueSegs.length) {\n");
-    js.push_str("    return Object.freeze({});\n");
-    js.push_str("  }\n");
     js.push_str("  const params = Object.create(null);\n");
-    js.push_str("  for (let i = 0; i < patternSegs.length; i++) {\n");
-    js.push_str("    const patternSeg = patternSegs[i];\n");
-    js.push_str("    const valueSeg = valueSegs[i];\n");
-    js.push_str("    if (patternSeg.startsWith(':')) {\n");
-    js.push_str("      params[patternSeg.slice(1)] = valueSeg;\n");
+    js.push_str("  let patternIndex = 0;\n");
+    js.push_str("  let valueIndex = 0;\n");
+    js.push_str("  while (patternIndex < patternSegs.length) {\n");
+    js.push_str("    const patternSeg = patternSegs[patternIndex];\n");
+    js.push_str("    if (patternSeg.startsWith('*')) {\n");
+    js.push_str("      const optionalCatchAll = patternSeg.endsWith('?');\n");
+    js.push_str(
+        "      const key = optionalCatchAll ? patternSeg.slice(1, -1) : patternSeg.slice(1);\n",
+    );
+    js.push_str("      if (patternIndex !== patternSegs.length - 1) {\n");
+    js.push_str("        return {};\n");
+    js.push_str("      }\n");
+    js.push_str("      const rest = valueSegs.slice(valueIndex);\n");
+    js.push_str(
+        "      const rootRequiredCatchAll = !optionalCatchAll && patternSegs.length === 1;\n",
+    );
+    js.push_str("      if (rest.length === 0 && !optionalCatchAll && !rootRequiredCatchAll) {\n");
+    js.push_str("        return {};\n");
+    js.push_str("      }\n");
+    js.push_str("      params[key] = __zenith_normalize_catch_all(rest);\n");
+    js.push_str("      valueIndex = valueSegs.length;\n");
+    js.push_str("      patternIndex = patternSegs.length;\n");
     js.push_str("      continue;\n");
     js.push_str("    }\n");
-    js.push_str("    if (patternSeg !== valueSeg) {\n");
-    js.push_str("      return Object.freeze({});\n");
+    js.push_str("    if (valueIndex >= valueSegs.length) {\n");
+    js.push_str("      return {};\n");
     js.push_str("    }\n");
+    js.push_str("    const valueSeg = valueSegs[valueIndex];\n");
+    js.push_str("    if (patternSeg.startsWith(':')) {\n");
+    js.push_str("      params[patternSeg.slice(1)] = valueSeg;\n");
+    js.push_str("    } else if (patternSeg !== valueSeg) {\n");
+    js.push_str("      return {};\n");
+    js.push_str("    }\n");
+    js.push_str("    patternIndex += 1;\n");
+    js.push_str("    valueIndex += 1;\n");
     js.push_str("  }\n");
-    js.push_str("  return Object.freeze(params);\n");
+    js.push_str(
+        "  if (patternIndex !== patternSegs.length || valueIndex !== valueSegs.length) {\n",
+    );
+    js.push_str("    return {};\n");
+    js.push_str("  }\n");
+    js.push_str("  return params;\n");
     js.push_str("}\n");
     js.push_str(&format!(
         "const __zenith_components = {};\n",
@@ -2970,11 +2997,11 @@ fn generate_entry_js(
     js.push_str("    root.body.replaceChildren(...parsed.body.children);\n");
     js.push_str("  }\n");
     js.push_str("}\n");
-    js.push_str("export function __zenith_mount(root = document, params = Object.freeze({})) {\n");
+    js.push_str("export function __zenith_mount(root = document, params = {}) {\n");
     js.push_str("  if (__zenith_has_route_html === true) {\n");
     js.push_str("    __zenith_apply_route_html(root);\n");
     js.push_str("  }\n");
-    js.push_str("  return hydrate({\n");
+    js.push_str("  const __zenith_unmount = hydrate({\n");
     js.push_str("    root,\n");
     js.push_str("    ir_version: __zenith_ir_version,\n");
     js.push_str("    graph_hash: __zenith_graph_hash,\n");
@@ -2982,12 +3009,18 @@ fn generate_entry_js(
     js.push_str("    markers: __zenith_markers,\n");
     js.push_str("    events: __zenith_events,\n");
     js.push_str("    state_values: __zenith_state_values,\n");
+    js.push_str("    state_keys: __zenith_state_keys,\n");
     js.push_str("    signals: __zenith_signals,\n");
     js.push_str("    components: __zenith_components,\n");
     js.push_str("    route: __zenith_route_pattern,\n");
     js.push_str("    ssr_data: __zenith_ssr_data,\n");
+    js.push_str("    props: typeof props !== 'undefined' ? props : {},\n");
     js.push_str("    params\n");
     js.push_str("  });\n");
+    js.push_str("  for (let i = 0; i < __zenith_component_bootstraps.length; i++) {\n");
+    js.push_str("    __zenith_component_bootstraps[i]();\n");
+    js.push_str("  }\n");
+    js.push_str("  return __zenith_unmount;\n");
     js.push_str("}\n");
     if !router_enabled {
         js.push_str("const __zenith_initial_path = typeof location === 'object' && typeof location.pathname === 'string'\n");
@@ -3002,17 +3035,28 @@ fn generate_entry_js(
 
 fn generate_state_table_js(bindings: &[CompilerStateBinding]) -> Result<String, String> {
     if bindings.is_empty() {
-        return Ok("const __zenith_state_values = Object.freeze([]);\n".to_string());
+        return Ok("const __zenith_state_values = [];\n".to_string());
     }
 
-    let mut out = String::from("const __zenith_state_values = Object.freeze([\n");
+    let mut out = String::from("const __zenith_state_values = [\n");
     for binding in bindings {
         out.push_str("  ");
         out.push_str(binding.value.trim());
         out.push_str(",\n");
     }
-    out.push_str("]);\n");
+    out.push_str("];\n");
     Ok(out)
+}
+
+fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, String> {
+    if bindings.is_empty() {
+        return Ok("const __zenith_state_keys = [];\n".to_string());
+    }
+
+    let keys: Vec<String> = bindings.iter().map(|binding| binding.key.clone()).collect();
+    let keys_json =
+        serde_json::to_string(&keys).map_err(|e| format!("failed to serialize state keys: {e}"))?;
+    Ok(format!("const __zenith_state_keys = {};\n", keys_json))
 }
 
 fn fallback_expression_bindings(ir: &CompilerIr) -> Result<String, String> {
@@ -3136,7 +3180,7 @@ fn inject_runtime_hook_aliases(component_code: &str) -> String {
 }
 
 fn guard_component_bindings(component_code: &str) -> Result<String, String> {
-    let anchor_re = Regex::new(r"bindings\s*:\s*Object\.freeze\(\{")
+    let anchor_re = Regex::new(r"bindings\s*:\s*\{")
         .map_err(|error| format!("failed to compile component bindings anchor regex: {error}"))?;
     let binding_value_re =
         Regex::new(r#"(?m)(['"][^'"]+['"]\s*:\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*,?)"#)
@@ -3152,7 +3196,7 @@ fn guard_component_bindings(component_code: &str) -> Result<String, String> {
             .ok_or_else(|| "component bindings rewrite failed: invalid anchor range".to_string())?;
         let close_brace_index =
             find_matching_brace(component_code, open_brace_index).ok_or_else(|| {
-                "component bindings rewrite failed: unterminated Object.freeze({ ... })".to_string()
+                "component bindings rewrite failed: unterminated bindings object".to_string()
             })?;
 
         rewritten.push_str(&component_code[cursor..anchor_end]);

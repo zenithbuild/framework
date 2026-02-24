@@ -8,43 +8,115 @@ pub fn generate_router_runtime_js() -> String {
     return path.split('/').filter(Boolean);
   }
 
+  function normalizeCatchAll(segments) {
+    return segments.filter(Boolean).join('/');
+  }
+
+  function segmentWeight(segment) {
+    if (!segment) return 0;
+    if (segment.startsWith('*')) return 1;
+    if (segment.startsWith(':')) return 2;
+    return 3;
+  }
+
+  function routeClass(segments) {
+    let hasParam = false;
+    let hasCatchAll = false;
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      if (segment.startsWith('*')) {
+        hasCatchAll = true;
+      } else if (segment.startsWith(':')) {
+        hasParam = true;
+      }
+    }
+    if (!hasParam && !hasCatchAll) return 3;
+    if (hasCatchAll) return 1;
+    return 2;
+  }
+
+  function compareRouteSpecificity(a, b) {
+    if (a === '/' && b !== '/') return -1;
+    if (b === '/' && a !== '/') return 1;
+    const aSegs = splitPath(a);
+    const bSegs = splitPath(b);
+    const aClass = routeClass(aSegs);
+    const bClass = routeClass(bSegs);
+    if (aClass !== bClass) {
+      return bClass - aClass;
+    }
+    const max = Math.min(aSegs.length, bSegs.length);
+    for (let i = 0; i < max; i++) {
+      const aWeight = segmentWeight(aSegs[i]);
+      const bWeight = segmentWeight(bSegs[i]);
+      if (aWeight !== bWeight) {
+        return bWeight - aWeight;
+      }
+    }
+    if (aSegs.length !== bSegs.length) {
+      return bSegs.length - aSegs.length;
+    }
+    return a.localeCompare(b);
+  }
+
   function resolveRoute(pathname) {
     if (__ZENITH_MANIFEST__.chunks[pathname]) {
       return {
         route: pathname,
-        params: Object.freeze({})
+        params: {}
       };
     }
 
     const pathnameSegments = splitPath(pathname);
-    const routes = Object.keys(__ZENITH_MANIFEST__.chunks);
+    const routes = Object.keys(__ZENITH_MANIFEST__.chunks).sort(compareRouteSpecificity);
 
     for (let i = 0; i < routes.length; i++) {
       const route = routes[i];
       const routeSegments = splitPath(route);
-      if (routeSegments.length !== pathnameSegments.length) continue;
-
       const params = Object.create(null);
+      let routeIndex = 0;
+      let pathIndex = 0;
       let matched = true;
 
-      for (let j = 0; j < routeSegments.length; j++) {
-        const routeSegment = routeSegments[j];
-        const pathnameSegment = pathnameSegments[j];
-        if (routeSegment.startsWith(':')) {
-          params[routeSegment.slice(1)] = pathnameSegment;
+      while (routeIndex < routeSegments.length) {
+        const routeSegment = routeSegments[routeIndex];
+        if (routeSegment.startsWith('*')) {
+          const optionalCatchAll = routeSegment.endsWith('?');
+          const key = optionalCatchAll ? routeSegment.slice(1, -1) : routeSegment.slice(1);
+          if (routeIndex !== routeSegments.length - 1) {
+            matched = false;
+            break;
+          }
+          const rest = pathnameSegments.slice(pathIndex);
+          const rootRequiredCatchAll = !optionalCatchAll && routeSegments.length === 1;
+          if (rest.length === 0 && !optionalCatchAll && !rootRequiredCatchAll) {
+            matched = false;
+            break;
+          }
+          params[key] = normalizeCatchAll(rest);
+          pathIndex = pathnameSegments.length;
+          routeIndex = routeSegments.length;
           continue;
         }
-
-        if (routeSegment !== pathnameSegment) {
+        if (pathIndex >= pathnameSegments.length) {
           matched = false;
           break;
         }
+        const pathnameSegment = pathnameSegments[pathIndex];
+        if (routeSegment.startsWith(':')) {
+          params[routeSegment.slice(1)] = pathnameSegment;
+        } else if (routeSegment !== pathnameSegment) {
+          matched = false;
+          break;
+        }
+        routeIndex += 1;
+        pathIndex += 1;
       }
 
-      if (matched) {
+      if (matched && routeIndex === routeSegments.length && pathIndex === pathnameSegments.length) {
         return {
           route,
-          params: Object.freeze({ ...params })
+          params: { ...params }
         };
       }
     }
@@ -59,23 +131,10 @@ pub fn generate_router_runtime_js() -> String {
     }
   }
 
-  function readRouterSsrPayload() {
-    try {
-      const encoded = new URL(import.meta.url).searchParams.get('__zenith_ssr');
-      if (!encoded) return null;
-      const decoded = JSON.parse(decodeURIComponent(encoded));
-      if (decoded && typeof decoded === 'object' && !Array.isArray(decoded)) {
-        return decoded;
-      }
-    } catch {
-      return null;
+  function resetScrollPosition() {
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
     }
-    return null;
-  }
-
-  const __routerSsrPayload = readRouterSsrPayload();
-  if (__routerSsrPayload) {
-    globalThis.__zenith_ssr_data = Object.freeze(__routerSsrPayload);
   }
 
   async function mountRoute(route, params, token) {
@@ -93,15 +152,15 @@ pub fn generate_router_runtime_js() -> String {
     }
   }
 
-  async function navigate(pathname, push) {
+  async function navigate(pathname) {
     const next = resolveRoute(pathname);
     if (!next) return false;
 
     navigationToken += 1;
-    if (push) {
-      history.pushState({}, '', pathname);
-    }
-    await mountRoute(next.route, next.params, navigationToken);
+    const token = navigationToken;
+    await mountRoute(next.route, next.params, token);
+    if (token !== navigationToken) return false;
+    resetScrollPosition();
     return true;
   }
 
@@ -123,9 +182,17 @@ pub fn generate_router_runtime_js() -> String {
   }
 
   function start() {
+    if (typeof history === 'object' && history && 'scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+
     document.addEventListener('click', function(event) {
-      const target = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      const target = event.target && event.target.closest ? event.target.closest('a[data-zen-link]') : null;
       if (!isInternalLink(target)) return;
+      
+      if (target.target && target.target !== '_self') return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.button !== 0) return;
 
       const url = new URL(target.href, window.location.href);
       const nextPath = url.pathname;
@@ -133,18 +200,10 @@ pub fn generate_router_runtime_js() -> String {
       if (!resolveRoute(nextPath)) return;
 
       event.preventDefault();
-      navigate(nextPath, true).catch(function(error) {
-        handleNavigationFailure(error, url);
-      });
+      window.location.assign(url.href);
     });
 
-    window.addEventListener('popstate', function() {
-      navigate(window.location.pathname, false).catch(function(error) {
-        console.error('[Zenith Router] popstate navigation failed', error);
-      });
-    });
-
-    navigate(window.location.pathname, false).catch(function(error) {
+    navigate(window.location.pathname).catch(function(error) {
       console.error('[Zenith Router] initial navigation failed', error);
     });
   }

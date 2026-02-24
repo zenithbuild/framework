@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "1.1.0",
+  "version": "0.5.0-beta.1",
   "scripts": {
     "build": "tsc && napi build --platform --release",
     "artifacts": "napi artifacts",
@@ -21,8 +21,6 @@
     "./dev-server": "./dev-server.js"
   },
   "files": [
-    "src",
-    "scripts",
     "dist",
     "index.js",
     "index.node",
@@ -31,9 +29,9 @@
     "README.md"
   ],
   "dependencies": {
-    "@zenithbuild/core": "^1.0.0",
-    "@zenithbuild/router": "^1.0.0",
-    "@zenithbuild/runtime": "^1.0.0",
+    "@zenithbuild/core": "^0.5.0-beta.1",
+    "@zenithbuild/router": "^0.5.0-beta.1",
+    "@zenithbuild/runtime": "^0.5.0-beta.1",
     "chokidar": "^5.0.0",
     "esbuild": "^0.27.3",
     "express": "^4.21.2",

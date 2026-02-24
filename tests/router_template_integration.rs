@@ -185,6 +185,14 @@ fn emitted_router_and_runtime_follow_template_contract() {
             "{label} asset must not contain fetch("
         );
         assert!(
+            !source.contains("__zenith_ssr="),
+            "{label} asset must not contain query-param SSR transport"
+        );
+        assert!(
+            !source.contains("searchParams.get('__zenith_ssr')"),
+            "{label} asset must not read __zenith_ssr query params"
+        );
+        assert!(
             !source.contains(".zen"),
             "{label} asset must not contain .zen references"
         );
