@@ -1,13 +1,14 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "0.5.0-beta.2",
+  "version": "0.5.0-beta.2.3",
   "scripts": {
     "build": "tsc && napi build --platform --release",
     "artifacts": "napi artifacts",
     "version": "napi version",
     "contract:deps": "node dependency_contract.spec.js",
     "contract:scan": "node contract-scan.mjs",
-    "contract:imports": "node --test tests/template_import_boundary.test.js"
+    "contract:imports": "node --test tests/template_import_boundary.test.js",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1",
@@ -26,12 +27,14 @@
     "index.node",
     "dev-server.js",
     "package.json",
-    "README.md"
+    "README.md",
+    "dist/**",
+    "LICENSE"
   ],
   "dependencies": {
-    "@zenithbuild/core": "^0.5.0-beta.1",
-    "@zenithbuild/router": "^0.5.0-beta.1",
-    "@zenithbuild/runtime": "^0.5.0-beta.1",
+    "@zenithbuild/core": "0.5.0-beta.2.3",
+    "@zenithbuild/router": "0.5.0-beta.2.3",
+    "@zenithbuild/runtime": "0.5.0-beta.2.3",
     "chokidar": "^5.0.0",
     "esbuild": "^0.27.3",
     "express": "^4.21.2",
