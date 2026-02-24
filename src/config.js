@@ -14,15 +14,23 @@ import { pathToFileURL } from 'node:url';
 /** V0 config defaults */
 const DEFAULTS = {
     router: false,
+    embeddedMarkupExpressions: false,
+    types: true,
+    typescriptDefault: true,
     outDir: 'dist',
-    pagesDir: 'pages'
+    pagesDir: 'pages',
+    experimental: {}
 };
 
 /** Allowed keys and their expected types */
 const SCHEMA = {
     router: 'boolean',
+    embeddedMarkupExpressions: 'boolean',
+    types: 'boolean',
+    typescriptDefault: 'boolean',
     outDir: 'string',
-    pagesDir: 'string'
+    pagesDir: 'string',
+    experimental: 'object'
 };
 
 /**
@@ -63,6 +71,23 @@ export function validateConfig(config) {
                 throw new Error(
                     `[Zenith:Config] Key "${key}" must be a non-empty string`
                 );
+            }
+            if (key === 'experimental' && value) {
+                if (typeof value !== 'object' || Array.isArray(value)) {
+                    throw new Error(`[Zenith:Config] Key "experimental" must be a plain object`);
+                }
+                const expDefaults = { ...DEFAULTS.experimental };
+                for (const expKey of Object.keys(value)) {
+                    if (!(expKey in expDefaults)) {
+                        throw new Error(`[Zenith:Config] Unknown experimental key: "${expKey}"`);
+                    }
+                    if (typeof value[expKey] !== typeof expDefaults[expKey]) {
+                        throw new Error(`[Zenith:Config] Experimental key "${expKey}" must be ${typeof expDefaults[expKey]}`);
+                    }
+                    expDefaults[expKey] = value[expKey];
+                }
+                result[key] = expDefaults;
+                continue;
             }
             result[key] = value;
         }

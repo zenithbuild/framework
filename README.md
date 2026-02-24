@@ -1,40 +1,19 @@
-# @zenithbuild/core ⚡
+# `@zenithbuild/core`
 
-The execution target and orchestrator for the Zenith framework. Contains the minimal reactive runtime and CLI tools.
+This is the **sole public entrypoint** for the Zenith framework. 
 
-## Overview
+Use this package directly in your projects to run Zenith utilities and access the official APIs.
 
-Zenith is a modern reactive web framework designed for maximum performance and developer experience. The core package serves as the **Execution Target**:
-- **Reactivity Engine**: Atomic signals and deep state with zero runtime abstraction.
-- **Lifecycle System**: Efficient `onMount`/`onUnmount` management.
-- **CLI Orchestrator**: Commands (`dev`, `build`, `preview`) that drive the native compiler.
+## Installation
 
-## Key Components
-
-### 1. Reactivity (`/core/reactivity`)
-The foundational reactive system. Pure, fast, and deterministic.
-
-### 2. Lifecycle (`/core/lifecycle`)
-Instance-based lifecycle management tied to the DOM.
-
-### 3. CLI (`/cli`)
-The command-line interface that orchestrates the system build chain.
-
-## Coordinated Architecture
-
-Zenith follows a strict "Compiler-First" philosophy:
-- **@zenithbuild/compiler**: Owns all structures, wiring, and build-time guarantees.
-- **@zenithbuild/core**: Owns the minimal runtime execution needed to run compiled plans.
-
-## Usage
-
-```typescript
-import { signal, effect, onMount } from '@zenithbuild/core';
-
-const count = signal(0);
-onMount(() => console.log('Ready'));
+```bash
+npm install @zenithbuild/core
 ```
 
-## License
+## Running the CLI
 
-MIT
+The `.bin` wrapper is exposed as `zenith`. Running `npx zenith dev` or `npx zenith build` executes the corresponding framework command.
+
+## Internal Dependencies
+
+For developers: DO NOT import any other `@zenithbuild/*` packages directly (e.g. `@zenithbuild/compiler`, `@zenithbuild/runtime`, `@zenithbuild/cli`). All needed features are either opaque implementation details or safely exposed through exports here. Direct access of inner implementation details is strictly forbidden.

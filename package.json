@@ -1,10 +1,13 @@
 {
   "name": "@zenithbuild/core",
-  "version": "1.1.0",
+  "version": "0.5.0-beta.1",
   "description": "Deterministic utility substrate for the Zenith framework",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
+  "bin": {
+    "zenith": "./bin/zenith.js"
+  },
   "exports": {
     ".": "./src/index.js",
     "./config": "./src/config.js",
@@ -15,15 +18,25 @@
     "./version": "./src/version.js",
     "./guards": "./src/guards.js",
     "./schema": "./src/schema.js",
-    "./ir": "./src/ir/index.js",
-    "./core-template": "./src/core-template.js"
+    "./core-template": "./src/core-template.js",
+    "./ir": "./src/ir/index.js"
   },
   "files": [
     "src",
-    "CORE_CONTRACT.md"
+    "bin",
+    "CORE_CONTRACT.md",
+    "README.md",
+    "contracts"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@zenithbuild/cli": "0.5.0-beta.1",
+    "@zenithbuild/compiler": "0.5.0-beta.1",
+    "@zenithbuild/runtime": "0.5.0-beta.1",
+    "@zenithbuild/router": "0.5.0-beta.1",
+    "@zenithbuild/bundler": "0.5.0-beta.1"
   },
   "scripts": {
     "test": "npm run contract:deps && npm run contract:scan && npm run contract:api && npm run contract:template && npm run contract:golden",
