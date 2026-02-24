@@ -94,4 +94,269 @@ describe('build orchestration', () => {
         expect(filesA).toEqual(filesB);
         expect(contentA).toEqual(contentB);
     });
+
+    test('emits .zenith type declarations and updates tsconfig include', async () => {
+        project = await makeProject({
+            'index.zen': '<script server lang="ts">export const data = { title: "home" };</script><main>{data.title}</main>\n'
+        });
+
+        await writeFile(
+            join(project.root, 'tsconfig.json'),
+            JSON.stringify(
+                {
+                    compilerOptions: { strict: true },
+                    include: ['pages/**/*']
+                },
+                null,
+                2
+            )
+        );
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+
+        const envDts = await readFile(join(project.root, '.zenith', 'zenith-env.d.ts'), 'utf8');
+        const routeDts = await readFile(join(project.root, '.zenith', 'zenith-routes.d.ts'), 'utf8');
+        const tsconfig = JSON.parse(await readFile(join(project.root, 'tsconfig.json'), 'utf8'));
+
+        expect(envDts.includes('interface LoadContext')).toBe(true);
+        expect(routeDts.includes('"/": {}')).toBe(true);
+        expect(Array.isArray(tsconfig.include)).toBe(true);
+        expect(tsconfig.include.includes('.zenith/**/*.d.ts')).toBe(true);
+    });
+
+    test('rejects mixed data and load exports in <script server>', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const data = { ok: true };',
+                'export const load = async (ctx) => ({ params: ctx.params });',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n')
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'export either data or load(ctx), not both'
+        );
+    });
+
+    test('rejects load export with invalid arity', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const load = async () => ({ ok: true });',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n')
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'load(ctx) must accept exactly one argument'
+        );
+    });
+
+    test('rejects mixing load with legacy ssr_data export', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const load = async (ctx) => ({ ok: true });',
+                'export const ssr_data = { legacy: true };',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n')
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'data/load cannot be combined with legacy ssr_data/ssr/props exports'
+        );
+    });
+
+    test('rejects non-boolean prerender export', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const data = { ok: true };',
+                'export const prerender = "yes";',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n')
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'prerender must be a boolean literal'
+        );
+    });
+
+    test('build succeeds when used components include <style> blocks', async () => {
+        const root = join(tmpdir(), `zenith-build-style-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'StyledCard.zen'),
+            [
+                '<script lang="ts">',
+                'const count = signal(1);',
+                '</script>',
+                '<style>',
+                '.styled-card { border: 1px solid red; }',
+                '</style>',
+                '<section class="styled-card">{count}</section>'
+            ].join('\n'),
+            'utf8'
+        );
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><StyledCard /></main>\n',
+            'utf8'
+        );
+
+        const result = await build({ pagesDir, outDir });
+        expect(result.pages).toBe(1);
+        expect((await readFile(join(outDir, 'index.html'), 'utf8')).includes('<!DOCTYPE html>')).toBe(true);
+    });
+
+    test('rewrites component template expressions with script bindings after expansion', async () => {
+        const root = join(tmpdir(), `zenith-build-expr-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'MappedList.zen'),
+            [
+                '<script lang="ts">',
+                'const items = [{ label: "A" }, { label: "B" }];',
+                '</script>',
+                '<section>',
+                '  <ul>{items.map((item) => zenhtml`<li>${item.label}</li>`)}</ul>',
+                '</section>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><MappedList /></main>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+        expect(pageAsset.includes('items.map((item)')).toBe(true);
+        expect(pageAsset.includes('__ZENITH_INTERNAL_ZENHTML`<li>${')).toBe(true);
+        expect(pageAsset.includes('___')).toBe(true);
+        expect(pageAsset.includes('"literal":"items.map((item)')).toBe(false);
+        expect(/const __zenith_state_keys = \[[^\]]+items/.test(pageAsset)).toBe(true);
+    });
+
+    test('keeps hoisted declarations at module scope while deferring zenMount/zenEffect calls', async () => {
+        const root = join(tmpdir(), `zenith-build-defer-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'DeferredMap.zen'),
+            [
+                '<script lang="ts">',
+                'const items = [{ label: "A" }, { label: "B" }];',
+                'const ready = signal(false);',
+                'zenMount(() => { ready.set(true); });',
+                '</script>',
+                '<section>{items.map((item) => zenhtml`<span>${item.label}</span>`)}</section>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><DeferredMap /></main>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+
+        const stateEntryMatch = pageAsset.match(/"literal":"([A-Za-z0-9_$]+)\.map\(\(item\)/);
+        expect(stateEntryMatch).toBeTruthy();
+        const hoistedItemIdent = stateEntryMatch?.[1];
+        expect(typeof hoistedItemIdent).toBe('string');
+        expect(pageAsset.includes(`const ${hoistedItemIdent} = [{`)).toBe(true);
+
+        const declarationIndex = pageAsset.indexOf(`const ${hoistedItemIdent} = [{`);
+        const bootstrapIndex = pageAsset.indexOf('__zenith_component_bootstraps.push(() => {');
+        expect(declarationIndex).toBeGreaterThanOrEqual(0);
+        expect(bootstrapIndex).toBeGreaterThanOrEqual(0);
+        expect(declarationIndex).toBeLessThan(bootstrapIndex);
+        expect(pageAsset.includes('zenMount(() => {')).toBe(true);
+    });
+
+    test('injects document-mode props so layout expressions do not render raw literals', async () => {
+        const root = join(tmpdir(), `zenith-build-docmode-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const layoutsDir = join(srcDir, 'layouts');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(layoutsDir, { recursive: true });
+
+        await writeFile(
+            join(layoutsDir, 'RootLayout.zen'),
+            [
+                '<script lang="ts">',
+                'const { pageTitle } = props;',
+                'const resolvedTitle = typeof pageTitle === "string" && pageTitle.length > 0 ? pageTitle : "Zenith";',
+                '</script>',
+                '<html lang="en">',
+                '<head><title>{resolvedTitle}</title></head>',
+                '<body><slot /></body>',
+                '</html>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<RootLayout pageTitle="About Page"><main>ok</main></RootLayout>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+
+        expect(pageAsset.includes('const props = { pageTitle: "About Page" };')).toBe(true);
+        expect(pageAsset.includes('"literal":"resolvedTitle"')).toBe(false);
+        expect(pageAsset.includes('resolvedTitle')).toBe(true);
+    });
 });
