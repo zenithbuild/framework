@@ -2,33 +2,20 @@
   "name": "@zenithbuild/bundler",
   "version": "0.5.0-beta.2.3",
   "scripts": {
-    "build": "tsc && napi build --platform --release",
-    "artifacts": "napi artifacts",
-    "version": "napi version",
+    "build": "cargo build --release",
     "contract:deps": "node dependency_contract.spec.js",
     "contract:scan": "node contract-scan.mjs",
     "contract:imports": "node --test tests/template_import_boundary.test.js",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.5.1",
     "@types/bun": "latest",
     "typescript": "^5"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js",
-    "./dev-server": "./dev-server.js"
-  },
   "files": [
-    "dist",
-    "index.js",
-    "index.node",
-    "dev-server.js",
+    "target/release/zenith-bundler",
     "package.json",
     "README.md",
-    "dist/**",
     "LICENSE"
   ],
   "dependencies": {
