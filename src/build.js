@@ -84,7 +84,7 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}) {
         ? ['--stdin', filePath]
         : [filePath];
     if (compilerOpts?.experimentalEmbeddedMarkup) {
-        args.push('--experimental-embedded-markup');
+        args.push('--embedded-markup-expressions');
     }
     const opts = { encoding: 'utf8' };
     if (stdinSource !== undefined) {

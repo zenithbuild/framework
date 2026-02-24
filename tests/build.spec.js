@@ -187,6 +187,42 @@ describe('build orchestration', () => {
         );
     });
 
+    test('rejects embedded markup expressions when config gate is disabled', async () => {
+        project = await makeProject({
+            'index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
+        });
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: { embeddedMarkupExpressions: false }
+        })
+            .then(() => {
+                throw new Error('build unexpectedly succeeded');
+            })
+            .catch((error) => {
+                const message = String(error?.message || error);
+                expect(message).toContain('Embedded markup expressions are disabled');
+                expect(message).not.toContain('Expected RBrace');
+                expect(message).not.toContain('found Lt');
+            });
+    });
+
+    test('allows embedded markup expressions when config gate is enabled', async () => {
+        project = await makeProject({
+            'index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
+        });
+
+        const result = await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: { embeddedMarkupExpressions: true }
+        });
+
+        expect(result.pages).toBe(1);
+        expect((await readFile(join(project.outDir, 'index.html'), 'utf8')).includes('<!DOCTYPE html>')).toBe(true);
+    });
+
     test('build succeeds when used components include <style> blocks', async () => {
         const root = join(tmpdir(), `zenith-build-style-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         const srcDir = join(root, 'src');
