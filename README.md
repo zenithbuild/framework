@@ -1,5 +1,8 @@
 # @zenith/router
 
+> **⚠️ Internal API:** This package is an internal implementation detail of the Zenith framework. It is not intended for public use and its API may break without warning. Please use `@zenithbuild/core` instead.
+
+
 File-based SPA router for Zenith framework with **deterministic, compile-time route resolution**.
 
 ## Features
