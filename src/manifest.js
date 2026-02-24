@@ -8,9 +8,11 @@
 // Rules:
 //   - index.zen → parent directory path
 //   - [param].zen → :param dynamic segment
-//   - Static routes sort before dynamic routes
-//   - Alphabetical within each category
-//   - No nested params, no optionals, no wildcards
+//   - [...slug].zen → *slug catch-all segment (must be terminal, 1+ segments;
+//                     root '/*slug' may match '/' in router matcher)
+//   - [[...slug]].zen → *slug? optional catch-all segment (must be terminal, 0+ segments)
+//   - Deterministic precedence: static > :param > *catchall
+//   - Tie-breaker: lexicographic route path
 // ---------------------------------------------------------------------------
 
 import { readdir, stat } from 'node:fs/promises';
@@ -83,6 +85,8 @@ async function _scanDir(dir, root, ext) {
  * pages/index.zen       → /
  * pages/about.zen       → /about
  * pages/users/[id].zen  → /users/:id
+ * pages/docs/[...slug].zen → /docs/*slug
+ * pages/[[...slug]].zen → /*slug?
  * pages/docs/api/index.zen → /docs/api
  *
  * @param {string} filePath - Absolute file path
@@ -99,6 +103,18 @@ function _fileToRoute(filePath, root, ext) {
 
     // Convert segments
     const routeSegments = segments.map((seg) => {
+        // [[...param]] → *param? (optional catch-all)
+        const optionalCatchAllMatch = seg.match(/^\[\[\.\.\.([a-zA-Z_][a-zA-Z0-9_]*)\]\]$/);
+        if (optionalCatchAllMatch) {
+            return '*' + optionalCatchAllMatch[1] + '?';
+        }
+
+        // [...param] → *param (required catch-all)
+        const catchAllMatch = seg.match(/^\[\.\.\.([a-zA-Z_][a-zA-Z0-9_]*)\]$/);
+        if (catchAllMatch) {
+            return '*' + catchAllMatch[1];
+        }
+
         // [param] → :param
         const paramMatch = seg.match(/^\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/);
         if (paramMatch) {
@@ -126,12 +142,22 @@ function _validateParams(routePath) {
     const segments = routePath.split('/').filter(Boolean);
     const paramNames = new Set();
 
-    for (const seg of segments) {
-        if (seg.startsWith(':')) {
-            const name = seg.slice(1);
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (seg.startsWith(':') || seg.startsWith('*')) {
+            const rawName = seg.slice(1);
+            const isCatchAll = seg.startsWith('*');
+            const optionalCatchAll = isCatchAll && rawName.endsWith('?');
+            const name = optionalCatchAll ? rawName.slice(0, -1) : rawName;
+            const label = isCatchAll ? `*${rawName}` : `:${name}`;
             if (paramNames.has(name)) {
                 throw new Error(
-                    `[Zenith CLI] Repeated param name ':${name}' in route '${routePath}'`
+                    `[Zenith CLI] Repeated param name '${label}' in route '${routePath}'`
+                );
+            }
+            if (isCatchAll && i !== segments.length - 1) {
+                throw new Error(
+                    `[Zenith CLI] Catch-all segment '${label}' must be the last segment in route '${routePath}'`
                 );
             }
             paramNames.add(name);
@@ -146,23 +172,85 @@ function _validateParams(routePath) {
  * @returns {boolean}
  */
 function _isDynamic(routePath) {
-    return routePath.split('/').some((seg) => seg.startsWith(':'));
+    return routePath.split('/').some((seg) => seg.startsWith(':') || seg.startsWith('*'));
 }
 
 /**
- * Sort manifest entries: static first, dynamic after, alpha within each.
+ * Sort manifest entries by deterministic route precedence.
  *
  * @param {ManifestEntry[]} entries
  * @returns {ManifestEntry[]}
  */
 function _sortEntries(entries) {
-    const statics = entries.filter((e) => !_isDynamic(e.path));
-    const dynamics = entries.filter((e) => _isDynamic(e.path));
+    return [...entries].sort((a, b) => compareRouteSpecificity(a.path, b.path));
+}
 
-    statics.sort((a, b) => a.path.localeCompare(b.path));
-    dynamics.sort((a, b) => a.path.localeCompare(b.path));
+/**
+ * Deterministic route precedence:
+ *   static segment > param segment > catch-all segment.
+ * Tie-breakers: segment count (more specific first), then lexicographic path.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+function compareRouteSpecificity(a, b) {
+    if (a === '/' && b !== '/') return -1;
+    if (b === '/' && a !== '/') return 1;
 
-    return [...statics, ...dynamics];
+    const aSegs = a.split('/').filter(Boolean);
+    const bSegs = b.split('/').filter(Boolean);
+    const aClass = routeClass(aSegs);
+    const bClass = routeClass(bSegs);
+    if (aClass !== bClass) {
+        return bClass - aClass;
+    }
+
+    const max = Math.min(aSegs.length, bSegs.length);
+
+    for (let i = 0; i < max; i++) {
+        const aWeight = segmentWeight(aSegs[i]);
+        const bWeight = segmentWeight(bSegs[i]);
+        if (aWeight !== bWeight) {
+            return bWeight - aWeight;
+        }
+    }
+
+    if (aSegs.length !== bSegs.length) {
+        return bSegs.length - aSegs.length;
+    }
+
+    return a.localeCompare(b);
+}
+
+/**
+ * @param {string[]} segments
+ * @returns {number}
+ */
+function routeClass(segments) {
+    let hasParam = false;
+    let hasCatchAll = false;
+    for (const segment of segments) {
+        if (segment.startsWith('*')) {
+            hasCatchAll = true;
+        } else if (segment.startsWith(':')) {
+            hasParam = true;
+        }
+    }
+    if (!hasParam && !hasCatchAll) return 3;
+    if (hasCatchAll) return 1;
+    return 2;
+}
+
+/**
+ * @param {string | undefined} segment
+ * @returns {number}
+ */
+function segmentWeight(segment) {
+    if (!segment) return 0;
+    if (segment.startsWith('*')) return 1;
+    if (segment.startsWith(':')) return 2;
+    return 3;
 }
 
 /**

@@ -6,7 +6,7 @@
 // - Compiles pages on demand
 // - Rebuilds on file change
 // - Injects HMR client script
-// - No SPA fallback unless router: true
+// - Server route resolution uses manifest matching
 //
 // V0: Uses Node.js http module + fs.watch. No external deps.
 // ---------------------------------------------------------------------------
@@ -16,6 +16,14 @@ import { watch } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { build } from './build.js';
+import {
+    executeServerScript,
+    injectSsrPayload,
+    loadRouteManifest,
+    resolveWithinDist,
+    toStaticFilePath
+} from './preview.js';
+import { resolveRequestRoute } from './server/resolve-request-route.js';
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -85,41 +93,67 @@ export async function createDevServer(options) {
             return;
         }
 
-        // Resolve file path
-        if (pathname === '/') {
-            pathname = '/index.html';
-        } else if (!extname(pathname)) {
-            pathname += '/index.html';
-        }
-
-        const filePath = join(outDir, pathname);
-
         try {
-            let content = await readFile(filePath, 'utf8');
-            const ext = extname(filePath);
-            const mime = MIME_TYPES[ext] || 'application/octet-stream';
-
-            // Inject HMR script into HTML pages
-            if (ext === '.html') {
-                content = content.replace('</body>', `${HMR_CLIENT_SCRIPT}</body>`);
+            const requestExt = extname(pathname);
+            if (requestExt) {
+                const assetPath = join(outDir, pathname);
+                const asset = await readFile(assetPath);
+                const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
+                res.writeHead(200, { 'Content-Type': mime });
+                res.end(asset);
+                return;
             }
 
-            res.writeHead(200, { 'Content-Type': mime });
-            res.end(content);
-        } catch {
-            // No SPA fallback unless router: true
-            if (config.router === true) {
+            const routes = await loadRouteManifest(outDir);
+            const resolved = resolveRequestRoute(url, routes);
+            let filePath = null;
+
+            if (resolved.matched && resolved.route) {
+                console.log(`[zenith] Request: ${pathname} | Route: ${resolved.route.path} | Params: ${JSON.stringify(resolved.params)}`);
+                const output = resolved.route.output.startsWith('/')
+                    ? resolved.route.output.slice(1)
+                    : resolved.route.output;
+                filePath = resolveWithinDist(outDir, output);
+            } else {
+                filePath = toStaticFilePath(outDir, pathname);
+            }
+
+            if (!filePath) {
+                throw new Error('not found');
+            }
+
+            let content = await readFile(filePath, 'utf8');
+            if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
+                let payload = null;
                 try {
-                    let indexContent = await readFile(join(outDir, 'index.html'), 'utf8');
-                    indexContent = indexContent.replace('</body>', `${HMR_CLIENT_SCRIPT}</body>`);
-                    res.writeHead(200, { 'Content-Type': 'text/html' });
-                    res.end(indexContent);
-                    return;
-                } catch {
-                    // fall through to 404
+                    payload = await executeServerScript({
+                        source: resolved.route.server_script,
+                        sourcePath: resolved.route.server_script_path || '',
+                        params: resolved.params,
+                        requestUrl: url.toString(),
+                        requestMethod: req.method || 'GET',
+                        requestHeaders: req.headers,
+                        routePattern: resolved.route.path,
+                        routeFile: resolved.route.server_script_path || ''
+                    });
+                } catch (error) {
+                    payload = {
+                        __zenith_error: {
+                            status: 500,
+                            code: 'LOAD_FAILED',
+                            message: error instanceof Error ? error.message : String(error)
+                        }
+                    };
+                }
+                if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+                    content = injectSsrPayload(content, payload);
                 }
             }
 
+            content = content.replace('</body>', `${HMR_CLIENT_SCRIPT}</body>`);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        } catch {
             res.writeHead(404, { 'Content-Type': 'text/plain' });
             res.end('404 Not Found');
         }

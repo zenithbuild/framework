@@ -1,0 +1,307 @@
+<script server lang="ts">
+    export const data = {
+        title: "Zenith Starter Template",
+        message: "Welcome to the Zenith Starter Template!"
+    };
+</script>
+
+<script setup="ts">
+    state count = 0 
+    zenOnMount(() => {
+        console.log('🚀 ' + data.message)
+    })
+
+    function increment() {
+        count = count + 1
+    }
+function decrement() {
+        count = count - 1
+    }
+</script>
+
+<html lang={lang || 'en'} title={data.title}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Preload LCP Assets -->
+    <link rel="preload" href="/logo.svg" as="image" type="image/svg+xml">
+    <link rel="preload" href="https://fonts.gstatic.com/s/outfit/v11/QGYsz_ueBhSfdrnSj5EaacA.woff2" as="font" type="font/woff2" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/styles/global.css">
+</head>
+<body>
+    <div class="layout">
+        <header class="header">
+            <nav class="nav">
+                <a href="/" class="nav-logo" aria-label="Zenith Home">
+                    <img src="/logo.svg" alt="" class="logo-img" width="32" height="32">
+                    <span class="logo-text">Zenith</span>
+                </a>
+                <div class="nav-links">
+                    <a href="https://github.com/zenithbuild/zenith" target="_blank" class="nav-link">GitHub</a>
+                </div>
+            </nav>
+        </header>
+        
+        <main class="content">
+            
+    <div class="page-container bg-gradient">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <div class="logo-badge">
+                    <img src="/logo.svg" alt="Zenith Flare Logo" class="hero-logo" width="80" height="80" fetchpriority="high">
+                </div>
+                <h1 class="hero-title">
+                    Build faster with <span class="gradient-text">Zenith</span>
+                </h1>
+                <p class="hero-subtitle">
+                    The modern reactive framework for developers who value performance, 
+                    simplicity, and beautiful developer experience.
+                </p>
+                <div class="hero-actions">
+                    <button on:click={increment} class="btn btn-primary"> Count: {count}</button>
+                    <a data-zen-link href="https://github.com/judahsullivan" target="_blank" class="btn btn-primary" rel="noopener">
+  
+                        View GitHub Profile
+                    </slot>
+</a>
+                    <a data-zen-link href="https://github.com/zenithbuild/zenith" target="_blank" class="btn btn-outline" rel="noopener">
+  
+                        Explore Github
+                    </slot>
+</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cards Section -->
+        <section class="cards-section">
+            <div class="cards-grid">
+                <a href="https://github.com/zenithbuild/zenith" target="_blank" class="card">
+                    <div class="card-icon">🌐</div>
+                    <h3 class="card-title">Main Site</h3>
+                    <p class="card-description">
+                        Visit our official repository to learn about the philosophy and vision behind Zenith.
+                    </p>
+                    <span class="card-link" aria-hidden="true">Visit Project →</span>
+                </a>
+
+                <a href="https://github.com/zenithbuild/zenith" target="_blank" class="card">
+                    <div class="card-icon">📚</div>
+                    <h3 class="card-title">Documentation</h3>
+                    <p class="card-description">
+                        Everything you need to know about Zenith components, state management, and more.
+                    </p>
+                    <span class="card-link" aria-hidden="true">Explore Docs →</span>
+                </a>
+
+                <a href="https://github.com/zenithbuild/zenith" target="_blank" class="card">
+                    <div class="card-icon">🚀</div>
+                    <h3 class="card-title">Starter Template</h3>
+                    <p class="card-description">
+                        Jump straight into the code. Clone the repository and start building your next idea.
+                    </p>
+                    <span class="card-link" aria-hidden="true">Clone Repo →</span>
+                </a>
+            </div>
+        </section>
+    </div>
+
+        </main>
+        
+        <footer class="footer">
+            <div class="footer-content">
+                <img src="/logo.svg" alt="" class="footer-logo" width="24" height="24" loading="lazy">
+                <p>Built with ⚡ Zenith Framework</p>
+                <div class="footer-links">
+                    <a href="https://github.com/judahsullivan" target="_blank">@judahsullivan</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        gap: 4rem;
+        padding-bottom: 8rem;
+    }
+
+    /* Hero Styling */
+    .hero-section {
+        padding: 2rem 2rem 2rem;
+        text-align: center;
+        position: relative;
+    }
+
+    .hero-content {
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .logo-badge {
+        background: rgba(59, 130, 246, 0.1);
+        padding: 1.5rem;
+        border-radius: 24px;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        margin-bottom: 1rem;
+    }
+
+    .hero-logo {
+        width: 80px;
+        height: 80px;
+    }
+
+    .hero-title {
+        font-size: clamp(3rem, 8vw, 4.5rem);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        margin: 0;
+    }
+
+    .gradient-text {
+        background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-subtitle {
+        font-size: 1.25rem;
+        color: var(--zen-muted);
+        max-width: 600px;
+        line-height: 1.6;
+    }
+
+    .hero-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: .5rem;
+    }
+
+    /* Button Styling */
+    .btn {
+        padding: 0.875rem 2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        display: inline-block;
+    }
+
+    .btn-primary {
+        background: var(--zen-primary);
+        color: white;
+        box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.23);
+        background: var(--zen-primary-hover);
+        color: white;
+    }
+
+    .btn-outline {
+        border: 1px solid var(--zen-surface-border);
+        color: var(--zen-text);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .btn-outline:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Cards Styling */
+    .cards-section {
+        padding: 0 1rem;
+    }
+
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: var(--zen-surface);
+        border: 1px solid var(--zen-surface-border);
+        padding: 1rem;
+        border-radius: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        color: inherit;
+        contain: layout paint;
+    }
+
+    .card:hover {
+        transform: translateY(-8px);
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(15, 23, 42, 0.8);
+        box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-icon {
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-title {
+        font-size: 1.5rem;
+        margin: 0;
+    }
+
+    .card-description {
+        color: var(--zen-muted);
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 0;
+        flex-grow: 1;
+    }
+
+    .card-link {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--zen-primary);
+        margin-top: 1.5rem;
+        opacity: 0.5;
+        transition: all 0.3s ease;
+    }
+
+    .card:hover .card-link {
+        opacity: 1;
+        transform: translateX(5px);
+    }
+
+    @media (max-width: 640px) {
+        .hero-actions {
+            flex-direction: column;
+            width: 100%;
+        }
+        .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>

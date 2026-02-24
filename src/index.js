@@ -11,8 +11,8 @@
 // ---------------------------------------------------------------------------
 
 import { resolve, join } from 'node:path';
-import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createLogger } from './ui/logger.js';
 
 const COMMANDS = ['dev', 'build', 'preview'];
 
@@ -39,15 +39,16 @@ async function loadConfig(projectRoot) {
  * @param {string} [cwd] - Working directory override
  */
 export async function cli(args, cwd) {
+    const logger = createLogger(process);
     const command = args[0];
 
     if (!command || !COMMANDS.includes(command)) {
-        console.log('Zenith CLI V0\n');
-        console.log('Usage:');
-        console.log('  zenith dev       Start development server');
-        console.log('  zenith build     Build static site to /dist');
-        console.log('  zenith preview   Preview /dist statically');
-        console.log('');
+        logger.heading('V0');
+        logger.print('Usage:');
+        logger.print('  zenith dev       Start development server');
+        logger.print('  zenith build     Build static site to /dist');
+        logger.print('  zenith preview   Preview /dist statically');
+        logger.print('');
         process.exit(command ? 1 : 0);
     }
 
@@ -60,18 +61,18 @@ export async function cli(args, cwd) {
 
     if (command === 'build') {
         const { build } = await import('./build.js');
-        console.log('[zenith] Building...');
+        logger.info('Building...');
         const result = await build({ pagesDir, outDir, config });
-        console.log(`[zenith] Built ${result.pages} page(s), ${result.assets.length} asset(s)`);
-        console.log('[zenith] Output: ./dist');
+        logger.success(`Built ${result.pages} page(s), ${result.assets.length} asset(s)`);
+        logger.summary([{ label: 'Output', value: './dist' }]);
     }
 
     if (command === 'dev') {
         const { createDevServer } = await import('./dev-server.js');
         const port = parseInt(args[1]) || 3000;
-        console.log(`[zenith] Starting dev server...`);
+        logger.info('Starting dev server...');
         const dev = await createDevServer({ pagesDir, outDir, port, config });
-        console.log(`[zenith] Dev server running at http://localhost:${dev.port}`);
+        logger.success(`Dev server running at http://localhost:${dev.port}`);
 
         // Graceful shutdown
         process.on('SIGINT', () => {
@@ -87,9 +88,9 @@ export async function cli(args, cwd) {
     if (command === 'preview') {
         const { createPreviewServer } = await import('./preview.js');
         const port = parseInt(args[1]) || 4000;
-        console.log(`[zenith] Starting preview server...`);
+        logger.info('Starting preview server...');
         const preview = await createPreviewServer({ distDir: outDir, port });
-        console.log(`[zenith] Preview server running at http://localhost:${preview.port}`);
+        logger.success(`Preview server running at http://localhost:${preview.port}`);
 
         process.on('SIGINT', () => {
             preview.close();
@@ -109,5 +110,9 @@ const isDirectRun = process.argv[1] && (
 );
 
 if (isDirectRun) {
-    cli(process.argv.slice(2));
+    cli(process.argv.slice(2)).catch((error) => {
+        const logger = createLogger(process);
+        logger.error(error);
+        process.exit(1);
+    });
 }

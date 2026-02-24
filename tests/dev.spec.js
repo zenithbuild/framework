@@ -90,19 +90,18 @@ describe('Dev Server', () => {
         expect(res.status).toBe(404);
     });
 
-    test('SPA fallback when router: true', async () => {
+    test('no SPA fallback even when softNavigation is enabled', async () => {
         project = await createTestProject(['index.zen']);
 
         dev = await createDevServer({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
             port: 0,
-            config: { router: true }
+            config: { softNavigation: true }
         });
 
         const res = await httpGet(`http://localhost:${dev.port}/any-path`);
-        expect(res.status).toBe(200);
-        expect(res.body).toContain('<!DOCTYPE html>');
+        expect(res.status).toBe(404);
     });
 
     test('HMR endpoint returns event-stream header', async () => {
@@ -198,7 +197,7 @@ describe('Preview Server', () => {
         await build({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
-            config: { router: true }
+            config: { softNavigation: true }
         });
 
         const manifest = JSON.parse(
@@ -251,10 +250,12 @@ describe('Contract Guardrails', () => {
 
             // Allow HMR client script (it's injected as a string for the browser)
             const withoutHmr = source.replace(/const HMR_CLIENT_SCRIPT[\s\S]*?`;/g, '');
+            // Ignore generated browser snippets emitted as template strings.
+            const withoutTemplateStrings = withoutHmr.replace(/`[\s\S]*?`/g, '');
 
             // Check remaining source
-            const windowRefs = withoutHmr.match(/\bwindow\b/g) || [];
-            const documentRefs = withoutHmr.match(/\bdocument\b/g) || [];
+            const windowRefs = withoutTemplateStrings.match(/\bwindow\b/g) || [];
+            const documentRefs = withoutTemplateStrings.match(/\bdocument\b/g) || [];
 
             expect(windowRefs.length).toBe(0);
             expect(documentRefs.length).toBe(0);

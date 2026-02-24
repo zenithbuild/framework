@@ -81,6 +81,22 @@ describe('generateManifest', () => {
         expect(manifest[0].path).toBe('/users/:userId/posts/:postId');
     });
 
+    test('catch-all segment [...slug] maps to *slug', async () => {
+        pagesDir = await createPages(['docs/[...slug].zen']);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest).toHaveLength(1);
+        expect(manifest[0].path).toBe('/docs/*slug');
+    });
+
+    test('optional catch-all segment [[...slug]] maps to *slug?', async () => {
+        pagesDir = await createPages(['[[...slug]].zen']);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest).toHaveLength(1);
+        expect(manifest[0].path).toBe('/*slug?');
+    });
+
     test('static routes sort before dynamic routes', async () => {
         pagesDir = await createPages([
             'users/[id].zen',
@@ -114,10 +130,63 @@ describe('generateManifest', () => {
         ]);
     });
 
+    test('deterministic precedence ranks static > param > catch-all', async () => {
+        pagesDir = await createPages([
+            'docs/[...slug].zen',
+            'docs/[section].zen',
+            'docs/getting-started.zen'
+        ]);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => entry.path)).toEqual([
+            '/docs/getting-started',
+            '/docs/:section',
+            '/docs/*slug'
+        ]);
+    });
+
+    test('optional catch-all stays in catch-all tier and static routes still win', async () => {
+        pagesDir = await createPages([
+            'about.zen',
+            '[[...slug]].zen',
+            '[id].zen'
+        ]);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => entry.path)).toEqual([
+            '/about',
+            '/:id',
+            '/*slug?'
+        ]);
+    });
+
+    test('root [...slug] catch-all is emitted as /*slug and sorted after static/param routes', async () => {
+        pagesDir = await createPages([
+            '[...slug].zen',
+            'about.zen',
+            'blog/[slug].zen',
+            'docs/[section]/[slug].zen'
+        ]);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => entry.path)).toEqual([
+            '/about',
+            '/docs/:section/:slug',
+            '/blog/:slug',
+            '/*slug'
+        ]);
+    });
+
     test('rejects repeated param names in same route', async () => {
         pagesDir = await createPages(['a/[id]/b/[id].zen']);
 
         await expect(generateManifest(pagesDir)).rejects.toThrow('Repeated param name');
+    });
+
+    test('rejects non-terminal catch-all segments', async () => {
+        pagesDir = await createPages(['a/[...slug]/b.zen']);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Catch-all segment');
     });
 
     test('ignores non-.zen files', async () => {
@@ -172,6 +241,21 @@ describe('generateManifest', () => {
         const firstDynamic = paths.findIndex(p => p.includes(':'));
         const lastStatic = paths.length - 1 - [...paths].reverse().findIndex(p => !p.includes(':'));
         expect(lastStatic).toBeLessThan(firstDynamic);
+    });
+
+    test('manifest ordering is deterministic across repeated runs', async () => {
+        pagesDir = await createPages([
+            '[...slug].zen',
+            'about.zen',
+            'blog/[slug].zen',
+            'docs/[section]/[slug].zen',
+            'docs/index.zen',
+            'index.zen'
+        ]);
+
+        const first = await generateManifest(pagesDir);
+        const second = await generateManifest(pagesDir);
+        expect(first.map((entry) => entry.path)).toEqual(second.map((entry) => entry.path));
     });
 });
 
