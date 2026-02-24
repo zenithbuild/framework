@@ -1,0 +1,25 @@
+{
+  "name": "zenith-docs-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx zenith dev",
+    "build": "npx zenith build",
+    "build:stage": "npx zenith build && node scripts/stage-public.mjs",
+    "preview": "npx zenith preview",
+    "check:ai": "node scripts/generate-ai-endpoints.mjs --check && node scripts/check-docs-integrity.mjs",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@zenithbuild/bundler": "file:../zenith-bundler",
+    "@zenithbuild/cli": "file:../zenith-cli",
+    "@zenithbuild/compiler": "file:../zenith-compiler",
+    "@zenithbuild/core": "file:../zenith-core",
+    "@zenithbuild/router": "file:../zenith-router",
+    "@zenithbuild/runtime": "file:../zenith-runtime"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.3"
+  }
+}

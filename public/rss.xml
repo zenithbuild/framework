@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Zenith Blog</title>
+    <link>/blog</link>
+    <description>Zenith framework updates and release notes.</description>
+    <item>
+      <title>Routing Awareness Fix: What Changed and Why</title>
+      <link>/blog/routing-awareness</link>
+      <guid>/blog/routing-awareness</guid>
+      <description>How Zenith locked route parity, manifest usage, and hard-reload defaults.</description>
+      <pubDate>Sun, 22 Feb 2026 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Runtime Expression Integrity Lock</title>
+      <link>/blog/runtime-expression-integrity</link>
+      <guid>/blog/runtime-expression-integrity</guid>
+      <description>How Zenith eliminated raw expression leaks and non-renderable object coercion.</description>
+      <pubDate>Sun, 22 Feb 2026 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -3,69 +3,154 @@ title: "Expressions"
 order: 1
 ---
 
-# Expressions: The Pulse of the Template
+# Zenith Expression Contract
 
-Within the braces, logic finds its breath,
-Escaping static bounds and avoiding death.
-A state, a math, a ternary of light,
-To make the template shine and burn so bright.
+Status: Active  
+Scope: `.zen` markup expressions (`{...}`), attribute bindings, and event bindings.
 
-The `{}` marks the spot where data flows,
-As Zenith watches, and the logic grows.
+This contract defines what expressions can do, what they cannot do, and how the compiler/runtime must behave.
 
----
+## 1) Core Rule
 
-## ⚡ The Power of `{}`
+Expressions are JavaScript/TypeScript expressions inside `{ ... }`.
 
-In Zenith, curly braces `{}` are more than just placeholders; they are the bridge between your JavaScript logic and your HTML structure.
+Examples:
 
-### Basic Interpolation
-
-Any valid JavaScript expression can be placed inside the braces. Zenith will evaluate it and render the result as text.
-
-```html
-<script setup="ts">
-  state user = "Judah"
-  state count = 5
-</script>
-
-<div>
-  <p>Welcome, {user}!</p>
-  <p>You have {count * 2} notifications.</p>
-</div>
+```zen
+<p>{userName}</p>
+<p>{count * 2}</p>
+<p>{isLoading ? "Loading..." : "Ready"}</p>
 ```
 
-## 🛠 Complex Expressions
+No statement blocks are allowed in markup expression positions.
 
-You aren't limited to simple variables. You can use ternaries, function calls, and template literals.
+## 2) Determinism Rules (Compiler Contract)
 
-```html
-<p>Status: {isLoading ? 'Searching...' : 'Ready'}</p>
-<p>Time: {new Date().toLocaleTimeString()}</p>
-<p>Class: {isActive ? 'text-blue-500' : 'text-gray-400'}</p>
+The compiler must preserve expression identity exactly:
+
+- One source expression becomes one expression entry.
+- Expressions are never split.
+- Expressions are never merged.
+- Expressions are never wrapped with hidden user-facing helpers.
+- Expression order is stable by source order.
+- Attribute/event expressions are indexed in source order with child expressions.
+
+## 3) Where Expressions Are Allowed
+
+### 3.1 Text positions
+
+```zen
+<p>{title}</p>
 ```
 
-## 🔄 Lists and Maps
+### 3.2 Attribute positions
 
-As seen in previous chapters, `.map()` is the standard way to handle arrays. But you can do more:
+```zen
+<div class={isActive ? "active" : "idle"} />
+```
 
-```html
+### 3.3 Event bindings (object-based only)
+
+```zen
+<button on:click={handleClick}>Toggle</button>
+```
+
+## 4) Renderable Semantics
+
+Expression results are rendered with these rules:
+
+- `string`, `number` -> rendered as text
+- `null`, `undefined`, `false`, `true` -> render nothing
+- arrays -> flattened recursively in order
+- embedded-markup fragments (compiler-generated) -> inserted as fragment output
+
+## 5) Ternaries and Maps
+
+### 5.1 Ternary expression
+
+```zen
+<span>{isDark.get() ? "🌙" : "☀"}</span>
+```
+
+### 5.2 Map to text
+
+```zen
+<p>{items.map((x) => x.name).join(", ")}</p>
+```
+
+### 5.3 Map to markup
+
+When embedded markup expressions are enabled:
+
+```zen
 <ul>
-  {items
-    .filter(i => i.visible)
-    .map(i => (
-      <li class={i.priority > 5 ? 'font-bold' : ''}>
-        {i.text.toUpperCase()}
-      </li>
-    ))
-  }
+  {items.map((x) => (
+    <li>{x.name}</li>
+  ))}
 </ul>
 ```
 
----
+Compiler lowering is deterministic (`__z_frag_*` factories), with no React/JSX runtime.
 
-## 🌌 Deep Dive: Sanitization
+## 6) Embedded Markup Expression Modes
 
-Zenith's expressions are automatically sanitized to prevent XSS attacks. If you need to render raw HTML (for example, from a markdown collection), you should use a dedicated content helper or trust your source.
+### Mode A: `embeddedMarkupExpressions = true`
 
-**Next Step**: [Templates & Layouts](../syntax/templates.md)
+- Inline element literals in expressions are allowed: `(<li>...</li>)`.
+- `zenhtml\`...\`` is forbidden in this mode.
+
+### Mode B: `embeddedMarkupExpressions = false`
+
+- Inline element literals in expressions are forbidden.
+- `zenhtml\`...\`` is required for markup-in-expression behavior.
+
+## 7) Security and Hard Bans
+
+Compile-time hard errors:
+
+- String event handlers are forbidden (`onclick="..."`).
+- `<script>` tags inside embedded markup literals are forbidden.
+- Svelte block tags are forbidden (`{#each}`, `{#if}`, `{:else}`, `{/each}`, ...).
+
+Framework/runtime bans:
+
+- No React runtime (`react/jsx-runtime`).
+- No string-based event binding model.
+
+## 8) Escaping and Raw HTML
+
+- Normal expression output is escaped by default.
+- Raw HTML must be explicit (`innerHTML={...}`) and should be sanitized upstream.
+- Never pass untrusted HTML directly without sanitization.
+
+## 9) Practical Patterns
+
+### Theme icon ternary in markup
+
+```zen
+<span>{isDark.get() ? "🌙" : "☀"}</span>
+```
+
+### List rendering
+
+```zen
+<ul>
+  {contributors.map((c) => (
+    <li>{c.name}</li>
+  ))}
+</ul>
+```
+
+### Event binding
+
+```zen
+<button on:click={toggleTheme}>Toggle Theme</button>
+```
+
+## 10) Non-goals
+
+Zenith expressions are not a hook system and not a virtual DOM API.
+
+- No `useRouter`, `useParams`, `useEffect`, etc.
+- No Svelte control-flow blocks.
+- No framework-specific runtime magic for expression semantics.

@@ -1,0 +1,207 @@
+{
+  "generated_at": "2026-02-22",
+  "categories": [
+    {
+      "slug": "contracts",
+      "title": "Contracts",
+      "summary": "Normative framework contracts and invariants.",
+      "order": 10,
+      "docs": [
+        {
+          "slug": "contracts/dsl-syntax",
+          "title": "DSL Syntax Contract",
+          "label": "DSL Syntax Contract",
+          "url": "/docs/contracts/dsl-syntax",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/dsl-syntax.md"
+        },
+        {
+          "slug": "contracts/navigation",
+          "title": "Navigation Contract",
+          "label": "Navigation Contract",
+          "url": "/docs/contracts/navigation",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/navigation.md"
+        },
+        {
+          "slug": "contracts/no-magic",
+          "title": "No Magic Contract",
+          "label": "No Magic Contract",
+          "url": "/docs/contracts/no-magic",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/no-magic.md"
+        },
+        {
+          "slug": "contracts/routing",
+          "title": "Routing Contract",
+          "label": "Routing Contract",
+          "url": "/docs/contracts/routing",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/routing.md"
+        },
+        {
+          "slug": "contracts/security-drift-gates",
+          "title": "Security and Drift Gates",
+          "label": "Security and Drift Gates",
+          "url": "/docs/contracts/security-drift-gates",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/security-drift-gates.md"
+        },
+        {
+          "slug": "contracts/server-data",
+          "title": "Server Data Contract",
+          "label": "Server Data Contract",
+          "url": "/docs/contracts/server-data",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/server-data.md"
+        },
+        {
+          "slug": "contracts/ssr-transport",
+          "title": "SSR Transport Contract",
+          "label": "SSR Transport Contract",
+          "url": "/docs/contracts/ssr-transport",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/ssr-transport.md"
+        }
+      ]
+    },
+    {
+      "slug": "guides",
+      "title": "Guides",
+      "summary": "Task-oriented implementation walkthroughs.",
+      "order": 80,
+      "docs": [
+        {
+          "slug": "guides/cms-unified-site",
+          "title": "CMS Unified Site Guide",
+          "label": "CMS Unified Site Guide",
+          "url": "/docs/guides/cms-unified-site",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/guides/cms-unified-site.md"
+        },
+        {
+          "slug": "guides/troubleshooting",
+          "title": "Troubleshooting Guide",
+          "label": "Troubleshooting Guide",
+          "url": "/docs/guides/troubleshooting",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/guides/troubleshooting.md"
+        }
+      ]
+    },
+    {
+      "slug": "contributing",
+      "title": "Contributing",
+      "summary": "Governance, drift gates, and contributor workflows.",
+      "order": 90,
+      "docs": [
+        {
+          "slug": "contributing/drift-gates",
+          "title": "Drift Gates",
+          "label": "Drift Gates",
+          "url": "/docs/contributing/drift-gates",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contributing/drift-gates.md"
+        }
+      ]
+    },
+    {
+      "slug": "reference",
+      "title": "Reference",
+      "summary": "API and marker references for stable lookup.",
+      "order": 100,
+      "docs": [
+        {
+          "slug": "reference/markers",
+          "title": "Marker Reference",
+          "label": "Marker Reference",
+          "url": "/docs/reference/markers",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reference/markers.md"
+        },
+        {
+          "slug": "reference/script-server",
+          "title": "Script Server Reference",
+          "label": "Script Server Reference",
+          "url": "/docs/reference/script-server",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reference/script-server.md"
+        },
+        {
+          "slug": "reference/server-data-api",
+          "title": "Server Data API",
+          "label": "Server Data API",
+          "url": "/docs/reference/server-data-api",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reference/server-data-api.md"
+        },
+        {
+          "slug": "reference/zenlink",
+          "title": "ZenLink Reference",
+          "label": "ZenLink Reference",
+          "url": "/docs/reference/zenlink",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reference/zenlink.md"
+        }
+      ]
+    }
+  ],
+  "start_here": [
+    "/docs/contracts/dsl-syntax",
+    "/docs/contracts/navigation",
+    "/docs/contracts/no-magic",
+    "/docs/contracts/routing",
+    "/docs/contracts/security-drift-gates",
+    "/docs/contracts/server-data",
+    "/docs/contracts/ssr-transport",
+    "/docs/guides/cms-unified-site",
+    "/docs/guides/troubleshooting",
+    "/docs/contributing/drift-gates",
+    "/docs/reference/markers",
+    "/docs/reference/script-server",
+    "/docs/reference/server-data-api",
+    "/docs/reference/zenlink"
+  ]
+}

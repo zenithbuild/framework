@@ -1,0 +1,26 @@
+---
+title: "Runtime Expression Integrity Lock"
+description: "How Zenith eliminated raw expression leaks and non-renderable object coercion."
+date: "2026-02-22"
+authors: ["Judah Sullivan"]
+tags: ["release", "runtime", "rendering"]
+status: "published"
+---
+
+# Runtime Expression Integrity
+
+Zenith rendering now enforces explicit renderable contracts:
+
+- Raw expression source is not a valid visible text fallback.
+- Non-renderable objects fail fast instead of coercing to text.
+- Collection rendering requires explicit mapping to nodes.
+
+## Why this matters
+
+Users now either get valid output or explicit errors, never silent corruption.
+
+## Verification focus
+
+- No raw fragment markers in visible text.
+- No object-coercion text in route output.
+- Hydration succeeds for valid expression bindings.

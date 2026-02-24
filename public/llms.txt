@@ -1,0 +1,29 @@
+# llms.txt for Zenith Docs
+Project: Zenith (compiler-first UI)
+Docs: /docs
+
+Start here (ordered):
+- Contracts:
+  - /docs/contracts/dsl-syntax
+  - /docs/contracts/navigation
+  - /docs/contracts/no-magic
+  - /docs/contracts/routing
+  - /docs/contracts/security-drift-gates
+  - /docs/contracts/server-data
+  - /docs/contracts/ssr-transport
+- Guides:
+  - /docs/guides/cms-unified-site
+  - /docs/guides/troubleshooting
+- Contributing:
+  - /docs/contributing/drift-gates
+- Reference:
+  - /docs/reference/markers
+  - /docs/reference/script-server
+  - /docs/reference/server-data-api
+  - /docs/reference/zenlink
+
+Machine-readable:
+- /ai/docs.manifest.json
+- /ai/docs.index.jsonl
+- /ai/docs.sitemap.json
+- /ai/docs.nav.json

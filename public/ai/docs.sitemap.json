@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-02-22",
+  "urls": [
+    "/docs/contracts/dsl-syntax",
+    "/docs/contracts/navigation",
+    "/docs/contracts/no-magic",
+    "/docs/contracts/routing",
+    "/docs/contracts/security-drift-gates",
+    "/docs/contracts/server-data",
+    "/docs/contracts/ssr-transport",
+    "/docs/guides/cms-unified-site",
+    "/docs/guides/troubleshooting",
+    "/docs/contributing/drift-gates",
+    "/docs/reference/markers",
+    "/docs/reference/script-server",
+    "/docs/reference/server-data-api",
+    "/docs/reference/zenlink",
+    "/blog/routing-awareness",
+    "/blog/runtime-expression-integrity"
+  ]
+}
