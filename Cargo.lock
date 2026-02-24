@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "zenith_cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -392,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "zenith_compiler"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "regex",
  "serde",
