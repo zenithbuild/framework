@@ -10,12 +10,14 @@
     "dist",
     "COMPILER_JS_BRIDGE_CONTRACT.md",
     "dist/**",
+    "target/release/zenith-compiler",
     "LICENSE",
     "README.md",
     "package.json"
   ],
   "private": false,
   "scripts": {
+    "build": "cargo build --release",
     "prepublishOnly": "npm run build"
   }
 }
