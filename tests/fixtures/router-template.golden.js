@@ -23,37 +23,115 @@ function splitPath(path) {
   return path.split('/').filter(Boolean);
 }
 
+function normalizeCatchAll(segments) {
+  return segments.filter(Boolean).join('/');
+}
+
+function requiresServerReload(route) {
+  const routes = __ZENITH_MANIFEST__.server_routes || __ZENITH_MANIFEST__.serverRoutes || [];
+  return Array.isArray(routes) && routes.includes(route);
+}
+
+function segmentWeight(segment) {
+  if (!segment) return 0;
+  if (segment.startsWith('*')) return 1;
+  if (segment.startsWith(':')) return 2;
+  return 3;
+}
+
+function routeClass(segments) {
+  let hasParam = false;
+  let hasCatchAll = false;
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (segment.startsWith('*')) {
+      hasCatchAll = true;
+    } else if (segment.startsWith(':')) {
+      hasParam = true;
+    }
+  }
+  if (!hasParam && !hasCatchAll) return 3;
+  if (hasCatchAll) return 1;
+  return 2;
+}
+
+function compareRouteSpecificity(a, b) {
+  if (a === '/' && b !== '/') return -1;
+  if (b === '/' && a !== '/') return 1;
+  const aSegs = splitPath(a);
+  const bSegs = splitPath(b);
+  const aClass = routeClass(aSegs);
+  const bClass = routeClass(bSegs);
+  if (aClass !== bClass) {
+    return bClass - aClass;
+  }
+  const max = Math.min(aSegs.length, bSegs.length);
+  for (let i = 0; i < max; i++) {
+    const aWeight = segmentWeight(aSegs[i]);
+    const bWeight = segmentWeight(bSegs[i]);
+    if (aWeight !== bWeight) {
+      return bWeight - aWeight;
+    }
+  }
+  if (aSegs.length !== bSegs.length) {
+    return bSegs.length - aSegs.length;
+  }
+  return a.localeCompare(b);
+}
+
 function resolveRoute(pathname) {
   if (__ZENITH_MANIFEST__.chunks[pathname]) {
-    return { route: pathname, params: Object.freeze({}) };
+    return { route: pathname, params: {} };
   }
 
   const pathnameSegments = splitPath(pathname);
-  const routes = Object.keys(__ZENITH_MANIFEST__.chunks);
+  const routes = Object.keys(__ZENITH_MANIFEST__.chunks).sort(compareRouteSpecificity);
 
   for (let i = 0; i < routes.length; i++) {
     const route = routes[i];
     const routeSegments = splitPath(route);
-    if (routeSegments.length !== pathnameSegments.length) continue;
-
     const params = Object.create(null);
+    let routeIndex = 0;
+    let pathIndex = 0;
     let matched = true;
 
-    for (let j = 0; j < routeSegments.length; j++) {
-      const routeSegment = routeSegments[j];
-      const pathnameSegment = pathnameSegments[j];
-      if (routeSegment.startsWith(':')) {
-        params[routeSegment.slice(1)] = pathnameSegment;
+    while (routeIndex < routeSegments.length) {
+      const routeSegment = routeSegments[routeIndex];
+      if (routeSegment.startsWith('*')) {
+        const optionalCatchAll = routeSegment.endsWith('?');
+        const key = optionalCatchAll ? routeSegment.slice(1, -1) : routeSegment.slice(1);
+        if (routeIndex !== routeSegments.length - 1) {
+          matched = false;
+          break;
+        }
+        const rest = pathnameSegments.slice(pathIndex);
+        const rootRequiredCatchAll = !optionalCatchAll && routeSegments.length === 1;
+        if (rest.length === 0 && !optionalCatchAll && !rootRequiredCatchAll) {
+          matched = false;
+          break;
+        }
+        params[key] = normalizeCatchAll(rest);
+        pathIndex = pathnameSegments.length;
+        routeIndex = routeSegments.length;
         continue;
       }
-      if (routeSegment !== pathnameSegment) {
+      if (pathIndex >= pathnameSegments.length) {
         matched = false;
         break;
       }
+      const pathnameSegment = pathnameSegments[pathIndex];
+      if (routeSegment.startsWith(':')) {
+        params[routeSegment.slice(1)] = pathnameSegment;
+      } else if (routeSegment !== pathnameSegment) {
+        matched = false;
+        break;
+      }
+      routeIndex += 1;
+      pathIndex += 1;
     }
 
-    if (matched) {
-      return { route, params: Object.freeze({ ...params }) };
+    if (matched && routeIndex === routeSegments.length && pathIndex === pathnameSegments.length) {
+      return { route, params: { ...params } };
     }
   }
 
@@ -82,16 +160,18 @@ async function mountRoute(route, params, token) {
   }
 }
 
-async function navigate(pathname, push, url) {
+async function navigate(pathname, url) {
   const next = resolveRoute(pathname);
   if (!next) return false;
 
   navigationToken += 1;
-  if (push) {
-    history.pushState({}, '', pathname);
-  }
+  const token = navigationToken;
 
-  await mountRoute(next.route, next.params, navigationToken);
+  await mountRoute(next.route, next.params, token);
+  if (token !== navigationToken) return false;
+  if (typeof window.scrollTo === 'function') {
+    window.scrollTo(0, 0);
+  }
   return true;
 }
 
@@ -111,30 +191,36 @@ function isInternalLink(anchor) {
 }
 
 function start() {
-  document.addEventListener('click', function(event) {
+  if (typeof history === 'object' && history && 'scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  document.addEventListener('click', function (event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const target = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    const target = event.target && event.target.closest ? event.target.closest('a[data-zen-link]') : null;
     if (!isInternalLink(target)) return;
 
     const url = new URL(target.href, window.location.href);
+    const hashOnlyNavigation =
+      url.hash &&
+      url.pathname === window.location.pathname &&
+      url.search === window.location.search;
+    if (hashOnlyNavigation) return;
     const nextPath = url.pathname;
     if (nextPath === window.location.pathname && url.search === window.location.search && url.hash === window.location.hash) return;
-    if (!resolveRoute(nextPath)) return;
+    const resolved = resolveRoute(nextPath);
+    if (!resolved) return;
+    if (requiresServerReload(resolved.route)) return;
 
-    event.preventDefault();
-    history.pushState({}, '', nextPath);
-    navigate(nextPath, false, url).catch(function(error) {
-      handleNavigationFailure(error, url);
-    });
+    try {
+      window.location.assign(url.href);
+    } catch (e) {
+      console.error('[Zenith Router] click navigation failed, falling back to browser default', e);
+    }
   });
 
-  window.addEventListener('popstate', function() {
-    navigate(window.location.pathname, false, null).catch(function(error) {
-      console.error('[Zenith Router] popstate navigation failed', error);
-    });
-  });
 
-  navigate(window.location.pathname, false, null).catch(function(error) {
+  navigate(window.location.pathname, null).catch(function (error) {
     console.error('[Zenith Router] initial navigation failed', error);
   });
 }

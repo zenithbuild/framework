@@ -1,0 +1,7 @@
+<script setup="ts">
+    export const props = { href: "", class: "", target: "", rel: "" };
+</script>
+
+<a data-zen-link="true" href={props.href} class={props.class} target={props.target} rel={props.rel}>
+  <slot></slot>
+</a>

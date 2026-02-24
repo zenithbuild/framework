@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
 // history.js — Zenith Router V0
 // ---------------------------------------------------------------------------
-// Synchronous History API wrapper.
+// Minimal navigation helpers without History API mutation.
 //
-// - push(path)     → pushState
-// - replace(path)  → replaceState
+// - push(path)     → hard navigation (assign)
+// - replace(path)  → hard navigation (replace)
 // - listen(cb)     → popstate listener, returns unlisten
 // - current()      → location.pathname
 //
@@ -42,7 +42,7 @@ function _ensureListening() {
  * @param {string} path
  */
 export function push(path) {
-    history.pushState({}, '', path);
+    window.location.assign(path);
 }
 
 /**
@@ -51,7 +51,7 @@ export function push(path) {
  * @param {string} path
  */
 export function replace(path) {
-    history.replaceState({}, '', path);
+    window.location.replace(path);
 }
 
 /**
