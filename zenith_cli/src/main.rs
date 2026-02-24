@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
-use zenith_compiler::compiler::{compile_structured_with_source, CompilerOutput};
+use zenith_compiler::compiler::{
+    compile_structured_with_source_options, CompileOptions, CompilerOutput,
+};
 use zenith_compiler::deterministic::sha256_hex;
 
 #[derive(Parser)]
@@ -15,6 +17,10 @@ struct Cli {
     /// Read source code from stdin instead of a file
     #[arg(long)]
     stdin: bool,
+
+    /// Enable embedded markup literals inside { ... } expressions.
+    #[arg(long = "embedded-markup-expressions")]
+    embedded_markup_expressions: bool,
 }
 
 fn main() -> Result<()> {
@@ -42,8 +48,14 @@ fn main() -> Result<()> {
         (text, input_path.to_string_lossy().into_owned())
     };
 
-    let output =
-        compile_structured_with_source(&content, &original_path).map_err(anyhow::Error::msg)?;
+    let output = compile_structured_with_source_options(
+        &content,
+        &original_path,
+        CompileOptions {
+            embedded_markup_expressions: cli.embedded_markup_expressions,
+        },
+    )
+    .map_err(anyhow::Error::msg)?;
     let hoisted_state = output
         .hoisted
         .state

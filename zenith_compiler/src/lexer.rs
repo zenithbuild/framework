@@ -195,6 +195,135 @@ impl<'a> Lexer<'a> {
             }
         }
     }
+
+    /// Read raw expression content with brace balancing.
+    ///
+    /// Must be called immediately after the opening `{` has been consumed.
+    /// Reads characters, tracking nested `{`/`}` pairs, string/template
+    /// literal escapes, and JS comments to avoid false termination.
+    /// Returns the raw content **without** the closing `}`.
+    /// After returning, the lexer mode is restored to whatever it was before
+    /// (Tag for attribute expressions, Text for text-node expressions).
+    pub fn lex_expression_content(&mut self) -> String {
+        let saved_mode = self.mode;
+        let mut content = String::new();
+        let mut depth: usize = 1; // opening '{' already consumed
+
+        while let Some(c) = self.advance() {
+            match c {
+                '{' => {
+                    depth += 1;
+                    content.push(c);
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        // Matched closing brace — done.
+                        self.mode = saved_mode;
+                        return content.trim().to_string();
+                    }
+                    content.push(c);
+                }
+                '"' | '\'' => {
+                    // String literal — read until matching unescaped quote.
+                    content.push(c);
+                    let quote = c;
+                    while let Some(sc) = self.advance() {
+                        content.push(sc);
+                        if sc == '\\' {
+                            // Escaped char — consume the next char unconditionally.
+                            if let Some(esc) = self.advance() {
+                                content.push(esc);
+                            }
+                        } else if sc == quote {
+                            break;
+                        }
+                    }
+                }
+                '`' => {
+                    // Template literal — read until matching backtick.
+                    // Handles ${...} interpolations by tracking brace depth.
+                    content.push(c);
+                    while let Some(tc) = self.advance() {
+                        content.push(tc);
+                        if tc == '\\' {
+                            if let Some(esc) = self.advance() {
+                                content.push(esc);
+                            }
+                        } else if tc == '`' {
+                            break;
+                        } else if tc == '$' {
+                            if let Some(&'{') = self.peek() {
+                                let brace = self.advance().unwrap();
+                                content.push(brace);
+                                // Read until matching } inside the template interpolation.
+                                let mut tmpl_depth: usize = 1;
+                                while tmpl_depth > 0 {
+                                    match self.advance() {
+                                        Some('{') => {
+                                            tmpl_depth += 1;
+                                            content.push('{');
+                                        }
+                                        Some('}') => {
+                                            tmpl_depth -= 1;
+                                            content.push('}');
+                                        }
+                                        Some(other) => content.push(other),
+                                        None => break,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                '/' => {
+                    // Possible comment start.
+                    match self.peek() {
+                        Some(&'/') => {
+                            // Single-line comment — read until newline.
+                            content.push(c);
+                            while let Some(lc) = self.advance() {
+                                content.push(lc);
+                                if lc == '\n' {
+                                    break;
+                                }
+                            }
+                        }
+                        Some(&'*') => {
+                            // Block comment — read until */.
+                            content.push(c);
+                            content.push(self.advance().unwrap()); // '*'
+                            loop {
+                                match self.advance() {
+                                    Some('*') => {
+                                        content.push('*');
+                                        if let Some(&'/') = self.peek() {
+                                            content.push(self.advance().unwrap());
+                                            break;
+                                        }
+                                    }
+                                    Some(bc) => content.push(bc),
+                                    None => break,
+                                }
+                            }
+                        }
+                        _ => {
+                            content.push(c);
+                        }
+                    }
+                }
+                _ => {
+                    content.push(c);
+                }
+            }
+        }
+
+        // Reached EOF without matching closing brace.
+        panic!(
+            "Lexer error: unterminated expression (unmatched '{{') at pos {}",
+            self.pos
+        );
+    }
 }
 
 fn is_ident_start(c: char) -> bool {

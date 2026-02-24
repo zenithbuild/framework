@@ -4,6 +4,7 @@ use crate::lexer::{Lexer, Token};
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
+    embedded_markup_expressions: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -13,6 +14,17 @@ impl<'a> Parser<'a> {
         Self {
             lexer,
             current_token,
+            embedded_markup_expressions: false,
+        }
+    }
+
+    pub fn new_with_options(input: &'a str, embedded_markup_expressions: bool) -> Self {
+        let mut lexer = Lexer::new(input);
+        let current_token = lexer.next_token();
+        Self {
+            lexer,
+            current_token,
+            embedded_markup_expressions,
         }
     }
 
@@ -76,25 +88,39 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Node {
-        self.expect(Token::LBrace);
-        // Expression content could be Text (if Lexer in Text mode) or Identifier (if in Tag mode? No, expression always follows LBrace)
-        // My Lexer returns Text or Identifier depending on mode.
-        // But inside { ... }, we are just reading tokens. simple V0: just expect Text or Identifier.
-        // Actually, Lexer `lex_text` returns `Text` for content up to `}`.
-        // So we expect `Text` or `Identifier`.
-
-        let content = match &self.current_token {
-            Token::Text(t) => t.clone(),
-            Token::Identifier(t) => t.clone(),
-            _ => panic!(
-                "Expected expression content, found {:?}",
-                self.current_token
-            ),
-        };
-        self.advance();
-
-        self.expect(Token::RBrace);
+        // current_token is LBrace — the lexer already consumed the '{' char.
+        // Do NOT call expect(Token::LBrace) / advance() because that would
+        // call next_token() which in Text mode consumes the expression content.
+        // Instead, assert and call lex_expression_content() directly.
+        assert_eq!(
+            self.current_token,
+            Token::LBrace,
+            "parse_expression called without LBrace"
+        );
+        let raw = self.lexer.lex_expression_content();
+        // lex_expression_content consumed everything up to and including the closing '}'.
+        // Re-sync current_token from the lexer.
+        self.current_token = self.lexer.next_token();
+        let content = self.contract_gate_expression(&raw);
         Node::Expression(content)
+    }
+
+    /// Contract gate: reject embedded markup tags inside expressions unless
+    /// the `embeddedMarkupExpressions` flag is enabled.
+    fn contract_gate_expression(&self, raw: &str) -> String {
+        if self.embedded_markup_expressions {
+            return raw.to_string();
+        }
+        if contains_markup_tag(raw) {
+            panic!(
+                "Embedded markup expressions are disabled.\n\
+                 Expression contains HTML/component tags: {{{}}}\n\
+                 To enable, set embeddedMarkupExpressions: true in zenith.config.js\n\
+                 Or refactor the expression to avoid inline markup.",
+                raw.chars().take(80).collect::<String>()
+            );
+        }
+        raw.to_string()
     }
 
     fn parse_element(&mut self) -> Node {
@@ -166,17 +192,14 @@ impl<'a> Parser<'a> {
                             self.expect(Token::RBrace);
                             attributes.push(Attribute::Ref { identifier });
                         } else if self.current_token == Token::LBrace {
-                            // Expression or Event
-                            self.advance(); // Eat '{'
-                            let value = match &self.current_token {
-                                Token::Identifier(v) | Token::Text(v) => v.clone(),
-                                _ => panic!(
-                                    "Expected attribute value expression, found {:?}",
-                                    self.current_token
-                                ),
-                            };
-                            self.advance();
-                            self.expect(Token::RBrace);
+                            // Expression or Event — use raw balanced capture.
+                            // The lexer produced LBrace as current_token and is
+                            // positioned right after the '{' char. Call
+                            // lex_expression_content() directly (do NOT advance
+                            // first, as that would consume the first content token).
+                            let value = self.lexer.lex_expression_content();
+                            self.current_token = self.lexer.next_token();
+                            let value = self.contract_gate_expression(&value);
 
                             if name.starts_with("on:") {
                                 attributes.push(Attribute::Event {
@@ -324,4 +347,85 @@ impl<'a> Parser<'a> {
             self_closing: false,
         })
     }
+}
+
+/// Detect HTML/component markup tags inside expression text.
+///
+/// Returns `true` if the expression contains patterns like `<div`, `</div`,
+/// `<MyComponent` — i.e. `<` (optionally `/`) followed by an ASCII letter
+/// and then another letter, digit, or whitespace/`>`.
+///
+/// Returns `false` for comparison operators (`x < 10`), generic syntax
+/// (`fn<T>(x)`), and arrow expressions (`x => ...`).
+///
+/// Heuristic: a "markup tag" is `<` followed by an optional `/`, then an
+/// ASCII letter, then at least one more ident char or whitespace/`>`/`/`.
+/// Single-letter generics like `<T>` are allowed because the second char is
+/// `>` which doesn't qualify as an ident continuation.
+fn contains_markup_tag(raw: &str) -> bool {
+    let chars: Vec<char> = raw.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        // Skip string literals to avoid false matches inside strings.
+        let c = chars[i];
+        if c == '"' || c == '\'' || c == '`' {
+            i += 1;
+            let quote = c;
+            while i < len {
+                if chars[i] == '\\' {
+                    i += 2; // skip escaped char
+                    continue;
+                }
+                if chars[i] == quote {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+
+        if c == '<' {
+            let mut j = i + 1;
+
+            // Optional '/' for closing tags.
+            let is_closing = j < len && chars[j] == '/';
+            if is_closing {
+                j += 1;
+            }
+
+            // Must have at least one ASCII letter.
+            if j < len && chars[j].is_ascii_alphabetic() {
+                let tag_start = j;
+                // Consume the full tag name: letters, digits, hyphens.
+                while j < len && (chars[j].is_ascii_alphanumeric() || chars[j] == '-') {
+                    j += 1;
+                }
+                let tag_name_len = j - tag_start;
+
+                // A single uppercase letter followed by '>' is a generic: <T>.
+                // Allow that. Single-letter lowercase tags (<a>, <p>) are real markup.
+                let boundary = j >= len || chars[j].is_whitespace() || chars[j] == '>' || chars[j] == '/';
+                if !boundary {
+                    i += 1;
+                    continue;
+                }
+
+                if tag_name_len > 1 {
+                    return true;
+                }
+
+                let tag_initial = chars[tag_start];
+                if tag_initial.is_ascii_lowercase() {
+                    return true;
+                }
+            }
+        }
+
+        i += 1;
+    }
+
+    false
 }

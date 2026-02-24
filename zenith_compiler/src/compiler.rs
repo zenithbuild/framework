@@ -9,6 +9,11 @@ use std::collections::BTreeMap;
 
 pub const IR_VERSION: u32 = 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CompileOptions {
+    pub embedded_markup_expressions: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct HoistedPayload {
     pub imports: Vec<String>,
@@ -166,6 +171,14 @@ pub fn compile_structured_with_source(
     input: &str,
     source_path: &str,
 ) -> Result<CompilerOutput, String> {
+    compile_structured_with_source_options(input, source_path, CompileOptions::default())
+}
+
+pub fn compile_structured_with_source_options(
+    input: &str,
+    source_path: &str,
+    options: CompileOptions,
+) -> Result<CompilerOutput, String> {
     let result = std::panic::catch_unwind(|| {
         let (
             ast,
@@ -176,7 +189,7 @@ pub fn compile_structured_with_source(
             markers,
             events,
             ref_bindings,
-        ) = compile_internal_result(input, source_path)?;
+        ) = compile_internal_result(input, source_path, options)?;
         let html = crate::codegen::generate_html(&ast);
         let signals = map_signals(&hoisted);
         let expression_bindings = map_expression_bindings(&expressions, &hoisted, &signals);
@@ -230,6 +243,7 @@ pub fn compile_structured_with_source_unchecked(input: &str, source_path: &str) 
 /// Used by the CLI and for human-readable output.
 pub fn compile(input: &str) -> Result<String, String> {
     let result = std::panic::catch_unwind(|| {
+        let options = CompileOptions::default();
         let (
             ast,
             expressions,
@@ -239,7 +253,7 @@ pub fn compile(input: &str) -> Result<String, String> {
             _markers,
             _events,
             _ref_bindings,
-        ) = compile_internal_result(input, "<inline>")?;
+        ) = compile_internal_result(input, "<inline>", options)?;
         Ok(generate(ast, expressions))
     });
 
@@ -262,6 +276,7 @@ pub fn compile_unchecked(input: &str) -> String {
 fn compile_internal_result(
     input: &str,
     source_path: &str,
+    options: CompileOptions,
 ) -> Result<
     (
         crate::ast::Node,
@@ -279,7 +294,10 @@ fn compile_internal_result(
         extract_script_blocks(input, source_path).map_err(|err| err.message)?;
     let normalized = strip_html_comments(&preprocessed);
 
-    let mut parser = Parser::new(&normalized);
+    let mut parser = Parser::new_with_options(
+        &normalized,
+        options.embedded_markup_expressions,
+    );
     let ast = parser.parse();
     Ok(transform(ast, &scripts))
 }
