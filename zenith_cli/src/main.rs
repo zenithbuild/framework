@@ -8,19 +8,42 @@ use zenith_compiler::deterministic::sha256_hex;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Input file to compile
-    #[arg(value_name = "FILE")]
-    input: PathBuf,
+    /// Input file to compile (or source origin if using stdin)
+    #[arg(value_name = "FILE", required = false)]
+    input: Option<PathBuf>,
+
+    /// Read source code from stdin instead of a file
+    #[arg(long)]
+    stdin: bool,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let content = fs::read_to_string(&cli.input)
-        .with_context(|| format!("Could not read file `{}`", cli.input.display()))?;
+    let (content, original_path) = if cli.stdin {
+        use std::io::Read;
+        let mut buffer = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buffer)
+            .context("Failed to read from stdin")?;
 
-    let output = compile_structured_with_source(&content, &cli.input.to_string_lossy())
-        .map_err(anyhow::Error::msg)?;
+        let origin = cli
+            .input
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "stdin".to_string());
+
+        (buffer, origin)
+    } else {
+        let input_path = cli
+            .input
+            .context("Input file is required unless --stdin is provided")?;
+        let text = fs::read_to_string(&input_path)
+            .with_context(|| format!("Could not read file `{}`", input_path.display()))?;
+        (text, input_path.to_string_lossy().into_owned())
+    };
+
+    let output =
+        compile_structured_with_source(&content, &original_path).map_err(anyhow::Error::msg)?;
     let hoisted_state = output
         .hoisted
         .state
