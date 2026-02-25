@@ -79,12 +79,6 @@ pub fn render_assets(request: &RenderAssetsRequest) -> Result<RenderAssetsRespon
 fn resolve_render_script_path() -> Result<PathBuf, String> {
     let mut candidates = Vec::<PathBuf>::new();
 
-    candidates.push(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("scripts")
-            .join("render-assets.mjs"),
-    );
-
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(release_dir) = exe_path.parent() {
             if let Some(target_dir) = release_dir.parent() {
@@ -94,6 +88,12 @@ fn resolve_render_script_path() -> Result<PathBuf, String> {
             }
         }
     }
+
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("scripts")
+            .join("render-assets.mjs"),
+    );
 
     if let Ok(cwd) = std::env::current_dir() {
         candidates.push(cwd.join("scripts").join("render-assets.mjs"));
