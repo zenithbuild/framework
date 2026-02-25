@@ -391,4 +391,83 @@ describe('drift gates', () => {
         unlinkSync(tmpInvalid);
         expect(threw).toBe(true);
     });
+
+    test('release gate: create-zenith starter scaffolds and builds all routes', async () => {
+        const createZenithCli = resolve(REPO_ROOT, 'create-zenith', 'dist', 'cli.js');
+        if (!existsSync(createZenithCli)) {
+            // Skip if create-zenith hasn't been built — not a failure, just not ready
+            return;
+        }
+
+        const tempRoot = await mkdtemp(join(tmpdir(), 'zenith-release-gate-'));
+        const projectName = 'release-gate-app';
+        const projectDir = join(tempRoot, projectName);
+
+        try {
+            // Scaffold
+            const scaffoldResult = spawnSync(
+                process.execPath,
+                [createZenithCli, projectName],
+                {
+                    cwd: tempRoot,
+                    encoding: 'utf8',
+                    timeout: 30_000,
+                    env: {
+                        ...process.env,
+                        ZENITH_NO_UI: '1',
+                        CI: '1',
+                        NO_COLOR: '1',
+                        CREATE_ZENITH_TEMPLATE_MODE: 'local',
+                        CREATE_ZENITH_SKIP_INSTALL: '1'
+                    }
+                }
+            );
+            expect(scaffoldResult.status).toBe(0);
+            expect(existsSync(projectDir)).toBe(true);
+
+            // Verify all 4 pages exist in scaffold
+            const expectedPages = ['index.zen', 'about.zen', 'blog.zen', 'docs.zen'];
+            const pagesDir = join(projectDir, 'src', 'pages');
+            for (const page of expectedPages) {
+                expect(existsSync(join(pagesDir, page))).toBe(true);
+            }
+
+            // Verify template only depends on @zenithbuild/core
+            const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
+            const zenithDeps = Object.keys(pkg.dependencies || {}).filter(d => d.startsWith('@zenithbuild/'));
+            expect(zenithDeps).toEqual(['@zenithbuild/core']);
+
+            // Install local packages and build
+            const localPackages = [
+                resolve(REPO_ROOT, 'zenith-core'),
+                resolve(REPO_ROOT, 'zenith-cli'),
+                resolve(REPO_ROOT, 'zenith-compiler'),
+                resolve(REPO_ROOT, 'zenith-runtime'),
+                resolve(REPO_ROOT, 'zenith-router'),
+                resolve(REPO_ROOT, 'zenith-bundler')
+            ];
+            for (const lp of localPackages) {
+                expect(existsSync(lp)).toBe(true);
+            }
+
+            const installResult = spawnSync(
+                'npm',
+                ['install', '--no-save', '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel=error', ...localPackages],
+                { cwd: projectDir, encoding: 'utf8', timeout: 120_000 }
+            );
+            expect(installResult.status).toBe(0);
+
+            // Build
+            await build({ pagesDir, outDir: join(projectDir, 'dist'), config: {} });
+
+            // Verify all 4 routes produced HTML
+            const distDir = join(projectDir, 'dist');
+            expect(existsSync(join(distDir, 'index.html'))).toBe(true);
+            expect(existsSync(join(distDir, 'about', 'index.html'))).toBe(true);
+            expect(existsSync(join(distDir, 'blog', 'index.html'))).toBe(true);
+            expect(existsSync(join(distDir, 'docs', 'index.html'))).toBe(true);
+        } finally {
+            await rm(tempRoot, { recursive: true, force: true });
+        }
+    });
 });
