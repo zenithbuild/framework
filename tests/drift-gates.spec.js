@@ -8,6 +8,26 @@ import { tmpdir } from 'node:os';
 import { build } from '../src/build.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const INTERNAL_PACKAGE_NAMES = [
+    '@zenithbuild/core',
+    '@zenithbuild/cli',
+    '@zenithbuild/compiler',
+    '@zenithbuild/runtime',
+    '@zenithbuild/router',
+    '@zenithbuild/bundler'
+];
+const INTERNAL_DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+const TRAIN_MANIFESTS = [
+    'zenith-core/package.json',
+    'zenith-cli/package.json',
+    'zenith-compiler/package.json',
+    'zenith-runtime/package.json',
+    'zenith-router/package.json',
+    'zenith-bundler/package.json',
+    'zenith-site-v0/package.json',
+    'create-zenith/examples/starter/package.json',
+    'create-zenith/examples/starter-tailwindcss/package.json'
+];
 
 function collectFiles(dir, allowExt) {
     const out = [];
@@ -49,7 +69,89 @@ function scanFiles(files, matcher) {
     return hits;
 }
 
+function collectInternalPackageVersions(tree, outMap = new Map()) {
+    if (!tree || typeof tree !== 'object') {
+        return outMap;
+    }
+
+    const dependencies = tree.dependencies && typeof tree.dependencies === 'object'
+        ? tree.dependencies
+        : {};
+
+    for (const [name, dep] of Object.entries(dependencies)) {
+        if (INTERNAL_PACKAGE_NAMES.includes(name)) {
+            const version = dep && typeof dep === 'object' ? dep.version : undefined;
+            if (typeof version === 'string' && version.length > 0) {
+                if (!outMap.has(name)) {
+                    outMap.set(name, new Set());
+                }
+                outMap.get(name).add(version);
+            }
+        }
+        collectInternalPackageVersions(dep, outMap);
+    }
+
+    return outMap;
+}
+
 describe('drift gates', () => {
+    test('release train: internal dependency versions match @zenithbuild/core exactly', () => {
+        const coreManifest = JSON.parse(
+            readFileSync(resolve(REPO_ROOT, 'zenith-core/package.json'), 'utf8')
+        );
+        const coreVersion = String(coreManifest.version || '');
+        expect(coreVersion).toMatch(/^0\.\d+\.\d+-beta\./);
+
+        const mismatches = [];
+        for (const manifestRel of TRAIN_MANIFESTS) {
+            const manifestPath = resolve(REPO_ROOT, manifestRel);
+            const pkg = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+            for (const field of INTERNAL_DEP_FIELDS) {
+                const deps = pkg[field] && typeof pkg[field] === 'object' ? pkg[field] : {};
+                for (const [name, version] of Object.entries(deps)) {
+                    if (!name.startsWith('@zenithbuild/')) {
+                        continue;
+                    }
+                    if (version !== coreVersion) {
+                        mismatches.push(`${manifestRel} :: ${field} :: ${name}@${version} (expected ${coreVersion})`);
+                    }
+                }
+            }
+        }
+
+        expect(mismatches).toEqual([]);
+    });
+
+    test('release train: npm ls has no duplicate internal package versions', () => {
+        const result = spawnSync(
+            'npm',
+            ['ls', '--json', ...INTERNAL_PACKAGE_NAMES],
+            {
+                cwd: REPO_ROOT,
+                encoding: 'utf8',
+                env: {
+                    ...process.env,
+                    npm_config_loglevel: 'error'
+                }
+            }
+        );
+
+        expect(result.status).toBe(0);
+        const tree = JSON.parse(result.stdout || '{}');
+        const versionsByPackage = collectInternalPackageVersions(tree);
+        const duplicates = [];
+
+        for (const name of INTERNAL_PACKAGE_NAMES) {
+            const versions = [...(versionsByPackage.get(name) || new Set())];
+            if (versions.length > 1) {
+                duplicates.push(`${name}: ${versions.join(', ')}`);
+            }
+        }
+
+        expect(duplicates).toEqual([]);
+    });
+
     test('framework sources do not import React or jsx-runtime', () => {
         const targets = [
             resolve(REPO_ROOT, 'zenith-cli/src'),

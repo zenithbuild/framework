@@ -2,6 +2,8 @@ import { build } from '../src/build.js';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 
 async function makeProject(files) {
     const root = join(tmpdir(), `zenith-build-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -43,6 +45,87 @@ async function walkFiles(dir) {
     await walk(dir);
     out.sort((a, b) => a.localeCompare(b));
     return out;
+}
+
+async function evaluateBuiltModule(source, identifier) {
+    const context = createContext({
+        console,
+        URL,
+        URLSearchParams,
+        setTimeout,
+        clearTimeout,
+        setInterval,
+        clearInterval,
+        requestAnimationFrame: () => 1,
+        cancelAnimationFrame: () => {},
+        location: { pathname: '/', href: 'http://localhost/' },
+        window: {
+            location: { pathname: '/', href: 'http://localhost/' },
+            __zenith_ssr_data: {}
+        },
+        document: {},
+        globalThis: undefined
+    });
+    context.globalThis = context;
+    context.global = context;
+    context.window.window = context.window;
+    context.window.globalThis = context;
+
+    const sharedExports = [
+        'default',
+        'hydrate',
+        'signal',
+        'state',
+        'ref',
+        'zeneffect',
+        'zenEffect',
+        'zenMount',
+        'createRouter',
+        'matchRoute',
+        'resolveRequestRoute'
+    ];
+    const moduleCache = new Map();
+
+    const linker = async (specifier) => {
+        if (moduleCache.has(specifier)) {
+            return moduleCache.get(specifier);
+        }
+
+        const module = new SyntheticModule(
+            sharedExports,
+            function () {
+                const noop = () => {};
+                const signalLike = (value) => ({
+                    get: () => value,
+                    set: noop
+                });
+
+                this.setExport('default', {});
+                this.setExport('hydrate', noop);
+                this.setExport('signal', signalLike);
+                this.setExport('state', signalLike);
+                this.setExport('ref', () => ({ current: null }));
+                this.setExport('zeneffect', noop);
+                this.setExport('zenEffect', noop);
+                this.setExport('zenMount', noop);
+                this.setExport('createRouter', () => ({ navigate: noop }));
+                this.setExport('matchRoute', () => null);
+                this.setExport('resolveRequestRoute', () => null);
+            },
+            { context, identifier: `stub:${specifier}` }
+        );
+
+        moduleCache.set(specifier, module);
+        return module;
+    };
+
+    const module = new SourceTextModule(source, {
+        context,
+        identifier
+    });
+
+    await module.link(linker);
+    await module.evaluate();
 }
 
 describe('build orchestration', () => {
@@ -223,6 +306,79 @@ describe('build orchestration', () => {
         expect((await readFile(join(project.outDir, 'index.html'), 'utf8')).includes('<!DOCTYPE html>')).toBe(true);
     });
 
+    test('builds component tags inside embedded markup expressions without leaking expanded internals', async () => {
+        const root = join(tmpdir(), `zenith-build-embedded-component-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'Button.zen'),
+            [
+                '<script lang="ts">',
+                'const cls = "chip";',
+                '</script>',
+                '<span class="contents">',
+                '  {props.href',
+                '    ? (',
+                '      <a href={props.href} class={cls}>',
+                '        <slot />',
+                '      </a>',
+                '    )',
+                '    : (',
+                '      <button class={cls}>',
+                '        <slot />',
+                '      </button>',
+                '    )}',
+                '</span>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            [
+                '<script lang="ts">',
+                'const items = [{ slug: "getting-started", title: "Getting Started" }];',
+                '</script>',
+                '<main>',
+                '  {items.map((item) => (',
+                '    <Button href={"#cat-" + item.slug}>',
+                '      {item.title}',
+                '    </Button>',
+                '  ))}',
+                '</main>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await build({
+            pagesDir,
+            outDir,
+            config: { embeddedMarkupExpressions: true }
+        });
+
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAssetPath = join(outDir, scriptPath);
+        const pageAsset = await readFile(pageAssetPath, 'utf8');
+
+        expect(pageAsset.includes('__zenith_fragment(')).toBe(true);
+        expect(pageAsset.includes('props.href')).toBe(false);
+        expect(pageAsset.includes('<span class="contents">')).toBe(false);
+
+        const syntaxCheck = spawnSync(process.execPath, ['--check', pageAssetPath], { encoding: 'utf8' });
+        expect(syntaxCheck.status).toBe(0);
+        await expect(evaluateBuiltModule(pageAsset, pageAssetPath)).resolves.toBeUndefined();
+    });
+
     test('build succeeds when used components include <style> blocks', async () => {
         const root = join(tmpdir(), `zenith-build-style-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         const srcDir = join(root, 'src');
@@ -394,5 +550,52 @@ describe('build orchestration', () => {
         expect(pageAsset.includes('const props = { pageTitle: "About Page" };')).toBe(true);
         expect(pageAsset.includes('"literal":"resolvedTitle"')).toBe(false);
         expect(pageAsset.includes('resolvedTitle')).toBe(true);
+    });
+
+    test('keeps function-local zenEffect/zenMount variables out of module state table and evaluates cleanly', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script lang="ts">',
+                'const theme = signal("light");',
+                'function resolvePreferredTheme() {',
+                '  const runtimePreferred = globalThis;',
+                '  const saved = runtimePreferred?.localStorage?.getItem("zenith-theme");',
+                '  return saved === "dark" ? "dark" : "light";',
+                '}',
+                'function applyTheme(nextTheme) {',
+                '  theme.set(nextTheme);',
+                '}',
+                'zenEffect(() => {',
+                '  const frameId = requestAnimationFrame(() => {});',
+                '  return () => cancelAnimationFrame(frameId);',
+                '});',
+                'zenMount(() => {',
+                '  applyTheme(resolvePreferredTheme());',
+                '});',
+                '</script>',
+                '<main>{theme.get()}</main>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+
+        const indexHtml = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAssetPath = join(project.outDir, scriptPath);
+        const pageAsset = await readFile(pageAssetPath, 'utf8');
+
+        const keysMatch = pageAsset.match(/const __zenith_state_keys = (\[[\s\S]*?\]);/);
+        expect(keysMatch).toBeTruthy();
+        const stateKeys = JSON.parse(String(keysMatch?.[1] || '[]'));
+        expect(stateKeys.some((key) => String(key).includes('runtimePreferred'))).toBe(false);
+        expect(stateKeys.some((key) => String(key).includes('frameId'))).toBe(false);
+
+        const syntaxCheck = spawnSync(process.execPath, ['--check', pageAssetPath], { encoding: 'utf8' });
+        expect(syntaxCheck.status).toBe(0);
+        expect(String(syntaxCheck.stderr || '')).toBe('');
+
+        await expect(evaluateBuiltModule(pageAsset, pageAssetPath)).resolves.toBeUndefined();
     });
 });

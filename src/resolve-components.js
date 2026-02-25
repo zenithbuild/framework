@@ -245,6 +245,9 @@ function findNextKnownTag(source, registry, startIndex) {
         if (!registry.has(name)) {
             continue;
         }
+        if (isInsideExpressionScope(source, match.index)) {
+            continue;
+        }
         return {
             name,
             start: match.index,
@@ -254,6 +257,111 @@ function findNextKnownTag(source, registry, startIndex) {
     }
 
     return null;
+}
+
+/**
+ * Detect whether `index` is inside a `{ ... }` expression scope.
+ *
+ * This prevents component macro expansion inside embedded markup expressions,
+ * which must remain expression-local so the compiler can lower them safely.
+ *
+ * @param {string} source
+ * @param {number} index
+ * @returns {boolean}
+ */
+function isInsideExpressionScope(source, index) {
+    let depth = 0;
+    let mode = 'code';
+    let escaped = false;
+    const lower = source.toLowerCase();
+
+    for (let i = 0; i < index; i++) {
+        if (mode === 'code') {
+            if (lower.startsWith('<script', i)) {
+                const close = lower.indexOf('</script>', i + 7);
+                if (close < 0 || close >= index) {
+                    return false;
+                }
+                i = close + '</script>'.length - 1;
+                continue;
+            }
+            if (lower.startsWith('<style', i)) {
+                const close = lower.indexOf('</style>', i + 6);
+                if (close < 0 || close >= index) {
+                    return false;
+                }
+                i = close + '</style>'.length - 1;
+                continue;
+            }
+        }
+
+        const ch = source[i];
+        const next = i + 1 < index ? source[i + 1] : '';
+
+        if (mode === 'line-comment') {
+            if (ch === '\n') {
+                mode = 'code';
+            }
+            continue;
+        }
+        if (mode === 'block-comment') {
+            if (ch === '*' && next === '/') {
+                mode = 'code';
+                i += 1;
+            }
+            continue;
+        }
+        if (mode === 'single-quote' || mode === 'double-quote' || mode === 'template') {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch === '\\') {
+                escaped = true;
+                continue;
+            }
+            if (
+                (mode === 'single-quote' && ch === "'") ||
+                (mode === 'double-quote' && ch === '"') ||
+                (mode === 'template' && ch === '`')
+            ) {
+                mode = 'code';
+            }
+            continue;
+        }
+
+        if (ch === '/' && next === '/') {
+            mode = 'line-comment';
+            i += 1;
+            continue;
+        }
+        if (ch === '/' && next === '*') {
+            mode = 'block-comment';
+            i += 1;
+            continue;
+        }
+        if (ch === "'") {
+            mode = 'single-quote';
+            continue;
+        }
+        if (ch === '"') {
+            mode = 'double-quote';
+            continue;
+        }
+        if (ch === '`') {
+            mode = 'template';
+            continue;
+        }
+        if (ch === '{') {
+            depth += 1;
+            continue;
+        }
+        if (ch === '}') {
+            depth = Math.max(0, depth - 1);
+        }
+    }
+
+    return depth > 0;
 }
 
 /**

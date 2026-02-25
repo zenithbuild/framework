@@ -81,6 +81,22 @@ describe('resolve-components', () => {
         expect(expandedSource).toContain('<main>Home</main>');
     });
 
+    test('does not expand component tags inside expression scopes', async () => {
+        project = await makeSrc({
+            'components/Button.zen': '<span class="btn"><slot /></span>',
+        });
+
+        const registry = buildComponentRegistry(project.srcDir);
+        const { expandedSource } = expandComponents(
+            '<main>{items.map((item) => (<Button>{item.label}</Button>))}</main>',
+            registry,
+            '/virtual/page.zen'
+        );
+
+        expect(expandedSource.includes('<Button>{item.label}</Button>')).toBe(true);
+        expect(expandedSource.includes('<span class="btn">')).toBe(false);
+    });
+
     test('throws when children are passed to a component without <slot />', async () => {
         project = await makeSrc({
             'components/Foo.zen': '<div>No slot</div>',

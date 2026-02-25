@@ -13,6 +13,9 @@ const ANSI = {
     green: '\x1b[32m',
     cyan: '\x1b[36m'
 };
+const DEFAULT_PHASE = 'cli';
+const DEFAULT_FILE = '.';
+const DEFAULT_HINT_BASE = 'https://github.com/zenithbuild/zenith/blob/main/zenith-cli/CLI_CONTRACT.md';
 
 function colorize(mode, token, text) {
     if (!mode.color) {
@@ -62,21 +65,53 @@ function normalizeFileLinePath(line) {
 
     const prefix = match[1];
     const filePath = match[2].trim();
-    if (!filePath.startsWith('/') && !/^[A-Za-z]:\\/.test(filePath)) {
-        return line;
+    const normalized = normalizePathForDisplay(filePath);
+    return `${prefix}${normalized}`;
+}
+
+function normalizePathForDisplay(filePath) {
+    const value = String(filePath || '').trim();
+    if (!value) {
+        return DEFAULT_FILE;
+    }
+    if (!value.startsWith('/') && !/^[A-Za-z]:\\/.test(value)) {
+        return value;
     }
 
     const cwd = process.cwd();
     const cwdWithSep = cwd.endsWith(sep) ? cwd : `${cwd}${sep}`;
-    if (filePath === cwd) {
-        return `${prefix}.`;
+    if (value === cwd) {
+        return DEFAULT_FILE;
     }
-    if (filePath.startsWith(cwdWithSep)) {
-        const relativePath = relative(cwd, filePath).replaceAll('\\', '/');
-        return `${prefix}${relativePath || '.'}`;
+    if (value.startsWith(cwdWithSep)) {
+        const relativePath = relative(cwd, value).replaceAll('\\', '/');
+        return relativePath || DEFAULT_FILE;
     }
 
-    return line;
+    return value;
+}
+
+function inferPhaseFromArgv() {
+    const knownPhases = new Set(['build', 'dev', 'preview']);
+    for (const arg of process.argv.slice(2)) {
+        if (knownPhases.has(arg)) {
+            return arg;
+        }
+    }
+    return DEFAULT_PHASE;
+}
+
+function extractFileFromMessage(message) {
+    const match = String(message || '').match(/\bFile:\s+([^\n]+)/);
+    return match ? match[1].trim() : '';
+}
+
+function formatHintUrl(code) {
+    const slug = String(code || 'CLI_ERROR')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return `${DEFAULT_HINT_BASE}#${slug || 'cli-error'}`;
 }
 
 export function normalizeErrorMessagePaths(message) {
@@ -102,22 +137,26 @@ export function normalizeError(err) {
  */
 export function formatErrorBlock(err, mode) {
     const normalized = normalizeError(err);
-    const maybe = /** @type {{ code?: unknown, phase?: unknown, kind?: unknown }} */ (normalized);
+    const maybe = /** @type {{ code?: unknown, phase?: unknown, kind?: unknown, file?: unknown, hint?: unknown }} */ (normalized);
     const kind = sanitizeErrorMessage(maybe.kind || maybe.code || 'CLI_ERROR');
-    const phase = maybe.phase ? sanitizeErrorMessage(maybe.phase) : '';
-    const code = maybe.code ? sanitizeErrorMessage(maybe.code) : '';
+    const phase = maybe.phase ? sanitizeErrorMessage(maybe.phase) : inferPhaseFromArgv();
+    const code = maybe.code
+        ? sanitizeErrorMessage(maybe.code)
+        : `${phase.toUpperCase().replace(/[^A-Z0-9]+/g, '_') || 'CLI'}_FAILED`;
     const rawMessage = sanitizeErrorMessage(normalized.message || String(normalized));
     const message = normalizeErrorMessagePaths(rawMessage);
+    const file = normalizePathForDisplay(
+        sanitizeErrorMessage(maybe.file || extractFileFromMessage(message) || DEFAULT_FILE)
+    );
+    const hint = sanitizeErrorMessage(maybe.hint || formatHintUrl(code));
 
     const lines = [];
     lines.push('[zenith] ERROR: Command failed');
     lines.push(`[zenith] Error Kind: ${kind}`);
-    if (phase) {
-        lines.push(`[zenith] Phase: ${phase}`);
-    }
-    if (code) {
-        lines.push(`[zenith] Code: ${code}`);
-    }
+    lines.push(`[zenith] Phase: ${phase || DEFAULT_PHASE}`);
+    lines.push(`[zenith] Code: ${code || 'CLI_FAILED'}`);
+    lines.push(`[zenith] File: ${file || DEFAULT_FILE}`);
+    lines.push(`[zenith] Hint: ${hint || formatHintUrl(code)}`);
     lines.push(`[zenith] Message: ${message}`);
 
     if (mode.debug && normalized.stack) {
