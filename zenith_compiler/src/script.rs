@@ -344,6 +344,9 @@ fn analyze_component_script(
             .to_string();
         let start = capture.get(1).map(|m| m.start()).unwrap_or(0);
         let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
+        if !is_top_level_position(source, full_start) {
+            continue;
+        }
         let tail = &source[full_start..];
 
         let kind = if Regex::new(&format!(
@@ -378,6 +381,10 @@ fn analyze_component_script(
     }
 
     for capture in fn_re.captures_iter(source) {
+        let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
+        if !is_top_level_position(source, full_start) {
+            continue;
+        }
         let ident = capture
             .get(1)
             .map(|m| m.as_str())
@@ -430,6 +437,7 @@ fn analyze_component_script(
 
     let declarations = decl_line_re
         .find_iter(&renamed_source)
+        .filter(|m| is_top_level_position(&renamed_source, m.start()))
         .map(|m| m.as_str().trim().to_string())
         .collect::<Vec<_>>();
 
@@ -461,6 +469,112 @@ fn analyze_component_script(
         signals,
         bindings,
     })
+}
+
+fn is_top_level_position(source: &str, pos: usize) -> bool {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum ScanMode {
+        Code,
+        SingleQuote,
+        DoubleQuote,
+        Template,
+        LineComment,
+        BlockComment,
+    }
+
+    let bytes = source.as_bytes();
+    let mut i = 0usize;
+    let mut depth = 0i32;
+    let mut mode = ScanMode::Code;
+    let end = pos.min(bytes.len());
+
+    while i < end {
+        match mode {
+            ScanMode::Code => {
+                if i + 1 < end && bytes[i] == b'/' && bytes[i + 1] == b'/' {
+                    mode = ScanMode::LineComment;
+                    i += 2;
+                    continue;
+                }
+                if i + 1 < end && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                    mode = ScanMode::BlockComment;
+                    i += 2;
+                    continue;
+                }
+                match bytes[i] {
+                    b'\'' => {
+                        mode = ScanMode::SingleQuote;
+                        i += 1;
+                        continue;
+                    }
+                    b'"' => {
+                        mode = ScanMode::DoubleQuote;
+                        i += 1;
+                        continue;
+                    }
+                    b'`' => {
+                        mode = ScanMode::Template;
+                        i += 1;
+                        continue;
+                    }
+                    b'{' => {
+                        depth += 1;
+                    }
+                    b'}' => {
+                        depth = (depth - 1).max(0);
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            ScanMode::SingleQuote => {
+                if bytes[i] == b'\\' {
+                    i = (i + 2).min(end);
+                    continue;
+                }
+                if bytes[i] == b'\'' {
+                    mode = ScanMode::Code;
+                }
+                i += 1;
+            }
+            ScanMode::DoubleQuote => {
+                if bytes[i] == b'\\' {
+                    i = (i + 2).min(end);
+                    continue;
+                }
+                if bytes[i] == b'"' {
+                    mode = ScanMode::Code;
+                }
+                i += 1;
+            }
+            ScanMode::Template => {
+                if bytes[i] == b'\\' {
+                    i = (i + 2).min(end);
+                    continue;
+                }
+                if bytes[i] == b'`' {
+                    mode = ScanMode::Code;
+                }
+                i += 1;
+            }
+            ScanMode::LineComment => {
+                if bytes[i] == b'\n' {
+                    mode = ScanMode::Code;
+                }
+                i += 1;
+            }
+            ScanMode::BlockComment => {
+                if i + 1 < end && bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                    mode = ScanMode::Code;
+                    i += 2;
+                    continue;
+                }
+                i += 1;
+            }
+        }
+    }
+
+    depth == 0
 }
 
 fn update_tag_depth(segment: &str, depth: &mut i32) {
