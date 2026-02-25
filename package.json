@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/core",
-  "version": "0.5.0-beta.2.7",
+  "version": "0.5.0-beta.2.8",
   "description": "Deterministic utility substrate for the Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -36,7 +36,7 @@
     "@zenithbuild/compiler": "0.5.0-beta.2.6",
     "@zenithbuild/runtime": "0.5.0-beta.2.6",
     "@zenithbuild/router": "0.5.0-beta.2.5",
-    "@zenithbuild/bundler": "0.5.0-beta.2.5"
+    "@zenithbuild/bundler": "0.5.0-beta.2.6"
   },
   "scripts": {
     "test": "npm run contract:deps && npm run contract:scan && npm run contract:api && npm run contract:template && npm run contract:golden",
