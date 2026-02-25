@@ -12,7 +12,6 @@ const deps = Object.keys(packageJson.dependencies || {});
 const zenithDeps = deps.filter((dep) => dep.startsWith('@zenithbuild/'));
 
 const allowed = new Set([
-  '@zenithbuild/core',
   '@zenithbuild/router',
   '@zenithbuild/runtime'
 ]);

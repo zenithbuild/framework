@@ -1,6 +1,7 @@
 import { runtimeModuleSource } from '@zenithbuild/runtime/template';
 import { renderRouterModule } from '@zenithbuild/router/template';
-import { IR_VERSION } from '@zenithbuild/core/ir';
+
+const IR_VERSION = 1;
 
 function normalizeNewlines(value) {
   return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');

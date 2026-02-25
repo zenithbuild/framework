@@ -96,13 +96,7 @@ function scanFile(filePath, violations) {
     }
 
     if (specifier.startsWith('@zenithbuild/core')) {
-      const allowed = new Set([
-        '@zenithbuild/core/ir',
-        '@zenithbuild/core/core-template'
-      ]);
-      if (!allowed.has(specifier)) {
-        violations.push(`${filePath}: forbidden core import "${specifier}"`);
-      }
+      violations.push(`${filePath}: forbidden core import "${specifier}"`);
     }
   }
 }

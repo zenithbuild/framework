@@ -17,10 +17,6 @@ assert.ok(
   source.includes("from '@zenithbuild/router/template'"),
   'bundler bridge must import router template subpath'
 );
-assert.ok(
-  source.includes("from '@zenithbuild/core/ir'"),
-  'bundler bridge must import core IR authority subpath'
-);
 
 assert.equal(
   source.includes("from '@zenithbuild/runtime'"),
