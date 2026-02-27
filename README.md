@@ -2,6 +2,13 @@
 
 The canonical source of truth for Zenith documentation, changelogs, and release alignment.
 
+## Agent Contract
+
+AI coding agents must follow Zenith syntax/contracts when generating examples and snippets.
+
+- Contract file: `AGENTS.md`
+- Canonical AI usage guide: `/docs/guides/using-ai-with-zenith`
+
 ## Structure
 
 - **`documentation/`**: Filesystem docs source (contracts, references, guides, contributing, legacy inventory).

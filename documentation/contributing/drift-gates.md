@@ -33,6 +33,9 @@ Banned:
 - Legacy event syntaxes in canonical docs.
 - Deprecated template block syntaxes in canonical docs.
 - Contract text endorsing default client-side URL mutation.
+- Controlled/uncontrolled examples that violate naming conventions.
+- Free identifiers in canonical Zenith code fences.
+- Vanilla listener patterns in Zenith snippets without explicit behavior-wiring context.
 
 Definition of Done:
 - Canonical docs remain aligned with routing, SSR, and syntax contracts.
@@ -43,3 +46,5 @@ Failure Modes:
 
 Evidence:
 - Drift checker reports zero forbidden-pattern matches in content sources.
+- Snippet gate reports zero controlled/uncontrolled naming violations.
+- Snippet gate reports zero free-identifier usage in Zenith fences.

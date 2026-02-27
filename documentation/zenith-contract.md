@@ -1,67 +1,69 @@
+---
+title: "Zenith Contract"
+description: "Top-level framework laws and precedence rules for compile-time-first behavior."
+version: "0.3"
+status: "canonical"
+last_updated: "2026-02-25"
+tags: ["contracts", "governance", "compiler-first"]
+---
+
 # Zenith Contract
 
-> [!IMPORTANT]
-> **Precedence Rule**: If any code, comment, or document conflicts with `zenith-contract.md`, **this document is authoritative**. Conflicting code must be changed or deleted.
+## ZEN-RULE-001: Compile-Time First
 
-## 1. Guarantees
+Contract: anything decidable at compile time must not be deferred to runtime.
 
-Zenith guarantees the following properties for all valid programs:
+Invariant: runtime is execution-only, not interpretation-only fallback.
 
-1.  **Mechanical Certainty**: All behavior is statically analyzable at compile time. There is no runtime guessing.
-2.  **Zero Runtime Abstraction**: The output contains no Virtual DOM, no reactive proxies, no "framework" code, and no runtime scope resolution.
-3.  **Structural Integrity**: The output structure matches the input structure (macro expansion). Components do not create runtime boundaries.
-4.  **Deterministic Identity**: Interactive anchors and bindings resolve to stable, deterministic references at build time.
-5.  **Simplicity**: Code exists only if proven necessary by an invariant. Deletion is preferred over abstraction.
+## ZEN-RULE-002: Determinism Is Non-Negotiable
 
-## 2. Non-Goals (Explicitly Forbidden)
+Contract: same input produces same output across environments.
 
-Zenith explicitly does **NOT** support or allow:
+Invariant: generated artifacts must not leak machine-local paths or nondeterministic ordering.
 
-1.  **Runtime Ambiguity**: No behavior dependent on runtime introspection of types or structures.
-2.  **Intent-Guessing**: The compiler does not infer intent. It enforces explicit instructions.
-3.  **Future-Proofing**: No "helper" layers or abstractions added for hypothetical future use.
-4.  **Runtime Scope Resolution**: No looking up identifiers at runtime. All bindings are resolved at compile time.
-5.  **Complex Reactivity**: No fine-grained reactivity engine or dependency tracking unless fully resolved at compile time.
-6.  **Heuristics**: No fuzzy matching or "best effort" recovery.
+## ZEN-RULE-003: No Framework Drift
 
-## 3. Compiler Emissions
+Banned:
+- React/Vue/Svelte/Solid syntax and primitives in canonical Zenith examples.
+- String event handlers in Zenith code examples.
+- Hidden globals and regex-magic behavior.
 
-The compiler is **permitted** to emit:
+For package-level boundaries, see canonical contracts in `documentation/contracts/**` and references in `documentation/reference/**`.
 
-1.  **Static HTML**: Logic-less, optimized HTML markup.
-2.  **Static CSS**: CSS assets derived from styles.
-3.  **Minimal JavaScript**: "Dumb" bindings that map native events to pre-compiled instructions.
+## ZEN-RULE-101: Local State Is Allowed
 
-The compiler is **forbidden** from emitting:
+Contract: components may declare local state for self-contained UI behavior.
 
-1.  **Runtime Parsers**: Logic to parse or interpret data/strings at runtime.
-2.  **framework.js**: Any generic runtime library code.
-3.  **Hydration Logic**: Complex state re-hydration mechanisms.
+Invariant: local state is valid unless a controlling prop is explicitly provided.
 
-**Phase Order Constraint**:
-The compiler must operate in specific order: Parse → Scope → Safety → Renaming → Lowering → Emit. Reordering is forbidden.
+## ZEN-RULE-102: Controlled Props Override Local State
 
-## 4. Runtime Execution Constraints
+Contract: control props (for example `open`, `value`) are the source of truth when present.
 
-The runtime is **permitted** to:
+Invariant: component resolution follows controlled-first fallback logic.
 
-1.  **Bind Events**: Attach native listeners to compiled anchors.
-2.  **Execute Instructions**: Run specific, compiler-approved function calls.
-3.  **Schedule Effects**: Perform DOM updates strictly as directed by the compiled output.
+## ZEN-RULE-103: Changes Emit `onXChange`
 
-The runtime is **forbidden** from:
+Contract: state transitions emit change callbacks (`onOpenChange`, `onValueChange`) when provided.
 
-1.  **Interpreting Syntax**: No processing of template strings or expressions.
-2.  **Deriving State**: No state management logic beyond simple values.
-3.  **Recovering Errors**: Runtime errors indicate compiler failure; the runtime must not attempt to recover.
-4.  **Scanning the DOM**: No searching the DOM for directives or markers.
+Invariant: callback payload is the next resolved value.
 
-## 6. Resources & Implementation Details
+## ZEN-RULE-104: Slot Scope Remains Parent-Owned
 
-For detailed package behaviors and public interfaces, refer to the authoritative documentation:
+Contract: slot content resolves in parent scope.
 
-- [Onboarding & Developer Guide](./onboarding.md)
-- [Compiler API Reference](./api/compiler.md)
-- [Runtime API Reference](./api/runtime.md)
-- [Router API Reference](./api/router.md)
-- [CLI Reference](./api/core.md)
+Invariant: component-local state does not implicitly rebind slot expressions.
+
+## ZEN-RULE-023: Event Binding Is Object-Based
+
+Contract: events are `on:*={handler}` only.
+
+Banned:
+- `onclick` string attributes
+- `onClick` React-style props
+- `@click` Vue-style attributes
+
+See also:
+- `/docs/reactivity/reactivity-model`
+- `/docs/reactivity/controlled-uncontrolled-components`
+- `/docs/syntax/bindings-expressions`
