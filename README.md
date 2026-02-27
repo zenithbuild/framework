@@ -5,6 +5,11 @@
 
 The command-line interface for developing and building Zenith applications.
 
+## Canonical Docs
+
+- CLI contract: `../zenith-docs/documentation/cli-contract.md`
+- Script server/data contract: `../zenith-docs/documentation/contracts/server-data.md`
+
 ## Overview
 
 `@zenithbuild/cli` provides the toolchain needed to manage Zenith projects. While `create-zenith` is for scaffolding, this CLI is for the daily development loop: serving apps, building for production, and managing plugins.

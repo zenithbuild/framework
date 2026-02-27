@@ -17,7 +17,7 @@ import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { build } from './build.js';
 import {
-    executeServerScript,
+    executeServerRoute,
     injectSsrPayload,
     loadRouteManifest,
     resolveWithinDist,
@@ -93,9 +93,42 @@ export async function createDevServer(options) {
             return;
         }
 
+        if (pathname === '/__zenith/route-check') {
+            try {
+                const targetPath = String(url.searchParams.get('path') || '/');
+                const targetUrl = new URL(targetPath, `http://localhost:${port}`);
+                const routes = await loadRouteManifest(outDir);
+                const resolvedCheck = resolveRequestRoute(targetUrl, routes);
+                if (!resolvedCheck.matched || !resolvedCheck.route) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'route_not_found' }));
+                    return;
+                }
+
+                const checkResult = await executeServerRoute({
+                    source: resolvedCheck.route.server_script || '',
+                    sourcePath: resolvedCheck.route.server_script_path || '',
+                    params: resolvedCheck.params,
+                    requestUrl: targetUrl.toString(),
+                    requestMethod: req.method || 'GET',
+                    requestHeaders: req.headers,
+                    routePattern: resolvedCheck.route.path,
+                    routeFile: resolvedCheck.route.server_script_path || '',
+                    routeId: resolvedCheck.route.route_id || ''
+                });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(checkResult));
+                return;
+            } catch {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'route_check_failed' }));
+                return;
+            }
+        }
+
         try {
             const requestExt = extname(pathname);
-            if (requestExt) {
+            if (requestExt && requestExt !== '.html') {
                 const assetPath = join(outDir, pathname);
                 const asset = await readFile(assetPath);
                 const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
@@ -122,11 +155,11 @@ export async function createDevServer(options) {
                 throw new Error('not found');
             }
 
-            let content = await readFile(filePath, 'utf8');
+            let ssrPayload = null;
             if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
-                let payload = null;
+                let routeExecution = null;
                 try {
-                    payload = await executeServerScript({
+                    routeExecution = await executeServerRoute({
                         source: resolved.route.server_script,
                         sourcePath: resolved.route.server_script_path || '',
                         params: resolved.params,
@@ -134,22 +167,53 @@ export async function createDevServer(options) {
                         requestMethod: req.method || 'GET',
                         requestHeaders: req.headers,
                         routePattern: resolved.route.path,
-                        routeFile: resolved.route.server_script_path || ''
+                        routeFile: resolved.route.server_script_path || '',
+                        routeId: resolved.route.route_id || ''
                     });
                 } catch (error) {
-                    payload = {
-                        __zenith_error: {
+                    routeExecution = {
+                        result: {
+                            kind: 'deny',
                             status: 500,
-                            code: 'LOAD_FAILED',
                             message: error instanceof Error ? error.message : String(error)
+                        },
+                        trace: {
+                            guard: 'none',
+                            load: 'deny'
                         }
                     };
                 }
-                if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-                    content = injectSsrPayload(content, payload);
+
+                const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
+                const routeId = resolved.route.route_id || '';
+                console.log(`[Zenith] guard(${routeId || resolved.route.path}) -> ${trace.guard}`);
+                console.log(`[Zenith] load(${routeId || resolved.route.path}) -> ${trace.load}`);
+
+                const result = routeExecution?.result;
+                if (result && result.kind === 'redirect') {
+                    const status = Number.isInteger(result.status) ? result.status : 302;
+                    res.writeHead(status, {
+                        Location: result.location,
+                        'Cache-Control': 'no-store'
+                    });
+                    res.end('');
+                    return;
+                }
+                if (result && result.kind === 'deny') {
+                    const status = Number.isInteger(result.status) ? result.status : 403;
+                    res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end(result.message || (status === 401 ? 'Unauthorized' : 'Forbidden'));
+                    return;
+                }
+                if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+                    ssrPayload = result.data;
                 }
             }
 
+            let content = await readFile(filePath, 'utf8');
+            if (ssrPayload) {
+                content = injectSsrPayload(content, ssrPayload);
+            }
             content = content.replace('</body>', `${HMR_CLIENT_SCRIPT}</body>`);
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);

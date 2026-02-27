@@ -158,6 +158,55 @@ const safeRequestHeaders =
   requestHeaders && typeof requestHeaders === 'object'
     ? { ...requestHeaders }
     : {};
+function parseCookies(rawCookieHeader) {
+  const out = Object.create(null);
+  const raw = String(rawCookieHeader || '');
+  if (!raw) return out;
+  const pairs = raw.split(';');
+  for (let i = 0; i < pairs.length; i++) {
+    const part = pairs[i];
+    const eq = part.indexOf('=');
+    if (eq <= 0) continue;
+    const key = part.slice(0, eq).trim();
+    if (!key) continue;
+    const value = part.slice(eq + 1).trim();
+    try {
+      out[key] = decodeURIComponent(value);
+    } catch {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+const cookieHeader = typeof safeRequestHeaders.cookie === 'string'
+  ? safeRequestHeaders.cookie
+  : '';
+const requestCookies = parseCookies(cookieHeader);
+
+function ctxAllow() {
+  return { kind: 'allow' };
+}
+function ctxRedirect(location, status = 302) {
+  return {
+    kind: 'redirect',
+    location: String(location || ''),
+    status: Number.isInteger(status) ? status : 302
+  };
+}
+function ctxDeny(status = 403, message = undefined) {
+  return {
+    kind: 'deny',
+    status: Number.isInteger(status) ? status : 403,
+    message: typeof message === 'string' ? message : undefined
+  };
+}
+function ctxData(payload) {
+  return {
+    kind: 'data',
+    data: payload
+  };
+}
+
 const requestSnapshot = new Request(requestUrl, {
   method: requestMethod,
   headers: new Headers(safeRequestHeaders)
@@ -168,15 +217,32 @@ const routeMeta = {
   pattern: routePattern,
   file: routeFile ? path.relative(process.cwd(), routeFile) : ''
 };
+const routeContext = {
+  params: routeParams,
+  url: new URL(requestUrl),
+  headers: { ...safeRequestHeaders },
+  cookies: requestCookies,
+  request: requestSnapshot,
+  method: requestMethod,
+  route: routeMeta,
+  env: {},
+  auth: {
+    async getSession(_ctx) {
+      return null;
+    },
+    async requireSession(_ctx) {
+      throw ctxRedirect('/login', 302);
+    }
+  },
+  allow: ctxAllow,
+  redirect: ctxRedirect,
+  deny: ctxDeny,
+  data: ctxData
+};
 
 const context = vm.createContext({
   params: routeParams,
-  ctx: {
-    params: routeParams,
-    url: new URL(requestUrl),
-    request: requestSnapshot,
-    route: routeMeta
-  },
+  ctx: routeContext,
   fetch: globalThis.fetch,
   Headers: globalThis.Headers,
   Request: globalThis.Request,
@@ -251,11 +317,11 @@ async function linkModule(specifier, parentIdentifier) {
   return loadFileModule(resolvedUrl);
 }
 
-const allowed = new Set(['data', 'load', 'ssr_data', 'props', 'ssr', 'prerender']);
+const allowed = new Set(['data', 'load', 'guard', 'ssr_data', 'props', 'ssr', 'prerender']);
 const prelude = "const params = globalThis.params;\n" +
   "const ctx = globalThis.ctx;\n" +
-  "import { resolveServerPayload } from 'zenith:server-contract';\n" +
-  "globalThis.resolveServerPayload = resolveServerPayload;\n";
+  "import { resolveRouteResult } from 'zenith:server-contract';\n" +
+  "globalThis.resolveRouteResult = resolveRouteResult;\n";
 const entryIdentifier = sourcePath
   ? pathToFileURL(sourcePath).href
   : 'zenith:server-script';
@@ -294,13 +360,13 @@ for (const key of namespaceKeys) {
 
 const exported = entryModule.namespace;
 try {
-  const payload = await context.resolveServerPayload({
+  const resolved = await context.resolveRouteResult({
     exports: exported,
     ctx: context.ctx,
     filePath: sourcePath || 'server_script'
   });
 
-  process.stdout.write(JSON.stringify(payload === undefined ? null : payload));
+  process.stdout.write(JSON.stringify(resolved || null));
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   process.stdout.write(
@@ -328,7 +394,34 @@ export async function createPreviewServer(options) {
     const url = new URL(req.url, `http://localhost:${port}`);
 
     try {
-      if (extname(url.pathname)) {
+      if (url.pathname === '/__zenith/route-check') {
+        const targetPath = String(url.searchParams.get('path') || '/');
+        const targetUrl = new URL(targetPath, `http://localhost:${port}`);
+        const routes = await loadRouteManifest(distDir);
+        const resolvedCheck = resolveRequestRoute(targetUrl, routes);
+        if (!resolvedCheck.matched || !resolvedCheck.route) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'route_not_found' }));
+          return;
+        }
+
+        const checkResult = await executeServerRoute({
+          source: resolvedCheck.route.server_script || '',
+          sourcePath: resolvedCheck.route.server_script_path || '',
+          params: resolvedCheck.params,
+          requestUrl: targetUrl.toString(),
+          requestMethod: req.method || 'GET',
+          requestHeaders: req.headers,
+          routePattern: resolvedCheck.route.path,
+          routeFile: resolvedCheck.route.server_script_path || '',
+          routeId: resolvedCheck.route.route_id || routeIdFromSourcePath(resolvedCheck.route.server_script_path || '')
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(checkResult));
+        return;
+      }
+
+      if (extname(url.pathname) && extname(url.pathname) !== '.html') {
         const staticPath = resolveWithinDist(distDir, url.pathname);
         if (!staticPath || !(await fileExists(staticPath))) {
           throw new Error('not found');
@@ -358,11 +451,11 @@ export async function createPreviewServer(options) {
         throw new Error('not found');
       }
 
-      let html = await readFile(htmlPath, 'utf8');
+      let ssrPayload = null;
       if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
-        let payload = null;
+        let routeExecution = null;
         try {
-          payload = await executeServerScript({
+          routeExecution = await executeServerRoute({
             source: resolved.route.server_script,
             sourcePath: resolved.route.server_script_path || '',
             params: resolved.params,
@@ -371,20 +464,51 @@ export async function createPreviewServer(options) {
             requestHeaders: req.headers,
             routePattern: resolved.route.path,
             routeFile: resolved.route.server_script_path || '',
-            routeId: routeIdFromSourcePath(resolved.route.server_script_path || '')
+            routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '')
           });
         } catch (error) {
-          payload = {
-            __zenith_error: {
+          routeExecution = {
+            result: {
+              kind: 'deny',
               status: 500,
-              code: 'LOAD_FAILED',
               message: error instanceof Error ? error.message : String(error)
+            },
+            trace: {
+              guard: 'none',
+              load: 'deny'
             }
           };
         }
-        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-          html = injectSsrPayload(html, payload);
+
+        const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
+        const routeId = resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '');
+        console.log(`[Zenith] guard(${routeId}) -> ${trace.guard}`);
+        console.log(`[Zenith] load(${routeId}) -> ${trace.load}`);
+
+        const result = routeExecution?.result;
+        if (result && result.kind === 'redirect') {
+          const status = Number.isInteger(result.status) ? result.status : 302;
+          res.writeHead(status, {
+            Location: result.location,
+            'Cache-Control': 'no-store'
+          });
+          res.end('');
+          return;
         }
+        if (result && result.kind === 'deny') {
+          const status = Number.isInteger(result.status) ? result.status : 403;
+          res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(result.message || (status === 401 ? 'Unauthorized' : 'Forbidden'));
+          return;
+        }
+        if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+          ssrPayload = result.data;
+        }
+      }
+
+      let html = await readFile(htmlPath, 'utf8');
+      if (ssrPayload) {
+        html = injectSsrPayload(html, ssrPayload);
       }
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -416,6 +540,13 @@ export async function createPreviewServer(options) {
  *   server_script?: string | null;
  *   server_script_path?: string | null;
  *   prerender?: boolean;
+ *   route_id?: string;
+ *   pattern?: string;
+ *   params_shape?: Record<string, string>;
+ *   has_guard?: boolean;
+ *   has_load?: boolean;
+ *   guard_module_ref?: string | null;
+ *   load_module_ref?: string | null;
  * }} PreviewRoute
  */
 
@@ -446,9 +577,16 @@ export const matchRoute = matchManifestRoute;
 
 /**
  * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
- * @returns {Promise<Record<string, unknown> | null>}
+ * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, load: string } }>}
  */
-export async function executeServerScript(input) {
+export async function executeServerRoute(input) {
+  if (!input.source || !String(input.source).trim()) {
+    return {
+      result: { kind: 'data', data: {} },
+      trace: { guard: 'none', load: 'none' }
+    };
+  }
+
   const payload = await spawnNodeServerRunner({
     source: input.source,
     sourcePath: input.sourcePath,
@@ -462,12 +600,85 @@ export async function executeServerScript(input) {
   });
 
   if (payload === null || payload === undefined) {
-    return null;
+    return {
+      result: { kind: 'data', data: {} },
+      trace: { guard: 'none', load: 'none' }
+    };
   }
   if (typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('[zenith-preview] server script payload must be an object');
   }
-  return payload;
+
+  const errorEnvelope = payload.__zenith_error;
+  if (errorEnvelope && typeof errorEnvelope === 'object') {
+    return {
+      result: {
+        kind: 'deny',
+        status: 500,
+        message: String(errorEnvelope.message || 'Server route execution failed')
+      },
+      trace: { guard: 'none', load: 'deny' }
+    };
+  }
+
+  const result = payload.result;
+  const trace = payload.trace;
+  if (result && typeof result === 'object' && !Array.isArray(result) && typeof result.kind === 'string') {
+    return {
+      result,
+      trace: trace && typeof trace === 'object'
+        ? {
+          guard: String(trace.guard || 'none'),
+          load: String(trace.load || 'none')
+        }
+        : { guard: 'none', load: 'none' }
+    };
+  }
+
+  return {
+    result: {
+      kind: 'data',
+      data: payload
+    },
+    trace: { guard: 'none', load: 'data' }
+  };
+}
+
+/**
+ * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+export async function executeServerScript(input) {
+  const execution = await executeServerRoute(input);
+  const result = execution?.result;
+  if (!result || typeof result !== 'object') {
+    return null;
+  }
+  if (result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  if (result.kind === 'redirect') {
+    return {
+      __zenith_error: {
+        status: Number.isInteger(result.status) ? result.status : 302,
+        code: 'REDIRECT',
+        message: `Redirect to ${String(result.location || '')}`
+      }
+    };
+  }
+
+  if (result.kind === 'deny') {
+    return {
+      __zenith_error: {
+        status: Number.isInteger(result.status) ? result.status : 403,
+        code: 'ACCESS_DENIED',
+        message: String(result.message || 'Access denied')
+      }
+    };
+  }
+
+  return {};
 }
 
 /**
@@ -609,7 +820,7 @@ export function resolveWithinDist(distDir, requestPath) {
  */
 function sanitizeRequestHeaders(headers) {
   const out = Object.create(null);
-  const denyExact = new Set(['authorization', 'cookie', 'proxy-authorization', 'set-cookie']);
+  const denyExact = new Set(['proxy-authorization', 'set-cookie']);
   const denyPrefixes = ['x-forwarded-', 'cf-'];
   for (const [rawKey, rawValue] of Object.entries(headers || {})) {
     const key = String(rawKey || '').toLowerCase();

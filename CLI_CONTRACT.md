@@ -1,5 +1,7 @@
 # CLI_CONTRACT.md — Sealed Project Orchestrator
 
+Canonical public docs: `../zenith-docs/documentation/cli-contract.md`
+
 > **This document is a legal boundary.**
 > The CLI is a deterministic project orchestrator.
 > It is not a framework, router, bundler, or compiler.
