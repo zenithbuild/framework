@@ -33,6 +33,8 @@ export const FORBIDDEN_PATTERNS = [
   { label: "vue v- directive", regex: /\bv-[a-z0-9_-]+\s*=/i },
   { label: "angular ng- directive", regex: /\bng-[a-z0-9_-]+\s*=/i },
   { label: "string on:event handler", regex: /on:[a-zA-Z0-9_-]+\s*=\s*["']/ },
+  { label: "legacy mouseover binding", regex: /on:mouseover\b/i },
+  { label: "legacy mouseout binding", regex: /on:mouseout\b/i },
 ];
 
 function stripComment(rawLine) {

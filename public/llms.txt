@@ -23,15 +23,17 @@ Start here (ordered):
   - /docs/contracts/server-data
   - /docs/contracts/ssr-transport
 - Language:
+  - /docs/syntax/events
   - /docs/syntax/bindings-expressions
 - Reactivity:
-  - /docs/reactivity/controlled-uncontrolled-components
   - /docs/reactivity/reactivity-model
+  - /docs/reactivity/controlled-uncontrolled-components
 - Guides:
+  - /docs/guides/using-ai-with-zenith
+  - /docs/guides/common-mistakes
   - /docs/guides/cms-unified-site
   - /docs/guides/interactive-demos
   - /docs/guides/troubleshooting
-  - /docs/guides/using-ai-with-zenith
 - Contributing:
   - /docs/contributing/drift-gates
 - Reference:
@@ -42,9 +44,9 @@ Start here (ordered):
   - /docs/reference/server-data-api
   - /docs/reference/zenlink
 - Root:
+  - /docs/zenith-contract
   - /docs/cli-contract
   - /docs/install-compatibility
-  - /docs/zenith-contract
 
 Machine-readable:
 - /ai/docs.manifest.json

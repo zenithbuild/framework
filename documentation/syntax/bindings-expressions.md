@@ -1,38 +1,53 @@
 ---
 title: "Bindings and Expressions"
-description: "Canonical event binding, expression binding, and free-identifier safety rules for Zenith templates."
+description: "Canonical expression binding rules, event handler contracts, and identifier safety for Zenith templates."
 version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["syntax", "bindings", "expressions"]
+nav:
+  order: 20
 ---
 
 # Bindings and Expressions
 
-## Contract: Event Bindings
+## Event Binding Contract
 
-Contract: Zenith event bindings are object-based.
+Use `on:<event>={handler}` for event bindings.
 
-Invariant: handlers must be bound with `on:event={handler}`.
+- Event names are normalized to lowercase.
+- Alias mapping follows [Events](/docs/syntax/events).
+- Handler expressions must be function-valued.
 
-Banned:
-- `onclick` string attributes
-- `onClick` React-style props
-- `@click` Vue-style attributes
+Allowed examples:
 
-Definition of Done:
-- Template events use only `on:*={...}`.
-- Handler identifiers resolve in local script scope.
+```zen
+<script lang="ts">
+function toggle() {}
+function submit(event) { return event; }
+function close() {}
+</script>
 
-## Contract: Expression Bindings
+<div>
+  <button on:click={toggle}>Toggle</button>
+  <button on:click={(event) => submit(event)}>Submit</button>
+  <div on:esc={close}></div>
+</div>
+```
 
-Contract: bound expressions are explicit JavaScript expressions in `{...}`.
+Compile-time errors:
+- String handlers
+- Direct call handler expressions (`on:click={doThing()}`)
 
-Invariant: identifiers used in expressions must be declared in the same component scope (or be explicit property access like `props.title`).
+## Expression Binding Contract
 
-Definition of Done:
-- `href={expr}`, `class={expr}`, `{value}` are valid when `expr`/`value` are declared.
-- No free identifiers are present in public docs examples.
+Bound expressions are explicit JavaScript expressions in `{...}`.
+
+Identifiers must resolve in local component scope, props, or explicit runtime bindings.
+
+Definition of done:
+- `href={expr}`, `class={expr}`, `{value}` are valid only when identifiers resolve.
+- Public docs examples must not contain free identifiers.
 
 ## Compile-Safe Example
 
@@ -47,5 +62,6 @@ function handleToggle() {}
 
 ## See Also
 
-- [DSL Syntax Contract](/docs/contracts/dsl-syntax)
+- [Events](/docs/syntax/events)
 - [Reactivity Model](/docs/reactivity/reactivity-model)
+- [Common Mistakes](/docs/guides/common-mistakes)

@@ -62,6 +62,13 @@ async function main() {
           `${rel}: code fence #${i + 1} uses onValueChange without value/defaultValue (controlled/uncontrolled contract)`,
         );
       }
+
+      const directCallEventBinding = /on:[a-zA-Z0-9_-]+\s*=\s*\{\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*\([^{}]*\)\s*;?\s*\}/;
+      if (directCallEventBinding.test(source)) {
+        violations.push(
+          `${rel}: code fence #${i + 1} uses direct-call event binding (use function reference or inline arrow function)`,
+        );
+      }
     }
   }
 

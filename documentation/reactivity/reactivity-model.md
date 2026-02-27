@@ -1,60 +1,69 @@
 ---
 title: "Reactivity Model"
-description: "Parent vs component scope, local state boundaries, and slot scope guarantees."
+description: "Canonical primitives and scope boundaries for state, signal, ref, and slot ownership."
 version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["reactivity", "state", "scope"]
+nav:
+  order: 10
 ---
 
 # Reactivity Model
 
-## ZEN-RULE-101: Local State Is Allowed
+## Primitives
 
-Contract: component-local state is valid for self-contained UI behavior.
+### `state`
+Use `state` for values that directly drive DOM updates.
 
-Invariant: local state may control component-owned markup without requiring parent ownership.
+```zen
+<script lang="ts">
+state open = false
+function toggle() { open = !open }
+</script>
 
-Definition of Done:
-- Local state is declared in component scope.
-- State transitions remain deterministic and cleanup-safe.
+<button on:click={toggle}>{open ? "Open" : "Closed"}</button>
+```
 
-## ZEN-RULE-102: Controlled Props Override Local State
+### `signal`
+Use `signal()` for stable identity and explicit `get()`/`set()`, especially for frequent updates and cross-boundary bindings.
 
-Contract: when a controlling prop is provided (for example `open`, `value`), it is the source of truth.
+```ts
+const count = signal(0)
+count.set(count.get() + 1)
+```
 
-Invariant: controlled props take precedence over local defaults.
+### `ref`
+Use `ref<T>()` for DOM handles (focus management, measurement, animation).
 
-Definition of Done:
-- Components resolve actual state via controlled-first fallback logic.
-- Parent override is honored whenever control props are present.
+```ts
+const shell = ref<HTMLDivElement>()
+```
 
-## ZEN-RULE-103: State Changes Emit Change Events
+## ZEN-RULE-300: Slot Expressions Preserve Parent Scope
 
-Contract: component state transitions should emit `onXChange` callbacks when provided.
+Slot content always resolves against parent scope.
 
-Invariant: event payload reports the next resolved value.
+## ZEN-RULE-301: Component Local State Does Not Rebind Slots
 
-Definition of Done:
-- `onOpenChange`, `onValueChange`, and similar callbacks are called on change.
-- Emission behavior is consistent for controlled and uncontrolled modes.
+Component-local state/signal affects component-owned markup only, unless explicitly passed outward.
 
-## ZEN-RULE-104: Slot Scope Preserves Parent Ownership
+## Example
 
-Contract: slot expressions stay in parent scope.
+```zen
+<script lang="ts">
+state parentOpen = false
+</script>
 
-Invariant: component-local state does not implicitly leak into slot expression resolution.
+<Nav>
+  <span>{parentOpen ? "Parent Open" : "Parent Closed"}</span>
+</Nav>
+```
 
-Definition of Done:
-- Slot content resolves against parent declarations.
-- Component state only affects component-owned markup unless explicitly passed out.
-
-## Event Rule Alignment
-
-ZEN-RULE-023 remains mandatory: events are object-based only (`on:*={handler}`).
+In slot content, `parentOpen` resolves to the parent binding, not internal `Nav` state.
 
 ## See Also
 
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
-- [Bindings and Expressions](/docs/syntax/bindings-expressions)
-- [Primitives and Patterns](/docs/reference/primitives-patterns)
+- [Events](/docs/syntax/events)
+- [Zenith Contract](/docs/zenith-contract)

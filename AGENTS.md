@@ -1,20 +1,40 @@
-# Zenith Docs Agent Contract
+# Zenith Agent Contract (Read before writing code)
 
-When writing Zenith code, you must follow:
+You are generating code for the Zenith framework and Zenith docs. Follow these rules exactly.
 
-- Events: `on:*={handler}` (no string handlers)
-- Controlled/uncontrolled pattern: `value`/`defaultValue`/`onValueChange` (and `open`/`defaultOpen`/`onOpenChange`)
-- No free identifiers in templates
-- Slot content retains parent scope
-- Use Zenith primitives and documented patterns only
+## Events (Universal)
+- Bind events on any element using `on:<event>={handler}`.
+- Event names normalize to lowercase.
+- Supported aliases:
+  - `on:hoverin` -> `pointerenter`
+  - `on:hoverout` -> `pointerleave`
+  - `on:doubleclick` -> `dblclick`
+  - `on:esc` -> Escape-filtered `keydown` handled by document-level dispatch
+- Handler expressions must be function-valued.
+- Allowed: identifier/member references and inline function expressions (arrow/function).
+- Forbidden: string handlers and direct call expressions like `on:click={doThing()}`.
 
-## Copy-Paste System Prompt
+## Reactivity Primitives
+- `state`: DOM-driving reactive values.
+- `signal()`: stable identity, explicit `get()`/`set()`, high-frequency or shared bindings.
+- `ref<T>()`: DOM handles for scoped imperative behavior.
 
-```text
-You are coding in Zenith. You MUST follow Zenith docs:
-- Use on:*={handler} only (no onclick/onClick/@click)
-- Use controlled/uncontrolled pattern: value/defaultValue/onValueChange
-- No free identifiers in templates: all identifiers must be props/state/const in the same file
-- Slots retain parent reactive scope
-If unsure, consult Zenith docs before coding and cite the rule ID in comments.
-```
+## Scope Rules
+- Slot expressions always preserve parent scope.
+- Component local state must never implicitly rebind slot expressions.
+
+## Controlled vs Uncontrolled
+Use canonical prop triplets:
+- `open` / `defaultOpen` / `onOpenChange`
+- `value` / `defaultValue` / `onValueChange`
+
+Controlled props override internal state.
+
+## Docs Rules
+- Canon docs must use rule IDs and examples that compile.
+- Unknown events are warnings (not hard errors), emitted by compiler diagnostics.
+- Avoid forbidden syntax in docs examples.
+
+## Forbidden Patterns
+- No `onclick="..."`, `onClick=`, `@click=`, `{#if}`, `{#each}`.
+- No free identifiers in template examples.

@@ -18,7 +18,7 @@
         "title": "Language",
         "summary": "Zenith DSL syntax and expression semantics.",
         "order": 20,
-        "count": 1
+        "count": 2
       },
       {
         "slug": "reactivity",
@@ -32,7 +32,7 @@
         "title": "Guides",
         "summary": "Task-oriented implementation walkthroughs.",
         "order": 80,
-        "count": 4
+        "count": 5
       },
       {
         "slug": "contributing",
@@ -530,6 +530,32 @@
     },
     {
       "kind": "doc",
+      "slug": "syntax/events",
+      "title": "Events",
+      "status": "canonical",
+      "tags": [
+        "syntax",
+        "events",
+        "dx"
+      ],
+      "source_path": "documentation/syntax/events.md",
+      "url": "/docs/syntax/events",
+      "category": "syntax",
+      "category_title": "Language",
+      "category_order": 20,
+      "category_path": [
+        "syntax"
+      ],
+      "category_titles": [
+        "Language"
+      ],
+      "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
       "slug": "syntax/bindings-expressions",
       "title": "Bindings and Expressions",
       "status": "canonical",
@@ -549,33 +575,7 @@
       "category_titles": [
         "Language"
       ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reactivity/controlled-uncontrolled-components",
-      "title": "Controlled vs Uncontrolled Components",
-      "status": "canonical",
-      "tags": [
-        "reactivity",
-        "components",
-        "api-design"
-      ],
-      "source_path": "documentation/reactivity/controlled-uncontrolled-components.md",
-      "url": "/docs/reactivity/controlled-uncontrolled-components",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
-      "category_path": [
-        "reactivity"
-      ],
-      "category_titles": [
-        "Reactivity"
-      ],
-      "doc_order": null,
+      "doc_order": 20,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -601,7 +601,86 @@
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": null,
+      "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/controlled-uncontrolled-components",
+      "title": "Controlled vs Uncontrolled Components",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "components",
+        "api-design"
+      ],
+      "source_path": "documentation/reactivity/controlled-uncontrolled-components.md",
+      "url": "/docs/reactivity/controlled-uncontrolled-components",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 20,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/using-ai-with-zenith",
+      "title": "Using AI with Zenith",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "ai",
+        "workflow",
+        "contracts"
+      ],
+      "source_path": "documentation/guides/using-ai-with-zenith.md",
+      "url": "/docs/guides/using-ai-with-zenith",
+      "category": "guides",
+      "category_title": "Guides",
+      "category_order": 80,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 30,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/common-mistakes",
+      "title": "Common Mistakes",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "troubleshooting",
+        "contracts"
+      ],
+      "source_path": "documentation/guides/common-mistakes.md",
+      "url": "/docs/guides/common-mistakes",
+      "category": "guides",
+      "category_title": "Guides",
+      "category_order": 80,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 40,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -670,33 +749,6 @@
       ],
       "source_path": "documentation/guides/troubleshooting.md",
       "url": "/docs/guides/troubleshooting",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
-      "category_path": [
-        "guides"
-      ],
-      "category_titles": [
-        "Guides"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "guides/using-ai-with-zenith",
-      "title": "Using AI with Zenith",
-      "status": "canonical",
-      "tags": [
-        "guides",
-        "ai",
-        "workflow",
-        "contracts"
-      ],
-      "source_path": "documentation/guides/using-ai-with-zenith.md",
-      "url": "/docs/guides/using-ai-with-zenith",
       "category": "guides",
       "category_title": "Guides",
       "category_order": 80,
@@ -896,6 +948,28 @@
     },
     {
       "kind": "doc",
+      "slug": "zenith-contract",
+      "title": "Zenith Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "governance",
+        "compiler-first"
+      ],
+      "source_path": "documentation/zenith-contract.md",
+      "url": "/docs/zenith-contract",
+      "category": "root",
+      "category_title": "Root",
+      "category_order": null,
+      "category_path": [],
+      "category_titles": [],
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
       "slug": "cli-contract",
       "title": "CLI Contract",
       "status": "canonical",
@@ -928,28 +1002,6 @@
       ],
       "source_path": "documentation/install-compatibility.md",
       "url": "/docs/install-compatibility",
-      "category": "root",
-      "category_title": "Root",
-      "category_order": null,
-      "category_path": [],
-      "category_titles": [],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "zenith-contract",
-      "title": "Zenith Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "governance",
-        "compiler-first"
-      ],
-      "source_path": "documentation/zenith-contract.md",
-      "url": "/docs/zenith-contract",
       "category": "root",
       "category_title": "Root",
       "category_order": null,

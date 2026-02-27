@@ -1,47 +1,44 @@
 ---
 title: "Using AI with Zenith"
-description: "Operational prompt contract for AI-assisted Zenith code generation."
+description: "Prompt contract for AI-assisted Zenith code generation with canonical event and reactivity rules."
 version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["guides", "ai", "workflow", "contracts"]
+nav:
+  order: 30
 ---
 
 # Using AI with Zenith
 
-## Contract: AI Safety Guardrails
+## AI Guardrails
 
-Contract: AI-generated Zenith code must follow Zenith contracts and syntax rules.
+AI-generated Zenith code must follow documented contracts and rule IDs.
 
-Invariant: generated code must not invent framework APIs or event syntaxes.
-
-Definition of Done:
-- AI output uses documented Zenith patterns only.
-- Rule IDs are cited when a contract is enforced.
-
-## Required Prompts for AI Sessions
-
-When instructing an AI assistant:
-
-- Do not invent APIs.
-- Always follow Zenith bindings.
-- Never use `onclick`, `onClick`, or `@click`.
-- Prefer existing Zenith primitives and documented patterns.
-- If unsure, search Zenith docs and cite the relevant rule ID.
+Required defaults:
+- Use `on:<event>={handler}` event bindings.
+- Allow inline function handlers when function-valued.
+- Never use string handlers or direct call event handlers.
+- Use canonical primitives (`state`, `signal`, `ref`) per docs.
+- Use controlled/uncontrolled prop triplets for interactive components.
+- Preserve parent scope for slot content.
 
 ## Copy-Paste System Prompt
 
 ```text
-You are coding in Zenith. You MUST follow Zenith docs:
-- Use on:*={handler} only (no onclick/onClick/@click)
-- Use controlled/uncontrolled pattern: value/defaultValue/onValueChange
-- No free identifiers in templates: all identifiers must be props/state/const in the same file
-- Slots retain parent reactive scope
-If unsure, consult Zenith docs before coding and cite the rule ID in comments.
+You are coding in Zenith. Follow Zenith canonical docs and rule IDs.
+- Events: use on:<event>={handler}; normalize lowercase names; aliases include hoverin/out, doubleclick, esc.
+- Event handlers must be function-valued; string handlers and direct call expressions are forbidden.
+- Use state for DOM-driven updates, signal() for stable explicit get/set values, ref() for DOM handles.
+- Slot expressions preserve parent scope.
+- For interactive components, use controlled/uncontrolled triplets:
+  open/defaultOpen/onOpenChange and value/defaultValue/onValueChange.
+If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 ```
 
 ## See Also
 
+- [Events](/docs/syntax/events)
 - [Reactivity Model](/docs/reactivity/reactivity-model)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
-- [Drift Gates](/docs/contributing/drift-gates)
+- [Common Mistakes](/docs/guides/common-mistakes)

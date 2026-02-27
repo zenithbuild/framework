@@ -1,53 +1,37 @@
 ---
 title: "Controlled vs Uncontrolled Components"
-description: "Canonical controlled/uncontrolled resolution algorithm and naming conventions for Zenith components."
+description: "Canonical controlled/uncontrolled contract and prop naming conventions for interactive Zenith components."
 version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["reactivity", "components", "api-design"]
+nav:
+  order: 20
 ---
 
 # Controlled vs Uncontrolled Components
 
-## Contract: Resolution Algorithm
+## ZEN-RULE-320: Controlled Props Override Internal State
 
-Contract: stateful components must support hybrid control without heavy runtime overhead.
+Interactive components should support both controlled and uncontrolled usage.
 
-Invariant: if control prop is provided, it wins; otherwise local state is used.
-
-Definition of Done:
-- `isControlled = prop !== undefined`
-- `actual = isControlled ? prop : local`
-- `set(next)` updates local only when uncontrolled and emits `onXChange` when provided.
-
-## Naming Convention
-
-Use these canonical prop triplets:
-
+Canonical prop triplets:
 - `open` / `defaultOpen` / `onOpenChange`
 - `value` / `defaultValue` / `onValueChange`
 
-## Flagship Example: Nav API Shape
+Resolution algorithm:
+- If `open`/`value` is provided, it is the source of truth.
+- Otherwise internal state is used.
+- On any state transition, emit `onOpenChange` / `onValueChange` when provided.
+
+## Example
 
 ```ts
-export interface NavProps {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (nextOpen: boolean) => void;
-}
-```
-
-```ts
-function resolveOpen(open: boolean | undefined, localOpen: boolean) {
+function resolveOpen(open, localOpen) {
   return open !== undefined ? open : localOpen;
 }
 
-function setOpen(
-  nextOpen: boolean,
-  open: boolean | undefined,
-  setLocalOpen: (next: boolean) => void,
-  onOpenChange?: (next: boolean) => void,
-) {
+function setOpen(nextOpen, open, setLocalOpen, onOpenChange) {
   if (open === undefined) {
     setLocalOpen(nextOpen);
   }
@@ -57,22 +41,23 @@ function setOpen(
 }
 ```
 
-## Usage Examples
+## Usage
 
 Uncontrolled:
 
 ```text
-<Navigation></Navigation>
-<Navigation defaultOpen={true}></Navigation>
+<Navigation />
+<Navigation defaultOpen={true} />
 ```
 
 Controlled:
 
 ```text
-<Navigation open={isOpen} onOpenChange={setIsOpen}></Navigation>
+<Navigation open={isOpen} onOpenChange={setIsOpen} />
 ```
 
 ## See Also
 
 - [Reactivity Model](/docs/reactivity/reactivity-model)
 - [Using AI with Zenith](/docs/guides/using-ai-with-zenith)
+- [Zenith Contract](/docs/zenith-contract)

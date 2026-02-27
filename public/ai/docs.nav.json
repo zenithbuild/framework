@@ -214,11 +214,22 @@
       "order": 20,
       "docs": [
         {
+          "slug": "syntax/events",
+          "title": "Events",
+          "label": "Events",
+          "url": "/docs/syntax/events",
+          "order": 10,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/syntax/events.md"
+        },
+        {
           "slug": "syntax/bindings-expressions",
           "title": "Bindings and Expressions",
           "label": "Bindings and Expressions",
           "url": "/docs/syntax/bindings-expressions",
-          "order": null,
+          "order": 20,
           "level": null,
           "status": "canonical",
           "prerequisites": [],
@@ -233,26 +244,26 @@
       "order": 30,
       "docs": [
         {
-          "slug": "reactivity/controlled-uncontrolled-components",
-          "title": "Controlled vs Uncontrolled Components",
-          "label": "Controlled vs Uncontrolled Components",
-          "url": "/docs/reactivity/controlled-uncontrolled-components",
-          "order": null,
-          "level": null,
-          "status": "canonical",
-          "prerequisites": [],
-          "source_path": "documentation/reactivity/controlled-uncontrolled-components.md"
-        },
-        {
           "slug": "reactivity/reactivity-model",
           "title": "Reactivity Model",
           "label": "Reactivity Model",
           "url": "/docs/reactivity/reactivity-model",
-          "order": null,
+          "order": 10,
           "level": null,
           "status": "canonical",
           "prerequisites": [],
           "source_path": "documentation/reactivity/reactivity-model.md"
+        },
+        {
+          "slug": "reactivity/controlled-uncontrolled-components",
+          "title": "Controlled vs Uncontrolled Components",
+          "label": "Controlled vs Uncontrolled Components",
+          "url": "/docs/reactivity/controlled-uncontrolled-components",
+          "order": 20,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/controlled-uncontrolled-components.md"
         }
       ]
     },
@@ -262,6 +273,28 @@
       "summary": "Task-oriented implementation walkthroughs.",
       "order": 80,
       "docs": [
+        {
+          "slug": "guides/using-ai-with-zenith",
+          "title": "Using AI with Zenith",
+          "label": "Using AI with Zenith",
+          "url": "/docs/guides/using-ai-with-zenith",
+          "order": 30,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/guides/using-ai-with-zenith.md"
+        },
+        {
+          "slug": "guides/common-mistakes",
+          "title": "Common Mistakes",
+          "label": "Common Mistakes",
+          "url": "/docs/guides/common-mistakes",
+          "order": 40,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/guides/common-mistakes.md"
+        },
         {
           "slug": "guides/cms-unified-site",
           "title": "CMS Unified Site Guide",
@@ -294,17 +327,6 @@
           "status": "canonical",
           "prerequisites": [],
           "source_path": "documentation/guides/troubleshooting.md"
-        },
-        {
-          "slug": "guides/using-ai-with-zenith",
-          "title": "Using AI with Zenith",
-          "label": "Using AI with Zenith",
-          "url": "/docs/guides/using-ai-with-zenith",
-          "order": null,
-          "level": null,
-          "status": "canonical",
-          "prerequisites": [],
-          "source_path": "documentation/guides/using-ai-with-zenith.md"
         }
       ]
     },
@@ -408,6 +430,17 @@
       "order": null,
       "docs": [
         {
+          "slug": "zenith-contract",
+          "title": "Zenith Contract",
+          "label": "Zenith Contract",
+          "url": "/docs/zenith-contract",
+          "order": 5,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/zenith-contract.md"
+        },
+        {
           "slug": "cli-contract",
           "title": "CLI Contract",
           "label": "CLI Contract",
@@ -428,17 +461,6 @@
           "status": "canonical",
           "prerequisites": [],
           "source_path": "documentation/install-compatibility.md"
-        },
-        {
-          "slug": "zenith-contract",
-          "title": "Zenith Contract",
-          "label": "Zenith Contract",
-          "url": "/docs/zenith-contract",
-          "order": null,
-          "level": null,
-          "status": "canonical",
-          "prerequisites": [],
-          "source_path": "documentation/zenith-contract.md"
         }
       ]
     }
@@ -462,13 +484,15 @@
     "/docs/contracts/security-drift-gates",
     "/docs/contracts/server-data",
     "/docs/contracts/ssr-transport",
+    "/docs/syntax/events",
     "/docs/syntax/bindings-expressions",
-    "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/reactivity/reactivity-model",
+    "/docs/reactivity/controlled-uncontrolled-components",
+    "/docs/guides/using-ai-with-zenith",
+    "/docs/guides/common-mistakes",
     "/docs/guides/cms-unified-site",
     "/docs/guides/interactive-demos",
     "/docs/guides/troubleshooting",
-    "/docs/guides/using-ai-with-zenith",
     "/docs/contributing/drift-gates",
     "/docs/reference/markers",
     "/docs/reference/primitives-patterns",
@@ -476,8 +500,8 @@
     "/docs/reference/script-server",
     "/docs/reference/server-data-api",
     "/docs/reference/zenlink",
+    "/docs/zenith-contract",
     "/docs/cli-contract",
-    "/docs/install-compatibility",
-    "/docs/zenith-contract"
+    "/docs/install-compatibility"
   ]
 }
