@@ -69,6 +69,24 @@ const BUNDLER_BIN = resolveBinary([
 ]);
 
 /**
+ * Build a per-build warning emitter that deduplicates repeated compiler lines.
+ *
+ * @param {(line: string) => void} sink
+ * @returns {(line: string) => void}
+ */
+export function createCompilerWarningEmitter(sink = (line) => console.warn(line)) {
+    const emitted = new Set();
+    return (line) => {
+        const text = String(line || '').trim();
+        if (!text || emitted.has(text)) {
+            return;
+        }
+        emitted.add(text);
+        sink(text);
+    };
+}
+
+/**
  * Run the compiler process and parse its JSON stdout.
  *
  * If `stdinSource` is provided, pipes it to the compiler via stdin
@@ -77,9 +95,12 @@ const BUNDLER_BIN = resolveBinary([
  *
  * @param {string} filePath — path for diagnostics (and file reading when no stdinSource)
  * @param {string} [stdinSource] — if provided, piped to compiler via stdin
+ * @param {object} compilerRunOptions
+ * @param {(warning: string) => void} [compilerRunOptions.onWarning]
+ * @param {boolean} [compilerRunOptions.suppressWarnings]
  * @returns {object}
  */
-function runCompiler(filePath, stdinSource, compilerOpts = {}) {
+function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOptions = {}) {
     const args = stdinSource !== undefined
         ? ['--stdin', filePath]
         : [filePath];
@@ -100,6 +121,20 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}) {
         throw new Error(
             `Compiler failed for ${filePath} with exit code ${result.status}\n${result.stderr || ''}`
         );
+    }
+
+    if (result.stderr && result.stderr.trim().length > 0 && compilerRunOptions.suppressWarnings !== true) {
+        const lines = String(result.stderr)
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+        for (const line of lines) {
+            if (typeof compilerRunOptions.onWarning === 'function') {
+                compilerRunOptions.onWarning(line);
+            } else {
+                console.warn(line);
+            }
+        }
     }
 
     try {
@@ -143,7 +178,7 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
 
     let templateIr;
     try {
-        templateIr = runCompiler(compPath, templateOnly, compilerOpts);
+        templateIr = runCompiler(compPath, templateOnly, compilerOpts, { suppressWarnings: true });
     } catch {
         return out;
     }
@@ -868,7 +903,7 @@ function transpileTypeScriptToJs(source, sourceFile) {
             fileName: sourceFile,
             compilerOptions: {
                 module: ts.ModuleKind.ESNext,
-                target: ts.ScriptTarget.ES2022,
+                target: ts.ScriptTarget.ES5,
                 importsNotUsedAsValues: ts.ImportsNotUsedAsValues.Preserve,
                 verbatimModuleSyntax: true,
                 newLine: ts.NewLineKind.LineFeed,
@@ -1103,7 +1138,7 @@ function injectPropsPrelude(source, attrs) {
     }
 
     const propsLiteral = renderPropsLiteralFromAttrs(attrs);
-    return `const props = ${propsLiteral};\n${source}`;
+    return `var props = ${propsLiteral};\n${source}`;
 }
 
 /**
@@ -1360,6 +1395,7 @@ export async function build(options) {
     const componentRefFallbackCache = new Map();
     /** @type {Map<string, { map: Map<string, string>, ambiguous: Set<string> }>} */
     const componentExpressionRewriteCache = new Map();
+    const emitCompilerWarning = createCompilerWarningEmitter((line) => console.warn(line));
 
     const envelopes = [];
     for (const entry of manifest) {
@@ -1375,7 +1411,12 @@ export async function build(options) {
         const compileSource = extractedServer.source;
 
         // 2b. Compile expanded page source via --stdin
-        const pageIr = runCompiler(sourceFile, compileSource, compilerOpts);
+        const pageIr = runCompiler(
+            sourceFile,
+            compileSource,
+            compilerOpts,
+            { onWarning: emitCompilerWarning }
+        );
         if (extractedServer.serverScript) {
             pageIr.server_script = extractedServer.serverScript;
             pageIr.prerender = extractedServer.serverScript.prerender === true;
@@ -1409,7 +1450,12 @@ export async function build(options) {
                 compIr = componentIrCache.get(compPath);
             } else {
                 const componentCompileSource = stripStyleBlocks(componentSource);
-                compIr = runCompiler(compPath, componentCompileSource, compilerOpts);
+                compIr = runCompiler(
+                    compPath,
+                    componentCompileSource,
+                    compilerOpts,
+                    { onWarning: emitCompilerWarning }
+                );
                 componentIrCache.set(compPath, compIr);
             }
 

@@ -1,4 +1,4 @@
-import { build } from '../src/build.js';
+import { build, createCompilerWarningEmitter } from '../src/build.js';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -597,5 +597,91 @@ describe('build orchestration', () => {
         expect(String(syntaxCheck.stderr || '')).toBe('');
 
         await expect(evaluateBuiltModule(pageAsset, pageAssetPath)).resolves.toBeUndefined();
+    });
+
+    test('prints compiler warnings during build for unknown events', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script lang="ts">',
+                'function handleClick() {}',
+                '</script>',
+                '<button on:clcik={handleClick}>Tap</button>'
+            ].join('\n')
+        });
+
+        const warned = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => {
+            warned.push(args.map((arg) => String(arg)).join(' '));
+        };
+
+        try {
+            await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        expect(warned.some((line) => line.includes('warning[ZEN-EVT-UNKNOWN]'))).toBe(true);
+        expect(warned.some((line) => line.includes("Did you mean 'click'?"))).toBe(true);
+    });
+
+    test('deduplicates repeated compiler warning lines in one build pass', () => {
+        const warned = [];
+        const emit = createCompilerWarningEmitter((line) => warned.push(line));
+
+        emit('a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
+        emit('a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
+        emit('a.zen:2:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
+
+        expect(warned).toEqual([
+            'a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?',
+            'a.zen:2:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?'
+        ]);
+    });
+
+    test('internal template recompiles do not duplicate component warning output', async () => {
+        const root = join(tmpdir(), `zenith-build-warning-suppress-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'TypoButton.zen'),
+            [
+                '<script lang="ts">',
+                'function handleClick() {}',
+                '</script>',
+                '<button on:clcik={handleClick}><slot /></button>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><TypoButton>One</TypoButton><TypoButton>Two</TypoButton></main>\n',
+            'utf8'
+        );
+
+        const warned = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => {
+            warned.push(args.map((arg) => String(arg)).join(' '));
+        };
+
+        try {
+            await build({ pagesDir, outDir });
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        const componentWarnings = warned.filter(
+            (line) => line.includes('TypoButton.zen') && line.includes('warning[ZEN-EVT-UNKNOWN]')
+        );
+        expect(componentWarnings.length).toBe(1);
     });
 });
