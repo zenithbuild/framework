@@ -1,9 +1,11 @@
-use crate::ast::{Attribute, ElementNode, Node};
+use crate::ast::{Attribute, ElementNode, Node, SourceLocation};
+use crate::event_contract;
 use crate::lexer::{Lexer, Token};
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
+    current_token_start: usize,
     embedded_markup_expressions: bool,
 }
 
@@ -11,9 +13,11 @@ impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
         let mut lexer = Lexer::new(input);
         let current_token = lexer.next_token();
+        let current_token_start = lexer.last_token_start();
         Self {
             lexer,
             current_token,
+            current_token_start,
             embedded_markup_expressions: false,
         }
     }
@@ -21,15 +25,31 @@ impl<'a> Parser<'a> {
     pub fn new_with_options(input: &'a str, embedded_markup_expressions: bool) -> Self {
         let mut lexer = Lexer::new(input);
         let current_token = lexer.next_token();
+        let current_token_start = lexer.last_token_start();
         Self {
             lexer,
             current_token,
+            current_token_start,
             embedded_markup_expressions,
         }
     }
 
     fn advance(&mut self) {
+        self.sync_current_token();
+    }
+
+    fn sync_current_token(&mut self) {
         self.current_token = self.lexer.next_token();
+        self.current_token_start = self.lexer.last_token_start();
+    }
+
+    fn location_for_offset(&self, offset: usize) -> SourceLocation {
+        let (line, column) = self.lexer.offset_to_line_col(offset);
+        SourceLocation { line, column }
+    }
+
+    fn current_token_location(&self) -> SourceLocation {
+        self.location_for_offset(self.current_token_start)
     }
 
     fn expect(&mut self, token: Token) {
@@ -100,7 +120,7 @@ impl<'a> Parser<'a> {
         let raw = self.lexer.lex_expression_content();
         // lex_expression_content consumed everything up to and including the closing '}'.
         // Re-sync current_token from the lexer.
-        self.current_token = self.lexer.next_token();
+        self.sync_current_token();
         let content = self.contract_gate_expression(&raw);
         Node::Expression(content)
     }
@@ -167,6 +187,7 @@ impl<'a> Parser<'a> {
             match &self.current_token {
                 Token::Identifier(name) => {
                     let name = name.clone();
+                    let attr_name_location = self.current_token_location();
                     self.advance();
 
                     if self.current_token == Token::Eq {
@@ -198,18 +219,42 @@ impl<'a> Parser<'a> {
                             // lex_expression_content() directly (do NOT advance
                             // first, as that would consume the first content token).
                             let value = self.lexer.lex_expression_content();
-                            self.current_token = self.lexer.next_token();
+                            self.sync_current_token();
                             let value = self.contract_gate_expression(&value);
 
                             if name.starts_with("on:") {
+                                let handler = value.trim().to_string();
+                                if event_contract::is_direct_call_expression(&handler) {
+                                    panic!(
+                                        "Event handlers must not be direct call expressions.\n\
+                                         Found: on:{}={{ {} }} at line {}, column {}.\n\
+                                         Use a function reference or inline function expression.",
+                                        &name[3..],
+                                        handler,
+                                        attr_name_location.line,
+                                        attr_name_location.column
+                                    );
+                                }
                                 attributes.push(Attribute::Event {
                                     name: name[3..].to_string(),
-                                    handler: value,
+                                    handler,
+                                    location: attr_name_location,
                                 });
                             } else {
                                 attributes.push(Attribute::Expression { name, value });
                             }
                         } else if let Token::StringLiteral(value) = &self.current_token {
+                            if name.starts_with("on:") {
+                                panic!(
+                                    "Event attributes do not accept string handlers.\n\
+                                     Found: {}=\"{}\" at line {}, column {}.\n\
+                                     Use on:event={{handler}} with a function-valued expression.",
+                                    name,
+                                    value,
+                                    attr_name_location.line,
+                                    attr_name_location.column
+                                );
+                            }
                             attributes.push(Attribute::Static {
                                 name,
                                 value: value.clone(),

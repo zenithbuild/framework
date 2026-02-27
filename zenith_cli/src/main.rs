@@ -3,7 +3,7 @@ use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 use zenith_compiler::compiler::{
-    compile_structured_with_source_options, CompileOptions, CompilerOutput,
+    compile_structured_with_source_options_and_warnings, CompileOptions, CompilerOutput,
 };
 use zenith_compiler::deterministic::sha256_hex;
 
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         (text, input_path.to_string_lossy().into_owned())
     };
 
-    let output = compile_structured_with_source_options(
+    let (output, warnings) = compile_structured_with_source_options_and_warnings(
         &content,
         &original_path,
         CompileOptions {
@@ -56,6 +56,12 @@ fn main() -> Result<()> {
         },
     )
     .map_err(anyhow::Error::msg)?;
+    for warning in warnings {
+        eprintln!(
+            "{}:{}:{}: warning[{}] {}",
+            original_path, warning.line, warning.column, warning.code, warning.message
+        );
+    }
     let hoisted_state = output
         .hoisted
         .state

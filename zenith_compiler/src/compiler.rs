@@ -4,7 +4,9 @@ use crate::script::{
     extract_script_blocks, ComponentInstanceBinding, ComponentScriptAsset, ExtractedStyleBlock,
     HoistedOutput, HoistedStateBinding,
 };
-use crate::transform::{transform, EventBinding, MarkerBinding, MarkerKind, RefBinding};
+use crate::transform::{
+    transform, EventBinding, MarkerBinding, MarkerKind, RefBinding, TransformWarning,
+};
 use std::collections::BTreeMap;
 
 pub const IR_VERSION: u32 = 1;
@@ -88,6 +90,14 @@ pub struct RefBindingPayload {
 pub struct GraphNodePayload {
     pub id: String,
     pub hoist_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CompileWarning {
+    pub code: String,
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
 }
 
 /// The sealed public API for the bundler.
@@ -179,6 +189,15 @@ pub fn compile_structured_with_source_options(
     source_path: &str,
     options: CompileOptions,
 ) -> Result<CompilerOutput, String> {
+    compile_structured_with_source_options_and_warnings(input, source_path, options)
+        .map(|(output, _warnings)| output)
+}
+
+pub fn compile_structured_with_source_options_and_warnings(
+    input: &str,
+    source_path: &str,
+    options: CompileOptions,
+) -> Result<(CompilerOutput, Vec<CompileWarning>), String> {
     let result = std::panic::catch_unwind(|| {
         let (
             ast,
@@ -189,12 +208,13 @@ pub fn compile_structured_with_source_options(
             markers,
             events,
             ref_bindings,
+            warnings,
         ) = compile_internal_result(input, source_path, options)?;
         let html = crate::codegen::generate_html(&ast);
         let signals = map_signals(&hoisted);
         let expression_bindings = map_expression_bindings(&expressions, &hoisted, &signals);
 
-        Ok(CompilerOutput {
+        let output = CompilerOutput {
             ir_version: IR_VERSION,
             graph_hash: String::new(),
             graph_edges: Vec::new(),
@@ -214,7 +234,9 @@ pub fn compile_structured_with_source_options(
             event_bindings: map_events(events),
             ref_bindings: map_ref_bindings(ref_bindings),
             style_blocks: Vec::new(),
-        })
+        };
+
+        Ok((output, map_warnings(warnings)))
     });
 
     match result {
@@ -253,6 +275,7 @@ pub fn compile(input: &str) -> Result<String, String> {
             _markers,
             _events,
             _ref_bindings,
+            _warnings,
         ) = compile_internal_result(input, "<inline>", options)?;
         Ok(generate(ast, expressions))
     });
@@ -287,6 +310,7 @@ fn compile_internal_result(
         Vec<MarkerBinding>,
         Vec<EventBinding>,
         Vec<RefBinding>,
+        Vec<TransformWarning>,
     ),
     String,
 > {
@@ -517,6 +541,18 @@ fn map_ref_bindings(bindings: Vec<RefBinding>) -> Vec<RefBindingPayload> {
             index: binding.index,
             identifier: binding.identifier,
             selector: binding.selector,
+        })
+        .collect()
+}
+
+fn map_warnings(warnings: Vec<TransformWarning>) -> Vec<CompileWarning> {
+    warnings
+        .into_iter()
+        .map(|warning| CompileWarning {
+            code: warning.code,
+            message: warning.message,
+            line: warning.line,
+            column: warning.column,
         })
         .collect()
 }

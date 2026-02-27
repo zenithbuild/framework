@@ -16,6 +16,12 @@ pub struct ComponentScript {
     pub functions: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SourceLocation {
+    pub line: usize,
+    pub column: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ElementNode {
     pub tag: String,
@@ -28,6 +34,10 @@ pub struct ElementNode {
 pub enum Attribute {
     Static { name: String, value: String },
     Expression { name: String, value: String },
-    Event { name: String, handler: String },
+    Event {
+        name: String,
+        handler: String,
+        location: SourceLocation,
+    },
     Ref { identifier: String },
 }

@@ -26,6 +26,8 @@ pub struct Lexer<'a> {
     chars: Peekable<Chars<'a>>,
     pos: usize,
     mode: LexMode,
+    token_start: usize,
+    token_end: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -35,6 +37,8 @@ impl<'a> Lexer<'a> {
             chars: input.chars().peekable(),
             pos: 0,
             mode: LexMode::Text,
+            token_start: 0,
+            token_end: 0,
         }
     }
 
@@ -51,10 +55,40 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
-        match self.mode {
+        self.token_start = self.pos;
+        let token = match self.mode {
             LexMode::Text => self.lex_text(),
             LexMode::Tag => self.lex_tag(),
+        };
+        self.token_end = self.pos;
+        token
+    }
+
+    pub fn last_token_start(&self) -> usize {
+        self.token_start
+    }
+
+    pub fn last_token_end(&self) -> usize {
+        self.token_end
+    }
+
+    pub fn offset_to_line_col(&self, offset: usize) -> (usize, usize) {
+        let mut line = 1usize;
+        let mut column = 1usize;
+        let mut seen = 0usize;
+        for ch in self._input.chars() {
+            if seen >= offset {
+                break;
+            }
+            if ch == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+            seen += 1;
         }
+        (line, column)
     }
 
     fn lex_text(&mut self) -> Token {
@@ -109,6 +143,7 @@ impl<'a> Lexer<'a> {
 
     fn lex_tag(&mut self) -> Token {
         self.skip_whitespace();
+        self.token_start = self.pos;
 
         let c = match self.peek() {
             Some(&c) => c,

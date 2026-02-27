@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use regex::Regex;
 
 use crate::ast::{Attribute, ElementNode, Node};
+use crate::event_contract;
 use crate::script::{
     ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript, SCRIPT_ID_ATTR,
     SCRIPT_PLACEHOLDER_TAG,
@@ -37,6 +38,14 @@ pub struct RefBinding {
     pub selector: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransformWarning {
+    pub code: String,
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+}
+
 pub fn transform(
     root: Node,
     scripts: &[HoistedScript],
@@ -49,6 +58,7 @@ pub fn transform(
     Vec<MarkerBinding>,
     Vec<EventBinding>,
     Vec<RefBinding>,
+    Vec<TransformWarning>,
 ) {
     let mut transformer = Transformer::new(scripts);
     let transformed_root = transformer.transform_node(root);
@@ -66,6 +76,7 @@ pub fn transform(
         transformer.markers,
         transformer.events,
         transformer.ref_bindings,
+        transformer.warnings,
     )
 }
 
@@ -86,6 +97,7 @@ struct Transformer {
     markers: Vec<MarkerBinding>,
     events: Vec<EventBinding>,
     ref_bindings: Vec<RefBinding>,
+    warnings: Vec<TransformWarning>,
     ref_counter: usize,
 }
 
@@ -120,6 +132,7 @@ impl Transformer {
             markers: Vec::new(),
             events: Vec::new(),
             ref_bindings: Vec::new(),
+            warnings: Vec::new(),
             ref_counter: 0,
         }
     }
@@ -203,10 +216,32 @@ impl Transformer {
         let mut new_attributes = Vec::new();
         for attr in elem.attributes {
             match attr {
-                Attribute::Event { name, handler } => {
+                Attribute::Event {
+                    name,
+                    handler,
+                    location,
+                } => {
+                    let normalized = event_contract::normalize_event_name(&name);
+                    let canonical = event_contract::canonicalize_event_name(&normalized);
+                    if !event_contract::is_known_event(&canonical) {
+                        let suggestion = event_contract::suggest_known_event(&canonical);
+                        let message = match suggestion {
+                            Some(candidate) => format!(
+                                "Unknown DOM event '{}'. Did you mean '{}'?",
+                                canonical, candidate
+                            ),
+                            None => format!("Unknown DOM event '{}'.", canonical),
+                        };
+                        self.warnings.push(TransformWarning {
+                            code: "ZEN-EVT-UNKNOWN".to_string(),
+                            message,
+                            line: location.line,
+                            column: location.column,
+                        });
+                    }
                     let rewritten = self.rewrite_expression(&handler, RewriteContext::Event);
                     let idx = self.add_expression(rewritten);
-                    let selector = format!(r#"[data-zx-on-{}="{}"]"#, name, idx);
+                    let selector = format!(r#"[data-zx-on-{}="{}"]"#, canonical, idx);
                     self.insert_marker(MarkerBinding {
                         index: idx,
                         kind: MarkerKind::Event,
@@ -215,11 +250,11 @@ impl Transformer {
                     });
                     self.events.push(EventBinding {
                         index: idx,
-                        event: name.clone(),
+                        event: canonical.clone(),
                         selector,
                     });
                     new_attributes.push(Attribute::Static {
-                        name: format!("data-zx-on-{}", name),
+                        name: format!("data-zx-on-{}", canonical),
                         value: idx.to_string(),
                     });
                 }
