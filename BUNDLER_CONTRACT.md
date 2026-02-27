@@ -1,5 +1,8 @@
 # BUNDLER_CONTRACT.md — Sealed Runtime Interface
 
+Canonical public docs: `../zenith-docs/documentation/contracts/bundler-contract.md`
+
+
 > **This document is a legal boundary.**
 > No symbol rename, no structural change, no semantic reinterpretation
 > is permitted after this contract is frozen.

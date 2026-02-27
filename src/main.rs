@@ -90,7 +90,6 @@ struct CompilerHoisted {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CompilerStateBinding {
-    #[allow(dead_code)]
     key: String,
     value: String,
 }
@@ -249,10 +248,16 @@ struct EventBinding {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 struct CompilerRefBinding {
     index: usize,
     identifier: String,
+    selector: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RuntimeRefBinding {
+    index: usize,
+    state_index: usize,
     selector: String,
 }
 
@@ -2852,6 +2857,8 @@ fn generate_entry_js(
         .map_err(|e| format!("failed to serialize marker table: {e}"))?;
     let events_json = serde_json::to_string(events)
         .map_err(|e| format!("failed to serialize event table: {e}"))?;
+    let refs_json = serde_json::to_string(&map_runtime_ref_bindings(ir)?)
+        .map_err(|e| format!("failed to serialize ref table: {e}"))?;
 
     let mut js = zenith_bundler::utils::generate_virtual_entry(&compiler_output);
     js.push_str("\nconst __zenith_component_bootstraps = [];\n");
@@ -2880,6 +2887,7 @@ fn generate_entry_js(
     }
     js.push_str(&format!("\nconst __zenith_markers = {};\n", markers_json));
     js.push_str(&format!("const __zenith_events = {};\n", events_json));
+    js.push_str(&format!("const __zenith_refs = {};\n", refs_json));
     let signals_json = serde_json::to_string(&ir.signals)
         .map_err(|e| format!("failed to serialize signal table: {e}"))?;
     let expression_bindings_json = if ir.expression_bindings.is_empty() {
@@ -3008,6 +3016,7 @@ fn generate_entry_js(
     js.push_str("    expressions: __zenith_expression_bindings,\n");
     js.push_str("    markers: __zenith_markers,\n");
     js.push_str("    events: __zenith_events,\n");
+    js.push_str("    refs: __zenith_refs,\n");
     js.push_str("    state_values: __zenith_state_values,\n");
     js.push_str("    state_keys: __zenith_state_keys,\n");
     js.push_str("    signals: __zenith_signals,\n");
@@ -3046,6 +3055,49 @@ fn generate_state_table_js(bindings: &[CompilerStateBinding]) -> Result<String, 
     }
     out.push_str("];\n");
     Ok(out)
+}
+
+fn map_runtime_ref_bindings(ir: &CompilerIr) -> Result<Vec<RuntimeRefBinding>, String> {
+    let mut out = Vec::new();
+    for binding in &ir.ref_bindings {
+        let Some(state_index) = resolve_ref_state_index(&ir.hoisted.state, &binding.identifier) else {
+            return Err(format!(
+                "failed to resolve ref binding '{}' to hoisted state key",
+                binding.identifier
+            ));
+        };
+        out.push(RuntimeRefBinding {
+            index: binding.index,
+            state_index,
+            selector: binding.selector.clone(),
+        });
+    }
+    Ok(out)
+}
+
+fn resolve_ref_state_index(bindings: &[CompilerStateBinding], identifier: &str) -> Option<usize> {
+    if identifier.is_empty() {
+        return None;
+    }
+
+    for (index, binding) in bindings.iter().enumerate() {
+        if binding.key == identifier {
+            return Some(index);
+        }
+    }
+
+    let suffix = format!("_{}", identifier);
+    let mut match_index: Option<usize> = None;
+    for (index, binding) in bindings.iter().enumerate() {
+        if binding.key.ends_with(&suffix) {
+            if match_index.is_some() {
+                return None;
+            }
+            match_index = Some(index);
+        }
+    }
+
+    match_index
 }
 
 fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, String> {

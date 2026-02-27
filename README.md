@@ -5,6 +5,11 @@
 
 Zero-Cost Abstraction Bundler for the Zenith Framework.
 
+## Canonical Docs
+
+- Bundler contract: `../zenith-docs/documentation/contracts/bundler-contract.md`
+- Script boundary contract: `../zenith-docs/documentation/contracts/script-boundary.md`
+
 ## Overview
 
 The Zenith Bundler provides capability-based runtime chunking, CSS pruning, and deferred hydration for optimal production builds. Instead of shipping a monolithic runtime, it selectively includes only the capabilities used by each page.

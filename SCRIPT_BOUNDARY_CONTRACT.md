@@ -1,5 +1,8 @@
 # Zenith V0 Script Boundary Contract
 
+Canonical public docs: `../zenith-docs/documentation/contracts/script-boundary.md`
+
+
 Status: FROZEN (V0)
 
 This contract defines script emission authority, injection semantics, and runtime/bootstrap boundaries for Zenith V0.
