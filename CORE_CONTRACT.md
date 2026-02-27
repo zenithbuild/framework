@@ -1,5 +1,7 @@
 # CORE_CONTRACT.md — Deterministic Utility Substrate
 
+Canonical public docs: `../zenith-docs/documentation/contracts/core-contract.md`
+
 > **This document is a legal boundary.**
 > Core is a shared utility layer. It contains no business logic,
 > no routing, no DOM, no framework behavior. Pure helper substrate only.

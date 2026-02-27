@@ -2,6 +2,11 @@
 
 This is the **sole public entrypoint** for the Zenith framework. 
 
+## Canonical Docs
+
+- Core contract: `../zenith-docs/documentation/contracts/core-contract.md`
+- Zenith contract: `../zenith-docs/documentation/zenith-contract.md`
+
 Use this package directly in your projects to run Zenith utilities and access the official APIs.
 
 ## Installation
