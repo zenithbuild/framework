@@ -1,5 +1,8 @@
 # COMPILER BOUNDARY FREEZE
 
+Canonical public docs: `../zenith-docs/documentation/contracts/compiler-boundary.md`
+
+
 > This document is a binding contract. The compiler must never violate these boundaries.
 
 ## The Compiler WILL NOT:

@@ -1,5 +1,8 @@
 # Component Script Hoisting Contract (Zenith V0)
 
+Canonical public docs: `../zenith-docs/documentation/contracts/component-script-hoisting.md`
+
+
 ## Purpose
 Component `<script>` blocks are compile-time artifacts. They are not runtime component lifecycles.
 

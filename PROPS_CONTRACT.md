@@ -1,5 +1,8 @@
 # Props Contract (Zenith V0 Planning Freeze)
 
+Canonical public docs: `../zenith-docs/documentation/contracts/props-contract.md`
+
+
 Status: DRAFT-FROZEN (NO IMPLEMENTATION IN V0)
 
 This document locks the props mental model before code changes.

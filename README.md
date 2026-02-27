@@ -5,6 +5,12 @@
 
 The Iron Heart of the Zenith framework. High-performance native compiler and build-time architect.
 
+## Canonical Docs
+
+- Compiler boundary: `../zenith-docs/documentation/contracts/compiler-boundary.md`
+- IR envelope: `../zenith-docs/documentation/contracts/ir-envelope.md`
+- Component script hoisting: `../zenith-docs/documentation/contracts/component-script-hoisting.md`
+
 ## Overview
 
 @zenithbuild/compiler owns everything related to structure, wiring, and validation. It is a coordinated companion to `@zenithbuild/core`.

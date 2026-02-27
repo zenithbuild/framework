@@ -1,5 +1,8 @@
 # IR Envelope Contract (Zenith V0)
 
+Canonical public docs: `../zenith-docs/documentation/contracts/ir-envelope.md`
+
+
 Status: FROZEN
 
 This contract defines the compiler-to-bundler IR envelope for V0 process seams.
