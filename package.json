@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "0.5.0-beta.2.19",
+  "version": "0.5.0-beta.2.20",
   "scripts": {
     "build": "cargo build --release",
     "contract:deps": "node dependency_contract.spec.js",
@@ -25,8 +25,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@zenithbuild/router": "0.5.0-beta.2.19",
-    "@zenithbuild/runtime": "0.5.0-beta.2.19",
+    "@zenithbuild/router": "0.5.0-beta.2.20",
+    "@zenithbuild/runtime": "0.5.0-beta.2.20",
     "chokidar": "^5.0.0",
     "esbuild": "^0.27.3",
     "express": "^4.21.2",
