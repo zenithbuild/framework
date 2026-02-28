@@ -626,6 +626,56 @@ describe('build orchestration', () => {
         expect(warned.some((line) => line.includes("Did you mean 'click'?"))).toBe(true);
     });
 
+    test('emitted JS never contains injected querySelector/addEventListener fallbacks (drift killer)', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script lang="ts">',
+                'const navRef = ref<HTMLElement>();',
+                'zenMount((ctx) => { ctx.cleanup(() => {}); });',
+                '</script>',
+                '<main><nav ref={navRef}>Nav</nav></main>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+
+        const manifestPath = join(project.outDir, 'manifest.json');
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+        const chunkPaths = Object.values(manifest.chunks || {});
+
+        // Drift killer: CLI must never inject these. Framework (router, runtime) may use root.getElementById etc.
+        const forbidden = [
+            /document\.querySelector\s*\(/,
+            /document\.querySelectorAll\s*\(/,
+            /document\.getElementById\s*\(/
+        ];
+
+        for (const chunkRel of chunkPaths) {
+            const chunkPath = join(project.outDir, chunkRel.replace(/^\//, ''));
+            const content = await readFile(chunkPath, 'utf8');
+            for (const pattern of forbidden) {
+                expect(content).not.toMatch(pattern);
+            }
+        }
+
+        const componentsDir = join(project.outDir, 'assets', 'components');
+        let componentFiles = [];
+        try {
+            const entries = await readdir(componentsDir, { withFileTypes: true });
+            componentFiles = entries
+                .filter((e) => e.isFile() && e.name.endsWith('.js'))
+                .map((e) => join(componentsDir, e.name));
+        } catch {
+            // No components dir is fine
+        }
+        for (const file of componentFiles) {
+            const content = await readFile(file, 'utf8');
+            for (const pattern of forbidden) {
+                expect(content).not.toMatch(pattern);
+            }
+        }
+    });
+
     test('deduplicates repeated compiler warning lines in one build pass', () => {
         const warned = [];
         const emit = createCompilerWarningEmitter((line) => warned.push(line));

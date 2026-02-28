@@ -107,6 +107,9 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOption
     if (compilerOpts?.experimentalEmbeddedMarkup) {
         args.push('--embedded-markup-expressions');
     }
+    if (compilerOpts?.strictDomLints) {
+        args.push('--strict-dom-lints');
+    }
     const opts = { encoding: 'utf8' };
     if (stdinSource !== undefined) {
         opts.input = stdinSource;
@@ -817,11 +820,7 @@ function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStati
                 : rebased;
             const withPropsPrelude = injectPropsPrelude(filteredImports, options.componentAttrs || '');
             const transpiled = transpileTypeScriptToJs(withPropsPrelude, compPath);
-            const withRefFallbacks = injectRefFallbacksInZenMount(
-                transpiled,
-                options.refFallbacks || []
-            );
-            const deduped = dedupeStaticImportsInSource(withRefFallbacks, seenStaticImports);
+            const deduped = dedupeStaticImportsInSource(transpiled, seenStaticImports);
             const deferred = deferComponentRuntimeBlock(deduped);
             if (deferred.trim().length > 0 && !pageIr.hoisted.code.includes(deferred)) {
                 pageIr.hoisted.code.push(deferred);
@@ -1232,96 +1231,6 @@ function deferComponentRuntimeBlock(source) {
 }
 
 /**
- * @param {string} componentSource
- * @returns {Array<{ identifier: string, selector: string }>}
- */
-function extractRefFallbackAssignments(componentSource) {
-    const template = extractTemplate(componentSource);
-    const tagRe = /<[^>]*ref=\{([A-Za-z_$][A-Za-z0-9_$]*)\}[^>]*>/g;
-    const out = [];
-    const seen = new Set();
-
-    let match;
-    while ((match = tagRe.exec(template)) !== null) {
-        const tag = match[0];
-        const identifier = match[1];
-        const attrMatch = tag.match(/\b(data-[a-z0-9-]+-runtime)\b/i)
-            || tag.match(/\b(data-[a-z0-9-]+)\b/i);
-        if (!attrMatch) {
-            continue;
-        }
-
-        const selector = `[${attrMatch[1]}]`;
-        const key = `${identifier}:${selector}`;
-        if (seen.has(key)) {
-            continue;
-        }
-        seen.add(key);
-        out.push({ identifier, selector });
-    }
-
-    return out;
-}
-
-/**
- * @param {string} source
- * @param {string} originalIdentifier
- * @returns {string | null}
- */
-function resolveRenamedRefIdentifier(source, originalIdentifier) {
-    const re = /const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*ref\s*\(/g;
-    let match;
-    while ((match = re.exec(source)) !== null) {
-        const candidate = match[1];
-        if (candidate === originalIdentifier || candidate.endsWith(`_${originalIdentifier}`)) {
-            return candidate;
-        }
-    }
-    return null;
-}
-
-/**
- * @param {string} source
- * @param {Array<{ identifier: string, selector: string }>} refFallbacks
- * @returns {string}
- */
-function injectRefFallbacksInZenMount(source, refFallbacks) {
-    if (!Array.isArray(refFallbacks) || refFallbacks.length === 0) {
-        return source;
-    }
-
-    const lines = [];
-    for (let i = 0; i < refFallbacks.length; i++) {
-        const fallback = refFallbacks[i];
-        const refIdentifier = resolveRenamedRefIdentifier(source, fallback.identifier);
-        if (!refIdentifier) {
-            continue;
-        }
-        const selector = JSON.stringify(fallback.selector);
-        const nodeVar = `__zenith_ref_node_${i}`;
-        lines.push(
-            `    if (typeof document !== 'undefined' && ${refIdentifier} && !${refIdentifier}.current) {`,
-            `        const ${nodeVar} = document.querySelector(${selector});`,
-            `        if (${nodeVar}) {`,
-            `            ${refIdentifier}.current = ${nodeVar};`,
-            '        }',
-            '    }'
-        );
-    }
-
-    if (lines.length === 0) {
-        return source;
-    }
-
-    const mountRe = /zenMount\s*\(\s*\([^)]*\)\s*=>\s*\{/;
-    if (!mountRe.test(source)) {
-        return source;
-    }
-
-    return source.replace(mountRe, (match) => `${match}\n${lines.join('\n')}\n`);
-}
-
-/**
  * Run bundler process for one page envelope.
  *
  * @param {object|object[]} envelope
@@ -1409,7 +1318,8 @@ export async function build(options) {
     const softNavigationEnabled = config.softNavigation === true || config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
-        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true || config.experimental?.embeddedMarkupExpressions === true
+        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true || config.experimental?.embeddedMarkupExpressions === true,
+        strictDomLints: config.strictDomLints === true
     };
 
     await rm(outDir, { recursive: true, force: true });
@@ -1432,8 +1342,6 @@ export async function build(options) {
     const componentIrCache = new Map();
     /** @type {Map<string, boolean>} */
     const componentDocumentModeCache = new Map();
-    /** @type {Map<string, Array<{ identifier: string, selector: string }>>} */
-    const componentRefFallbackCache = new Map();
     /** @type {Map<string, { map: Map<string, string>, ambiguous: Set<string> }>} */
     const componentExpressionRewriteCache = new Map();
     const emitCompilerWarning = createCompilerWarningEmitter((line) => console.warn(line));
@@ -1527,12 +1435,9 @@ export async function build(options) {
             }
 
             let isDocMode = componentDocumentModeCache.get(compPath);
-            let refFallbacks = componentRefFallbackCache.get(compPath);
             if (isDocMode === undefined) {
                 isDocMode = isDocumentMode(extractTemplate(componentSource));
-                refFallbacks = extractRefFallbackAssignments(componentSource);
                 componentDocumentModeCache.set(compPath, isDocMode);
-                componentRefFallbackCache.set(compPath, refFallbacks);
             }
 
             let expressionRewrite = componentExpressionRewriteCache.get(compPath);
@@ -1556,8 +1461,7 @@ export async function build(options) {
                     includeCode: true,
                     cssImportsOnly: isDocMode,
                     documentMode: isDocMode,
-                    componentAttrs: (componentUsageAttrs.get(compName) || [])[0] || '',
-                    refFallbacks: refFallbacks || []
+                    componentAttrs: (componentUsageAttrs.get(compName) || [])[0] || ''
                 },
                 seenStaticImports
             );
