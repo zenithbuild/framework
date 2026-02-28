@@ -1,7 +1,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use zenith_compiler::compiler::compile_structured_with_source;
+use zenith_compiler::compiler::{
+    compile_structured_with_source, compile_structured_with_source_options_and_warnings,
+    CompileOptions,
+};
 
 fn fixture_root(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!(
@@ -86,15 +89,43 @@ fn nested_component_scripts_are_rejected() {
 fn forbidden_component_script_tokens_fail_with_precise_message() {
     let input = r#"
 <script lang="ts">
-document.querySelector('#x')
+setTimeout(() => {})
 </script>
 <div>Hello</div>
 "#;
 
     let msg = compile_structured_with_source(input, "/tmp/Bad.zen")
-        .expect_err("forbidden DOM access should return contract error");
+        .expect_err("forbidden setTimeout should return contract error");
 
     assert!(msg.contains("Zenith requires TypeScript scripts. Add lang=\"ts\"."));
     assert!(msg.contains("Component scripts cannot create runtime scope boundaries"));
     assert!(msg.contains("/tmp/Bad.zen#script0"));
+}
+
+#[test]
+fn document_query_selector_emits_zen_dom_query_warning() {
+    let input = r#"
+<script lang="ts">
+document.querySelector('#x')
+</script>
+<div>Hello</div>
+"#;
+
+    let (output, warnings) = compile_structured_with_source_options_and_warnings(
+        input,
+        "/tmp/Page.zen",
+        CompileOptions::default(),
+    )
+    .expect("document.querySelector should compile with warning");
+
+    assert!(!output.html.is_empty());
+    let dom_query_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.code == "ZEN-DOM-QUERY")
+        .collect();
+    assert!(
+        !dom_query_warnings.is_empty(),
+        "expected ZEN-DOM-QUERY warning for querySelector, got: {:?}",
+        warnings
+    );
 }

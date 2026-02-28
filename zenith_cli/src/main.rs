@@ -21,6 +21,10 @@ struct Cli {
     /// Enable embedded markup literals inside { ... } expressions.
     #[arg(long = "embedded-markup-expressions")]
     embedded_markup_expressions: bool,
+
+    /// Treat ZEN-DOM-* warnings as build failures.
+    #[arg(long = "strict-dom-lints")]
+    strict_dom_lints: bool,
 }
 
 fn main() -> Result<()> {
@@ -53,14 +57,18 @@ fn main() -> Result<()> {
         &original_path,
         CompileOptions {
             embedded_markup_expressions: cli.embedded_markup_expressions,
+            strict_dom_lints: cli.strict_dom_lints,
         },
     )
     .map_err(anyhow::Error::msg)?;
-    for warning in warnings {
+    for warning in &warnings {
         eprintln!(
             "{}:{}:{}: warning[{}] {}",
             original_path, warning.line, warning.column, warning.code, warning.message
         );
+    }
+    if cli.strict_dom_lints && warnings.iter().any(|w| w.code.starts_with("ZEN-DOM-")) {
+        std::process::exit(1);
     }
     let hoisted_state = output
         .hoisted
@@ -142,7 +150,23 @@ fn main() -> Result<()> {
     }
     let graph_hash = compute_graph_hash(&output);
 
+    let warnings_json: Vec<serde_json::Value> = warnings
+        .iter()
+        .map(|w| {
+            serde_json::json!({
+                "code": w.code,
+                "message": w.message,
+                "severity": "warning",
+                "range": {
+                    "start": { "line": w.line, "column": w.column },
+                    "end": { "line": w.line, "column": w.column + 1 }
+                }
+            })
+        })
+        .collect();
+
     let json = serde_json::json!({
+        "schemaVersion": 1,
         "ir_version": output.ir_version,
         "graph_hash": graph_hash,
         "graph_edges": output.graph_edges,
@@ -165,7 +189,8 @@ fn main() -> Result<()> {
         "signals": signals,
         "expression_bindings": expression_bindings,
         "marker_bindings": marker_bindings,
-        "event_bindings": event_bindings
+        "event_bindings": event_bindings,
+        "warnings": warnings_json
     });
 
     println!(

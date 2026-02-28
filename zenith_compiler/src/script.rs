@@ -128,9 +128,10 @@ impl HoistedOutput {
 pub fn extract_script_blocks(
     input: &str,
     source_path: &str,
-) -> Result<(String, Vec<HoistedScript>), ScriptContractError> {
+) -> Result<(String, Vec<HoistedScript>, Vec<ScriptDomLint>), ScriptContractError> {
     let mut output = String::new();
     let mut scripts = Vec::new();
+    let mut dom_lints = Vec::new();
 
     let mut cursor = 0usize;
     let mut script_id = 0usize;
@@ -183,6 +184,14 @@ pub fn extract_script_blocks(
         )?;
         scripts.push(analyzed);
 
+        let line_offset = input[..=open_end].matches('\n').count();
+        dom_lints.extend(collect_dom_lint_warnings(
+            script_source,
+            source_path,
+            script_id,
+            line_offset,
+        ));
+
         cursor = close_end;
         script_id += 1;
     }
@@ -192,10 +201,10 @@ pub fn extract_script_blocks(
     // Preserve legacy structural behavior for script-only files.
     // Hoisting only activates when a script contributes to a non-script tree.
     if !scripts.is_empty() && output.trim().is_empty() {
-        return Ok((input.to_string(), Vec::new()));
+        return Ok((input.to_string(), Vec::new(), Vec::new()));
     }
 
-    Ok((output, scripts))
+    Ok((output, scripts, dom_lints))
 }
 
 fn validate_script_tag_contract(
@@ -732,15 +741,101 @@ fn generate_factory_code(
     lines.join("\n")
 }
 
+/// DOM lint warning emitted by script scan. Same shape as CompileWarning.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptDomLint {
+    pub code: String,
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+/// Collect ZEN-DOM-* lint warnings from script source. Does not fail compilation.
+pub fn collect_dom_lint_warnings(
+    source: &str,
+    _source_path: &str,
+    _script_id: usize,
+    line_offset: usize,
+) -> Vec<ScriptDomLint> {
+    let mut warnings = Vec::new();
+    let lines: Vec<&str> = source.lines().collect();
+
+    for (i, line) in lines.iter().enumerate() {
+        let line_num = line_offset + i + 1;
+        let prev_line = if i > 0 { lines[i - 1] } else { "" };
+
+        // ZEN-DOM-QUERY (with escape hatch)
+        for (pattern, name) in [
+            (r"querySelector\s*\(", "querySelector"),
+            (r"querySelectorAll\s*\(", "querySelectorAll"),
+            (r"getElementById\s*\(", "getElementById"),
+        ] {
+            if Regex::new(pattern).unwrap().is_match(line) {
+                let suppressed = prev_line
+                    .trim()
+                    .starts_with("//")
+                    && prev_line.contains("zen-allow:dom-query");
+                if !suppressed {
+                    let col = line.find(name).unwrap_or(0) + 1;
+                    warnings.push(ScriptDomLint {
+                        code: "ZEN-DOM-QUERY".to_string(),
+                        message: "Use ref<T>() + zenMount for DOM nodes, or collectRefs() for multiple refs. Suppress with // zen-allow:dom-query <reason>".to_string(),
+                        line: line_num,
+                        column: col,
+                    });
+                }
+            }
+        }
+
+        // ZEN-DOM-LISTENER
+        if Regex::new(r"\.addEventListener\s*\(").unwrap().is_match(line) {
+            let col = line.find(".addEventListener").unwrap_or(0) + 1;
+            warnings.push(ScriptDomLint {
+                code: "ZEN-DOM-LISTENER".to_string(),
+                message: "Use zenOn(target, eventName, handler, options?) and register disposer via zenMount ctx.cleanup.".to_string(),
+                line: line_num,
+                column: col,
+            });
+        }
+
+        // ZEN-DOM-WRAPPER: detect SSR guard patterns (typeof window/document === 'undefined' ? ... : ...)
+        if Regex::new(r#"typeof\s+(?:window|document)\s*===\s*["']undefined["']"#)
+            .unwrap()
+            .is_match(line)
+            || Regex::new(r#"typeof\s+(?:window|document)\s*!==\s*["']undefined["']"#)
+                .unwrap()
+                .is_match(line)
+        {
+            let col = line.find("typeof").unwrap_or(0) + 1;
+            warnings.push(ScriptDomLint {
+                code: "ZEN-DOM-WRAPPER".to_string(),
+                message: "Use zenWindow() / zenDocument().".to_string(),
+                line: line_num,
+                column: col,
+            });
+        }
+        if Regex::new(r"globalThis\.(?:window|document)\b").unwrap().is_match(line) {
+            let col = line.find("globalThis").unwrap_or(0) + 1;
+            warnings.push(ScriptDomLint {
+                code: "ZEN-DOM-WRAPPER".to_string(),
+                message: "Use zenWindow() / zenDocument().".to_string(),
+                line: line_num,
+                column: col,
+            });
+        }
+    }
+
+    warnings
+}
+
 fn assert_no_forbidden_tokens(
     source: &str,
     source_path: &str,
     script_id: usize,
 ) -> Result<(), ScriptContractError> {
+    // document.* and window.* removed: now ZEN-DOM-* lints instead of hard-fail
     let forbidden = [
         (r"\bonMount\s*\(", "onMount() lifecycle hooks"),
-        (r"\bdocument\.", "DOM access via document.*"),
-        (r"\bwindow\.", "DOM/global access via window.*"),
         (r"\bsetTimeout\s*\(", "timer scheduling via setTimeout()"),
         (r"\bwith\s*\(", "`with (...)` usage"),
         (r"\beval\s*\(", "eval() usage"),

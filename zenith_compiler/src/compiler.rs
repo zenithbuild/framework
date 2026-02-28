@@ -14,6 +14,7 @@ pub const IR_VERSION: u32 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CompileOptions {
     pub embedded_markup_expressions: bool,
+    pub strict_dom_lints: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -314,7 +315,7 @@ fn compile_internal_result(
     ),
     String,
 > {
-    let (preprocessed, scripts) =
+    let (preprocessed, scripts, dom_lints) =
         extract_script_blocks(input, source_path).map_err(|err| err.message)?;
     let normalized = strip_html_comments(&preprocessed);
 
@@ -323,7 +324,34 @@ fn compile_internal_result(
         options.embedded_markup_expressions,
     );
     let ast = parser.parse();
-    Ok(transform(ast, &scripts))
+    let (
+        ast,
+        expressions,
+        hoisted,
+        component_scripts,
+        component_instances,
+        markers,
+        events,
+        ref_bindings,
+        mut warnings,
+    ) = transform(ast, &scripts);
+    warnings.extend(dom_lints.into_iter().map(|l| TransformWarning {
+        code: l.code,
+        message: l.message,
+        line: l.line,
+        column: l.column,
+    }));
+    Ok((
+        ast,
+        expressions,
+        hoisted,
+        component_scripts,
+        component_instances,
+        markers,
+        events,
+        ref_bindings,
+        warnings,
+    ))
 }
 
 fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {

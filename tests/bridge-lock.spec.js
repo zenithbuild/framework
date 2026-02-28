@@ -75,3 +75,34 @@ test('compile is deterministic for identical input', () => {
 
   assert.deepEqual(first, second)
 })
+
+test('compiler JSON contract: schemaVersion and warnings array exist', () => {
+  const fixturePath = path.join(projectRoot, 'tests', 'fixture.zen')
+  const result = compiler.compile(fixturePath)
+
+  assert.ok('schemaVersion' in result, 'JSON must include schemaVersion for LSP branching')
+  assert.equal(result.schemaVersion, 1, 'schemaVersion must be 1')
+  assert.ok('warnings' in result, 'JSON must include warnings key')
+  assert.ok(Array.isArray(result.warnings), 'warnings must be an array')
+
+  for (const w of result.warnings) {
+    assert.ok('code' in w, `warning must have code: ${JSON.stringify(w)}`)
+    assert.ok('message' in w, `warning must have message: ${JSON.stringify(w)}`)
+    assert.ok('severity' in w, `warning must have severity: ${JSON.stringify(w)}`)
+    assert.ok('range' in w, `warning must have range: ${JSON.stringify(w)}`)
+    assert.ok(w.range && 'start' in w.range, `warning.range must have start: ${JSON.stringify(w)}`)
+    assert.ok(w.range && 'end' in w.range, `warning.range must have end: ${JSON.stringify(w)}`)
+  }
+})
+
+test('compiler JSON contract: warnings shape when warnings exist', () => {
+  const source = '<script lang="ts">\nconst el = document.querySelector(".x");\n</script>\n<div class="x"></div>'
+  const result = compiler.compile(source, '/tmp/test.zen')
+
+  assert.ok(result.warnings.length >= 1, 'querySelector should produce ZEN-DOM-QUERY warning')
+  const w = result.warnings[0]
+  assert.equal(w.code, 'ZEN-DOM-QUERY')
+  assert.ok(typeof w.message === 'string')
+  assert.ok(w.range.start.line >= 1 && w.range.start.column >= 1)
+  assert.ok(w.range.end.line >= 1 && w.range.end.column >= 1)
+})

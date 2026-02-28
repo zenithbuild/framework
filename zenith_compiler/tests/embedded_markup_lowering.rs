@@ -8,6 +8,7 @@ fn compile_with_embedded_markup(input: &str) -> Result<CompilerOutput, String> {
         "/virtual/embedded-markup.zen",
         CompileOptions {
             embedded_markup_expressions: true,
+            strict_dom_lints: false,
         },
     )
 }
