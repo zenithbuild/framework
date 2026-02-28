@@ -141,7 +141,7 @@ describe('preview.executeServerScript', () => {
 
         expect(payload).not.toBeNull();
         expect(payload.__zenith_error).toBeDefined();
-        expect(payload.__zenith_error.code).toBe('LOAD_FAILED');
+        expect(payload.__zenith_error.code).toBe('ACCESS_DENIED');
     });
 
     test('load(ctx) receives route params/url/route metadata for static routes', async () => {

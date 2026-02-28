@@ -15,7 +15,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateManifest } from './manifest.js';
 import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMode } from './resolve-components.js';
@@ -487,7 +487,7 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
     const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     const serverMatches = [];
     const reservedServerExportRe =
-        /\bexport\s+const\s+(?:data|prerender)\b|\bexport\s+(?:async\s+)?function\s+load\s*\(|\bexport\s+const\s+load\s*=/;
+        /\bexport\s+const\s+(?:data|prerender|guard|load)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard)\s*\(|\bexport\s+const\s+(?:load|guard)\s*=/;
 
     for (const match of source.matchAll(scriptRe)) {
         const attrs = String(match[1] || '');
@@ -498,8 +498,8 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
-                `  Reason: data/load/prerender exports are only allowed in <script server lang="ts">\n` +
-                `  Example: move export const data or export const load into <script server lang="ts">`
+                `  Reason: guard/load/data exports are only allowed in <script server lang="ts"> or adjacent .guard.ts / .load.ts files\n` +
+                `  Example: move the export into <script server lang="ts">`
             );
         }
 
@@ -570,6 +570,25 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
+    const guardFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+guard\s*\(([^)]*)\)/);
+    const guardConstParenMatch = serverSource.match(/\bexport\s+const\s+guard\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
+    const guardConstSingleArgMatch = serverSource.match(
+        /\bexport\s+const\s+guard\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
+    );
+    const hasGuard = Boolean(guardFnMatch || guardConstParenMatch || guardConstSingleArgMatch);
+    const guardMatchCount =
+        Number(Boolean(guardFnMatch)) +
+        Number(Boolean(guardConstParenMatch)) +
+        Number(Boolean(guardConstSingleArgMatch));
+    if (guardMatchCount > 1) {
+        throw new Error(
+            `Zenith server script contract violation:\n` +
+            `  File: ${sourceFile}\n` +
+            `  Reason: multiple guard exports detected\n` +
+            `  Example: keep exactly one export const guard = async (ctx) => ({ ... })`
+        );
+    }
+
     const hasData = /\bexport\s+const\s+data\b/.test(serverSource);
     const hasSsrData = /\bexport\s+const\s+ssr_data\b/.test(serverSource);
     const hasSsr = /\bexport\s+const\s+ssr\b/.test(serverSource);
@@ -610,6 +629,24 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
         }
     }
 
+    if (hasGuard) {
+        const singleArg = String(guardConstSingleArgMatch?.[1] || '').trim();
+        const paramsText = String((guardFnMatch || guardConstParenMatch)?.[1] || '').trim();
+        const arity = singleArg
+            ? 1
+            : paramsText.length === 0
+                ? 0
+                : paramsText.split(',').length;
+        if (arity !== 1) {
+            throw new Error(
+                `Zenith server script contract violation:\n` +
+                `  File: ${sourceFile}\n` +
+                `  Reason: guard(ctx) must accept exactly one argument\n` +
+                `  Example: export const guard = async (ctx) => ({ ... })`
+            );
+        }
+    }
+
     const prerenderMatch = serverSource.match(/\bexport\s+const\s+prerender\s*=\s*([^\n;]+)/);
     let prerender = false;
     if (prerenderMatch) {
@@ -631,6 +668,8 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
             serverScript: {
                 source: serverSource,
                 prerender,
+                has_guard: hasGuard,
+                has_load: hasLoad,
                 source_path: sourceFile
             }
         };
@@ -644,6 +683,8 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
         serverScript: {
             source: serverSource,
             prerender,
+            has_guard: hasGuard,
+            has_load: hasLoad,
             source_path: sourceFile
         }
     };
@@ -1403,6 +1444,14 @@ export async function build(options) {
         const rawSource = readFileSync(sourceFile, 'utf8');
         const componentUsageAttrs = collectComponentUsageAttrs(rawSource, registry);
 
+        const baseName = sourceFile.slice(0, -extname(sourceFile).length);
+        let adjacentGuard = null;
+        let adjacentLoad = null;
+        for (const ext of ['.ts', '.js']) {
+            if (!adjacentGuard && existsSync(`${baseName}.guard${ext}`)) adjacentGuard = `${baseName}.guard${ext}`;
+            if (!adjacentLoad && existsSync(`${baseName}.load${ext}`)) adjacentLoad = `${baseName}.load${ext}`;
+        }
+
         // 2a. Expand PascalCase component tags
         const { expandedSource, usedComponents } = expandComponents(
             rawSource, registry, sourceFile
@@ -1417,6 +1466,10 @@ export async function build(options) {
             compilerOpts,
             { onWarning: emitCompilerWarning }
         );
+
+        const hasGuard = (extractedServer.serverScript && extractedServer.serverScript.has_guard) || adjacentGuard !== null;
+        const hasLoad = (extractedServer.serverScript && extractedServer.serverScript.has_load) || adjacentLoad !== null;
+
         if (extractedServer.serverScript) {
             pageIr.server_script = extractedServer.serverScript;
             pageIr.prerender = extractedServer.serverScript.prerender === true;
@@ -1424,6 +1477,20 @@ export async function build(options) {
                 pageIr.ssr_data = null;
             }
         }
+
+        // Static Build Route Protection Policy
+        if (pageIr.prerender === true && (hasGuard || hasLoad)) {
+            throw new Error(
+                `[zenith] Build failed for ${entry.file}: protected routes require SSR/runtime. ` +
+                `Cannot prerender a static route with a \`guard\` or \`load\` function.`
+            );
+        }
+
+        // Apply metadata to IR
+        pageIr.has_guard = hasGuard;
+        pageIr.has_load = hasLoad;
+        pageIr.guard_module_ref = adjacentGuard ? relative(srcDir, adjacentGuard).replaceAll('\\', '/') : null;
+        pageIr.load_module_ref = adjacentLoad ? relative(srcDir, adjacentLoad).replaceAll('\\', '/') : null;
 
         // Ensure IR has required array fields for merging
         pageIr.components_scripts = pageIr.components_scripts || {};

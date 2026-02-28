@@ -57,7 +57,7 @@ async function evaluateBuiltModule(source, identifier) {
         setInterval,
         clearInterval,
         requestAnimationFrame: () => 1,
-        cancelAnimationFrame: () => {},
+        cancelAnimationFrame: () => { },
         location: { pathname: '/', href: 'http://localhost/' },
         window: {
             location: { pathname: '/', href: 'http://localhost/' },
@@ -94,7 +94,7 @@ async function evaluateBuiltModule(source, identifier) {
         const module = new SyntheticModule(
             sharedExports,
             function () {
-                const noop = () => {};
+                const noop = () => { };
                 const signalLike = (value) => ({
                     get: () => value,
                     set: noop
@@ -498,14 +498,15 @@ describe('build orchestration', () => {
         expect(stateEntryMatch).toBeTruthy();
         const hoistedItemIdent = stateEntryMatch?.[1];
         expect(typeof hoistedItemIdent).toBe('string');
-        expect(pageAsset.includes(`const ${hoistedItemIdent} = [{`)).toBe(true);
+        expect(pageAsset).toMatch(new RegExp(`(?:var|const|let) ${hoistedItemIdent} = \\[\{`));
 
-        const declarationIndex = pageAsset.indexOf(`const ${hoistedItemIdent} = [{`);
+        const declarationMatch = pageAsset.match(new RegExp(`(?:var|const|let) ${hoistedItemIdent} = \\[\{`));
+        const declarationIndex = declarationMatch ? declarationMatch.index : -1;
         const bootstrapIndex = pageAsset.indexOf('__zenith_component_bootstraps.push(() => {');
         expect(declarationIndex).toBeGreaterThanOrEqual(0);
         expect(bootstrapIndex).toBeGreaterThanOrEqual(0);
         expect(declarationIndex).toBeLessThan(bootstrapIndex);
-        expect(pageAsset.includes('zenMount(() => {')).toBe(true);
+        expect(pageAsset).toMatch(/zenMount\((?:(?:function\s*\(\)\s*\{)|\(\)\s*=>\s*\{)/);
     });
 
     test('injects document-mode props so layout expressions do not render raw literals', async () => {
@@ -547,7 +548,7 @@ describe('build orchestration', () => {
         const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
 
-        expect(pageAsset.includes('const props = { pageTitle: "About Page" };')).toBe(true);
+        expect(pageAsset).toMatch(/(?:var|const|let) props = \{ pageTitle: "About Page" \};/);
         expect(pageAsset.includes('"literal":"resolvedTitle"')).toBe(false);
         expect(pageAsset.includes('resolvedTitle')).toBe(true);
     });

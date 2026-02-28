@@ -47,6 +47,7 @@ const requestHeaders = JSON.parse(process.env.ZENITH_SERVER_REQUEST_HEADERS || '
 const routePattern = process.env.ZENITH_SERVER_ROUTE_PATTERN || '';
 const routeFile = process.env.ZENITH_SERVER_ROUTE_FILE || sourcePath || '';
 const routeId = process.env.ZENITH_SERVER_ROUTE_ID || routePattern || '';
+const guardOnly = process.env.ZENITH_SERVER_GUARD_ONLY === '1';
 
 if (!source.trim()) {
   process.stdout.write('null');
@@ -363,7 +364,8 @@ try {
   const resolved = await context.resolveRouteResult({
     exports: exported,
     ctx: context.ctx,
-    filePath: sourcePath || 'server_script'
+    filePath: sourcePath || 'server_script',
+    guardOnly: guardOnly
   });
 
   process.stdout.write(JSON.stringify(resolved || null));
@@ -395,8 +397,29 @@ export async function createPreviewServer(options) {
 
     try {
       if (url.pathname === '/__zenith/route-check') {
+        // Security: Require explicitly designated header to prevent public oracle probing
+        if (req.headers['x-zenith-route-check'] !== '1') {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden', message: 'invalid request context' }));
+          return;
+        }
+
         const targetPath = String(url.searchParams.get('path') || '/');
+
+        // Security: Prevent protocol/domain injection in path
+        if (targetPath.includes('://') || targetPath.startsWith('//') || /[\r\n]/.test(targetPath)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid_path_format' }));
+          return;
+        }
+
         const targetUrl = new URL(targetPath, `http://localhost:${port}`);
+        if (targetUrl.origin !== `http://localhost:${port}`) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
+          return;
+        }
+
         const routes = await loadRouteManifest(distDir);
         const resolvedCheck = resolveRequestRoute(targetUrl, routes);
         if (!resolvedCheck.matched || !resolvedCheck.route) {
@@ -414,10 +437,36 @@ export async function createPreviewServer(options) {
           requestHeaders: req.headers,
           routePattern: resolvedCheck.route.path,
           routeFile: resolvedCheck.route.server_script_path || '',
-          routeId: resolvedCheck.route.route_id || routeIdFromSourcePath(resolvedCheck.route.server_script_path || '')
+          routeId: resolvedCheck.route.route_id || routeIdFromSourcePath(resolvedCheck.route.server_script_path || ''),
+          guardOnly: true
         });
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(checkResult));
+        // Security: Enforce relative or same-origin redirects
+        if (checkResult && checkResult.result && checkResult.result.kind === 'redirect') {
+          const loc = String(checkResult.result.location || '/');
+          if (loc.includes('://') || loc.startsWith('//')) {
+            try {
+              const parsedLoc = new URL(loc);
+              if (parsedLoc.origin !== targetUrl.origin) {
+                checkResult.result.location = '/'; // Fallback to root for open redirect attempt
+              }
+            } catch {
+              checkResult.result.location = '/';
+            }
+          }
+        }
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Vary': 'Cookie'
+        });
+        res.end(JSON.stringify({
+          result: checkResult?.result || checkResult,
+          routeId: resolvedCheck.route.route_id || '',
+          to: targetUrl.toString()
+        }));
         return;
       }
 
@@ -467,15 +516,10 @@ export async function createPreviewServer(options) {
             routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '')
           });
         } catch (error) {
-          routeExecution = {
-            result: {
-              kind: 'deny',
-              status: 500,
+          ssrPayload = {
+            __zenith_error: {
+              code: 'LOAD_FAILED',
               message: error instanceof Error ? error.message : String(error)
-            },
-            trace: {
-              guard: 'none',
-              load: 'deny'
             }
           };
         }
@@ -579,8 +623,19 @@ export const matchRoute = matchManifestRoute;
  * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
  * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, load: string } }>}
  */
-export async function executeServerRoute(input) {
-  if (!input.source || !String(input.source).trim()) {
+export async function executeServerRoute({
+  source,
+  sourcePath,
+  params,
+  requestUrl,
+  requestMethod,
+  requestHeaders,
+  routePattern,
+  routeFile,
+  routeId,
+  guardOnly = false
+}) {
+  if (!source || !String(source).trim()) {
     return {
       result: { kind: 'data', data: {} },
       trace: { guard: 'none', load: 'none' }
@@ -588,15 +643,16 @@ export async function executeServerRoute(input) {
   }
 
   const payload = await spawnNodeServerRunner({
-    source: input.source,
-    sourcePath: input.sourcePath,
-    params: input.params,
-    requestUrl: input.requestUrl || 'http://localhost/',
-    requestMethod: input.requestMethod || 'GET',
-    requestHeaders: sanitizeRequestHeaders(input.requestHeaders || {}),
-    routePattern: input.routePattern || '',
-    routeFile: input.routeFile || input.sourcePath || '',
-    routeId: input.routeId || routeIdFromSourcePath(input.sourcePath || '')
+    source,
+    sourcePath,
+    params,
+    requestUrl: requestUrl || 'http://localhost/',
+    requestMethod: requestMethod || 'GET',
+    requestHeaders: sanitizeRequestHeaders(requestHeaders || {}),
+    routePattern: routePattern || '',
+    routeFile: routeFile || sourcePath || '',
+    routeId: routeId || routeIdFromSourcePath(sourcePath || ''),
+    guardOnly
   });
 
   if (payload === null || payload === undefined) {
@@ -702,6 +758,7 @@ function spawnNodeServerRunner(input) {
           ZENITH_SERVER_ROUTE_PATTERN: input.routePattern || '',
           ZENITH_SERVER_ROUTE_FILE: input.routeFile || input.sourcePath || '',
           ZENITH_SERVER_ROUTE_ID: input.routeId || '',
+          ZENITH_SERVER_GUARD_ONLY: input.guardOnly ? '1' : '',
           ZENITH_SERVER_CONTRACT_PATH: join(__dirname, 'server-contract.js')
         },
         stdio: ['ignore', 'pipe', 'pipe']

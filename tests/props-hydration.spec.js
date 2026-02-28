@@ -165,7 +165,7 @@ describe('props hydration', () => {
         const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
         // The props prelude must be present
-        expect(pageJs).toContain('const props = ');
+        expect(pageJs).toMatch(/(?:var|let|const) props = /);
         expect(pageJs).toContain('myvalue');
     });
 
@@ -208,6 +208,6 @@ describe('props hydration', () => {
         expect(scriptMatch).toBeTruthy();
         const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
-        expect(pageAsset.includes('const props = { pageTitle: "About Page" };')).toBe(true);
+        expect(pageAsset).toMatch(/(?:var|let|const) props = \{ pageTitle: "About Page" \};/);
     });
 });

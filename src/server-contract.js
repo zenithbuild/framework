@@ -189,7 +189,7 @@ export function assertJsonSerializable(value, where = 'payload') {
     walk(value, '$');
 }
 
-export async function resolveRouteResult({ exports, ctx, filePath }) {
+export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = false }) {
     validateServerExports({ exports, filePath });
 
     const trace = {
@@ -200,6 +200,9 @@ export async function resolveRouteResult({ exports, ctx, filePath }) {
     if ('guard' in exports) {
         const guardRaw = await exports.guard(ctx);
         const guardResult = guardRaw == null ? allow() : guardRaw;
+        if (guardResult.kind === 'data') {
+            throw new Error(`[Zenith] ${filePath}: guard(ctx) returned data(payload) which is a critical invariant violation. guard() can only return allow(), redirect(), or deny(). Use load(ctx) for data injection.`);
+        }
         assertValidRouteResultShape(
             guardResult,
             `${filePath}: guard(ctx) return`,
@@ -209,6 +212,10 @@ export async function resolveRouteResult({ exports, ctx, filePath }) {
         if (guardResult.kind === 'redirect' || guardResult.kind === 'deny') {
             return { result: guardResult, trace };
         }
+    }
+
+    if (guardOnly) {
+        return { result: allow(), trace };
     }
 
     let payload;

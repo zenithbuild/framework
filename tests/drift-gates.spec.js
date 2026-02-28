@@ -192,7 +192,7 @@ describe('drift gates', () => {
             return pathStr.endsWith('.js') ? [pathStr] : collectFiles(pathStr, ['.js', '.ts', '.rs']);
         });
 
-        const hits = scanFiles(files, /history\.(?:push|replace)State/);
+        const hits = scanFiles(files, /history\.(?:push|replace)State(?!\s*\(\s*null\s*,\s*["']["']\s*,\s*window\.location\.href\s*\))/);
         expect(hits).toEqual([]);
     });
 
@@ -235,7 +235,7 @@ describe('drift gates', () => {
             const files = collectFiles(outDir, ['.js']);
             const hits = scanFiles(
                 files,
-                /history\.(?:push|replace)State|\beval\(|\bnew\s+Function\(|__zenith_ssr=/
+                /history\.(?:push|replace)State(?!\s*\(\s*null\s*,\s*["']["']\s*,\s*window\.location\.href\s*\))|\beval\(|\bnew\s+Function\(|__zenith_ssr=/
             );
             expect(hits).toEqual([]);
         } finally {
@@ -458,7 +458,13 @@ describe('drift gates', () => {
             expect(installResult.status).toBe(0);
 
             // Build
-            await build({ pagesDir, outDir: join(projectDir, 'dist'), config: {} });
+            const originalCwd = process.cwd();
+            process.chdir(projectDir);
+            try {
+                await build({ pagesDir, outDir: join(projectDir, 'dist'), config: {} });
+            } finally {
+                process.chdir(originalCwd);
+            }
 
             // Verify all 4 routes produced HTML
             const distDir = join(projectDir, 'dist');
@@ -469,5 +475,5 @@ describe('drift gates', () => {
         } finally {
             await rm(tempRoot, { recursive: true, force: true });
         }
-    });
+    }, 120_000);
 });

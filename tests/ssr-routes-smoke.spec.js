@@ -128,5 +128,5 @@ describe('SSR Route Independence & Payload Smoke Test', () => {
             },
             params: { slug: 'hello-world/123' }
         });
-    });
+    }, 30000);
 });

@@ -60,7 +60,8 @@ describe('Dev Server', () => {
         const res = await httpGet(`http://localhost:${dev.port}/`);
         expect(res.status).toBe(200);
         expect(res.body).toContain('<!DOCTYPE html>');
-        expect(res.body).toContain('__zenith_hmr');
+        // Note: CLI no longer injects __zenith_hmr; only the runtime does this
+        expect(res.body).not.toContain('__zenith_hmr');
     });
 
     test('serves nested routes', async () => {
@@ -104,7 +105,7 @@ describe('Dev Server', () => {
         expect(res.status).toBe(404);
     });
 
-    test('HMR endpoint returns event-stream header', async () => {
+    test('V1 HMR endpoint /__zenith_dev/events returns event-stream header', async () => {
         project = await createTestProject(['index.zen']);
 
         dev = await createDevServer({
@@ -115,17 +116,20 @@ describe('Dev Server', () => {
 
         const res = await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('SSE timeout')), 3000);
-            const req = http.get(`http://localhost:${dev.port}/__zenith_hmr`, (response) => {
-                // Read first chunk to confirm connection
-                response.once('data', (chunk) => {
-                    clearTimeout(timeout);
-                    resolve({
-                        status: response.statusCode,
-                        headers: response.headers,
-                        firstChunk: chunk.toString()
-                    });
-                    response.destroy();
-                    req.destroy();
+            const req = http.get(`http://localhost:${dev.port}/__zenith_dev/events`, (response) => {
+                let data = '';
+                response.on('data', (chunk) => {
+                    data += chunk.toString();
+                    if (data.includes('event: connected')) {
+                        clearTimeout(timeout);
+                        resolve({
+                            status: response.statusCode,
+                            headers: response.headers,
+                            firstChunk: data
+                        });
+                        response.destroy();
+                        req.destroy();
+                    }
                 });
             });
             req.on('error', () => { });
@@ -133,7 +137,28 @@ describe('Dev Server', () => {
 
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toBe('text/event-stream');
-        expect(res.firstChunk).toContain(': connected');
+        expect(res.firstChunk).toContain('event: connected');
+    });
+
+    test('V1 HMR endpoint /__zenith_dev/state returns deterministic JSON', async () => {
+        project = await createTestProject(['index.zen']);
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port: 0
+        });
+
+        const res = await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`);
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('application/json');
+
+        const state = JSON.parse(res.body);
+        expect(state.buildId).toBe(0);
+        expect(state.status).toBe('ok');
+        expect(typeof state.lastBuildMs).toBe('number');
+        expect(state.cssHref).toBeDefined();
+        expect(state.error).toBe(null);
     });
 });
 
@@ -248,10 +273,10 @@ describe('Contract Guardrails', () => {
         for (const file of files) {
             const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
 
-            // Allow HMR client script (it's injected as a string for the browser)
-            const withoutHmr = source.replace(/const HMR_CLIENT_SCRIPT[\s\S]*?`;/g, '');
+            // Allow HMR client script references if tests previously mocked it, 
+            // but we removed the HMR_CLIENT_SCRIPT constant.
             // Ignore generated browser snippets emitted as template strings.
-            const withoutTemplateStrings = withoutHmr.replace(/`[\s\S]*?`/g, '');
+            const withoutTemplateStrings = source.replace(/`[\s\S]*?`/g, '');
 
             // Check remaining source
             const windowRefs = withoutTemplateStrings.match(/\bwindow\b/g) || [];

@@ -35,21 +35,8 @@ const MIME_TYPES = {
     '.svg': 'image/svg+xml'
 };
 
-const HMR_CLIENT_SCRIPT = `
-<script>
-// Zenith HMR Client V0
-(function() {
-    const es = new EventSource('/__zenith_hmr');
-    es.onmessage = function(event) {
-        if (event.data === 'reload') {
-            window.location.reload();
-        }
-    };
-    es.onerror = function() {
-        setTimeout(function() { window.location.reload(); }, 1000);
-    };
-})();
-</script>`;
+// Note: V0 HMR script injection has been moved to the runtime client.
+// This server purely hosts the V1 HMR contract endpoints.
 
 /**
  * Create and start a development server.
@@ -69,22 +56,87 @@ export async function createDevServer(options) {
     const hmrClients = [];
     let _watcher = null;
 
+    let buildId = 0;
+    let buildStatus = 'ok'; // 'ok' | 'error' | 'building'
+    let lastBuildMs = Date.now();
+    let durationMs = 0;
+    let buildError = null;
+
+    // We can't know the exact CSS hashed filename here easily without parsing the dist manifest,
+    // but the runtime handles standard HMR updates via generic fetch if we pass a timestamp,
+    // or we can pass an empty string and rely on the client's `swapStylesheet`.
+    let currentCssHref = '';
+
+    function _broadcastEvent(type, payload = {}) {
+        const data = JSON.stringify({
+            buildId,
+            ...payload
+        });
+        for (const client of hmrClients) {
+            try {
+                client.write(`event: ${type}\ndata: ${data}\n\n`);
+            } catch {
+                // client disconnected
+            }
+        }
+    }
+
     // Initial build
-    await build({ pagesDir, outDir, config });
+    try {
+        await build({ pagesDir, outDir, config });
+    } catch (err) {
+        buildStatus = 'error';
+        buildError = { message: err instanceof Error ? err.message : String(err) };
+    }
 
     const server = createServer(async (req, res) => {
         const url = new URL(req.url, `http://localhost:${port}`);
         let pathname = url.pathname;
 
-        // HMR endpoint
+        // Legacy HMR endpoint (deprecated but kept alive to avoid breaking old caches instantly)
         if (pathname === '/__zenith_hmr') {
             res.writeHead(200, {
                 'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
+                'Cache-Control': 'no-store',
+                'Connection': 'keep-alive',
+                'X-Zenith-Deprecated': 'true'
+            });
+            console.warn('[zenith] Warning: /__zenith_hmr is legacy; use /__zenith_dev/events');
+            res.write(': connected\n\n');
+            hmrClients.push(res);
+            req.on('close', () => {
+                const idx = hmrClients.indexOf(res);
+                if (idx !== -1) hmrClients.splice(idx, 1);
+            });
+            return;
+        }
+
+        // V1 Dev State Endpoint
+        if (pathname === '/__zenith_dev/state') {
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-store'
+            });
+            res.end(JSON.stringify({
+                serverUrl: `http://localhost:${port}`,
+                buildId,
+                status: buildStatus,
+                lastBuildMs,
+                durationMs,
+                cssHref: currentCssHref,
+                error: buildError
+            }));
+            return;
+        }
+
+        // V1 Dev Events Endpoint (SSE)
+        if (pathname === '/__zenith_dev/events') {
+            res.writeHead(200, {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-store',
                 'Connection': 'keep-alive'
             });
-            // Flush headers by sending initial comment
-            res.write(': connected\n\n');
+            res.write('event: connected\ndata: {}\n\n');
             hmrClients.push(res);
             req.on('close', () => {
                 const idx = hmrClients.indexOf(res);
@@ -95,8 +147,29 @@ export async function createDevServer(options) {
 
         if (pathname === '/__zenith/route-check') {
             try {
+                // Security: Require explicitly designated header to prevent public oracle probing
+                if (req.headers['x-zenith-route-check'] !== '1') {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'forbidden', message: 'invalid request context' }));
+                    return;
+                }
+
                 const targetPath = String(url.searchParams.get('path') || '/');
+
+                // Security: Prevent protocol/domain injection in path
+                if (targetPath.includes('://') || targetPath.startsWith('//') || /[\r\n]/.test(targetPath)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'invalid_path_format' }));
+                    return;
+                }
+
                 const targetUrl = new URL(targetPath, `http://localhost:${port}`);
+                if (targetUrl.origin !== `http://localhost:${port}`) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
+                    return;
+                }
+
                 const routes = await loadRouteManifest(outDir);
                 const resolvedCheck = resolveRequestRoute(targetUrl, routes);
                 if (!resolvedCheck.matched || !resolvedCheck.route) {
@@ -114,10 +187,36 @@ export async function createDevServer(options) {
                     requestHeaders: req.headers,
                     routePattern: resolvedCheck.route.path,
                     routeFile: resolvedCheck.route.server_script_path || '',
-                    routeId: resolvedCheck.route.route_id || ''
+                    routeId: resolvedCheck.route.route_id || '',
+                    guardOnly: true
                 });
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(checkResult));
+                // Security: Enforce relative or same-origin redirects
+                if (checkResult && checkResult.result && checkResult.result.kind === 'redirect') {
+                    const loc = String(checkResult.result.location || '/');
+                    if (loc.includes('://') || loc.startsWith('//')) {
+                        try {
+                            const parsedLoc = new URL(loc);
+                            if (parsedLoc.origin !== targetUrl.origin) {
+                                checkResult.result.location = '/'; // Fallback to root for open redirect attempt
+                            }
+                        } catch {
+                            checkResult.result.location = '/';
+                        }
+                    }
+                }
+
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    'Vary': 'Cookie'
+                });
+                res.end(JSON.stringify({
+                    result: checkResult?.result || checkResult,
+                    routeId: resolvedCheck.route.route_id || '',
+                    to: targetUrl.toString()
+                }));
                 return;
             } catch {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -171,15 +270,10 @@ export async function createDevServer(options) {
                         routeId: resolved.route.route_id || ''
                     });
                 } catch (error) {
-                    routeExecution = {
-                        result: {
-                            kind: 'deny',
-                            status: 500,
+                    ssrPayload = {
+                        __zenith_error: {
+                            code: 'LOAD_FAILED',
                             message: error instanceof Error ? error.message : String(error)
-                        },
-                        trace: {
-                            guard: 'none',
-                            load: 'deny'
                         }
                     };
                 }
@@ -214,7 +308,6 @@ export async function createDevServer(options) {
             if (ssrPayload) {
                 content = injectSsrPayload(content, ssrPayload);
             }
-            content = content.replace('</body>', `${HMR_CLIENT_SCRIPT}</body>`);
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
         } catch {
@@ -236,17 +329,62 @@ export async function createDevServer(options) {
         }
     }
 
+    let _buildDebounce = null;
+    let _queuedFiles = new Set();
+
     /**
      * Start watching the pages directory for changes.
      */
     function _startWatcher() {
         try {
-            _watcher = watch(pagesDir, { recursive: true }, async (eventType, filename) => {
+            _watcher = watch(pagesDir, { recursive: true }, (eventType, filename) => {
                 if (!filename) return;
 
-                // Rebuild
-                await build({ pagesDir, outDir, config });
-                _broadcastReload();
+                _queuedFiles.add(filename);
+
+                if (_buildDebounce !== null) {
+                    clearTimeout(_buildDebounce);
+                }
+
+                _buildDebounce = setTimeout(async () => {
+                    _buildDebounce = null;
+                    const changed = Array.from(_queuedFiles);
+                    _queuedFiles.clear();
+
+                    buildId++;
+                    buildStatus = 'building';
+                    _broadcastEvent('build_start', { changedFiles: changed });
+
+                    const startTime = Date.now();
+                    try {
+                        await build({ pagesDir, outDir, config });
+                        buildStatus = 'ok';
+                        buildError = null;
+                        lastBuildMs = Date.now();
+                        durationMs = lastBuildMs - startTime;
+
+                        _broadcastEvent('build_complete', {
+                            durationMs,
+                            status: buildStatus
+                        });
+
+                        const onlyCss = changed.every(f => f.endsWith('.css'));
+                        if (onlyCss) {
+                            // Let the client fetch the updated CSS automatically
+                            _broadcastEvent('css_update', {});
+                        } else {
+                            _broadcastEvent('reload', {});
+                        }
+                    } catch (err) {
+                        const fullError = err instanceof Error ? err.message : String(err);
+                        buildStatus = 'error';
+                        buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
+                        lastBuildMs = Date.now();
+                        durationMs = lastBuildMs - startTime;
+
+                        _broadcastEvent('build_error', buildError);
+                    }
+                }, 50);
             });
         } catch {
             // fs.watch may not support recursive on all platforms
