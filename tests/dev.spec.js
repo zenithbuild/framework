@@ -39,6 +39,18 @@ function httpGet(url) {
     });
 }
 
+async function waitFor(predicate, { timeoutMs = 4000, intervalMs = 100 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const result = await predicate();
+        if (result) {
+            return result;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+    throw new Error('Timed out waiting for condition');
+}
+
 describe('Dev Server', () => {
     let project;
     let dev;
@@ -159,6 +171,76 @@ describe('Dev Server', () => {
         expect(typeof state.lastBuildMs).toBe('number');
         expect(state.cssHref).toBeDefined();
         expect(state.error).toBe(null);
+    });
+
+    test('rebuilds when non-page source files change', async () => {
+        const root = join(tmpdir(), `zenith-dev-src-watch-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'src', 'pages');
+        const componentsDir = join(root, 'src', 'components');
+        const outDir = join(root, 'dist');
+        const componentFile = join(componentsDir, 'header.zen');
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
+        await writeFile(componentFile, '<header>v1</header>');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const before = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        await writeFile(componentFile, '<header>v2</header>');
+
+        const after = await waitFor(async () => {
+            const state = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+            return state.buildId > before.buildId ? state : null;
+        }, { timeoutMs: 5000, intervalMs: 120 });
+
+        expect(after.buildId).toBeGreaterThan(before.buildId);
+        expect(after.status).toBe('ok');
+    });
+
+    test('does not loop rebuilds from dist temp output events', async () => {
+        const root = join(tmpdir(), `zenith-dev-dist-loop-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const componentsDir = join(root, 'components');
+        const outDir = join(root, 'dist');
+        const componentFile = join(componentsDir, 'header.zen');
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
+        await writeFile(componentFile, '<header>v1</header>');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const before = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        await writeFile(componentFile, '<header>v2</header>');
+
+        const settled = await waitFor(async () => {
+            const state = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+            if (state.buildId > before.buildId && state.status === 'ok') {
+                return state;
+            }
+            return null;
+        }, { timeoutMs: 5000, intervalMs: 120 });
+
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        const later = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+
+        expect(later.status).toBe('ok');
+        expect(later.buildId).toBe(settled.buildId);
     });
 });
 

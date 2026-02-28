@@ -141,8 +141,9 @@ Each stage is a discrete function call. No implicit chaining.
 ## 8. Dev Server Contract
 
 - Serves compiled pages from memory
-- Rebuilds on file change
-- Injects HMR client script
+- Rebuilds on page/component/source file change (`pages`, `src`, or project root when needed)
+- Exposes runtime-owned HMR endpoints (`/__zenith_dev/state`, `/__zenith_dev/events`)
+- Ignores rebuild loops from output/tooling folders (`dist`, `node_modules`, `.git`, `.zenith`)
 - No SPA fallback unless `router: true`
 - No production behavior in dev mode
 

@@ -5,16 +5,16 @@
 //
 // - Compiles pages on demand
 // - Rebuilds on file change
-// - Injects HMR client script
+// - Exposes V1 HMR endpoints consumed by runtime dev client
 // - Server route resolution uses manifest matching
 //
 // V0: Uses Node.js http module + fs.watch. No external deps.
 // ---------------------------------------------------------------------------
 
 import { createServer } from 'node:http';
-import { watch } from 'node:fs';
+import { existsSync, watch } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join, extname } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { build } from './build.js';
 import {
     executeServerRoute,
@@ -52,9 +52,19 @@ export async function createDevServer(options) {
         config = {}
     } = options;
 
+    const resolvedPagesDir = resolve(pagesDir);
+    const resolvedOutDir = resolve(outDir);
+    const resolvedOutDirTmp = resolve(dirname(resolvedOutDir), `${basename(resolvedOutDir)}.tmp`);
+    const pagesParentDir = dirname(resolvedPagesDir);
+    const projectRoot = basename(pagesParentDir) === 'src'
+        ? dirname(pagesParentDir)
+        : pagesParentDir;
+    const watchRoots = new Set([pagesParentDir]);
+
     /** @type {import('http').ServerResponse[]} */
     const hmrClients = [];
-    let _watcher = null;
+    /** @type {import('fs').FSWatcher[]} */
+    let _watchers = [];
 
     let buildId = 0;
     let buildStatus = 'ok'; // 'ok' | 'error' | 'building'
@@ -332,62 +342,108 @@ export async function createDevServer(options) {
     let _buildDebounce = null;
     let _queuedFiles = new Set();
 
+    function _isWithin(parent, child) {
+        const rel = relative(parent, child);
+        return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+    }
+
+    function _toDisplayPath(absPath) {
+        const rel = relative(projectRoot, absPath);
+        if (rel === '') return '.';
+        if (!rel.startsWith('..') && !isAbsolute(rel)) {
+            return rel;
+        }
+        return absPath;
+    }
+
+    function _shouldIgnoreChange(absPath) {
+        if (_isWithin(resolvedOutDir, absPath)) {
+            return true;
+        }
+        if (_isWithin(resolvedOutDirTmp, absPath)) {
+            return true;
+        }
+        const rel = relative(projectRoot, absPath);
+        if (rel.startsWith('..') || isAbsolute(rel)) {
+            return false;
+        }
+        const segments = rel.split(/[\\/]+/g);
+        return segments.includes('node_modules')
+            || segments.includes('.git')
+            || segments.includes('.zenith')
+            || segments.includes('target')
+            || segments.includes('.turbo');
+    }
+
     /**
-     * Start watching the pages directory for changes.
+     * Start watching source roots for changes.
      */
     function _startWatcher() {
-        try {
-            _watcher = watch(pagesDir, { recursive: true }, (eventType, filename) => {
-                if (!filename) return;
+        const queueRebuild = () => {
+            if (_buildDebounce !== null) {
+                clearTimeout(_buildDebounce);
+            }
 
-                _queuedFiles.add(filename);
+            _buildDebounce = setTimeout(async () => {
+                _buildDebounce = null;
+                const changed = Array.from(_queuedFiles).map(_toDisplayPath).sort();
+                _queuedFiles.clear();
 
-                if (_buildDebounce !== null) {
-                    clearTimeout(_buildDebounce);
-                }
+                buildId++;
+                buildStatus = 'building';
+                _broadcastEvent('build_start', { changedFiles: changed });
 
-                _buildDebounce = setTimeout(async () => {
-                    _buildDebounce = null;
-                    const changed = Array.from(_queuedFiles);
-                    _queuedFiles.clear();
+                const startTime = Date.now();
+                try {
+                    await build({ pagesDir, outDir, config });
+                    buildStatus = 'ok';
+                    buildError = null;
+                    lastBuildMs = Date.now();
+                    durationMs = lastBuildMs - startTime;
 
-                    buildId++;
-                    buildStatus = 'building';
-                    _broadcastEvent('build_start', { changedFiles: changed });
+                    _broadcastEvent('build_complete', {
+                        durationMs,
+                        status: buildStatus
+                    });
 
-                    const startTime = Date.now();
-                    try {
-                        await build({ pagesDir, outDir, config });
-                        buildStatus = 'ok';
-                        buildError = null;
-                        lastBuildMs = Date.now();
-                        durationMs = lastBuildMs - startTime;
-
-                        _broadcastEvent('build_complete', {
-                            durationMs,
-                            status: buildStatus
-                        });
-
-                        const onlyCss = changed.every(f => f.endsWith('.css'));
-                        if (onlyCss) {
-                            // Let the client fetch the updated CSS automatically
-                            _broadcastEvent('css_update', {});
-                        } else {
-                            _broadcastEvent('reload', {});
-                        }
-                    } catch (err) {
-                        const fullError = err instanceof Error ? err.message : String(err);
-                        buildStatus = 'error';
-                        buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
-                        lastBuildMs = Date.now();
-                        durationMs = lastBuildMs - startTime;
-
-                        _broadcastEvent('build_error', buildError);
+                    const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
+                    if (onlyCss) {
+                        // Let the client fetch the updated CSS automatically
+                        _broadcastEvent('css_update', {});
+                    } else {
+                        _broadcastEvent('reload', {});
                     }
-                }, 50);
-            });
-        } catch {
-            // fs.watch may not support recursive on all platforms
+                } catch (err) {
+                    const fullError = err instanceof Error ? err.message : String(err);
+                    buildStatus = 'error';
+                    buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
+                    lastBuildMs = Date.now();
+                    durationMs = lastBuildMs - startTime;
+
+                    _broadcastEvent('build_error', buildError);
+                }
+            }, 50);
+        };
+
+        const roots = Array.from(watchRoots);
+        for (const root of roots) {
+            if (!existsSync(root)) continue;
+            try {
+                const watcher = watch(root, { recursive: true }, (_eventType, filename) => {
+                    if (!filename) {
+                        return;
+                    }
+                    const changedPath = resolve(root, String(filename));
+                    if (_shouldIgnoreChange(changedPath)) {
+                        return;
+                    }
+                    _queuedFiles.add(changedPath);
+                    queueRebuild();
+                });
+                _watchers.push(watcher);
+            } catch {
+                // fs.watch recursive may not be supported on this platform/root
+            }
         }
     }
 
@@ -400,10 +456,14 @@ export async function createDevServer(options) {
                 server,
                 port: actualPort,
                 close: () => {
-                    if (_watcher) {
-                        _watcher.close();
-                        _watcher = null;
+                    for (const watcher of _watchers) {
+                        try {
+                            watcher.close();
+                        } catch {
+                            // ignore close errors
+                        }
                     }
+                    _watchers = [];
                     for (const client of hmrClients) {
                         try { client.end(); } catch { }
                     }
