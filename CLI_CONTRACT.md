@@ -142,7 +142,9 @@ Each stage is a discrete function call. No implicit chaining.
 
 - Serves compiled pages from memory
 - Rebuilds on page/component/source file change (`pages`, `src`, or project root when needed)
-- Exposes runtime-owned HMR endpoints (`/__zenith_dev/state`, `/__zenith_dev/events`)
+- Exposes runtime-owned HMR endpoints (`/__zenith_dev/state`, `/__zenith_dev/events`, `/__zenith_dev/styles.css`)
+- Serializes rebuild cycles (`build_start` -> `build_complete|build_error`) with monotonic `buildId`
+- Keeps `/__zenith_dev/styles.css` stable and non-cacheable (`Cache-Control: no-store`) across rebuilds
 - Ignores rebuild loops from output/tooling folders (`dist`, `node_modules`, `.git`, `.zenith`)
 - No SPA fallback unless `router: true`
 - No production behavior in dev mode

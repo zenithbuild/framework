@@ -386,14 +386,29 @@ try {
 /**
  * Create and start a preview server.
  *
- * @param {{ distDir: string, port?: number }} options
+ * @param {{ distDir: string, port?: number, host?: string }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createPreviewServer(options) {
-  const { distDir, port = 4000 } = options;
+  const { distDir, port = 4000, host = '127.0.0.1' } = options;
+  let actualPort = port;
+
+  function publicHost() {
+    if (host === '0.0.0.0' || host === '::') {
+      return '127.0.0.1';
+    }
+    return host;
+  }
+
+  function serverOrigin() {
+    return `http://${publicHost()}:${actualPort}`;
+  }
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url, `http://localhost:${port}`);
+    const requestBase = typeof req.headers.host === 'string' && req.headers.host.length > 0
+      ? `http://${req.headers.host}`
+      : serverOrigin();
+    const url = new URL(req.url, requestBase);
 
     try {
       if (url.pathname === '/__zenith/route-check') {
@@ -413,8 +428,8 @@ export async function createPreviewServer(options) {
           return;
         }
 
-        const targetUrl = new URL(targetPath, `http://localhost:${port}`);
-        if (targetUrl.origin !== `http://localhost:${port}`) {
+        const targetUrl = new URL(targetPath, url.origin);
+        if (targetUrl.origin !== url.origin) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
           return;
@@ -564,8 +579,8 @@ export async function createPreviewServer(options) {
   });
 
   return new Promise((resolveServer) => {
-    server.listen(port, () => {
-      const actualPort = server.address().port;
+    server.listen(port, host, () => {
+      actualPort = server.address().port;
       resolveServer({
         server,
         port: actualPort,

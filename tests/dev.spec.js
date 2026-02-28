@@ -39,6 +39,22 @@ function httpGet(url) {
     });
 }
 
+function parseSseBlock(block) {
+    const lines = String(block || '').split('\n');
+    const eventLine = lines.find((line) => line.startsWith('event: '));
+    const dataLine = lines.find((line) => line.startsWith('data: '));
+    const event = eventLine ? eventLine.slice(7).trim() : '';
+    let data = {};
+    if (dataLine) {
+        try {
+            data = JSON.parse(dataLine.slice(6));
+        } catch {
+            data = {};
+        }
+    }
+    return { event, data };
+}
+
 async function waitFor(predicate, { timeoutMs = 4000, intervalMs = 100 } = {}) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -49,6 +65,10 @@ async function waitFor(predicate, { timeoutMs = 4000, intervalMs = 100 } = {}) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error('Timed out waiting for condition');
+}
+
+function localOrigin(port) {
+    return `http://127.0.0.1:${port}`;
 }
 
 describe('Dev Server', () => {
@@ -69,7 +89,7 @@ describe('Dev Server', () => {
             port: 0 // random port
         });
 
-        const res = await httpGet(`http://localhost:${dev.port}/`);
+        const res = await httpGet(`${localOrigin(dev.port)}/`);
         expect(res.status).toBe(200);
         expect(res.body).toContain('<!DOCTYPE html>');
         // Note: CLI no longer injects __zenith_hmr; only the runtime does this
@@ -85,7 +105,7 @@ describe('Dev Server', () => {
             port: 0
         });
 
-        const res = await httpGet(`http://localhost:${dev.port}/about`);
+        const res = await httpGet(`${localOrigin(dev.port)}/about`);
         expect(res.status).toBe(200);
         expect(res.body).toContain('<!DOCTYPE html>');
     });
@@ -99,7 +119,7 @@ describe('Dev Server', () => {
             port: 0
         });
 
-        const res = await httpGet(`http://localhost:${dev.port}/nonexistent`);
+        const res = await httpGet(`${localOrigin(dev.port)}/nonexistent`);
         expect(res.status).toBe(404);
     });
 
@@ -113,7 +133,7 @@ describe('Dev Server', () => {
             config: { softNavigation: true }
         });
 
-        const res = await httpGet(`http://localhost:${dev.port}/any-path`);
+        const res = await httpGet(`${localOrigin(dev.port)}/any-path`);
         expect(res.status).toBe(404);
     });
 
@@ -128,7 +148,7 @@ describe('Dev Server', () => {
 
         const res = await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('SSE timeout')), 3000);
-            const req = http.get(`http://localhost:${dev.port}/__zenith_dev/events`, (response) => {
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
                 let data = '';
                 response.on('data', (chunk) => {
                     data += chunk.toString();
@@ -161,7 +181,7 @@ describe('Dev Server', () => {
             port: 0
         });
 
-        const res = await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`);
+        const res = await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`);
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toBe('application/json');
 
@@ -169,8 +189,14 @@ describe('Dev Server', () => {
         expect(state.buildId).toBe(0);
         expect(state.status).toBe('ok');
         expect(typeof state.lastBuildMs).toBe('number');
-        expect(state.cssHref).toBeDefined();
+        expect(typeof state.cssHref).toBe('string');
+        expect(state.cssHref).toContain('/__zenith_dev/styles.css?buildId=');
         expect(state.error).toBe(null);
+
+        const css = await httpGet(`${localOrigin(dev.port)}/__zenith_dev/styles.css`);
+        expect(css.status).toBe(200);
+        expect(String(css.headers['content-type'] || '')).toContain('text/css');
+        expect(css.body.length).toBeGreaterThan(0);
     });
 
     test('rebuilds when non-page source files change', async () => {
@@ -192,12 +218,12 @@ describe('Dev Server', () => {
             port: 0
         });
 
-        const before = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+        const before = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
         await new Promise((resolve) => setTimeout(resolve, 120));
         await writeFile(componentFile, '<header>v2</header>');
 
         const after = await waitFor(async () => {
-            const state = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+            const state = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
             return state.buildId > before.buildId ? state : null;
         }, { timeoutMs: 5000, intervalMs: 120 });
 
@@ -224,12 +250,12 @@ describe('Dev Server', () => {
             port: 0
         });
 
-        const before = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+        const before = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
         await new Promise((resolve) => setTimeout(resolve, 120));
         await writeFile(componentFile, '<header>v2</header>');
 
         const settled = await waitFor(async () => {
-            const state = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+            const state = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
             if (state.buildId > before.buildId && state.status === 'ok') {
                 return state;
             }
@@ -237,10 +263,295 @@ describe('Dev Server', () => {
         }, { timeoutMs: 5000, intervalMs: 120 });
 
         await new Promise((resolve) => setTimeout(resolve, 800));
-        const later = JSON.parse((await httpGet(`http://localhost:${dev.port}/__zenith_dev/state`)).body);
+        const later = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
 
         expect(later.status).toBe('ok');
         expect(later.buildId).toBe(settled.buildId);
+    });
+
+    test('css_update event includes resolvable stylesheet href', async () => {
+        const root = join(tmpdir(), `zenith-dev-css-update-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const styleFile = join(root, 'styles.css');
+        const outDir = join(root, 'dist');
+        await mkdir(pagesDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
+        await writeFile(styleFile, '/* trigger */');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const cssUpdate = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('css_update timeout')), 5000);
+            let triggered = false;
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
+                let data = '';
+                response.on('data', (chunk) => {
+                    data += chunk.toString();
+                    if (!triggered && data.includes('event: connected')) {
+                        triggered = true;
+                        writeFile(styleFile, '/* trigger 2 */').catch(() => { });
+                    }
+                    if (data.includes('event: css_update')) {
+                        const blocks = data.split('\n\n');
+                        for (const block of blocks) {
+                            if (!block.includes('event: css_update')) continue;
+                            const line = block.split('\n').find((entry) => entry.startsWith('data: '));
+                            if (!line) continue;
+                            clearTimeout(timeout);
+                            try {
+                                resolve(JSON.parse(line.slice(6)));
+                            } catch {
+                                resolve({});
+                            }
+                            response.destroy();
+                            req.destroy();
+                            return;
+                        }
+                    }
+                });
+            });
+            req.on('error', reject);
+        });
+
+        expect(typeof cssUpdate.href).toBe('string');
+        expect(cssUpdate.href).toContain('/__zenith_dev/styles.css?buildId=');
+
+        const href = new URL(cssUpdate.href, localOrigin(dev.port));
+        const css = await httpGet(href.toString());
+        expect(css.status).toBe(200);
+        expect(String(css.headers['content-type'] || '')).toContain('text/css');
+        expect(css.body.length).toBeGreaterThan(0);
+    });
+
+    test('css_update emits only after build_complete with same buildId (repeat updates)', async () => {
+        const root = join(tmpdir(), `zenith-dev-css-seq-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const styleFile = join(root, 'styles.css');
+        const outDir = join(root, 'dist');
+        await mkdir(pagesDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
+        await writeFile(styleFile, '/* seq-0 */');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const events = [];
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('css sequence timeout')), 8000);
+            let buffer = '';
+            let stage = 0;
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
+                response.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    let splitIndex = buffer.indexOf('\n\n');
+                    while (splitIndex !== -1) {
+                        const block = buffer.slice(0, splitIndex);
+                        buffer = buffer.slice(splitIndex + 2);
+                        const parsed = parseSseBlock(block);
+                        if (parsed.event) {
+                            events.push(parsed);
+                        }
+
+                        if (parsed.event === 'connected' && stage === 0) {
+                            stage = 1;
+                            writeFile(styleFile, '/* seq-1 */').catch(() => { });
+                        } else if (parsed.event === 'css_update' && stage === 1) {
+                            stage = 2;
+                            writeFile(styleFile, '/* seq-2 */').catch(() => { });
+                        } else if (parsed.event === 'css_update' && stage === 2) {
+                            clearTimeout(timeout);
+                            response.destroy();
+                            req.destroy();
+                            resolve();
+                            return;
+                        }
+
+                        splitIndex = buffer.indexOf('\n\n');
+                    }
+                });
+            });
+            req.on('error', reject);
+        });
+
+        const buildCompleteById = new Map();
+        const buildStartById = new Map();
+        const cssUpdates = [];
+
+        for (const item of events) {
+            const buildId = Number(item.data?.buildId);
+            if (!Number.isInteger(buildId)) continue;
+            if (item.event === 'build_start') {
+                buildStartById.set(buildId, (buildStartById.get(buildId) || 0) + 1);
+            }
+            if (item.event === 'build_complete') {
+                buildCompleteById.set(buildId, (buildCompleteById.get(buildId) || 0) + 1);
+            }
+            if (item.event === 'css_update') {
+                cssUpdates.push(item.data);
+            }
+        }
+
+        expect(cssUpdates.length).toBeGreaterThanOrEqual(2);
+
+        for (const update of cssUpdates) {
+            const buildId = Number(update.buildId);
+            expect(buildStartById.get(buildId)).toBe(1);
+            expect(buildCompleteById.get(buildId)).toBe(1);
+
+            const href = String(update.href || '');
+            expect(href).toContain('/__zenith_dev/styles.css?buildId=');
+            const css = await httpGet(new URL(href, localOrigin(dev.port)).toString());
+            expect(css.status).toBe(200);
+            expect(css.body.length).toBeGreaterThan(0);
+        }
+
+        const firstCssIndex = events.findIndex((entry) => entry.event === 'css_update');
+        const firstCompleteIndex = events.findIndex((entry) => entry.event === 'build_complete');
+        expect(firstCompleteIndex).toBeGreaterThanOrEqual(0);
+        expect(firstCssIndex).toBeGreaterThan(firstCompleteIndex);
+    });
+
+    test('stable /__zenith_dev/styles.css remains 200 during back-to-back css rebuilds', async () => {
+        const root = join(tmpdir(), `zenith-dev-css-race-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const styleFile = join(root, 'styles.css');
+        const outDir = join(root, 'dist');
+        await mkdir(pagesDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>race</main>');
+        await writeFile(styleFile, '/* race-0 */');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const cssStatuses = [];
+        let pollPromise = Promise.resolve();
+
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('css race timeout')), 10000);
+            let buffer = '';
+            let stage = 0;
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
+                response.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    let splitIndex = buffer.indexOf('\n\n');
+                    while (splitIndex !== -1) {
+                        const block = buffer.slice(0, splitIndex);
+                        buffer = buffer.slice(splitIndex + 2);
+                        const parsed = parseSseBlock(block);
+
+                        if (parsed.event === 'connected' && stage === 0) {
+                            stage = 1;
+                            writeFile(styleFile, '/* race-1 */').catch(() => { });
+                        } else if (parsed.event === 'css_update' && stage === 1) {
+                            stage = 2;
+                            const href = new URL(String(parsed.data?.href || '/__zenith_dev/styles.css'), localOrigin(dev.port)).toString();
+                            writeFile(styleFile, '/* race-2 */').catch(() => { });
+                            pollPromise = (async () => {
+                                for (let i = 0; i < 16; i += 1) {
+                                    const css = await httpGet(href);
+                                    cssStatuses.push(css.status);
+                                    await new Promise((r) => setTimeout(r, 20));
+                                }
+                            })();
+                        } else if (parsed.event === 'css_update' && stage === 2) {
+                            clearTimeout(timeout);
+                            response.destroy();
+                            req.destroy();
+                            resolve();
+                            return;
+                        }
+
+                        splitIndex = buffer.indexOf('\n\n');
+                    }
+                });
+            });
+            req.on('error', reject);
+        });
+
+        await pollPromise;
+        expect(cssStatuses.length).toBeGreaterThan(0);
+        for (const status of cssStatuses) {
+            expect(status).toBe(200);
+        }
+    });
+
+    test('SSE stays alive across build_error and subsequent recovery build', async () => {
+        const root = join(tmpdir(), `zenith-dev-build-recovery-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const pageFile = join(pagesDir, 'index.zen');
+        const outDir = join(root, 'dist');
+        await mkdir(pagesDir, { recursive: true });
+        await writeFile(pageFile, '<main>ok</main>');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        let seenBuildError = false;
+        let seenRecoveryComplete = false;
+        let failedBuildId = -1;
+        let recoveredBuildId = -1;
+
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('build recovery timeout')), 10000);
+            let buffer = '';
+            let stage = 0;
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
+                response.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    let splitIndex = buffer.indexOf('\n\n');
+                    while (splitIndex !== -1) {
+                        const block = buffer.slice(0, splitIndex);
+                        buffer = buffer.slice(splitIndex + 2);
+                        const parsed = parseSseBlock(block);
+
+                        if (parsed.event === 'connected' && stage === 0) {
+                            stage = 1;
+                            writeFile(pageFile, '<main>{</main>').catch(() => { });
+                        } else if (parsed.event === 'build_error' && stage === 1) {
+                            stage = 2;
+                            seenBuildError = true;
+                            failedBuildId = Number(parsed.data?.buildId);
+                            writeFile(pageFile, '<main>recovered</main>').catch(() => { });
+                        } else if (parsed.event === 'build_complete' && stage === 2) {
+                            const thisBuildId = Number(parsed.data?.buildId);
+                            if (Number.isInteger(thisBuildId) && thisBuildId > failedBuildId) {
+                                seenRecoveryComplete = true;
+                                recoveredBuildId = thisBuildId;
+                                clearTimeout(timeout);
+                                response.destroy();
+                                req.destroy();
+                                resolve();
+                                return;
+                            }
+                        }
+
+                        splitIndex = buffer.indexOf('\n\n');
+                    }
+                });
+            });
+            req.on('error', reject);
+        });
+
+        expect(seenBuildError).toBe(true);
+        expect(seenRecoveryComplete).toBe(true);
+        expect(recoveredBuildId).toBeGreaterThan(failedBuildId);
     });
 });
 
@@ -264,7 +575,7 @@ describe('Preview Server', () => {
             port: 0
         });
 
-        const res = await httpGet(`http://localhost:${preview.port}/`);
+        const res = await httpGet(`${localOrigin(preview.port)}/`);
         expect(res.status).toBe(200);
         expect(res.body).toContain('<!DOCTYPE html>');
         // Preview should NOT inject HMR
@@ -280,7 +591,7 @@ describe('Preview Server', () => {
             port: 0
         });
 
-        const res = await httpGet(`http://localhost:${preview.port}/nothing`);
+        const res = await httpGet(`${localOrigin(preview.port)}/nothing`);
         expect(res.status).toBe(404);
     });
 
@@ -320,9 +631,9 @@ describe('Preview Server', () => {
             port: 0
         });
 
-        const dynamic = await httpGet(`http://localhost:${preview.port}/users/42`);
-        const unknown = await httpGet(`http://localhost:${preview.port}/unknown/42`);
-        const traversal = await httpGet(`http://localhost:${preview.port}/%2e%2e/%2e%2e/etc/passwd`);
+        const dynamic = await httpGet(`${localOrigin(preview.port)}/users/42`);
+        const unknown = await httpGet(`${localOrigin(preview.port)}/unknown/42`);
+        const traversal = await httpGet(`${localOrigin(preview.port)}/%2e%2e/%2e%2e/etc/passwd`);
 
         expect(dynamic.status).toBe(200);
         expect(dynamic.body).toContain('<!DOCTYPE html>');

@@ -127,9 +127,10 @@ export async function cli(args, cwd) {
     if (command === 'dev') {
         const { createDevServer } = await import('./dev-server.js');
         const port = resolvePort(args.slice(1), 3000);
+        const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
         logger.info('Starting dev server...');
-        const dev = await createDevServer({ pagesDir, outDir, port, config });
-        logger.success(`Dev server running at http://localhost:${dev.port}`);
+        const dev = await createDevServer({ pagesDir, outDir, port, host, config });
+        logger.success(`Dev server running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
 
         // Graceful shutdown
         process.on('SIGINT', () => {
@@ -145,9 +146,10 @@ export async function cli(args, cwd) {
     if (command === 'preview') {
         const { createPreviewServer } = await import('./preview.js');
         const port = resolvePort(args.slice(1), 4000);
+        const host = process.env.ZENITH_PREVIEW_HOST || '127.0.0.1';
         logger.info('Starting preview server...');
-        const preview = await createPreviewServer({ distDir: outDir, port });
-        logger.success(`Preview server running at http://localhost:${preview.port}`);
+        const preview = await createPreviewServer({ distDir: outDir, port, host });
+        logger.success(`Preview server running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${preview.port}`);
 
         process.on('SIGINT', () => {
             preview.close();

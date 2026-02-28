@@ -13,7 +13,7 @@
 
 import { createServer } from 'node:http';
 import { existsSync, watch } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { build } from './build.js';
 import {
@@ -41,7 +41,7 @@ const MIME_TYPES = {
 /**
  * Create and start a development server.
  *
- * @param {{ pagesDir: string, outDir: string, port?: number, config?: object }} options
+ * @param {{ pagesDir: string, outDir: string, port?: number, host?: string, config?: object }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createDevServer(options) {
@@ -49,6 +49,7 @@ export async function createDevServer(options) {
         pagesDir,
         outDir,
         port = 3000,
+        host = '127.0.0.1',
         config = {}
     } = options;
 
@@ -65,22 +66,169 @@ export async function createDevServer(options) {
     const hmrClients = [];
     /** @type {import('fs').FSWatcher[]} */
     let _watchers = [];
+    const sseHeartbeat = setInterval(() => {
+        for (const client of hmrClients) {
+            try {
+                client.write(': ping\n\n');
+            } catch {
+                // client disconnected
+            }
+        }
+    }, 15000);
 
     let buildId = 0;
     let buildStatus = 'ok'; // 'ok' | 'error' | 'building'
     let lastBuildMs = Date.now();
     let durationMs = 0;
     let buildError = null;
+    const traceEnabled = config.devTrace === true || process.env.ZENITH_DEV_TRACE === '1';
 
-    // We can't know the exact CSS hashed filename here easily without parsing the dist manifest,
-    // but the runtime handles standard HMR updates via generic fetch if we pass a timestamp,
-    // or we can pass an empty string and rely on the client's `swapStylesheet`.
+    // Stable dev CSS endpoint points to this backing asset.
+    let currentCssAssetPath = '';
     let currentCssHref = '';
+    let currentCssContent = '';
+    let actualPort = port;
+
+    function _publicHost() {
+        if (host === '0.0.0.0' || host === '::') {
+            return '127.0.0.1';
+        }
+        return host;
+    }
+
+    function _serverOrigin() {
+        return `http://${_publicHost()}:${actualPort}`;
+    }
+
+    function _trace(event, payload = {}) {
+        if (!traceEnabled) return;
+        try {
+            const timestamp = new Date().toISOString();
+            console.log(`[zenith-dev][${timestamp}] ${event} ${JSON.stringify(payload)}`);
+        } catch {
+            // tracing must never break the dev server
+        }
+    }
+
+    function _classifyPath(pathname) {
+        if (pathname.startsWith('/__zenith_dev/events')) return 'dev_events';
+        if (pathname.startsWith('/__zenith_dev/state')) return 'dev_state';
+        if (pathname.startsWith('/__zenith_dev/styles.css')) return 'dev_styles';
+        if (pathname.startsWith('/assets/')) return 'asset';
+        return 'other';
+    }
+
+    function _trace404(req, url, details = {}) {
+        _trace('http_404', {
+            method: req.method || 'GET',
+            url: `${url.pathname}${url.search}`,
+            classify: _classifyPath(url.pathname),
+            ...details
+        });
+    }
+
+    function _pickCssAsset(assets) {
+        if (!Array.isArray(assets) || assets.length === 0) {
+            return '';
+        }
+        const cssAssets = assets
+            .filter((entry) => typeof entry === 'string' && entry.endsWith('.css'))
+            .map((entry) => entry.startsWith('/') ? entry : `/${entry}`);
+        if (cssAssets.length === 0) {
+            return '';
+        }
+        const preferred = cssAssets.find((entry) => /\/styles(\.|\/|$)/.test(entry));
+        return preferred || cssAssets[0];
+    }
+
+    function _delay(ms) {
+        return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+    }
+
+    async function _waitForCssFile(absolutePath, retries = 16, delayMs = 40) {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const info = await stat(absolutePath);
+                if (info.isFile()) {
+                    return true;
+                }
+            } catch {
+                // keep retrying
+            }
+            if (i < retries) {
+                await _delay(delayMs);
+            }
+        }
+        return false;
+    }
+
+    async function _syncCssStateFromBuild(buildResult, nextBuildId) {
+        currentCssHref = `/__zenith_dev/styles.css?buildId=${nextBuildId}`;
+        const candidate = _pickCssAsset(buildResult?.assets);
+        if (!candidate) {
+            _trace('css_sync_skipped', { reason: 'no_css_asset', buildId: nextBuildId });
+            return false;
+        }
+
+        const absoluteCssPath = join(outDir, candidate);
+        const ready = await _waitForCssFile(absoluteCssPath);
+        if (!ready) {
+            _trace('css_sync_skipped', {
+                reason: 'css_not_ready',
+                buildId: nextBuildId,
+                cssAsset: candidate,
+                resolvedPath: absoluteCssPath
+            });
+            return false;
+        }
+
+        let cssContent = '';
+        try {
+            cssContent = await readFile(absoluteCssPath, 'utf8');
+        } catch {
+            _trace('css_sync_skipped', {
+                reason: 'css_read_failed',
+                buildId: nextBuildId,
+                cssAsset: candidate,
+                resolvedPath: absoluteCssPath
+            });
+            return false;
+        }
+        if (typeof cssContent !== 'string') {
+            _trace('css_sync_skipped', {
+                reason: 'css_invalid_type',
+                buildId: nextBuildId,
+                cssAsset: candidate,
+                resolvedPath: absoluteCssPath
+            });
+            return false;
+        }
+        if (cssContent.length === 0) {
+            _trace('css_sync_skipped', {
+                reason: 'css_empty',
+                buildId: nextBuildId,
+                cssAsset: candidate,
+                resolvedPath: absoluteCssPath
+            });
+            cssContent = '/* zenith-dev: empty css */';
+        }
+
+        currentCssAssetPath = candidate;
+        currentCssContent = cssContent;
+        return true;
+    }
 
     function _broadcastEvent(type, payload = {}) {
         const data = JSON.stringify({
             buildId,
             ...payload
+        });
+        _trace('sse_emit', {
+            type,
+            buildId,
+            status: buildStatus,
+            cssHref: currentCssHref,
+            changedFiles: Array.isArray(payload.changedFiles) ? payload.changedFiles : undefined
         });
         for (const client of hmrClients) {
             try {
@@ -93,14 +241,18 @@ export async function createDevServer(options) {
 
     // Initial build
     try {
-        await build({ pagesDir, outDir, config });
+        const initialBuild = await build({ pagesDir, outDir, config });
+        await _syncCssStateFromBuild(initialBuild, buildId);
     } catch (err) {
         buildStatus = 'error';
         buildError = { message: err instanceof Error ? err.message : String(err) };
     }
 
     const server = createServer(async (req, res) => {
-        const url = new URL(req.url, `http://localhost:${port}`);
+        const requestBase = typeof req.headers.host === 'string' && req.headers.host.length > 0
+            ? `http://${req.headers.host}`
+            : _serverOrigin();
+        const url = new URL(req.url, requestBase);
         let pathname = url.pathname;
 
         // Legacy HMR endpoint (deprecated but kept alive to avoid breaking old caches instantly)
@@ -128,7 +280,7 @@ export async function createDevServer(options) {
                 'Cache-Control': 'no-store'
             });
             res.end(JSON.stringify({
-                serverUrl: `http://localhost:${port}`,
+                serverUrl: _serverOrigin(),
                 buildId,
                 status: buildStatus,
                 lastBuildMs,
@@ -144,14 +296,53 @@ export async function createDevServer(options) {
             res.writeHead(200, {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-store',
-                'Connection': 'keep-alive'
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no'
             });
+            res.write('retry: 1000\n');
             res.write('event: connected\ndata: {}\n\n');
             hmrClients.push(res);
             req.on('close', () => {
                 const idx = hmrClients.indexOf(res);
                 if (idx !== -1) hmrClients.splice(idx, 1);
             });
+            return;
+        }
+
+        if (pathname === '/__zenith_dev/styles.css') {
+            if (typeof currentCssContent === 'string' && currentCssContent.length > 0) {
+                res.writeHead(200, {
+                    'Content-Type': 'text/css; charset=utf-8',
+                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                });
+                res.end(currentCssContent);
+                return;
+            }
+            if (typeof currentCssAssetPath === 'string' && currentCssAssetPath.length > 0) {
+                try {
+                    const css = await readFile(join(outDir, currentCssAssetPath), 'utf8');
+                    if (typeof css === 'string' && css.length > 0) {
+                        currentCssContent = css;
+                    }
+                } catch {
+                    // keep serving last known CSS body below
+                }
+            }
+            if (typeof currentCssContent !== 'string') {
+                currentCssContent = '';
+            }
+            if (currentCssContent.length === 0) {
+                currentCssContent = '/* zenith-dev: css pending */';
+            }
+            res.writeHead(200, {
+                'Content-Type': 'text/css; charset=utf-8',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            });
+            res.end(currentCssContent);
             return;
         }
 
@@ -173,8 +364,8 @@ export async function createDevServer(options) {
                     return;
                 }
 
-                const targetUrl = new URL(targetPath, `http://localhost:${port}`);
-                if (targetUrl.origin !== `http://localhost:${port}`) {
+                const targetUrl = new URL(targetPath, url.origin);
+                if (targetUrl.origin !== url.origin) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
                     return;
@@ -235,10 +426,14 @@ export async function createDevServer(options) {
             }
         }
 
+        let resolvedPathFor404 = null;
+        let staticRootFor404 = null;
         try {
             const requestExt = extname(pathname);
             if (requestExt && requestExt !== '.html') {
                 const assetPath = join(outDir, pathname);
+                resolvedPathFor404 = assetPath;
+                staticRootFor404 = outDir;
                 const asset = await readFile(assetPath);
                 const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
                 res.writeHead(200, { 'Content-Type': mime });
@@ -259,6 +454,9 @@ export async function createDevServer(options) {
             } else {
                 filePath = toStaticFilePath(outDir, pathname);
             }
+
+            resolvedPathFor404 = filePath;
+            staticRootFor404 = outDir;
 
             if (!filePath) {
                 throw new Error('not found');
@@ -321,6 +519,11 @@ export async function createDevServer(options) {
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
         } catch {
+            _trace404(req, url, {
+                reason: 'not_found',
+                staticRoot: staticRootFor404,
+                resolvedPath: resolvedPathFor404
+            });
             res.writeHead(404, { 'Content-Type': 'text/plain' });
             res.end('404 Not Found');
         }
@@ -341,6 +544,7 @@ export async function createDevServer(options) {
 
     let _buildDebounce = null;
     let _queuedFiles = new Set();
+    let _buildInFlight = false;
 
     function _isWithin(parent, child) {
         const rel = relative(parent, child);
@@ -379,50 +583,84 @@ export async function createDevServer(options) {
      * Start watching source roots for changes.
      */
     function _startWatcher() {
-        const queueRebuild = () => {
+        const triggerBuildDrain = (delayMs = 50) => {
             if (_buildDebounce !== null) {
                 clearTimeout(_buildDebounce);
             }
-
-            _buildDebounce = setTimeout(async () => {
+            _buildDebounce = setTimeout(() => {
                 _buildDebounce = null;
-                const changed = Array.from(_queuedFiles).map(_toDisplayPath).sort();
-                _queuedFiles.clear();
+                void drainBuildQueue();
+            }, delayMs);
+        };
 
-                buildId++;
-                buildStatus = 'building';
-                _broadcastEvent('build_start', { changedFiles: changed });
+        const drainBuildQueue = async () => {
+            if (_buildInFlight) {
+                return;
+            }
+            const changed = Array.from(_queuedFiles).map(_toDisplayPath).sort();
+            if (changed.length === 0) {
+                return;
+            }
+            _queuedFiles.clear();
 
-                const startTime = Date.now();
-                try {
-                    await build({ pagesDir, outDir, config });
-                    buildStatus = 'ok';
-                    buildError = null;
-                    lastBuildMs = Date.now();
-                    durationMs = lastBuildMs - startTime;
+            _buildInFlight = true;
+            const cycleBuildId = buildId + 1;
+            buildId = cycleBuildId;
+            buildStatus = 'building';
+            _broadcastEvent('build_start', { changedFiles: changed });
 
-                    _broadcastEvent('build_complete', {
-                        durationMs,
-                        status: buildStatus
-                    });
+            const startTime = Date.now();
+            try {
+                const buildResult = await build({ pagesDir, outDir, config });
+                const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
+                buildStatus = 'ok';
+                buildError = null;
+                lastBuildMs = Date.now();
+                durationMs = lastBuildMs - startTime;
 
-                    const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
-                    if (onlyCss) {
-                        // Let the client fetch the updated CSS automatically
-                        _broadcastEvent('css_update', {});
-                    } else {
-                        _broadcastEvent('reload', {});
-                    }
-                } catch (err) {
-                    const fullError = err instanceof Error ? err.message : String(err);
-                    buildStatus = 'error';
-                    buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
-                    lastBuildMs = Date.now();
-                    durationMs = lastBuildMs - startTime;
-
-                    _broadcastEvent('build_error', buildError);
+                _broadcastEvent('build_complete', {
+                    durationMs,
+                    status: buildStatus,
+                    cssHref: currentCssHref,
+                    changedFiles: changed
                 }
-            }, 50);
+                );
+                _trace('state_snapshot', {
+                    status: buildStatus,
+                    buildId: cycleBuildId,
+                    cssHref: currentCssHref,
+                    durationMs,
+                    changedFiles: changed
+                });
+
+                const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
+                if (onlyCss && cssReady && currentCssHref.length > 0) {
+                    // Let the client fetch the updated CSS automatically
+                    _broadcastEvent('css_update', { href: currentCssHref, changedFiles: changed });
+                } else {
+                    _broadcastEvent('reload', { changedFiles: changed });
+                }
+            } catch (err) {
+                const fullError = err instanceof Error ? err.message : String(err);
+                buildStatus = 'error';
+                buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
+                lastBuildMs = Date.now();
+                durationMs = lastBuildMs - startTime;
+
+                _broadcastEvent('build_error', { ...buildError, changedFiles: changed });
+                _trace('state_snapshot', {
+                    status: buildStatus,
+                    buildId: cycleBuildId,
+                    cssHref: currentCssHref,
+                    durationMs,
+                    error: buildError
+                });
+            } finally {
+                _buildInFlight = false;
+                if (_queuedFiles.size > 0) {
+                    triggerBuildDrain(20);
+                }
+            }
         };
 
         const roots = Array.from(watchRoots);
@@ -438,7 +676,7 @@ export async function createDevServer(options) {
                         return;
                     }
                     _queuedFiles.add(changedPath);
-                    queueRebuild();
+                    triggerBuildDrain();
                 });
                 _watchers.push(watcher);
             } catch {
@@ -448,14 +686,15 @@ export async function createDevServer(options) {
     }
 
     return new Promise((resolve) => {
-        server.listen(port, () => {
-            const actualPort = server.address().port;
+        server.listen(port, host, () => {
+            actualPort = server.address().port;
             _startWatcher();
 
             resolve({
                 server,
                 port: actualPort,
                 close: () => {
+                    clearInterval(sseHeartbeat);
                     for (const watcher of _watchers) {
                         try {
                             watcher.close();
