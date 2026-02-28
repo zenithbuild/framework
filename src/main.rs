@@ -2126,11 +2126,11 @@ fn emit_component_assets(
         rewritten_component_code = inject_runtime_hook_aliases(&rewritten_component_code);
         rewritten_component_code = guard_component_bindings(&rewritten_component_code)?;
         module_source.push_str(&format!(
-            "import {{ signal, state, ref, zeneffect, zenEffect, zenMount }} from '{}';\n",
+            "import {{ signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }} from '{}';\n",
             runtime_import_spec
         ));
         module_source.push_str(&format!(
-            "const __zenith_runtime = {{ signal, state, ref, zeneffect, zenEffect, zenMount }};\n"
+            "const __zenith_runtime = {{ signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }};\n"
         ));
 
         module_source.push_str(&rewritten_component_code);
@@ -3257,7 +3257,7 @@ fn inject_runtime_hook_aliases(component_code: &str) -> String {
     if component_code.contains(hook_anchor) {
         return component_code.replacen(
             hook_anchor,
-            "const zeneffect = __runtime.zeneffect;\n  const zenEffect = __runtime.zenEffect || __runtime.zeneffect;\n  const zenMount = __runtime.zenMount;\n  const ref = __runtime.ref;",
+            "const zeneffect = __runtime.zeneffect;\n  const zenEffect = __runtime.zenEffect || __runtime.zeneffect;\n  const zenMount = __runtime.zenMount;\n  const ref = __runtime.ref;\n  const zenWindow = __runtime.zenWindow;\n  const zenDocument = __runtime.zenDocument;\n  const zenOn = __runtime.zenOn;\n  const zenResize = __runtime.zenResize;\n  const collectRefs = __runtime.collectRefs;",
             1,
         );
     }
