@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/router",
-  "version": "0.5.0-beta.2.19",
+  "version": "0.5.0-beta.2.20",
   "description": "File-based SPA router for Zenith framework with deterministic, compile-time route resolution",
   "license": "MIT",
   "type": "module",
