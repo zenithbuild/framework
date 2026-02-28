@@ -47,4 +47,4 @@ Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/REACTIVE_
 ## Global Access Guard
 
 Component scripts must not rely on direct `window.*` / `document.*` access patterns.  
-Use runtime lookups through `globalThis` when host APIs are required.
+Use `zenWindow()` and `zenDocument()` for SSR-safe global access.

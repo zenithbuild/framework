@@ -64,6 +64,8 @@ In slot content, `parentOpen` resolves to the parent binding, not internal `Nav`
 
 ## See Also
 
+- [DOM and Environment](/docs/reactivity/dom-and-environment)
+- [zenEffect vs zenMount](/docs/reactivity/effects-vs-mount)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
 - [Events](/docs/syntax/events)
 - [Zenith Contract](/docs/zenith-contract)

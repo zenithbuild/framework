@@ -36,9 +36,9 @@ Contract: GSAP or other animation engines are allowed in component scripts when 
 Invariant: mount/unmount lifecycles clean all listeners/timelines.
 
 Definition of Done:
-- Setup happens in mount boundary.
+- Setup happens in zenMount boundary.
 - Teardown removes listeners and kills timeline instances.
-- `addEventListener` in Zenith snippets is only acceptable for explicit behavior wiring.
+- Use `zenOn(target, eventName, handler, options?)` for event subscriptions; do not call `addEventListener` directly.
 
 ## See Also
 

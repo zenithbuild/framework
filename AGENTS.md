@@ -35,6 +35,18 @@ Controlled props override internal state.
 - Unknown events are warnings (not hard errors), emitted by compiler diagnostics.
 - Avoid forbidden syntax in docs examples.
 
+## Canonical DOM + Environment Rules (Non-Negotiable)
+- Use `ref<T>()` for DOM access in `.zen` scripts.
+- Do not use `querySelector`, `querySelectorAll`, or `getElementById` in `.zen` scripts.
+- Rare interop exception only: `// zen-allow:dom-query <reason>` on the relevant query usage.
+- Use `zenOn(target, eventName, handler, options?)` for event subscriptions.
+- Do not call `addEventListener` directly in `.zen` scripts.
+- Use `zenWindow()` / `zenDocument()` for global DOM access.
+- Do not declare custom wrappers like `runtimeWindow` / `runtimeDocument`.
+- Use `zenResize(handler)` for window-resize-driven reactive updates.
+- Use `collectRefs(...refs)` for deterministic multi-node operations instead of selector scans.
+- If canonical primitives are insufficient, do not invent APIs or workarounds; report the missing primitive explicitly.
+
 ## Forbidden Patterns
 - No `onclick="..."`, `onClick=`, `@click=`, `{#if}`, `{#each}`.
 - No free identifiers in template examples.

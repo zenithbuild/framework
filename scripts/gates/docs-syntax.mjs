@@ -9,6 +9,7 @@ import {
   findForbiddenMatches,
   isPublicDocStatus,
   extractCodeFences,
+  DOM_ANTIPATTERN_LABELS,
 } from "./shared.mjs";
 
 async function main() {
@@ -34,11 +35,29 @@ async function main() {
 
     scanned += 1;
     const hits = findForbiddenMatches(parsed.body);
+
+    const domAntipatternHits = [];
+    const fences = extractCodeFences(parsed.body);
+    for (const fence of fences) {
+      const preceding = parsed.body.slice(Math.max(0, fence.index - 120), fence.index);
+      const isMigrationBefore = /\b(?:before|migration)\s*:?\s*$/i.test(preceding.trim());
+      if (isMigrationBefore) continue;
+      for (const rule of DOM_ANTIPATTERN_LABELS) {
+        if (rule.regex.test(fence.code) && !domAntipatternHits.includes(rule.label)) {
+          domAntipatternHits.push(rule.label);
+        }
+      }
+    }
+    if (domAntipatternHits.length > 0) {
+      violations.push(
+        `${rel}: canonical doc must not recommend DOM anti-patterns (${domAntipatternHits.join(", ")}). Use zenWindow/zenDocument, zenOn, ref+zenMount, collectRefs.`
+      );
+    }
+
     if (hits.length > 0) {
       violations.push(`${rel}: forbidden syntax detected (${hits.join(", ")})`);
     }
 
-    const fences = extractCodeFences(parsed.body);
     for (let i = 0; i < fences.length; i += 1) {
       const fence = fences[i];
       const source = fence.code;

@@ -25,7 +25,7 @@
         "title": "Reactivity",
         "summary": "State, memoization, and reactive execution model.",
         "order": 30,
-        "count": 2
+        "count": 4
       },
       {
         "slug": "guides",
@@ -636,6 +636,60 @@
         "Reactivity"
       ],
       "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/effects-vs-mount",
+      "title": "zenEffect vs zenMount",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "effects",
+        "mount",
+        "lifecycle"
+      ],
+      "source_path": "documentation/reactivity/effects-vs-mount.md",
+      "url": "/docs/reactivity/effects-vs-mount",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 11,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/dom-and-environment",
+      "title": "DOM and Environment",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "dom",
+        "environment",
+        "refs"
+      ],
+      "source_path": "documentation/reactivity/dom-and-environment.md",
+      "url": "/docs/reactivity/dom-and-environment",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 12,
       "level": null,
       "hidden": false,
       "prerequisites": []

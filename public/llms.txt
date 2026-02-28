@@ -28,6 +28,8 @@ Start here (ordered):
   - /docs/syntax/bindings-expressions
 - Reactivity:
   - /docs/reactivity/reactivity-model
+  - /docs/reactivity/effects-vs-mount
+  - /docs/reactivity/dom-and-environment
   - /docs/reactivity/controlled-uncontrolled-components
 - Guides:
   - /docs/guides/using-ai-with-zenith

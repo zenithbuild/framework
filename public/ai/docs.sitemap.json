@@ -23,6 +23,8 @@
     "/docs/syntax/events",
     "/docs/syntax/bindings-expressions",
     "/docs/reactivity/reactivity-model",
+    "/docs/reactivity/effects-vs-mount",
+    "/docs/reactivity/dom-and-environment",
     "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",

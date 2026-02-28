@@ -38,6 +38,8 @@ Definition of Done:
 | guides/cms-unified-site | CMS Unified Site Guide | guide | keep | Unified route view model |
 | guides/troubleshooting | Troubleshooting Guide | guide | keep | Operational diagnosis |
 | contributing/drift-gates | Drift Gates | contributing | keep | CI + docs integrity checks |
+| reactivity/dom-and-environment | DOM and Environment | reactivity | keep | Refs, zenWindow/zenDocument, zenOn, zenResize, collectRefs |
+| reactivity/effects-vs-mount | zenEffect vs zenMount | reactivity | keep | When to use zenEffect vs zenMount |
 
 ## Legacy Docs (Rewrite or Deprecate)
 

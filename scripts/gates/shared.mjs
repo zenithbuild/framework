@@ -37,6 +37,15 @@ export const FORBIDDEN_PATTERNS = [
   { label: "legacy mouseout binding", regex: /on:mouseout\b/i },
 ];
 
+/** Canonical docs must not recommend these DOM anti-patterns. _legacy/ is excluded. */
+export const DOM_ANTIPATTERN_LABELS = [
+  { label: "querySelector", regex: /\bquerySelector\s*\(/ },
+  { label: "querySelectorAll", regex: /\bquerySelectorAll\s*\(/ },
+  { label: "getElementById", regex: /\bgetElementById\s*\(/ },
+  { label: "direct addEventListener", regex: /\.addEventListener\s*\(/ },
+  { label: "runtimeWindow/runtimeDocument wrapper", regex: /\b(?:runtimeWindow|runtimeDocument)\b/ },
+];
+
 function stripComment(rawLine) {
   let quote = null;
   for (let i = 0; i < rawLine.length; i += 1) {

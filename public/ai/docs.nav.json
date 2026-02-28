@@ -266,6 +266,28 @@
           "source_path": "documentation/reactivity/reactivity-model.md"
         },
         {
+          "slug": "reactivity/effects-vs-mount",
+          "title": "zenEffect vs zenMount",
+          "label": "zenEffect vs zenMount",
+          "url": "/docs/reactivity/effects-vs-mount",
+          "order": 11,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/effects-vs-mount.md"
+        },
+        {
+          "slug": "reactivity/dom-and-environment",
+          "title": "DOM and Environment",
+          "label": "DOM and Environment",
+          "url": "/docs/reactivity/dom-and-environment",
+          "order": 12,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/dom-and-environment.md"
+        },
+        {
           "slug": "reactivity/controlled-uncontrolled-components",
           "title": "Controlled vs Uncontrolled Components",
           "label": "Controlled vs Uncontrolled Components",
@@ -518,6 +540,8 @@
     "/docs/syntax/events",
     "/docs/syntax/bindings-expressions",
     "/docs/reactivity/reactivity-model",
+    "/docs/reactivity/effects-vs-mount",
+    "/docs/reactivity/dom-and-environment",
     "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",

@@ -35,6 +35,7 @@ You are coding in Zenith. Follow Zenith canonical docs and rule IDs.
 - For interactive components, use controlled/uncontrolled triplets:
   open/defaultOpen/onOpenChange and value/defaultValue/onValueChange.
 - For route protection, export `guard(ctx)` or `load(ctx)` returning `allow()`, `redirect()`, `deny()`, or `data()`. Never implement generic client-side guards; "Server is Security".
+- Do NOT use querySelector, addEventListener, or custom window/document wrappers. Use zenWindow(), zenDocument(), zenOn(), zenResize(), collectRefs() from @zenithbuild/runtime.
 If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 ```
 
@@ -42,6 +43,7 @@ If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 
 - [Events](/docs/syntax/events)
 - [Reactivity Model](/docs/reactivity/reactivity-model)
+- [DOM and Environment](/docs/reactivity/dom-and-environment)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
 - [Route Protection](/docs/routing/route-protection)
 - [Common Mistakes](/docs/guides/common-mistakes)
