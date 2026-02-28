@@ -65,6 +65,14 @@ struct CompilerIr {
     ref_bindings: Vec<CompilerRefBinding>,
     #[serde(default)]
     style_blocks: Vec<ExtractedStyleBlock>,
+    #[serde(default)]
+    has_guard: bool,
+    #[serde(default)]
+    has_load: bool,
+    #[serde(default)]
+    guard_module_ref: Option<String>,
+    #[serde(default)]
+    load_module_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -150,6 +158,10 @@ struct CompilerServerScript {
     prerender: bool,
     #[serde(default)]
     source_path: Option<String>,
+    #[serde(default)]
+    has_guard: bool,
+    #[serde(default)]
+    has_load: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -220,6 +232,14 @@ struct RouterRouteEntry {
     prerender: bool,
     #[serde(default)]
     ssr_data: Option<serde_json::Value>,
+    #[serde(default)]
+    has_guard: bool,
+    #[serde(default)]
+    has_load: bool,
+    #[serde(default)]
+    guard_module_ref: Option<String>,
+    #[serde(default)]
+    load_module_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -547,6 +567,10 @@ fn run() -> Result<(), String> {
                 .and_then(|script| script.source_path.clone()),
             input.ir.prerender,
             prerender_ssr_data.clone(),
+            input.ir.has_guard,
+            input.ir.has_load,
+            input.ir.guard_module_ref.clone(),
+            input.ir.load_module_ref.clone(),
         ));
     }
 
@@ -602,9 +626,6 @@ fn run() -> Result<(), String> {
                     .into(),
             );
         }
-        if router_source.contains("fetch(") {
-            return Err("Runtime graph purity violation: router bundle contains 'fetch('".into());
-        }
 
         let router_hash = stable_hash_8(&router_source);
         let r_rel = format!("assets/router.{}.js", router_hash);
@@ -641,6 +662,10 @@ fn run() -> Result<(), String> {
         server_script_path,
         prerender,
         ssr_data,
+        has_guard,
+        has_load,
+        guard_module_ref,
+        load_module_ref,
     ) in &page_assets
     {
         let output = format!(
@@ -659,6 +684,10 @@ fn run() -> Result<(), String> {
             server_script_path: server_script_path.clone(),
             prerender: *prerender,
             ssr_data: ssr_data.clone(),
+            has_guard: *has_guard,
+            has_load: *has_load,
+            guard_module_ref: guard_module_ref.clone(),
+            load_module_ref: load_module_ref.clone(),
         });
     }
     router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
@@ -679,6 +708,10 @@ fn run() -> Result<(), String> {
         _server_script_path,
         _prerender,
         _ssr_data,
+        _has_guard,
+        _has_load,
+        _guard_module_ref,
+        _load_module_ref,
     ) in page_assets
     {
         let mut html = inject_stylesheet_link_once(&html_tpl, &css_rel, &route)?;
@@ -3060,7 +3093,8 @@ fn generate_state_table_js(bindings: &[CompilerStateBinding]) -> Result<String, 
 fn map_runtime_ref_bindings(ir: &CompilerIr) -> Result<Vec<RuntimeRefBinding>, String> {
     let mut out = Vec::new();
     for binding in &ir.ref_bindings {
-        let Some(state_index) = resolve_ref_state_index(&ir.hoisted.state, &binding.identifier) else {
+        let Some(state_index) = resolve_ref_state_index(&ir.hoisted.state, &binding.identifier)
+        else {
             return Err(format!(
                 "failed to resolve ref binding '{}' to hoisted state key",
                 binding.identifier

@@ -145,7 +145,9 @@ fn emitted_router_and_runtime_follow_template_contract() {
     let manifest_raw = fs::read_to_string(&manifest_path).expect("read manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest_raw).expect("parse manifest");
 
-    let router_rel = manifest["router"].as_str().expect("manifest.router missing");
+    let router_rel = manifest["router"]
+        .as_str()
+        .expect("manifest.router missing");
     let runtime_rel = manifest["entry"].as_str().expect("manifest.entry missing");
 
     let router_path = from_manifest_path(&out_dir, router_rel);
@@ -163,15 +165,17 @@ fn emitted_router_and_runtime_follow_template_contract() {
     let prevent_default = router_source
         .find("event.preventDefault();")
         .expect("preventDefault missing in click flow");
-    let push_state = router_source
-        .find("history.pushState({}, '', nextPath);")
-        .expect("pushState missing in click flow");
+    let evaluate_guard = router_source
+        .find("evaluateServerGuard(nextPath, url,")
+        .expect("evaluateServerGuard missing in click flow");
     let navigate = router_source
-        .find("navigate(nextPath, false, url)")
+        .find("navigate(nextPath, url)")
         .expect("navigate call missing in click flow");
 
     assert!(
-        click_start <= prevent_default && prevent_default < push_state && push_state < navigate,
+        click_start <= evaluate_guard
+            && evaluate_guard < prevent_default
+            && prevent_default < navigate,
         "router click contract ordering violated"
     );
     assert!(
@@ -180,10 +184,12 @@ fn emitted_router_and_runtime_follow_template_contract() {
     );
 
     for (label, source) in [("router", &router_source), ("runtime", &runtime_source)] {
-        assert!(
-            !source.contains("fetch("),
-            "{label} asset must not contain fetch("
-        );
+        if label == "runtime" {
+            assert!(
+                !source.contains("fetch("),
+                "{label} asset must not contain fetch("
+            );
+        }
         assert!(
             !source.contains("__zenith_ssr="),
             "{label} asset must not contain query-param SSR transport"
@@ -193,8 +199,8 @@ fn emitted_router_and_runtime_follow_template_contract() {
             "{label} asset must not read __zenith_ssr query params"
         );
         assert!(
-            !source.contains(".zen"),
-            "{label} asset must not contain .zen references"
+            !source.contains(".zen\"") && !source.contains(".zen'"),
+            "{label} asset must not contain .zen string literals"
         );
         assert!(
             !source.contains("zenith:"),

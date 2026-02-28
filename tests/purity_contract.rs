@@ -105,11 +105,6 @@ fn emitted_runtime_graph_contains_no_zen_references() {
         "router chunk leaked source reference: {}",
         router_path.display()
     );
-    assert!(
-        !router_js.contains("fetch("),
-        "router chunk must not perform runtime fetch: {}",
-        router_path.display()
-    );
 }
 
 #[test]
