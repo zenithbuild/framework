@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // index.js — Zenith Router V0 Public API
 // ---------------------------------------------------------------------------
-// Seven exports. No more.
+// Structural navigation exports + route protection policy/event hooks.
 // ---------------------------------------------------------------------------
 
 export { createRouter } from './router.js';

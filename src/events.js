@@ -54,29 +54,59 @@ export function _getSubscriberCount() {
 
 // --- Route Protection Events & Policy ---
 
-let _routePolicy = {};
+const ROUTE_POLICY_KEY = '__zenith_route_protection_policy';
+const ROUTE_EVENT_LISTENERS_KEY = '__zenith_route_event_listeners';
+const ROUTE_EVENT_NAMES = [
+    'guard:start',
+    'guard:end',
+    'route-check:start',
+    'route-check:end',
+    'route-check:error',
+    'route:deny',
+    'route:redirect'
+];
+
+function getRouteProtectionScope() {
+    return typeof globalThis === 'object' && globalThis ? globalThis : {};
+}
+
+function ensureRouteProtectionState() {
+    const scope = getRouteProtectionScope();
+
+    let policy = scope[ROUTE_POLICY_KEY];
+    if (!policy || typeof policy !== 'object') {
+        policy = {};
+        scope[ROUTE_POLICY_KEY] = policy;
+    }
+
+    let listeners = scope[ROUTE_EVENT_LISTENERS_KEY];
+    if (!listeners || typeof listeners !== 'object') {
+        listeners = Object.create(null);
+        scope[ROUTE_EVENT_LISTENERS_KEY] = listeners;
+    }
+
+    for (const eventName of ROUTE_EVENT_NAMES) {
+        if (!(listeners[eventName] instanceof Set)) {
+            listeners[eventName] = new Set();
+        }
+    }
+
+    return { policy, listeners };
+}
 
 /**
  * Configure default behaviors for route protection.
  * @param {import('../index').RouteProtectionPolicy} policy 
  */
 export function setRouteProtectionPolicy(policy) {
-    _routePolicy = Object.assign({}, _routePolicy, policy);
+    const state = ensureRouteProtectionState();
+    state.policy = Object.assign({}, state.policy, policy);
+    getRouteProtectionScope()[ROUTE_POLICY_KEY] = state.policy;
 }
 
 export function _getRouteProtectionPolicy() {
-    return _routePolicy;
+    return ensureRouteProtectionState().policy;
 }
-
-const _eventListeners = {
-    'guard:start': new Set(),
-    'guard:end': new Set(),
-    'route-check:start': new Set(),
-    'route-check:end': new Set(),
-    'route-check:error': new Set(),
-    'route:deny': new Set(),
-    'route:redirect': new Set()
-};
 
 /**
  * Listen to route protection lifecycle events.
@@ -84,8 +114,9 @@ const _eventListeners = {
  * @param {Function} handler 
  */
 export function on(eventName, handler) {
-    if (_eventListeners[eventName]) {
-        _eventListeners[eventName].add(handler);
+    const listeners = ensureRouteProtectionState().listeners;
+    if (listeners[eventName] instanceof Set) {
+        listeners[eventName].add(handler);
     }
 }
 
@@ -95,19 +126,23 @@ export function on(eventName, handler) {
  * @param {Function} handler 
  */
 export function off(eventName, handler) {
-    if (_eventListeners[eventName]) {
-        _eventListeners[eventName].delete(handler);
+    const listeners = ensureRouteProtectionState().listeners;
+    if (listeners[eventName] instanceof Set) {
+        listeners[eventName].delete(handler);
     }
 }
 
 export function _dispatchRouteEvent(eventName, payload) {
-    if (_eventListeners[eventName]) {
-        for (const handler of _eventListeners[eventName]) {
-            try {
-                handler(payload);
-            } catch (e) {
-                console.error(`[Zenith Router] Error in ${eventName} listener:`, e);
-            }
+    const listeners = ensureRouteProtectionState().listeners[eventName];
+    if (!(listeners instanceof Set)) {
+        return;
+    }
+
+    for (const handler of listeners) {
+        try {
+            handler(payload);
+        } catch (e) {
+            console.error(`[Zenith Router] Error in ${eventName} listener:`, e);
         }
     }
 }

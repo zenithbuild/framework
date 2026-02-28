@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,24 @@ assert.ok(
     sourceA.includes('import(__ZENITH_MANIFEST__.chunks[route])'),
     'router template must use manifest-driven dynamic import shape'
 );
+assert.equal(
+    sourceA.includes('import { _dispatchRouteEvent as __zenithDispatchRouteEvent'),
+    false,
+    'router template must not import route event helpers from runtime'
+);
+assert.equal(
+    sourceA.includes('import { _getRouteProtectionPolicy as __zenithGetRouteProtectionPolicy'),
+    false,
+    'router template must not import route policy helpers from runtime'
+);
+assert.ok(
+    sourceA.includes('function __zenithDispatchRouteEvent(eventName, payload)'),
+    'router template must provide internal route event dispatch helper'
+);
+assert.ok(
+    sourceA.includes('function __zenithGetRouteProtectionPolicy()'),
+    'router template must provide internal route policy helper'
+);
 
 const clickStart = sourceA.indexOf("document.addEventListener('click'");
 assert.ok(clickStart >= 0, 'router template must register delegated click handler');
@@ -90,6 +108,15 @@ assert.ok(
 
 assert.ok(sourceA.includes('fetch("/__zenith/route-check'), 'router template must query route protection fallback');
 assert.equal(
+    sourceA.includes('routeId: resolved.route.route_id'),
+    false,
+    'route-check event payload must not read invalid route_id property'
+);
+assert.ok(
+    sourceA.includes('routeId: resolved.route'),
+    'route-check event payload must include resolved route id string'
+);
+assert.equal(
     sourceA.includes("searchParams.get('__zenith_ssr')"),
     false,
     'router template must not read SSR query params'
@@ -105,7 +132,6 @@ assert.equal(sourceA.includes('zenith:'), false, 'router template must not conta
 const sourceFromPackage = renderRouterModuleFromPackage(opts);
 assert.equal(sourceFromPackage, sourceA, 'subpath export must resolve and return the same deterministic source');
 
-writeFileSync(goldenPath, sourceA, 'utf8');
 const golden = readFileSync(goldenPath, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 assert.equal(sourceA, golden, 'router template output must match golden bytes for the fixed fixture');
 

@@ -1,6 +1,5 @@
 import { hydrate as __zenithHydrate } from '/assets/runtime.11111111.js';
 import { zenOnMount as __zenithOnMount } from '/assets/core.33333333.js';
-import { _dispatchRouteEvent as __zenithDispatchRouteEvent, _getRouteProtectionPolicy as __zenithGetRouteProtectionPolicy } from '/assets/runtime.11111111.js';
 
 void __zenithHydrate;
 void __zenithOnMount;
@@ -31,6 +30,47 @@ function normalizeCatchAll(segments) {
 function requiresServerReload(route) {
   const routes = __ZENITH_MANIFEST__.server_routes || __ZENITH_MANIFEST__.serverRoutes || [];
   return Array.isArray(routes) && routes.includes(route);
+}
+
+const __ZENITH_ROUTE_POLICY_KEY = "__zenith_route_protection_policy";
+const __ZENITH_ROUTE_EVENT_KEY = "__zenith_route_event_listeners";
+const __ZENITH_ROUTE_EVENT_NAMES = ["guard:start", "guard:end", "route-check:start", "route-check:end", "route-check:error", "route:deny", "route:redirect"];
+
+function __zenithEnsureRouteProtectionState() {
+  const scope = typeof globalThis === "object" && globalThis ? globalThis : window;
+  let policy = scope[__ZENITH_ROUTE_POLICY_KEY];
+  if (!policy || typeof policy !== "object") {
+    policy = {};
+    scope[__ZENITH_ROUTE_POLICY_KEY] = policy;
+  }
+  let listeners = scope[__ZENITH_ROUTE_EVENT_KEY];
+  if (!listeners || typeof listeners !== "object") {
+    listeners = Object.create(null);
+    scope[__ZENITH_ROUTE_EVENT_KEY] = listeners;
+  }
+  for (let i = 0; i < __ZENITH_ROUTE_EVENT_NAMES.length; i++) {
+    const name = __ZENITH_ROUTE_EVENT_NAMES[i];
+    if (!(listeners[name] instanceof Set)) {
+      listeners[name] = new Set();
+    }
+  }
+  return { policy, listeners };
+}
+
+function __zenithGetRouteProtectionPolicy() {
+  return __zenithEnsureRouteProtectionState().policy;
+}
+
+function __zenithDispatchRouteEvent(eventName, payload) {
+  const listeners = __zenithEnsureRouteProtectionState().listeners[eventName];
+  if (!(listeners instanceof Set)) return;
+  for (const handler of listeners) {
+    try {
+      handler(payload);
+    } catch (error) {
+      console.error("[Zenith Router] route event handler failed", error);
+    }
+  }
 }
 
 function segmentWeight(segment) {
@@ -217,7 +257,7 @@ function start() {
         onSuccess();
         return;
       }
-      __zenithDispatchRouteEvent("route-check:start", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id });
+      __zenithDispatchRouteEvent("route-check:start", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route });
       fetch("/__zenith/route-check?path=" + encodeURIComponent(path), { headers: { "x-zenith-route-check": "1" }, credentials: "include" }).then(function(res) {
         return res.json().then(function(data) {
           if (!res.ok) throw new Error("route-check failed");
@@ -226,15 +266,15 @@ function start() {
       }).then(function(checkResult) {
         if (checkResult && checkResult.result) {
           const result = checkResult.result;
-          __zenithDispatchRouteEvent("route-check:end", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+          __zenithDispatchRouteEvent("route-check:end", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
           const policy = __zenithGetRouteProtectionPolicy();
           if (result.kind === "redirect") {
-             __zenithDispatchRouteEvent("route:redirect", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+             __zenithDispatchRouteEvent("route:redirect", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
              window.location.assign(result.location || "/");
              return;
           }
           if (result.kind === "deny") {
-             __zenithDispatchRouteEvent("route:deny", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+             __zenithDispatchRouteEvent("route:deny", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
              console.warn("[Zenith] Route denied:", result.message);
              if (result.status === 401 && policy.deny401RedirectToLogin !== false) {
                  const loginPath = policy.defaultLoginPath || "/login";
@@ -264,7 +304,7 @@ function start() {
           window.location.assign(targetUrl.href);
         }
       }).catch(function(e) {
-          __zenithDispatchRouteEvent("route-check:error", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, error: e });
+          __zenithDispatchRouteEvent("route-check:error", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, error: e });
           console.error("[Zenith Router] fallback route-check failed", e);
           window.location.assign(targetUrl.href);
       });
@@ -297,7 +337,7 @@ function start() {
         onSuccess();
         return;
       }
-      __zenithDispatchRouteEvent("route-check:start", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id });
+      __zenithDispatchRouteEvent("route-check:start", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route });
       fetch("/__zenith/route-check?path=" + encodeURIComponent(path), { headers: { "x-zenith-route-check": "1" }, credentials: "include" }).then(function(res) {
         return res.json().then(function(data) {
           if (!res.ok) throw new Error("route-check failed");
@@ -306,43 +346,51 @@ function start() {
       }).then(function(checkResult) {
         if (checkResult && checkResult.result) {
           const result = checkResult.result;
-          __zenithDispatchRouteEvent("route-check:end", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+          __zenithDispatchRouteEvent("route-check:end", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
           const policy = __zenithGetRouteProtectionPolicy();
           if (result.kind === "redirect") {
-             __zenithDispatchRouteEvent("route:redirect", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+             __zenithDispatchRouteEvent("route:redirect", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
+             window._zenith_is_popstate_nav = false;
              window.location.assign(result.location || "/");
              return;
           }
           if (result.kind === "deny") {
-             __zenithDispatchRouteEvent("route:deny", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, result });
+             __zenithDispatchRouteEvent("route:deny", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, result });
              console.warn("[Zenith] Route denied:", result.message);
              if (result.status === 401 && policy.deny401RedirectToLogin !== false) {
                  const loginPath = policy.defaultLoginPath || "/login";
+                 window._zenith_is_popstate_nav = false;
                  window.location.assign(loginPath + "?next=" + encodeURIComponent(targetUrl.pathname + targetUrl.search + targetUrl.hash));
                  return;
              }
              if (result.status === 403 && (policy.onDeny === "navigate" || policy.onDeny === "render403" || policy.forbiddenPath)) {
+                 window._zenith_is_popstate_nav = false;
                  window.location.assign(policy.forbiddenPath || "/403");
                  return;
              }
              if (policy.onDeny === "redirect") {
+                 window._zenith_is_popstate_nav = false;
                  window.location.assign(policy.defaultLoginPath || "/login");
                  return;
              }
              if (typeof policy.onDeny === "function") {
                  policy.onDeny(result);
+                 window._zenith_is_popstate_nav = false;
                  return;
              }
+             window._zenith_is_popstate_nav = false;
              history.back(); // Revert the popstate in history to align url bar with DOM
              return; // No-flash block
           }
           onSuccess();
         } else {
+          window._zenith_is_popstate_nav = false;
           window.location.assign(targetUrl.href);
         }
       }).catch(function(e) {
-          __zenithDispatchRouteEvent("route-check:error", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route.route_id, error: e });
+          __zenithDispatchRouteEvent("route-check:error", { to: targetUrl, from: new URL(window.location.href), routeId: resolved.route, error: e });
           console.error("[Zenith Router] fallback route-check failed", e);
+          window._zenith_is_popstate_nav = false;
           window.location.assign(targetUrl.href);
       });
     }

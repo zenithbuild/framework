@@ -131,6 +131,16 @@ describe('Route Protection Events & Policy', () => {
         expect(policy.forbiddenPath).toBe('/forbidden');
     });
 
+    test('policy/event stores are shared on globalThis for template interop', () => {
+        setRouteProtectionPolicy({
+            defaultLoginPath: '/login-global'
+        });
+
+        expect(globalThis.__zenith_route_protection_policy.defaultLoginPath).toBe('/login-global');
+        expect(globalThis.__zenith_route_event_listeners).toBeDefined();
+        expect(globalThis.__zenith_route_event_listeners['route-check:start'] instanceof Set).toBe(true);
+    });
+
     test('event lifecycle dispatches listeners in order', () => {
         const logs = [];
         const startFn = (payload) => logs.push('start:' + payload.routeId);

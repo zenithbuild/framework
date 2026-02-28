@@ -93,6 +93,9 @@ router.start(); // Initial route match + mount happens here
 | `onRouteChange` | `(callback) => () => void` | Subscribe, returns unsubscribe |
 | `getCurrentPath` | `() => string` | Returns current pathname |
 | `matchRoute` | `(routes, pathname) => result` | Pure match function (for testing) |
+| `setRouteProtectionPolicy` | `(policy) => void` | Configure deny/redirect UX policy for client no-flash checks |
+| `on` | `(eventName, handler) => void` | Subscribe to route protection lifecycle events |
+| `off` | `(eventName, handler) => void` | Unsubscribe route protection lifecycle events |
 
 ---
 
@@ -176,9 +179,12 @@ export { forward }        // History forward
 export { onRouteChange }  // Subscribe to route changes
 export { getCurrentPath } // Read current path
 export { matchRoute }     // Pure match function (testing)
+export { setRouteProtectionPolicy } // Configure guard/load no-flash client policy
+export { on }             // Route protection lifecycle events
+export { off }            // Remove route protection lifecycle events
 ```
 
-Seven functions. No more.
+Navigation + route protection hooks only. No unrelated framework surface.
 
 ---
 
@@ -196,3 +202,4 @@ This contract is valid if and only if:
 - [ ] No auto-start — `router.start()` is explicit
 - [ ] No scroll or focus management
 - [ ] Route manifest is consumed blindly — no file-system logic in router
+- [ ] Route protection policy/event store is router-owned and shared via stable global keys
