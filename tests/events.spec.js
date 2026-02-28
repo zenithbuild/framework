@@ -6,7 +6,12 @@ import {
     onRouteChange,
     _dispatchRouteChange,
     _clearSubscribers,
-    _getSubscriberCount
+    _getSubscriberCount,
+    setRouteProtectionPolicy,
+    _getRouteProtectionPolicy,
+    on,
+    off,
+    _dispatchRouteEvent
 } from '../src/events.js';
 
 describe('Route Change Events', () => {
@@ -97,5 +102,67 @@ describe('Route Change Events', () => {
 
         _clearSubscribers();
         expect(_getSubscriberCount()).toBe(0);
+    });
+});
+
+describe('Route Protection Events & Policy', () => {
+    afterEach(() => {
+        // Reset defaults
+        setRouteProtectionPolicy({
+            onDeny: undefined,
+            defaultLoginPath: undefined,
+            deny401RedirectToLogin: undefined,
+            forbiddenPath: undefined
+        });
+    });
+
+    test('policy state is initialized and configurable', () => {
+        setRouteProtectionPolicy({
+            onDeny: 'stay',
+            defaultLoginPath: '/login-custom',
+            deny401RedirectToLogin: true,
+            forbiddenPath: '/forbidden'
+        });
+
+        const policy = _getRouteProtectionPolicy();
+        expect(policy.onDeny).toBe('stay');
+        expect(policy.defaultLoginPath).toBe('/login-custom');
+        expect(policy.deny401RedirectToLogin).toBe(true);
+        expect(policy.forbiddenPath).toBe('/forbidden');
+    });
+
+    test('event lifecycle dispatches listeners in order', () => {
+        const logs = [];
+        const startFn = (payload) => logs.push('start:' + payload.routeId);
+        const denyFn = (payload) => logs.push('deny:' + payload.result.status);
+        const redirectFn = (payload) => logs.push('redirect:' + payload.result.status);
+
+        on('route-check:start', startFn);
+        on('route:deny', denyFn);
+        on('route:redirect', redirectFn);
+
+        _dispatchRouteEvent('route-check:start', { routeId: '123' });
+        _dispatchRouteEvent('route:deny', { result: { kind: 'deny', status: 401 } });
+        _dispatchRouteEvent('route:deny', { result: { kind: 'deny', status: 403 } });
+        _dispatchRouteEvent('route:redirect', { result: { kind: 'redirect', status: 302 } });
+
+        expect(logs).toEqual([
+            'start:123',
+            'deny:401',
+            'deny:403',
+            'redirect:302'
+        ]);
+
+        off('route-check:start', startFn);
+        off('route:deny', denyFn);
+        off('route:redirect', redirectFn);
+
+        _dispatchRouteEvent('route-check:start', { routeId: '456' });
+        expect(logs).toEqual([
+            'start:123',
+            'deny:401',
+            'deny:403',
+            'redirect:302'
+        ]);
     });
 });

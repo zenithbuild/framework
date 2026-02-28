@@ -23,7 +23,6 @@ const source = renderRouterModule({
   coreImport: '/assets/core.33333333.js'
 });
 
-assert.equal(source.includes('fetch('), false, 'router output must not contain fetch(');
 assert.equal(source.includes('.zen'), false, 'router output must not contain .zen');
 assert.equal(source.includes('zenith:'), false, 'router output must not contain zenith:');
 assert.ok(

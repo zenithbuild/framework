@@ -5,6 +5,12 @@
 
 File-based SPA router for Zenith framework with **deterministic, compile-time route resolution**.
 
+## Canonical Docs
+
+- Routing contract: `../zenith-docs/documentation/contracts/routing.md`
+- Navigation contract: `../zenith-docs/documentation/contracts/navigation.md`
+- Router contract: `../zenith-docs/documentation/contracts/router-contract.md`
+
 ## Features
 
 - 📁 **File-based routing** — Pages in `pages/` directory become routes automatically

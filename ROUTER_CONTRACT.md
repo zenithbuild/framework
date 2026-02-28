@@ -1,5 +1,8 @@
 # ROUTER_CONTRACT.md — Sealed Navigation Interface
 
+Canonical public docs: `../zenith-docs/documentation/contracts/router-contract.md`
+
+
 > **This document is a legal boundary.**
 > The router performs structural navigation.
 > It does not interpret, evaluate, or rewrite page content.

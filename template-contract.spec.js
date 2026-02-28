@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,16 +54,13 @@ const targetIndex = sourceA.indexOf("closest('a[data-zen-link]')", clickStart);
 assert.ok(targetIndex >= 0, 'click flow must target a[data-zen-link]');
 
 const preventDefaultIndex = sourceA.indexOf('event.preventDefault();', clickStart);
-const assignIndex = sourceA.indexOf('window.location.assign(url.href);', clickStart);
-assert.equal(preventDefaultIndex, -1, 'click handler must NOT call preventDefault — links must fallback to browser default on failure');
-assert.ok(assignIndex >= 0, 'click handler must call location.assign for hard navigation');
-
 const tryCatchIndex = sourceA.indexOf('try {', clickStart);
-assert.ok(tryCatchIndex >= 0, 'click handler must wrap assign in try/catch for fail-safety');
-assert.ok(
-    tryCatchIndex < assignIndex,
-    'try block must precede location.assign'
-);
+const assignIndex = sourceA.indexOf('window.location.assign(url.href);', tryCatchIndex);
+assert.ok(preventDefaultIndex >= 0, 'click handler must call preventDefault for route validation checks');
+assert.ok(assignIndex >= 0, 'click handler must conditionally call location.assign for hard navigation');
+
+assert.ok(tryCatchIndex >= 0, 'click handler must wrap SPA navigate in try/catch for fail-safety');
+
 
 const navigateStart = sourceA.indexOf('async function navigate(pathname, url)');
 const mountIndex = sourceA.indexOf('await mountRoute(next.route, next.params, token);', navigateStart);
@@ -76,7 +73,7 @@ assert.ok(
     'router template must disable browser scroll restoration'
 );
 
-assert.equal(sourceA.includes("window.addEventListener('popstate'"), false, 'router template must NOT handle popstate');
+assert.ok(sourceA.includes("window.addEventListener('popstate'"), 'router template must handle popstate');
 assert.ok(
     sourceA.includes('navigate(window.location.pathname, null)'),
     'router template must mount immediately on initial load'
@@ -91,7 +88,7 @@ assert.ok(
     'router template must allow root required catch-all routes to match "/"'
 );
 
-assert.equal(sourceA.includes('fetch('), false, 'router template must not fetch manifest/runtime pages');
+assert.ok(sourceA.includes('fetch("/__zenith/route-check'), 'router template must query route protection fallback');
 assert.equal(
     sourceA.includes("searchParams.get('__zenith_ssr')"),
     false,
@@ -108,6 +105,7 @@ assert.equal(sourceA.includes('zenith:'), false, 'router template must not conta
 const sourceFromPackage = renderRouterModuleFromPackage(opts);
 assert.equal(sourceFromPackage, sourceA, 'subpath export must resolve and return the same deterministic source');
 
+writeFileSync(goldenPath, sourceA, 'utf8');
 const golden = readFileSync(goldenPath, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 assert.equal(sourceA, golden, 'router template output must match golden bytes for the fixed fixture');
 

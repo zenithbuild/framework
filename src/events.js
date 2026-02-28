@@ -51,3 +51,63 @@ export function _clearSubscribers() {
 export function _getSubscriberCount() {
     return _subscribers.size;
 }
+
+// --- Route Protection Events & Policy ---
+
+let _routePolicy = {};
+
+/**
+ * Configure default behaviors for route protection.
+ * @param {import('../index').RouteProtectionPolicy} policy 
+ */
+export function setRouteProtectionPolicy(policy) {
+    _routePolicy = Object.assign({}, _routePolicy, policy);
+}
+
+export function _getRouteProtectionPolicy() {
+    return _routePolicy;
+}
+
+const _eventListeners = {
+    'guard:start': new Set(),
+    'guard:end': new Set(),
+    'route-check:start': new Set(),
+    'route-check:end': new Set(),
+    'route-check:error': new Set(),
+    'route:deny': new Set(),
+    'route:redirect': new Set()
+};
+
+/**
+ * Listen to route protection lifecycle events.
+ * @param {string} eventName 
+ * @param {Function} handler 
+ */
+export function on(eventName, handler) {
+    if (_eventListeners[eventName]) {
+        _eventListeners[eventName].add(handler);
+    }
+}
+
+/**
+ * Remove a route protection lifecycle event listener.
+ * @param {string} eventName 
+ * @param {Function} handler 
+ */
+export function off(eventName, handler) {
+    if (_eventListeners[eventName]) {
+        _eventListeners[eventName].delete(handler);
+    }
+}
+
+export function _dispatchRouteEvent(eventName, payload) {
+    if (_eventListeners[eventName]) {
+        for (const handler of _eventListeners[eventName]) {
+            try {
+                handler(payload);
+            } catch (e) {
+                console.error(`[Zenith Router] Error in ${eventName} listener:`, e);
+            }
+        }
+    }
+}
