@@ -97,3 +97,34 @@ Routes protected with `guard(ctx)` or `load(ctx)` **cannot be statically generat
 When navigating via SPA links (`<a data-zen-link>`), the Zenith Router detects guarded server routes. It intercepts the navigation, pings `/__zenith/route-check` in the background, and will only transition the browser once the server allows access. If denied, the user remains on their current page without a flash of unauthorized content.
 
 If redirected, the router seamlessly follows the redirect.
+
+### Optional Client Policy and Events
+For SPA UX tuning (not security), you can configure route-protection behavior and subscribe to lifecycle events:
+
+```ts
+import { setRouteProtectionPolicy, on, off } from "@zenithbuild/router";
+
+setRouteProtectionPolicy({
+  defaultLoginPath: "/login",
+  deny401RedirectToLogin: true,
+  forbiddenPath: "/403",
+  onDeny: "stay" // or "redirect" | "render403" | (result) => {}
+});
+
+const handleDeny = (payload) => {
+  console.warn("Denied route", payload.routeId, payload.result?.status);
+};
+
+on("route:deny", handleDeny);
+// later:
+off("route:deny", handleDeny);
+```
+
+Supported route-protection events:
+- `guard:start`
+- `guard:end`
+- `route-check:start`
+- `route-check:end`
+- `route-check:error`
+- `route:deny`
+- `route:redirect`

@@ -15,6 +15,9 @@ Contract: route matching is deterministic and server-correct across dev/preview/
 
 Invariant: plain anchors hard navigate by default; soft navigation is explicit opt-in.
 
+Route-protection UX hooks (`setRouteProtectionPolicy`, `on`, `off`) are router-owned.
+They are advisory client behavior only and must never be treated as a security boundary.
+
 Banned:
 - Implicit global link interception.
 - Query-transport SSR channels.
