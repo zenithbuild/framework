@@ -21,9 +21,8 @@ A core hook must satisfy **all** of these criteria:
 4. Represents a structural or lifecycle boundary.
 
 **Examples of Core Hooks:**
-- `onMount`: Runs when a component enters the DOM.
-- `onUnmount`: Runs when a component leaves the DOM.
-- `zenEffect`: Reactive side-effect boundary.
+- `zenMount`: Mount lifecycle boundary (with optional cleanup return).
+- `zeneffect`: Reactive side-effect boundary.
 
 ---
 
@@ -73,3 +72,12 @@ Zenith achieve seamlessness through **compile-time indirection**, not runtime co
 - **Runtime** stays dumb and minimal.
 - **Compiler** is the only place where these worlds meet.
 - **Plugins** are self-contained power-ups.
+
+## Current API Naming
+
+For core lifecycle/reactivity docs and examples, use:
+
+- `zenMount(...)`
+- `zeneffect(...)`
+
+Do not publish new examples using legacy names such as `zenOnMount`, `zenOnUnmount`, or `zenOnUpdate`.

@@ -22,6 +22,7 @@ Required defaults:
 - Use canonical primitives (`state`, `signal`, `ref`) per docs.
 - Use controlled/uncontrolled prop triplets for interactive components.
 - Preserve parent scope for slot content.
+- Route protection MUST be implemented via `guard(ctx)` and `load(ctx)` exports in `<script server>` or adjacent files, returning canonical `RouteResult` types (`allow()`, `redirect()`, `deny()`, `data()`).
 
 ## Copy-Paste System Prompt
 
@@ -33,6 +34,7 @@ You are coding in Zenith. Follow Zenith canonical docs and rule IDs.
 - Slot expressions preserve parent scope.
 - For interactive components, use controlled/uncontrolled triplets:
   open/defaultOpen/onOpenChange and value/defaultValue/onValueChange.
+- For route protection, export `guard(ctx)` or `load(ctx)` returning `allow()`, `redirect()`, `deny()`, or `data()`. Never implement generic client-side guards; "Server is Security".
 If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 ```
 
@@ -41,4 +43,5 @@ If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 - [Events](/docs/syntax/events)
 - [Reactivity Model](/docs/reactivity/reactivity-model)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
+- [Route Protection](/docs/routing/route-protection)
 - [Common Mistakes](/docs/guides/common-mistakes)

@@ -1,0 +1,48 @@
+<script setup="ts">
+const count = signal(0);
+const countValueRef = ref<HTMLElement>();
+const doubledValueRef = ref<HTMLElement>();
+
+function renderCounter() {
+  const current = count.get();
+
+  if (countValueRef.current) {
+    countValueRef.current.textContent = `${current}`;
+  }
+
+  if (doubledValueRef.current) {
+    doubledValueRef.current.textContent = `Double: ${current * 2}`;
+  }
+}
+
+function increment() {
+  count.set(count.get() + 1);
+  renderCounter();
+}
+
+function reset() {
+  count.set(0);
+  renderCounter();
+}
+
+zenMount(() => {
+  renderCounter();
+});
+
+zeneffect([count], () => {
+  renderCounter();
+});
+</script>
+
+<section class="p-6 font-sans">
+  <h1 class="text-2xl font-semibold">Counter Demo</h1>
+  <p class="mt-2 text-sm text-zinc-600">State updates are compiler-wired and deterministic.</p>
+
+  <p ref={countValueRef} data-demo-counter-value-runtime class="mt-5 text-4xl font-mono">0</p>
+  <p ref={doubledValueRef} data-demo-counter-doubled-runtime class="mt-1 text-sm text-zinc-500">Double: 0</p>
+
+  <div class="mt-4 flex gap-3">
+    <button class="rounded-md bg-cyan-600 px-4 py-2 text-white" on:click={increment}>Increment</button>
+    <button class="rounded-md border border-zinc-300 px-4 py-2" on:click={reset}>Reset</button>
+  </div>
+</section>

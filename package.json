@@ -7,7 +7,11 @@
     "build": "npx zenith build",
     "build:stage": "npx zenith build && node scripts/stage-public.mjs",
     "preview": "npx zenith preview",
-    "check:ai": "node scripts/generate-ai-endpoints.mjs --check && node scripts/check-docs-integrity.mjs",
+    "docs:structure": "node scripts/gates/docs-structure.mjs",
+    "docs:syntax": "node scripts/gates/docs-syntax.mjs",
+    "docs:snippets": "node scripts/gates/docs-snippets.mjs",
+    "docs:gate": "npm run docs:structure && npm run docs:syntax && npm run docs:snippets && node scripts/generate-ai-endpoints.mjs --check",
+    "check:ai": "npm run docs:gate",
     "test": "bun test"
   },
   "dependencies": {

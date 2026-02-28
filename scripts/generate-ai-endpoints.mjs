@@ -244,14 +244,18 @@ function buildRss(posts) {
   ].join("\n");
 }
 
-async function listContentFiles(rootDir) {
+async function listContentFiles(rootDir, options = {}) {
   const out = [];
+  const excludedDirs = new Set(options.excludeDirectories || []);
 
   async function walk(dir) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (excludedDirs.has(entry.name)) {
+          continue;
+        }
         await walk(full);
         continue;
       }
@@ -625,7 +629,7 @@ function llmsTxt(nav) {
 }
 
 async function buildDocsRecords(categoryMap) {
-  const files = await listContentFiles(DOCS_ROOT);
+  const files = await listContentFiles(DOCS_ROOT, { excludeDirectories: ["_legacy"] });
   const records = [];
   for (const fullPath of files) {
     const raw = await fs.readFile(fullPath, "utf8");
@@ -708,6 +712,13 @@ async function computeOutputs() {
   const jsonlChunks = [];
 
   for (const entry of all) {
+    if (entry.kind === "doc" && entry.meta.status !== "canonical") {
+      continue;
+    }
+    if (entry.kind === "post" && entry.meta.status !== "published") {
+      continue;
+    }
+
     manifestItems.push({
       kind: entry.kind,
       slug: entry.slug,
@@ -727,10 +738,7 @@ async function computeOutputs() {
       prerequisites: entry.prerequisites,
     });
 
-    if (
-      (entry.kind === "doc" && entry.meta.status === "canonical" && !entry.hidden) ||
-      (entry.kind === "post" && entry.meta.status === "published")
-    ) {
+    if ((entry.kind === "doc" && !entry.hidden) || entry.kind === "post") {
       urls.push(entry.url);
     }
 
