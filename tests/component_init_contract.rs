@@ -88,6 +88,20 @@ fn find_component_asset(out_dir: &Path) -> PathBuf {
         .expect("component asset must exist")
 }
 
+fn find_page_asset(out_dir: &Path) -> PathBuf {
+    let index_html = fs::read_to_string(out_dir.join("index.html")).expect("read index html");
+    let marker = "type=\"module\" src=\"/";
+    let start = index_html
+        .find(marker)
+        .map(|idx| idx + marker.len())
+        .expect("page asset marker");
+    let end = index_html[start..]
+        .find('"')
+        .map(|offset| start + offset)
+        .expect("page asset terminator");
+    out_dir.join(&index_html[start..end])
+}
+
 fn component_payload() -> serde_json::Value {
     let graph_hash = compute_graph_hash(&["root_hoist"], &[]);
     json!([{
@@ -192,5 +206,60 @@ fn component_init_modules_do_not_embed_forbidden_imports() {
     assert!(
         !source.contains("fetch("),
         "component init asset leaked fetch(:\n{source}"
+    );
+}
+
+#[test]
+fn page_assets_import_runtime_helpers_needed_by_hoisted_code() {
+    let tmp = tempfile::tempdir().expect("temp dir");
+    let out_dir = tmp.path().join("dist");
+    let graph_hash = compute_graph_hash(&["root_hoist"], &[]);
+
+    let payload = json!([{
+        "route": "/",
+        "file": "src/pages/index.zen",
+        "router": false,
+        "ir": {
+            "ir_version": 1,
+            "graph_hash": graph_hash,
+            "graph_edges": [],
+            "graph_nodes": [{ "id": "src/pages/index.zen", "hoist_id": "root_hoist" }],
+            "html": "<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><button>Home</button></body></html>",
+            "expressions": [],
+            "hoisted": {
+                "imports": [],
+                "declarations": [],
+                "functions": [],
+                "signals": [],
+                "state": [],
+                "code": [
+                    "function measure(){ const win = zenWindow(); const doc = zenDocument(); zenOn(doc, 'click', () => {}); const stop = zenResize(() => {}); collectRefs({ current: win }, { current: doc }); stop(); }\nzenMount(() => { measure(); });"
+                ]
+            },
+            "components_scripts": {},
+            "component_instances": [],
+            "imports": [],
+            "modules": [],
+            "signals": [],
+            "expression_bindings": [],
+            "marker_bindings": [],
+            "event_bindings": [],
+            "ref_bindings": [],
+            "style_blocks": []
+        }
+    }]);
+
+    let output = run_bundler(payload, &out_dir);
+    assert!(
+        output.status.success(),
+        "bundler failed unexpectedly: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let page_asset = find_page_asset(&out_dir);
+    let source = fs::read_to_string(page_asset).expect("read page asset");
+    assert!(
+        source.contains("import { hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }"),
+        "page asset did not import full runtime helper set:\n{source}"
     );
 }

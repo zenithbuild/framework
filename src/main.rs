@@ -2985,7 +2985,7 @@ fn generate_entry_js(
         js.push_str(&component_imports);
     }
     js.push_str(&format!(
-        "import {{ hydrate, signal, state, ref, zeneffect, zenEffect, zenMount }} from '{}';\n",
+        "import {{ hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }} from '{}';\n",
         runtime_import_spec
     ));
     let route_pattern_json = serde_json::to_string(route_pattern)
