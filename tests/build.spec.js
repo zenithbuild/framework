@@ -536,6 +536,46 @@ describe('build orchestration', () => {
         expect(pageAsset).toMatch(/"state_index":\d+/);
     });
 
+    test('rewrites hoisted component declarations in emitted expression bindings', async () => {
+        const root = join(tmpdir(), `zenith-build-hoisted-decls-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'OverlayChip.zen'),
+            [
+                '<script lang="ts">',
+                'const overlayTone = "bg-fuchsia-500/30";',
+                '</script>',
+                '<div class={"base " + overlayTone}>chip</div>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><OverlayChip /></main>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+
+        expect(pageAsset).toContain('overlayTone = "bg-fuchsia-500/30"');
+        expect(pageAsset).not.toContain('return "base " + overlayTone;');
+        expect(pageAsset).toMatch(/return "base " \+ [A-Za-z0-9_$]+;/);
+    });
+
     test('build compiles local tailwind entry css internally', async () => {
         const root = join(tmpdir(), `zenith-build-tailwind-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         const srcDir = join(root, 'src');

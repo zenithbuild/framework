@@ -116,6 +116,15 @@ export async function cli(args, cwd) {
     const outDir = join(projectRoot, 'dist');
     const config = await loadConfig(projectRoot);
 
+    if (command === 'build' || command === 'dev') {
+        const { maybeWarnAboutZenithVersionMismatch } = await import('./version-check.js');
+        await maybeWarnAboutZenithVersionMismatch({
+            projectRoot,
+            logger,
+            command
+        });
+    }
+
     if (command === 'build') {
         const { build } = await import('./build.js');
         logger.build('Building…');

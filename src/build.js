@@ -16,13 +16,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { generateManifest } from './manifest.js';
 import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMode } from './resolve-components.js';
+import { resolveBundlerBin, resolveCompilerBin } from './toolchain-paths.js';
+import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const CLI_ROOT = resolve(__dirname, '..');
 const require = createRequire(import.meta.url);
 let cachedTypeScript = undefined;
 
@@ -38,40 +36,6 @@ function loadTypeScriptApi() {
         }
     }
     return cachedTypeScript;
-}
-
-/**
- * Resolve a binary path from deterministic candidates.
- *
- * Supports both repository layout (../zenith-*) and installed package layout
- * under node_modules/@zenithbuild (../compiler, ../bundler).
- *
- * @param {string[]} candidates
- * @returns {string}
- */
-function resolveBinary(candidates) {
-    for (const candidate of candidates) {
-        if (existsSync(candidate)) {
-            return candidate;
-        }
-    }
-    return candidates[0];
-}
-
-const COMPILER_BIN = resolveBinary([
-    resolve(CLI_ROOT, '../compiler/target/release/zenith-compiler'),
-    resolve(CLI_ROOT, '../zenith-compiler/target/release/zenith-compiler')
-]);
-
-function getBundlerBin() {
-    const envBin = process.env.ZENITH_BUNDLER_BIN;
-    if (envBin && typeof envBin === 'string' && existsSync(envBin)) {
-        return envBin;
-    }
-    return resolveBinary([
-        resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler'),
-        resolve(CLI_ROOT, '../zenith-bundler/target/release/zenith-bundler')
-    ]);
 }
 
 /**
@@ -133,9 +97,11 @@ function forwardStreamLines(stream, onLine) {
  * @param {object} compilerRunOptions
  * @param {(warning: string) => void} [compilerRunOptions.onWarning]
  * @param {boolean} [compilerRunOptions.suppressWarnings]
+ * @param {string} [compilerRunOptions.compilerBin]
  * @returns {object}
  */
 function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOptions = {}) {
+    const compilerBin = compilerRunOptions.compilerBin || resolveCompilerBin();
     const args = stdinSource !== undefined
         ? ['--stdin', filePath]
         : [filePath];
@@ -150,7 +116,7 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOption
         opts.input = stdinSource;
     }
 
-    const result = spawnSync(COMPILER_BIN, args, opts);
+    const result = spawnSync(compilerBin, args, opts);
 
     if (result.error) {
         throw new Error(`Compiler spawn failed for ${filePath}: ${result.error.message}`);
@@ -200,6 +166,8 @@ function stripStyleBlocks(source) {
  * @param {string} compPath
  * @param {string} componentSource
  * @param {object} compIr
+ * @param {object} compilerOpts
+ * @param {string} compilerBin
  * @returns {{
  *   map: Map<string, string>,
  *   bindings: Map<string, {
@@ -215,7 +183,7 @@ function stripStyleBlocks(source) {
  *   ambiguous: Set<string>
  * }}
  */
-function buildComponentExpressionRewrite(compPath, componentSource, compIr, compilerOpts) {
+function buildComponentExpressionRewrite(compPath, componentSource, compIr, compilerOpts, compilerBin) {
     const out = {
         map: new Map(),
         bindings: new Map(),
@@ -236,7 +204,10 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
 
     let templateIr;
     try {
-        templateIr = runCompiler(compPath, templateOnly, compilerOpts, { suppressWarnings: true });
+        templateIr = runCompiler(compPath, templateOnly, compilerOpts, {
+            suppressWarnings: true,
+            compilerBin
+        });
     } catch {
         return out;
     }
@@ -327,7 +298,7 @@ function resolveRewrittenBindingMetadata(pageIr, componentRewrite, binding) {
     }
 
     const pageStateBindings = Array.isArray(pageIr?.hoisted?.state) ? pageIr.hoisted.state : [];
-    const pageSignals = Array.isArray(pageIr?.hoisted?.signals) ? pageIr.hoisted.signals : [];
+    const pageSignals = Array.isArray(pageIr?.signals) ? pageIr.signals : [];
     const pageStateIndexByKey = new Map();
     const pageSignalIndexByStateKey = new Map();
 
@@ -616,6 +587,107 @@ function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambiguous) {
             bindings[index].compiled_expr === current
         ) {
             bindings[index].compiled_expr = current;
+        }
+    }
+}
+
+function applyScopedIdentifierRewrites(pageIr, scopeRewrite) {
+    if (!Array.isArray(pageIr?.expressions) || pageIr.expressions.length === 0) {
+        return;
+    }
+    const bindings = Array.isArray(pageIr.expression_bindings) ? pageIr.expression_bindings : [];
+    const rewriteContext = {
+        scopeRewrite
+    };
+
+    for (let index = 0; index < pageIr.expressions.length; index++) {
+        const current = pageIr.expressions[index];
+        if (typeof current === 'string') {
+            pageIr.expressions[index] = rewritePropsExpression(current, rewriteContext);
+        }
+
+        if (!bindings[index] || typeof bindings[index] !== 'object') {
+            continue;
+        }
+
+        if (typeof bindings[index].literal === 'string') {
+            bindings[index].literal = rewritePropsExpression(bindings[index].literal, rewriteContext);
+        }
+        if (typeof bindings[index].compiled_expr === 'string') {
+            bindings[index].compiled_expr = rewritePropsExpression(bindings[index].compiled_expr, rewriteContext);
+        }
+    }
+}
+
+function synthesizeSignalBackedCompiledExpressions(pageIr) {
+    if (!Array.isArray(pageIr?.expression_bindings) || pageIr.expression_bindings.length === 0) {
+        return;
+    }
+
+    const stateBindings = Array.isArray(pageIr?.hoisted?.state) ? pageIr.hoisted.state : [];
+    const signals = Array.isArray(pageIr?.signals) ? pageIr.signals : [];
+    if (stateBindings.length === 0 || signals.length === 0) {
+        return;
+    }
+
+    const signalIndexByStateKey = new Map();
+    for (let index = 0; index < signals.length; index++) {
+        const stateIndex = signals[index]?.state_index;
+        const stateKey = Number.isInteger(stateIndex) ? stateBindings[stateIndex]?.key : null;
+        if (typeof stateKey === 'string' && stateKey.length > 0) {
+            signalIndexByStateKey.set(stateKey, index);
+        }
+    }
+    if (signalIndexByStateKey.size === 0) {
+        return;
+    }
+
+    for (let index = 0; index < pageIr.expression_bindings.length; index++) {
+        const binding = pageIr.expression_bindings[index];
+        if (!binding || typeof binding !== 'object') {
+            continue;
+        }
+        if (typeof binding.compiled_expr === 'string' && binding.compiled_expr.includes('signalMap.get(')) {
+            continue;
+        }
+
+        const candidate = typeof binding.literal === 'string' && binding.literal.trim().length > 0
+            ? binding.literal
+            : typeof pageIr.expressions?.[index] === 'string'
+                ? pageIr.expressions[index]
+                : null;
+        if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+            continue;
+        }
+
+        let rewritten = candidate;
+        const signalIndices = [];
+        for (const [stateKey, signalIndex] of signalIndexByStateKey.entries()) {
+            if (!rewritten.includes(stateKey)) {
+                continue;
+            }
+            const escaped = stateKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`\\b${escaped}\\b`, 'g');
+            if (!pattern.test(rewritten)) {
+                continue;
+            }
+            rewritten = rewritten.replace(pattern, `signalMap.get(${signalIndex}).get()`);
+            signalIndices.push(signalIndex);
+        }
+
+        if (rewritten === candidate || signalIndices.length === 0) {
+            continue;
+        }
+
+        const uniqueSignalIndices = [...new Set(signalIndices)].sort((a, b) => a - b);
+        binding.compiled_expr = rewritten;
+        binding.signal_indices = uniqueSignalIndices;
+        if (uniqueSignalIndices.length === 1) {
+            binding.signal_index = uniqueSignalIndices[0];
+            const stateIndex = signals[uniqueSignalIndices[0]]?.state_index;
+            if (Number.isInteger(stateIndex)) {
+                binding.state_index = stateIndex;
+            }
         }
     }
 }
@@ -1654,6 +1726,62 @@ function deriveScopedIdentifierAlias(value) {
 }
 
 /**
+ * @param {string} source
+ * @returns {string[]}
+ */
+function extractDeclaredIdentifiers(source) {
+    const text = String(source || '').trim();
+    if (!text) {
+        return [];
+    }
+
+    const ts = loadTypeScriptApi();
+    if (ts) {
+        const sourceFile = ts.createSourceFile('zenith-hoisted-declaration.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+        const identifiers = [];
+        const collectBindingNames = (name) => {
+            if (ts.isIdentifier(name)) {
+                identifiers.push(name.text);
+                return;
+            }
+            if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+                for (const element of name.elements) {
+                    if (ts.isBindingElement(element)) {
+                        collectBindingNames(element.name);
+                    }
+                }
+            }
+        };
+
+        for (const statement of sourceFile.statements) {
+            if (!ts.isVariableStatement(statement)) {
+                continue;
+            }
+            for (const declaration of statement.declarationList.declarations) {
+                collectBindingNames(declaration.name);
+            }
+        }
+
+        if (identifiers.length > 0) {
+            return identifiers;
+        }
+    }
+
+    const fallback = [];
+    const match = text.match(/^\s*(?:const|let|var)\s+([\s\S]+?);?\s*$/);
+    if (!match) {
+        return fallback;
+    }
+    const declarationList = match[1];
+    const identifierRe = /(?:^|,)\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*(?::[^=,]+)?=/g;
+    let found;
+    while ((found = identifierRe.exec(declarationList)) !== null) {
+        fallback.push(found[1]);
+    }
+    return fallback;
+}
+
+/**
  * @param {Map<string, string>} map
  * @param {Set<string>} ambiguous
  * @param {string | null} raw
@@ -1698,7 +1826,129 @@ function buildScopedIdentifierRewrite(ir) {
         recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(fnName), fnName);
     }
 
+    const declarations = Array.isArray(ir?.hoisted?.declarations) ? ir.hoisted.declarations : [];
+    for (const declaration of declarations) {
+        if (typeof declaration !== 'string') {
+            continue;
+        }
+        for (const identifier of extractDeclaredIdentifiers(declaration)) {
+            recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(identifier), identifier);
+        }
+    }
+
     return out;
+}
+
+function rewriteIdentifiersWithinExpression(expr, scopeMap, scopeAmbiguous) {
+    const ts = loadTypeScriptApi();
+    if (!(scopeMap instanceof Map) || !ts) {
+        return expr;
+    }
+
+    const wrapped = `const __zenith_expr__ = (${expr});`;
+    let sourceFile;
+    try {
+        sourceFile = ts.createSourceFile('zenith-expression.ts', wrapped, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    } catch {
+        return expr;
+    }
+
+    const statement = sourceFile.statements[0];
+    if (!statement || !ts.isVariableStatement(statement)) {
+        return expr;
+    }
+    const initializer = statement.declarationList.declarations[0]?.initializer;
+    const root = initializer && ts.isParenthesizedExpression(initializer) ? initializer.expression : initializer;
+    if (!root) {
+        return expr;
+    }
+
+    const replacements = [];
+    const collectBoundNames = (name, target) => {
+        if (ts.isIdentifier(name)) {
+            target.add(name.text);
+            return;
+        }
+        if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+            for (const element of name.elements) {
+                if (ts.isBindingElement(element)) {
+                    collectBoundNames(element.name, target);
+                }
+            }
+        }
+    };
+    const shouldSkipIdentifier = (node, localBindings) => {
+        if (localBindings.has(node.text)) {
+            return true;
+        }
+        const parent = node.parent;
+        if (!parent) {
+            return false;
+        }
+        if (ts.isPropertyAccessExpression(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isPropertyAssignment(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isShorthandPropertyAssignment(parent)) {
+            return true;
+        }
+        if (ts.isBindingElement(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isParameter(parent) && parent.name === node) {
+            return true;
+        }
+        return false;
+    };
+    const visit = (node, localBindings) => {
+        let nextBindings = localBindings;
+        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+            nextBindings = new Set(localBindings);
+            if (node.name && ts.isIdentifier(node.name)) {
+                nextBindings.add(node.name.text);
+            }
+            for (const param of node.parameters) {
+                collectBoundNames(param.name, nextBindings);
+            }
+        }
+
+        if (ts.isIdentifier(node) && !shouldSkipIdentifier(node, nextBindings)) {
+            const rewritten = scopeMap.get(node.text);
+            if (
+                typeof rewritten === 'string' &&
+                rewritten.length > 0 &&
+                rewritten !== node.text &&
+                !(scopeAmbiguous instanceof Set && scopeAmbiguous.has(node.text))
+            ) {
+                replacements.push({
+                    start: node.getStart(sourceFile),
+                    end: node.getEnd(),
+                    text: rewritten
+                });
+            }
+        }
+
+        ts.forEachChild(node, (child) => visit(child, nextBindings));
+    };
+
+    visit(root, new Set());
+    if (replacements.length === 0) {
+        return expr;
+    }
+
+    let rewritten = wrapped;
+    for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+        rewritten = `${rewritten.slice(0, replacement.start)}${replacement.text}${rewritten.slice(replacement.end)}`;
+    }
+
+    const prefix = 'const __zenith_expr__ = (';
+    const suffix = ');';
+    if (!rewritten.startsWith(prefix) || !rewritten.endsWith(suffix)) {
+        return expr;
+    }
+    return rewritten.slice(prefix.length, rewritten.length - suffix.length);
 }
 
 /**
@@ -1730,18 +1980,21 @@ function rewritePropsExpression(expr, rewriteContext = null) {
     const scopeMap = rewriteContext?.scopeRewrite?.map;
     const scopeAmbiguous = rewriteContext?.scopeRewrite?.ambiguous;
     const rootMatch = trimmed.match(/^([A-Za-z_$][A-Za-z0-9_$]*)([\s\S]*)$/);
-    if (!rootMatch || !(scopeMap instanceof Map)) {
+    if (!(scopeMap instanceof Map)) {
         return trimmed;
+    }
+    if (!rootMatch) {
+        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
     }
 
     const root = rootMatch[1];
     if (scopeAmbiguous instanceof Set && scopeAmbiguous.has(root)) {
-        return trimmed;
+        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
     }
 
     const rewrittenRoot = scopeMap.get(root);
     if (typeof rewrittenRoot !== 'string' || rewrittenRoot.length === 0 || rewrittenRoot === root) {
-        return trimmed;
+        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
     }
 
     return `${rewrittenRoot}${rootMatch[2]}`;
@@ -1874,13 +2127,21 @@ function deferComponentRuntimeBlock(source) {
  * @param {string} projectRoot
  * @param {object | null} [logger]
  * @param {boolean} [showInfo]
+ * @param {string} [bundlerBin]
  * @returns {Promise<void>}
  */
-function runBundler(envelope, outDir, projectRoot, logger = null, showInfo = true) {
+function runBundler(
+    envelope,
+    outDir,
+    projectRoot,
+    logger = null,
+    showInfo = true,
+    bundlerBin = resolveBundlerBin(projectRoot)
+) {
     return new Promise((resolvePromise, rejectPromise) => {
         const useStructuredLogger = Boolean(logger && typeof logger.childLine === 'function');
         const child = spawn(
-            getBundlerBin(),
+            bundlerBin,
             ['--out-dir', outDir],
             {
                 cwd: projectRoot,
@@ -1968,6 +2229,8 @@ async function collectAssets(rootDir) {
 export async function build(options) {
     const { pagesDir, outDir, config = {}, logger = null, showBundlerInfo = true } = options;
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
+    const compilerBin = resolveCompilerBin(projectRoot);
+    const bundlerBin = resolveBundlerBin(projectRoot);
     const softNavigationEnabled = config.softNavigation === true || config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
@@ -1977,6 +2240,15 @@ export async function build(options) {
 
     await rm(outDir, { recursive: true, force: true });
     await mkdir(outDir, { recursive: true });
+
+    if (logger) {
+        await maybeWarnAboutZenithVersionMismatch({
+            projectRoot,
+            logger,
+            command: 'build',
+            bundlerBinPath: bundlerBin
+        });
+    }
 
     // Derive src/ directory from pages/ directory
     const srcDir = resolve(pagesDir, '..');
@@ -2037,7 +2309,10 @@ export async function build(options) {
             sourceFile,
             compileSource,
             compilerOpts,
-            { onWarning: emitCompilerWarning }
+            {
+                compilerBin,
+                onWarning: emitCompilerWarning
+            }
         );
 
         const hasGuard = (extractedServer.serverScript && extractedServer.serverScript.has_guard) || adjacentGuard !== null;
@@ -2082,7 +2357,20 @@ export async function build(options) {
         const pageAmbiguousExpressionMap = new Set();
         const knownRefKeys = new Set();
         const pageScopeRewrite = buildScopedIdentifierRewrite(pageIr);
-        const pageSelfExpressionRewrite = buildComponentExpressionRewrite(sourceFile, compileSource, pageIr, compilerOpts);
+        const pageSelfExpressionRewrite = buildComponentExpressionRewrite(
+            sourceFile,
+            compileSource,
+            pageIr,
+            compilerOpts,
+            compilerBin
+        );
+        mergeExpressionRewriteMaps(
+            pageExpressionRewriteMap,
+            pageExpressionBindingMap,
+            pageAmbiguousExpressionMap,
+            pageSelfExpressionRewrite,
+            pageIr
+        );
         const componentScopeRewriteCache = new Map();
 
         // 2c. Compile each used component separately for its script IR
@@ -2100,7 +2388,10 @@ export async function build(options) {
                     compPath,
                     componentCompileSource,
                     compilerOpts,
-                    { onWarning: emitCompilerWarning }
+                    {
+                        compilerBin,
+                        onWarning: emitCompilerWarning
+                    }
                 );
                 componentIrCache.set(compPath, compIr);
             }
@@ -2113,7 +2404,13 @@ export async function build(options) {
 
             let expressionRewrite = componentExpressionRewriteCache.get(compPath);
             if (!expressionRewrite) {
-                expressionRewrite = buildComponentExpressionRewrite(compPath, componentSource, compIr, compilerOpts);
+                expressionRewrite = buildComponentExpressionRewrite(
+                    compPath,
+                    componentSource,
+                    compIr,
+                    compilerOpts,
+                    compilerBin
+                );
                 componentExpressionRewriteCache.set(compPath, expressionRewrite);
             }
 
@@ -2136,7 +2433,10 @@ export async function build(options) {
                         ownerPath,
                         stripStyleBlocks(ownerSource),
                         compilerOpts,
-                        { onWarning: emitCompilerWarning }
+                        {
+                            compilerBin,
+                            onWarning: emitCompilerWarning
+                        }
                     );
                     componentIrCache.set(ownerPath, ownerIr);
                 }
@@ -2144,7 +2444,13 @@ export async function build(options) {
                 attrExpressionRewrite = componentExpressionRewriteCache.get(ownerPath);
                 if (!attrExpressionRewrite) {
                     const ownerSource = readFileSync(ownerPath, 'utf8');
-                    attrExpressionRewrite = buildComponentExpressionRewrite(ownerPath, ownerSource, ownerIr, compilerOpts);
+                    attrExpressionRewrite = buildComponentExpressionRewrite(
+                        ownerPath,
+                        ownerSource,
+                        ownerIr,
+                        compilerOpts,
+                        compilerBin
+                    );
                     componentExpressionRewriteCache.set(ownerPath, attrExpressionRewrite);
                 }
 
@@ -2190,6 +2496,8 @@ export async function build(options) {
             pageExpressionBindingMap,
             pageAmbiguousExpressionMap
         );
+        applyScopedIdentifierRewrites(pageIr, buildScopedIdentifierRewrite(pageIr));
+        synthesizeSignalBackedCompiledExpressions(pageIr);
         normalizeExpressionBindingDependencies(pageIr);
 
         rewriteLegacyMarkupIdentifiers(pageIr);
@@ -2204,7 +2512,7 @@ export async function build(options) {
     }
 
     if (envelopes.length > 0) {
-    await runBundler(envelopes, outDir, projectRoot, logger, showBundlerInfo);
+        await runBundler(envelopes, outDir, projectRoot, logger, showBundlerInfo, bundlerBin);
     }
 
     const assets = await collectAssets(outDir);
