@@ -292,10 +292,37 @@ struct RuntimeRefBinding {
 }
 
 fn main() {
+    if env::args().skip(1).any(|arg| arg == "--version") {
+        println!("{}", resolve_bundler_version());
+        return;
+    }
     if let Err(err) = run() {
         eprintln!("[zenith-bundler] {}", err);
         process::exit(1);
     }
+}
+
+fn resolve_bundler_version() -> String {
+    let package_json = env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .map(|root| root.join("package.json"));
+
+    if let Some(package_json_path) = package_json {
+        if let Ok(source) = fs::read_to_string(&package_json_path) {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&source) {
+                if let Some(version) = value.get("version").and_then(|entry| entry.as_str()) {
+                    if !version.trim().is_empty() {
+                        return version.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 fn run() -> Result<(), String> {
