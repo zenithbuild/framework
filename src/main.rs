@@ -26,8 +26,13 @@ struct BundlerInput {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct CompilerIr {
+    #[serde(rename = "schemaVersion", default)]
+    #[allow(dead_code)]
+    schema_version: Option<u32>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    warnings: Vec<serde_json::Value>,
     ir_version: u32,
     #[serde(default)]
     graph_hash: Option<String>,
@@ -200,6 +205,8 @@ struct CompilerExpressionBinding {
     #[serde(default)]
     signal_index: Option<usize>,
     #[serde(default)]
+    signal_indices: Vec<usize>,
+    #[serde(default)]
     state_index: Option<usize>,
     #[serde(default)]
     component_instance: Option<String>,
@@ -207,6 +214,8 @@ struct CompilerExpressionBinding {
     component_binding: Option<String>,
     #[serde(default)]
     literal: Option<String>,
+    #[serde(default)]
+    compiled_expr: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -2923,12 +2932,29 @@ fn generate_entry_js(
     js.push_str(&format!("const __zenith_refs = {};\n", refs_json));
     let signals_json = serde_json::to_string(&ir.signals)
         .map_err(|e| format!("failed to serialize signal table: {e}"))?;
-    let expression_bindings_json = if ir.expression_bindings.is_empty() {
-        fallback_expression_bindings(ir)?
+    let bindings_to_use: Vec<CompilerExpressionBinding> = if ir.expression_bindings.is_empty() {
+        ir.expressions
+            .iter()
+            .enumerate()
+            .map(|(index, value)| CompilerExpressionBinding {
+                marker_index: index,
+                signal_index: None,
+                signal_indices: Vec::new(),
+                state_index: None,
+                component_instance: None,
+                component_binding: None,
+                literal: Some(value.clone()),
+                compiled_expr: None,
+            })
+            .collect()
     } else {
-        serde_json::to_string(&ir.expression_bindings)
-            .map_err(|e| format!("failed to serialize expression table: {e}"))?
+        ir.expression_bindings.clone()
     };
+    let (expr_fns_js, runtime_expression_bindings) =
+        build_expression_fns_and_bindings(&bindings_to_use);
+    let expression_bindings_json =
+        serde_json::to_string(&runtime_expression_bindings)
+            .map_err(|e| format!("failed to serialize expression table: {e}"))?;
 
     js.push_str(&generate_state_table_js(&ir.hoisted.state)?);
     js.push_str(&generate_state_keys_js(&ir.hoisted.state)?);
@@ -2939,6 +2965,7 @@ fn generate_entry_js(
             .map_err(|e| format!("failed to serialize graph hash: {e}"))?
     ));
     js.push_str(&format!("const __zenith_signals = {};\n", signals_json));
+    js.push_str(&expr_fns_js);
     js.push_str(&format!(
         "const __zenith_expression_bindings = {};\n",
         expression_bindings_json
@@ -3047,6 +3074,7 @@ fn generate_entry_js(
     js.push_str("    ir_version: __zenith_ir_version,\n");
     js.push_str("    graph_hash: __zenith_graph_hash,\n");
     js.push_str("    expressions: __zenith_expression_bindings,\n");
+    js.push_str("    expr_fns: typeof __zenith_expr_fns !== 'undefined' ? __zenith_expr_fns : [],\n");
     js.push_str("    markers: __zenith_markers,\n");
     js.push_str("    events: __zenith_events,\n");
     js.push_str("    refs: __zenith_refs,\n");
@@ -3145,22 +3173,91 @@ fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, S
     Ok(format!("const __zenith_state_keys = {};\n", keys_json))
 }
 
-fn fallback_expression_bindings(ir: &CompilerIr) -> Result<String, String> {
-    let bindings: Vec<CompilerExpressionBinding> = ir
-        .expressions
+/// Build __zenith_expr_fns JS and bindings with fn_index for compound expressions.
+fn build_expression_fns_and_bindings(
+    bindings: &[CompilerExpressionBinding],
+) -> (String, Vec<serde_json::Value>) {
+    let mut expr_fns = Vec::new();
+    let mut fn_index_by_binding = std::collections::BTreeMap::new();
+    for (i, b) in bindings.iter().enumerate() {
+        if let Some(ref expr) = b.compiled_expr {
+            let fn_idx = expr_fns.len();
+            expr_fns.push(expr.clone());
+            fn_index_by_binding.insert(i, fn_idx);
+        }
+    }
+    let js = if expr_fns.is_empty() {
+        "const __zenith_expr_fns = [];\n".to_string()
+    } else {
+        let fn_defs: Vec<String> = expr_fns
+            .iter()
+            .map(|e| {
+                format!(
+                    "function(__ctx) {{ const signalMap = __ctx.signalMap; const params = __ctx.params; const props = __ctx.props; const ssrData = __ctx.ssrData; const data = ssrData; const ssr = ssrData; const componentBindings = __ctx.componentBindings; const __ZENITH_INTERNAL_ZENHTML = __ctx.zenhtml; const html = __ctx.zenhtml; return {}; }}",
+                    e
+                )
+            })
+            .collect();
+        format!("const __zenith_expr_fns = [\n  {}\n];\n", fn_defs.join(",\n  "))
+    };
+    let runtime_bindings: Vec<serde_json::Value> = bindings
         .iter()
         .enumerate()
-        .map(|(index, value)| CompilerExpressionBinding {
-            marker_index: index,
-            signal_index: None,
-            state_index: None,
-            component_instance: None,
-            component_binding: None,
-            literal: Some(value.clone()),
+        .map(|(i, b)| {
+            let mut obj = serde_json::json!({
+                "marker_index": b.marker_index,
+                "signal_index": b.signal_index,
+                "signal_indices": b.signal_indices,
+                "state_index": b.state_index,
+                "component_instance": b.component_instance,
+                "component_binding": b.component_binding,
+                "literal": b.literal
+            });
+            if let Some(&fi) = fn_index_by_binding.get(&i) {
+                obj["fn_index"] = serde_json::json!(fi);
+            }
+            obj
         })
         .collect();
-    serde_json::to_string(&bindings)
-        .map_err(|e| format!("failed to serialize fallback expressions: {e}"))
+    (js, runtime_bindings)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_expression_fns_and_bindings, CompilerExpressionBinding};
+
+    #[test]
+    fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
+        let bindings = vec![
+            CompilerExpressionBinding {
+                marker_index: 0,
+                signal_index: Some(0),
+                signal_indices: vec![0, 2],
+                state_index: Some(0),
+                component_instance: None,
+                component_binding: None,
+                literal: Some("count ? \"on\" : \"off\"".to_string()),
+                compiled_expr: Some("signalMap.get(0).get() ? \"on\" : \"off\"".to_string()),
+            },
+            CompilerExpressionBinding {
+                marker_index: 1,
+                signal_index: None,
+                signal_indices: Vec::new(),
+                state_index: None,
+                component_instance: None,
+                component_binding: None,
+                literal: Some("props.href".to_string()),
+                compiled_expr: None,
+            },
+        ];
+
+        let (js, runtime_bindings) = build_expression_fns_and_bindings(&bindings);
+        assert!(js.contains("const __zenith_expr_fns = ["));
+        assert!(js.contains("const signalMap = __ctx.signalMap;"));
+        assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
+        assert_eq!(runtime_bindings[0]["signal_indices"], serde_json::json!([0, 2]));
+        assert!(runtime_bindings[1].get("fn_index").is_none());
+    }
 }
 
 fn generate_component_bootstrap_js(

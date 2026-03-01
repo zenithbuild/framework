@@ -336,6 +336,67 @@ fn compiler_style_blocks_still_strip_anchor_and_emit_single_stylesheet() {
 }
 
 #[test]
+fn raw_tailwind_import_in_emitted_css_hard_fails() {
+    let tmp = tempfile::tempdir().expect("temp dir");
+    let pages_dir = tmp.path().join("pages");
+    fs::create_dir_all(&pages_dir).expect("create pages dir");
+
+    let page_path = pages_dir.join("index.zen");
+    fs::write(&page_path, "<main>Home</main>\n").expect("write page");
+
+    let out_dir = tmp.path().join("dist");
+    let graph_hash = compute_graph_hash(&["index.zen"], &[]);
+
+    let payload = json!([
+        {
+            "route": "/",
+            "file": page_path,
+            "router": true,
+            "ir": {
+                "ir_version": 1,
+                "graph_hash": graph_hash,
+                "graph_nodes": [{ "id": "index.zen", "hoist_id": "index.zen" }],
+                "graph_edges": [],
+                "html": "<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><main>Home</main></body></html>",
+                "expressions": [],
+                "hoisted": {
+                    "imports": [],
+                    "declarations": [],
+                    "functions": [],
+                    "signals": [],
+                    "state": [],
+                    "code": []
+                },
+                "components_scripts": {},
+                "component_instances": [],
+                "imports": [],
+                "modules": [],
+                "signals": [],
+                "expression_bindings": [],
+                "marker_bindings": [],
+                "event_bindings": [],
+                "style_blocks": [
+                    {
+                        "module_id": "index.zen::__style0",
+                        "order": 0,
+                        "content": "@import \"tailwindcss\";\nbody { color: red; }\n"
+                    }
+                ]
+            }
+        }
+    ]);
+
+    let output = run_bundler(payload, tmp.path(), &out_dir);
+    assert!(!output.status.success(), "bundler must reject raw tailwind imports in emitted CSS");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Tailwind CSS contract violation"),
+        "expected tailwind CSS contract diagnostic, got:\n{}",
+        stderr
+    );
+}
+
+#[test]
 fn bare_css_package_import_hard_fails() {
     let tmp = tempfile::tempdir().expect("temp dir");
     let pages_dir = tmp.path().join("pages");

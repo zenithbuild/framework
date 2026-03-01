@@ -337,6 +337,15 @@ pub fn process_css(
         );
     }
 
+    if final_content.contains("@import \"tailwindcss\"") || final_content.contains("@import 'tailwindcss'") {
+        return Err(
+            "Tailwind CSS contract violation: emitted CSS contains raw @import \"tailwindcss\". \
+             This directive is build-time only; the browser cannot resolve it and will 404. \
+             Precompile Tailwind (e.g. npx @tailwindcss/cli -i ./src/styles/tailwind.css -o ./src/styles/output.css) \
+             and import the output file instead of files containing @import \"tailwindcss\".".to_string(),
+        );
+    }
+
     let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
     let count = html.matches(anchor).count();
     if count != 1 {
