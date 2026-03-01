@@ -486,6 +486,56 @@ describe('build orchestration', () => {
         expect(/const __zenith_state_keys = \[[^\]]+items/.test(pageAsset)).toBe(true);
     });
 
+    test('preserves component reactive binding metadata after expansion', async () => {
+        const root = join(tmpdir(), `zenith-build-component-bindings-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'ThemeIcon.zen'),
+            [
+                '<script lang="ts">',
+                'state currentTheme = "light";',
+                'function toggle() {',
+                '  currentTheme = currentTheme === "dark" ? "light" : "dark";',
+                '}',
+                '</script>',
+                '<button',
+                '  aria-label={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}',
+                '  aria-pressed={currentTheme === "dark" ? "true" : "false"}',
+                '  on:click={toggle}',
+                '>',
+                '  {currentTheme === "dark" ? "🌙" : "☀️"}',
+                '</button>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><ThemeIcon /></main>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+
+        expect(pageAsset).toMatch(/return signalMap\.get\(\d+\)\.get\(\) === "dark" \? "🌙" : "☀️";/);
+        expect(pageAsset).toMatch(/return signalMap\.get\(\d+\)\.get\(\) === "dark" \? "Switch to light theme" : "Switch to dark theme";/);
+        expect(pageAsset).toMatch(/"signal_indices":\[\d+\]/);
+        expect(pageAsset).toMatch(/"state_index":\d+/);
+    });
+
     test('build compiles local tailwind entry css internally', async () => {
         const root = join(tmpdir(), `zenith-build-tailwind-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         const srcDir = join(root, 'src');

@@ -200,11 +200,31 @@ function stripStyleBlocks(source) {
  * @param {string} compPath
  * @param {string} componentSource
  * @param {object} compIr
- * @returns {{ map: Map<string, string>, ambiguous: Set<string> }}
+ * @returns {{
+ *   map: Map<string, string>,
+ *   bindings: Map<string, {
+ *     compiled_expr: string | null,
+ *     signal_index: number | null,
+ *     signal_indices: number[],
+ *     state_index: number | null,
+ *     component_instance: string | null,
+ *     component_binding: string | null
+ *   }>,
+ *   signals: Array<{ id?: number, kind?: string, state_index?: number }>,
+ *   stateBindings: Array<{ key?: string, value?: string }>,
+ *   ambiguous: Set<string>
+ * }}
  */
 function buildComponentExpressionRewrite(compPath, componentSource, compIr, compilerOpts) {
-    const out = { map: new Map(), ambiguous: new Set() };
+    const out = {
+        map: new Map(),
+        bindings: new Map(),
+        signals: Array.isArray(compIr?.signals) ? compIr.signals : [],
+        stateBindings: Array.isArray(compIr?.hoisted?.state) ? compIr.hoisted.state : [],
+        ambiguous: new Set()
+    };
     const rewrittenExpressions = Array.isArray(compIr?.expressions) ? compIr.expressions : [];
+    const rewrittenBindings = Array.isArray(compIr?.expression_bindings) ? compIr.expression_bindings : [];
     if (rewrittenExpressions.length === 0) {
         return out;
     }
@@ -229,34 +249,243 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
         if (typeof raw !== 'string' || typeof rewritten !== 'string') {
             continue;
         }
-        if (raw === rewritten) {
-            continue;
+
+        const binding = rewrittenBindings[i];
+        const normalizedBinding = binding && typeof binding === 'object'
+            ? {
+                compiled_expr: typeof binding.compiled_expr === 'string' ? binding.compiled_expr : null,
+                signal_index: Number.isInteger(binding.signal_index) ? binding.signal_index : null,
+                signal_indices: Array.isArray(binding.signal_indices)
+                    ? binding.signal_indices.filter((value) => Number.isInteger(value))
+                    : [],
+                state_index: Number.isInteger(binding.state_index) ? binding.state_index : null,
+                component_instance: typeof binding.component_instance === 'string' ? binding.component_instance : null,
+                component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
+            }
+            : null;
+
+        if (!out.ambiguous.has(raw) && normalizedBinding) {
+            const existingBinding = out.bindings.get(raw);
+            if (existingBinding) {
+                if (JSON.stringify(existingBinding) !== JSON.stringify(normalizedBinding)) {
+                    out.bindings.delete(raw);
+                    out.map.delete(raw);
+                    out.ambiguous.add(raw);
+                    continue;
+                }
+            } else {
+                out.bindings.set(raw, normalizedBinding);
+            }
         }
-        const existing = out.map.get(raw);
-        if (existing && existing !== rewritten) {
-            out.map.delete(raw);
-            out.ambiguous.add(raw);
-            continue;
-        }
-        if (!out.ambiguous.has(raw)) {
-            out.map.set(raw, rewritten);
+
+        if (raw !== rewritten) {
+            const existing = out.map.get(raw);
+            if (existing && existing !== rewritten) {
+                out.bindings.delete(raw);
+                out.map.delete(raw);
+                out.ambiguous.add(raw);
+                continue;
+            }
+            if (!out.ambiguous.has(raw)) {
+                out.map.set(raw, rewritten);
+            }
         }
     }
 
     return out;
 }
 
+function remapCompiledExpressionSignals(compiledExpr, componentSignals, componentStateBindings, pageSignalIndexByStateKey) {
+    if (typeof compiledExpr !== 'string' || compiledExpr.length === 0) {
+        return null;
+    }
+
+    return compiledExpr.replace(/signalMap\.get\((\d+)\)/g, (full, rawIndex) => {
+        const localIndex = Number.parseInt(rawIndex, 10);
+        if (!Number.isInteger(localIndex)) {
+            return full;
+        }
+        const signal = componentSignals[localIndex];
+        if (!signal || !Number.isInteger(signal.state_index)) {
+            return full;
+        }
+        const stateKey = componentStateBindings[signal.state_index]?.key;
+        if (typeof stateKey !== 'string' || stateKey.length === 0) {
+            return full;
+        }
+        const pageIndex = pageSignalIndexByStateKey.get(stateKey);
+        if (!Number.isInteger(pageIndex)) {
+            return full;
+        }
+        return `signalMap.get(${pageIndex})`;
+    });
+}
+
+function resolveRewrittenBindingMetadata(pageIr, componentRewrite, binding) {
+    if (!binding || typeof binding !== 'object') {
+        return null;
+    }
+
+    const pageStateBindings = Array.isArray(pageIr?.hoisted?.state) ? pageIr.hoisted.state : [];
+    const pageSignals = Array.isArray(pageIr?.hoisted?.signals) ? pageIr.hoisted.signals : [];
+    const pageStateIndexByKey = new Map();
+    const pageSignalIndexByStateKey = new Map();
+
+    for (let index = 0; index < pageStateBindings.length; index++) {
+        const key = pageStateBindings[index]?.key;
+        if (typeof key === 'string' && key.length > 0 && !pageStateIndexByKey.has(key)) {
+            pageStateIndexByKey.set(key, index);
+        }
+    }
+
+    for (let index = 0; index < pageSignals.length; index++) {
+        const stateIndex = pageSignals[index]?.state_index;
+        if (!Number.isInteger(stateIndex)) {
+            continue;
+        }
+        const stateKey = pageStateBindings[stateIndex]?.key;
+        if (typeof stateKey === 'string' && stateKey.length > 0 && !pageSignalIndexByStateKey.has(stateKey)) {
+            pageSignalIndexByStateKey.set(stateKey, index);
+        }
+    }
+
+    const componentSignals = Array.isArray(componentRewrite?.signals) ? componentRewrite.signals : [];
+    const componentStateBindings = Array.isArray(componentRewrite?.stateBindings) ? componentRewrite.stateBindings : [];
+
+    let signalIndices = Array.isArray(binding.signal_indices)
+        ? [...new Set(
+            binding.signal_indices
+                .map((signalIndex) => {
+                    if (!Number.isInteger(signalIndex)) {
+                        return null;
+                    }
+                    const signal = componentSignals[signalIndex];
+                    if (!signal || !Number.isInteger(signal.state_index)) {
+                        return null;
+                    }
+                    const stateKey = componentStateBindings[signal.state_index]?.key;
+                    if (typeof stateKey !== 'string' || stateKey.length === 0) {
+                        return null;
+                    }
+                    const pageIndex = pageSignalIndexByStateKey.get(stateKey);
+                    return Number.isInteger(pageIndex) ? pageIndex : null;
+                })
+                .filter((value) => Number.isInteger(value))
+        )].sort((a, b) => a - b)
+        : [];
+
+    let signalIndex = null;
+    if (Number.isInteger(binding.signal_index)) {
+        const signal = componentSignals[binding.signal_index];
+        const stateKey = signal && Number.isInteger(signal.state_index)
+            ? componentStateBindings[signal.state_index]?.key
+            : null;
+        const pageIndex = typeof stateKey === 'string' ? pageSignalIndexByStateKey.get(stateKey) : null;
+        signalIndex = Number.isInteger(pageIndex) ? pageIndex : null;
+    }
+    if (signalIndex === null && signalIndices.length === 1) {
+        signalIndex = signalIndices[0];
+    }
+
+    let stateIndex = null;
+    if (Number.isInteger(binding.state_index)) {
+        const stateKey = componentStateBindings[binding.state_index]?.key;
+        const pageIndex = typeof stateKey === 'string' ? pageStateIndexByKey.get(stateKey) : null;
+        stateIndex = Number.isInteger(pageIndex) ? pageIndex : null;
+    }
+
+    if (Number.isInteger(stateIndex)) {
+        const fallbackSignalIndices = pageSignals
+            .map((signal, index) => signal?.state_index === stateIndex ? index : null)
+            .filter((value) => Number.isInteger(value));
+        const signalIndicesMatchState = signalIndices.every(
+            (index) => pageSignals[index]?.state_index === stateIndex
+        );
+        if ((!signalIndicesMatchState || signalIndices.length === 0) && fallbackSignalIndices.length > 0) {
+            signalIndices = fallbackSignalIndices;
+        }
+        if (
+            (signalIndex === null || pageSignals[signalIndex]?.state_index !== stateIndex) &&
+            fallbackSignalIndices.length === 1
+        ) {
+            signalIndex = fallbackSignalIndices[0];
+        }
+    }
+
+    let compiledExpr = remapCompiledExpressionSignals(
+        binding.compiled_expr,
+        componentSignals,
+        componentStateBindings,
+        pageSignalIndexByStateKey
+    );
+    if (
+        typeof compiledExpr === 'string' &&
+        signalIndices.length === 1 &&
+        Array.isArray(binding.signal_indices) &&
+        binding.signal_indices.length <= 1
+    ) {
+        compiledExpr = compiledExpr.replace(/signalMap\.get\(\d+\)/g, `signalMap.get(${signalIndices[0]})`);
+    }
+
+    return {
+        compiled_expr: compiledExpr,
+        signal_index: signalIndex,
+        signal_indices: signalIndices,
+        state_index: stateIndex,
+        component_instance: typeof binding.component_instance === 'string' ? binding.component_instance : null,
+        component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
+    };
+}
+
 /**
  * Merge a per-component rewrite table into the page-level rewrite table.
  *
  * @param {Map<string, string>} pageMap
+ * @param {Map<string, {
+ *   compiled_expr: string | null,
+ *   signal_index: number | null,
+ *   signal_indices: number[],
+ *   state_index: number | null,
+ *   component_instance: string | null,
+ *   component_binding: string | null
+ * }>} pageBindingMap
  * @param {Set<string>} pageAmbiguous
- * @param {{ map: Map<string, string>, ambiguous: Set<string> }} componentRewrite
+ * @param {{
+ *   map: Map<string, string>,
+ *   bindings: Map<string, {
+ *     compiled_expr: string | null,
+ *     signal_index: number | null,
+ *     signal_indices: number[],
+ *     state_index: number | null,
+ *     component_instance: string | null,
+ *     component_binding: string | null
+ *   }>,
+ *   signals: Array<{ id?: number, kind?: string, state_index?: number }>,
+ *   stateBindings: Array<{ key?: string, value?: string }>,
+ *   ambiguous: Set<string>
+ * }} componentRewrite
+ * @param {object} pageIr
  */
-function mergeExpressionRewriteMaps(pageMap, pageAmbiguous, componentRewrite) {
+function mergeExpressionRewriteMaps(pageMap, pageBindingMap, pageAmbiguous, componentRewrite, pageIr) {
     for (const raw of componentRewrite.ambiguous) {
         pageAmbiguous.add(raw);
         pageMap.delete(raw);
+        pageBindingMap.delete(raw);
+    }
+
+    for (const [raw, binding] of componentRewrite.bindings.entries()) {
+        if (pageAmbiguous.has(raw)) {
+            continue;
+        }
+        const resolved = resolveRewrittenBindingMetadata(pageIr, componentRewrite, binding);
+        const existing = pageBindingMap.get(raw);
+        if (existing && JSON.stringify(existing) !== JSON.stringify(resolved)) {
+            pageAmbiguous.add(raw);
+            pageMap.delete(raw);
+            pageBindingMap.delete(raw);
+            continue;
+        }
+        pageBindingMap.set(raw, resolved);
     }
 
     for (const [raw, rewritten] of componentRewrite.map.entries()) {
@@ -267,6 +496,7 @@ function mergeExpressionRewriteMaps(pageMap, pageAmbiguous, componentRewrite) {
         if (existing && existing !== rewritten) {
             pageAmbiguous.add(raw);
             pageMap.delete(raw);
+            pageBindingMap.delete(raw);
             continue;
         }
         pageMap.set(raw, rewritten);
@@ -329,9 +559,17 @@ function rewriteRefBindingIdentifiers(pageIr, preferredKeys = null) {
  *
  * @param {object} pageIr
  * @param {Map<string, string>} expressionMap
+ * @param {Map<string, {
+ *   compiled_expr: string | null,
+ *   signal_index: number | null,
+ *   signal_indices: number[],
+ *   state_index: number | null,
+ *   component_instance: string | null,
+ *   component_binding: string | null
+ * }>} bindingMap
  * @param {Set<string>} ambiguous
  */
-function applyExpressionRewrites(pageIr, expressionMap, ambiguous) {
+function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambiguous) {
     if (!Array.isArray(pageIr?.expressions) || pageIr.expressions.length === 0) {
         return;
     }
@@ -345,20 +583,108 @@ function applyExpressionRewrites(pageIr, expressionMap, ambiguous) {
         if (ambiguous.has(current)) {
             continue;
         }
+
         const rewritten = expressionMap.get(current);
-        if (!rewritten || rewritten === current) {
+        const rewrittenBinding = bindingMap.get(current);
+        if (rewritten && rewritten !== current) {
+            pageIr.expressions[index] = rewritten;
+        }
+
+        if (!bindings[index] || typeof bindings[index] !== 'object') {
             continue;
         }
-        pageIr.expressions[index] = rewritten;
-        if (
-            bindings[index] &&
-            typeof bindings[index] === 'object' &&
-            bindings[index].literal === current
-        ) {
+
+        if (rewritten && rewritten !== current && bindings[index].literal === current) {
             bindings[index].literal = rewritten;
-            if (bindings[index].compiled_expr === current) {
-                bindings[index].compiled_expr = rewritten;
+        }
+
+        if (rewrittenBinding) {
+            bindings[index].compiled_expr = rewrittenBinding.compiled_expr;
+            bindings[index].signal_index = rewrittenBinding.signal_index;
+            bindings[index].signal_indices = rewrittenBinding.signal_indices;
+            bindings[index].state_index = rewrittenBinding.state_index;
+            bindings[index].component_instance = rewrittenBinding.component_instance;
+            bindings[index].component_binding = rewrittenBinding.component_binding;
+        } else if (rewritten && rewritten !== current && bindings[index].compiled_expr === current) {
+            bindings[index].compiled_expr = rewritten;
+        }
+
+        if (
+            !rewrittenBinding &&
+            (!rewritten || rewritten === current) &&
+            bindings[index].literal === current &&
+            bindings[index].compiled_expr === current
+        ) {
+            bindings[index].compiled_expr = current;
+        }
+    }
+}
+
+function normalizeExpressionBindingDependencies(pageIr) {
+    if (!Array.isArray(pageIr?.expression_bindings) || pageIr.expression_bindings.length === 0) {
+        return;
+    }
+
+    const signals = Array.isArray(pageIr.signals) ? pageIr.signals : [];
+    const dependencyRe = /signalMap\.get\((\d+)\)/g;
+
+    for (const binding of pageIr.expression_bindings) {
+        if (!binding || typeof binding !== 'object' || typeof binding.compiled_expr !== 'string') {
+            continue;
+        }
+
+        const indices = [];
+        dependencyRe.lastIndex = 0;
+        let match;
+        while ((match = dependencyRe.exec(binding.compiled_expr)) !== null) {
+            const index = Number.parseInt(match[1], 10);
+            if (Number.isInteger(index)) {
+                indices.push(index);
             }
+        }
+
+        if (indices.length === 0) {
+            continue;
+        }
+
+        let signalIndices = [...new Set(indices)].sort((a, b) => a - b);
+        if (Number.isInteger(binding.state_index)) {
+            const owningSignalIndices = signals
+                .map((signal, index) => signal?.state_index === binding.state_index ? index : null)
+                .filter((value) => Number.isInteger(value));
+            const extractedMatchState =
+                signalIndices.length > 0 &&
+                signalIndices.every((index) => signals[index]?.state_index === binding.state_index);
+            if (owningSignalIndices.length > 0 && !extractedMatchState) {
+                signalIndices = owningSignalIndices;
+            }
+        }
+
+        if (
+            !Array.isArray(binding.signal_indices) ||
+            binding.signal_indices.length === 0 ||
+            binding.signal_indices.some((index) => signals[index]?.state_index !== binding.state_index)
+        ) {
+            binding.signal_indices = signalIndices;
+        }
+        if (
+            (!Number.isInteger(binding.signal_index) ||
+                signals[binding.signal_index]?.state_index !== binding.state_index) &&
+            signalIndices.length === 1
+        ) {
+            binding.signal_index = signalIndices[0];
+        }
+        if (!Number.isInteger(binding.state_index) && Number.isInteger(binding.signal_index)) {
+            const stateIndex = signals[binding.signal_index]?.state_index;
+            if (Number.isInteger(stateIndex)) {
+                binding.state_index = stateIndex;
+            }
+        }
+        if (signalIndices.length === 1) {
+            binding.compiled_expr = binding.compiled_expr.replace(
+                /signalMap\.get\(\d+\)/g,
+                `signalMap.get(${signalIndices[0]})`
+            );
         }
     }
 }
@@ -798,9 +1124,10 @@ const OPEN_COMPONENT_TAG_RE = /<([A-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\s*(\/?)>/g;
  *
  * @param {string} source
  * @param {Map<string, string>} registry
- * @returns {Map<string, string[]>}
+ * @param {string | null} ownerPath
+ * @returns {Map<string, Array<{ attrs: string, ownerPath: string | null }>>}
  */
-function collectComponentUsageAttrs(source, registry) {
+function collectComponentUsageAttrs(source, registry, ownerPath = null) {
     const out = new Map();
     OPEN_COMPONENT_TAG_RE.lastIndex = 0;
     let match;
@@ -813,8 +1140,44 @@ function collectComponentUsageAttrs(source, registry) {
         if (!out.has(name)) {
             out.set(name, []);
         }
-        out.get(name).push(attrs);
+        out.get(name).push({ attrs, ownerPath });
     }
+    return out;
+}
+
+/**
+ * Collect component usage attrs recursively so nested component callsites
+ * receive deterministic props preludes during page-hoist merging.
+ *
+ * Current Zenith architecture still resolves one attrs set per component type.
+ * This helper preserves that model while ensuring nested usages are not lost.
+ *
+ * @param {string} source
+ * @param {Map<string, string>} registry
+ * @param {string | null} ownerPath
+ * @param {Set<string>} visitedFiles
+ * @param {Map<string, Array<{ attrs: string, ownerPath: string | null }>>} out
+ * @returns {Map<string, Array<{ attrs: string, ownerPath: string | null }>>}
+ */
+function collectRecursiveComponentUsageAttrs(source, registry, ownerPath = null, visitedFiles = new Set(), out = new Map()) {
+    const local = collectComponentUsageAttrs(source, registry, ownerPath);
+    for (const [name, attrsList] of local.entries()) {
+        if (!out.has(name)) {
+            out.set(name, []);
+        }
+        out.get(name).push(...attrsList);
+    }
+
+    for (const name of local.keys()) {
+        const compPath = registry.get(name);
+        if (!compPath || visitedFiles.has(compPath)) {
+            continue;
+        }
+        visitedFiles.add(compPath);
+        const componentSource = readFileSync(compPath, 'utf8');
+        collectRecursiveComponentUsageAttrs(componentSource, registry, compPath, visitedFiles, out);
+    }
+
     return out;
 }
 
@@ -828,7 +1191,16 @@ function collectComponentUsageAttrs(source, registry) {
  * @param {object} compIr — the component's compiled IR
  * @param {string} compPath — component file path
  * @param {string} pageFile — page file path
- * @param {{ includeCode: boolean, cssImportsOnly: boolean, documentMode?: boolean, componentAttrs?: string }} options
+ * @param {{
+ *   includeCode: boolean,
+ *   cssImportsOnly: boolean,
+ *   documentMode?: boolean,
+ *   componentAttrs?: string,
+ *   componentAttrsRewrite?: {
+ *     expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
+ *     scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ *   } | null
+ * }} options
  * @param {Set<string>} seenStaticImports
  */
 function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStaticImports, knownRefKeys = null) {
@@ -920,6 +1292,41 @@ function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStati
         }
     }
 
+    if (options.includeCode && Array.isArray(compIr.signals)) {
+        pageIr.signals = Array.isArray(pageIr.signals) ? pageIr.signals : [];
+        const existingSignalStateKeys = new Set(
+            pageIr.signals
+                .map((signal) => {
+                    const stateIndex = signal?.state_index;
+                    return Number.isInteger(stateIndex) ? pageIr.hoisted.state?.[stateIndex]?.key : null;
+                })
+                .filter(Boolean)
+        );
+
+        for (const signal of compIr.signals) {
+            if (!signal || !Number.isInteger(signal.state_index)) {
+                continue;
+            }
+            const stateKey = compIr.hoisted?.state?.[signal.state_index]?.key;
+            if (typeof stateKey !== 'string' || stateKey.length === 0) {
+                continue;
+            }
+            const pageStateIndex = pageIr.hoisted.state.findIndex((entry) => entry?.key === stateKey);
+            if (!Number.isInteger(pageStateIndex) || pageStateIndex < 0) {
+                continue;
+            }
+            if (existingSignalStateKeys.has(stateKey)) {
+                continue;
+            }
+            existingSignalStateKeys.add(stateKey);
+            pageIr.signals.push({
+                id: pageIr.signals.length,
+                kind: typeof signal.kind === 'string' && signal.kind.length > 0 ? signal.kind : 'signal',
+                state_index: pageStateIndex
+            });
+        }
+    }
+
     // Merge hoisted code blocks (rebased to the page file path)
     if (options.includeCode && compIr.hoisted?.code?.length) {
         for (const block of compIr.hoisted.code) {
@@ -927,7 +1334,11 @@ function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStati
             const filteredImports = options.cssImportsOnly
                 ? stripNonCssStaticImportsInSource(rebased)
                 : rebased;
-            const withPropsPrelude = injectPropsPrelude(filteredImports, options.componentAttrs || '');
+            const withPropsPrelude = injectPropsPrelude(
+                filteredImports,
+                options.componentAttrs || '',
+                options.componentAttrsRewrite || null
+            );
             const transpiled = transpileTypeScriptToJs(withPropsPrelude, compPath);
             const deduped = dedupeStaticImportsInSource(transpiled, seenStaticImports);
             const deferred = deferComponentRuntimeBlock(deduped);
@@ -1229,10 +1640,122 @@ function renderObjectKey(key) {
 }
 
 /**
- * @param {string} attrs
+ * @param {string} value
+ * @returns {string | null}
+ */
+function deriveScopedIdentifierAlias(value) {
+    const ident = String(value || '').trim();
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ident)) {
+        return null;
+    }
+    const parts = ident.split('_').filter(Boolean);
+    const candidate = parts.length > 1 ? parts[parts.length - 1] : ident;
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(candidate) ? candidate : ident;
+}
+
+/**
+ * @param {Map<string, string>} map
+ * @param {Set<string>} ambiguous
+ * @param {string | null} raw
+ * @param {string | null} rewritten
+ */
+function recordScopedIdentifierRewrite(map, ambiguous, raw, rewritten) {
+    if (typeof raw !== 'string' || raw.length === 0 || typeof rewritten !== 'string' || rewritten.length === 0) {
+        return;
+    }
+    const existing = map.get(raw);
+    if (existing && existing !== rewritten) {
+        map.delete(raw);
+        ambiguous.add(raw);
+        return;
+    }
+    if (!ambiguous.has(raw)) {
+        map.set(raw, rewritten);
+    }
+}
+
+/**
+ * @param {object | null | undefined} ir
+ * @returns {{ map: Map<string, string>, ambiguous: Set<string> }}
+ */
+function buildScopedIdentifierRewrite(ir) {
+    const out = { map: new Map(), ambiguous: new Set() };
+    if (!ir || typeof ir !== 'object') {
+        return out;
+    }
+
+    const stateBindings = Array.isArray(ir?.hoisted?.state) ? ir.hoisted.state : [];
+    for (const stateEntry of stateBindings) {
+        const key = typeof stateEntry?.key === 'string' ? stateEntry.key : null;
+        recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(key), key);
+    }
+
+    const functionBindings = Array.isArray(ir?.hoisted?.functions) ? ir.hoisted.functions : [];
+    for (const fnName of functionBindings) {
+        if (typeof fnName !== 'string') {
+            continue;
+        }
+        recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(fnName), fnName);
+    }
+
+    return out;
+}
+
+/**
+ * @param {string} expr
+ * @param {{
+ *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
+ *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ * } | null} rewriteContext
  * @returns {string}
  */
-function renderPropsLiteralFromAttrs(attrs) {
+function rewritePropsExpression(expr, rewriteContext = null) {
+    const trimmed = String(expr || '').trim();
+    if (!trimmed) {
+        return trimmed;
+    }
+
+    const expressionMap = rewriteContext?.expressionRewrite?.map;
+    const expressionAmbiguous = rewriteContext?.expressionRewrite?.ambiguous;
+    if (
+        expressionMap instanceof Map &&
+        !(expressionAmbiguous instanceof Set && expressionAmbiguous.has(trimmed))
+    ) {
+        const exact = expressionMap.get(trimmed);
+        if (typeof exact === 'string' && exact.length > 0) {
+            return exact;
+        }
+    }
+
+    const scopeMap = rewriteContext?.scopeRewrite?.map;
+    const scopeAmbiguous = rewriteContext?.scopeRewrite?.ambiguous;
+    const rootMatch = trimmed.match(/^([A-Za-z_$][A-Za-z0-9_$]*)([\s\S]*)$/);
+    if (!rootMatch || !(scopeMap instanceof Map)) {
+        return trimmed;
+    }
+
+    const root = rootMatch[1];
+    if (scopeAmbiguous instanceof Set && scopeAmbiguous.has(root)) {
+        return trimmed;
+    }
+
+    const rewrittenRoot = scopeMap.get(root);
+    if (typeof rewrittenRoot !== 'string' || rewrittenRoot.length === 0 || rewrittenRoot === root) {
+        return trimmed;
+    }
+
+    return `${rewrittenRoot}${rootMatch[2]}`;
+}
+
+/**
+ * @param {string} attrs
+ * @param {{
+ *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
+ *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ * } | null} rewriteContext
+ * @returns {string}
+ */
+function renderPropsLiteralFromAttrs(attrs, rewriteContext = null) {
     const src = String(attrs || '').trim();
     if (!src) {
         return '{}';
@@ -1257,7 +1780,7 @@ function renderPropsLiteralFromAttrs(attrs) {
             valueCode = JSON.stringify(singleQuoted);
         } else if (expressionValue !== undefined) {
             const trimmed = String(expressionValue).trim();
-            valueCode = trimmed.length > 0 ? trimmed : 'undefined';
+            valueCode = trimmed.length > 0 ? rewritePropsExpression(trimmed, rewriteContext) : 'undefined';
         }
 
         entries.push(`${renderObjectKey(rawName)}: ${valueCode}`);
@@ -1273,9 +1796,13 @@ function renderPropsLiteralFromAttrs(attrs) {
 /**
  * @param {string} source
  * @param {string} attrs
+ * @param {{
+ *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
+ *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ * } | null} rewriteContext
  * @returns {string}
  */
-function injectPropsPrelude(source, attrs) {
+function injectPropsPrelude(source, attrs, rewriteContext = null) {
     if (typeof source !== 'string' || source.trim().length === 0) {
         return source;
     }
@@ -1286,7 +1813,7 @@ function injectPropsPrelude(source, attrs) {
         return source;
     }
 
-    const propsLiteral = renderPropsLiteralFromAttrs(attrs);
+    const propsLiteral = renderPropsLiteralFromAttrs(attrs, rewriteContext);
     return `var props = ${propsLiteral};\n${source}`;
 }
 
@@ -1488,7 +2015,7 @@ export async function build(options) {
     for (const entry of manifest) {
         const sourceFile = join(pagesDir, entry.file);
         const rawSource = readFileSync(sourceFile, 'utf8');
-        const componentUsageAttrs = collectComponentUsageAttrs(rawSource, registry);
+        const componentUsageAttrs = collectRecursiveComponentUsageAttrs(rawSource, registry, sourceFile);
 
         const baseName = sourceFile.slice(0, -extname(sourceFile).length);
         let adjacentGuard = null;
@@ -1541,6 +2068,7 @@ export async function build(options) {
         // Ensure IR has required array fields for merging
         pageIr.components_scripts = pageIr.components_scripts || {};
         pageIr.component_instances = pageIr.component_instances || [];
+        pageIr.signals = Array.isArray(pageIr.signals) ? pageIr.signals : [];
         pageIr.hoisted = pageIr.hoisted || { imports: [], declarations: [], functions: [], signals: [], state: [], code: [] };
         pageIr.hoisted.imports = pageIr.hoisted.imports || [];
         pageIr.hoisted.declarations = pageIr.hoisted.declarations || [];
@@ -1550,8 +2078,12 @@ export async function build(options) {
         pageIr.hoisted.code = pageIr.hoisted.code || [];
         const seenStaticImports = new Set();
         const pageExpressionRewriteMap = new Map();
+        const pageExpressionBindingMap = new Map();
         const pageAmbiguousExpressionMap = new Set();
         const knownRefKeys = new Set();
+        const pageScopeRewrite = buildScopedIdentifierRewrite(pageIr);
+        const pageSelfExpressionRewrite = buildComponentExpressionRewrite(sourceFile, compileSource, pageIr, compilerOpts);
+        const componentScopeRewriteCache = new Map();
 
         // 2c. Compile each used component separately for its script IR
         for (const compName of usedComponents) {
@@ -1584,11 +2116,44 @@ export async function build(options) {
                 expressionRewrite = buildComponentExpressionRewrite(compPath, componentSource, compIr, compilerOpts);
                 componentExpressionRewriteCache.set(compPath, expressionRewrite);
             }
-            mergeExpressionRewriteMaps(
-                pageExpressionRewriteMap,
-                pageAmbiguousExpressionMap,
-                expressionRewrite
-            );
+
+            let usageEntry = (componentUsageAttrs.get(compName) || [])[0] || { attrs: '', ownerPath: sourceFile };
+            if (!usageEntry || typeof usageEntry !== 'object') {
+                usageEntry = { attrs: '', ownerPath: sourceFile };
+            }
+
+            let attrExpressionRewrite = pageSelfExpressionRewrite;
+            let attrScopeRewrite = pageScopeRewrite;
+            const ownerPath = typeof usageEntry.ownerPath === 'string' && usageEntry.ownerPath.length > 0
+                ? usageEntry.ownerPath
+                : sourceFile;
+
+            if (ownerPath !== sourceFile) {
+                let ownerIr = componentIrCache.get(ownerPath);
+                if (!ownerIr) {
+                    const ownerSource = readFileSync(ownerPath, 'utf8');
+                    ownerIr = runCompiler(
+                        ownerPath,
+                        stripStyleBlocks(ownerSource),
+                        compilerOpts,
+                        { onWarning: emitCompilerWarning }
+                    );
+                    componentIrCache.set(ownerPath, ownerIr);
+                }
+
+                attrExpressionRewrite = componentExpressionRewriteCache.get(ownerPath);
+                if (!attrExpressionRewrite) {
+                    const ownerSource = readFileSync(ownerPath, 'utf8');
+                    attrExpressionRewrite = buildComponentExpressionRewrite(ownerPath, ownerSource, ownerIr, compilerOpts);
+                    componentExpressionRewriteCache.set(ownerPath, attrExpressionRewrite);
+                }
+
+                attrScopeRewrite = componentScopeRewriteCache.get(ownerPath);
+                if (!attrScopeRewrite) {
+                    attrScopeRewrite = buildScopedIdentifierRewrite(ownerIr);
+                    componentScopeRewriteCache.set(ownerPath, attrScopeRewrite);
+                }
+            }
 
             // 2d. Merge component IR into page IR
             mergeComponentIr(
@@ -1600,18 +2165,32 @@ export async function build(options) {
                     includeCode: true,
                     cssImportsOnly: isDocMode,
                     documentMode: isDocMode,
-                    componentAttrs: (componentUsageAttrs.get(compName) || [])[0] || ''
+                    componentAttrs: typeof usageEntry.attrs === 'string' ? usageEntry.attrs : '',
+                    componentAttrsRewrite: {
+                        expressionRewrite: attrExpressionRewrite,
+                        scopeRewrite: attrScopeRewrite
+                    }
                 },
                 seenStaticImports,
                 knownRefKeys
+            );
+
+            mergeExpressionRewriteMaps(
+                pageExpressionRewriteMap,
+                pageExpressionBindingMap,
+                pageAmbiguousExpressionMap,
+                expressionRewrite,
+                pageIr
             );
         }
 
         applyExpressionRewrites(
             pageIr,
             pageExpressionRewriteMap,
+            pageExpressionBindingMap,
             pageAmbiguousExpressionMap
         );
+        normalizeExpressionBindingDependencies(pageIr);
 
         rewriteLegacyMarkupIdentifiers(pageIr);
         rewriteRefBindingIdentifiers(pageIr, knownRefKeys);

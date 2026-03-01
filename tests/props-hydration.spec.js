@@ -169,6 +169,64 @@ describe('props hydration', () => {
         expect(pageJs).toContain('myvalue');
     });
 
+    test('T5 — nested component usage still injects props prelude', async () => {
+        project = await makePropsProject({
+            'components/SharedButton.zen': [
+                '<script lang="ts">',
+                'interface Props { variant?: string; ariaLabel?: string }',
+                'const incoming = props as Props;',
+                'const variant = incoming.variant === "ghost" ? "ghost" : "primary";',
+                'const ariaLabel = typeof incoming.ariaLabel === "string" ? incoming.ariaLabel : "fallback";',
+                '</script>',
+                '<button data-kind={variant} aria-label={ariaLabel}><slot /></button>'
+            ].join('\n'),
+            'components/NavShell.zen': [
+                '<script lang="ts"></script>',
+                '<SharedButton variant="ghost" ariaLabel="Toggle menu">menu</SharedButton>'
+            ].join('\n'),
+            'pages/index.zen': '<main><NavShell /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const indexHtml = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/src="([^"]+\.js)"/);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
+        const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
+
+        expect(pageJs).toMatch(/var props = \{ variant: "ghost", ariaLabel: "Toggle menu" \};/);
+    });
+
+    test('T6 — nested component usage rewrites function-valued props to owner scope', async () => {
+        project = await makePropsProject({
+            'components/SharedButton.zen': [
+                '<script lang="ts">',
+                'interface Props { onPress?: () => void }',
+                'const incoming = props as Props;',
+                'const onPress = typeof incoming.onPress === "function" ? incoming.onPress : undefined;',
+                '</script>',
+                '<button on:click={onPress}>menu</button>'
+            ].join('\n'),
+            'components/NavShell.zen': [
+                '<script lang="ts">',
+                'function toggleMenu() {}',
+                '</script>',
+                '<SharedButton onPress={toggleMenu} />'
+            ].join('\n'),
+            'pages/index.zen': '<main><NavShell /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const indexHtml = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/src="([^"]+\.js)"/);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
+        const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
+
+        expect(pageJs).not.toContain('onPress: toggleMenu');
+        expect(pageJs).toMatch(/onPress:\s*___.*toggleMenu/);
+    });
+
     test('existing document-mode props test still works', async () => {
         // Ensure the documentMode gate removal didn't break layout props injection
         const root = join(tmpdir(), `zenith-docmode-${Date.now()}-${Math.random().toString(36).slice(2)}`);
