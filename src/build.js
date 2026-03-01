@@ -1253,14 +1253,18 @@ function deferComponentRuntimeBlock(source) {
  *
  * @param {object|object[]} envelope
  * @param {string} outDir
+ * @param {string} projectRoot
  * @returns {Promise<void>}
  */
-function runBundler(envelope, outDir) {
+function runBundler(envelope, outDir, projectRoot) {
     return new Promise((resolvePromise, rejectPromise) => {
         const child = spawn(
             getBundlerBin(),
             ['--out-dir', outDir],
-            { stdio: ['pipe', 'inherit', 'inherit'] }
+            {
+                cwd: projectRoot,
+                stdio: ['pipe', 'inherit', 'inherit']
+            }
         );
 
         child.on('error', (err) => {
@@ -1333,6 +1337,7 @@ async function collectAssets(rootDir) {
  */
 export async function build(options) {
     const { pagesDir, outDir, config = {} } = options;
+    const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
     const softNavigationEnabled = config.softNavigation === true || config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
@@ -1502,7 +1507,7 @@ export async function build(options) {
     }
 
     if (envelopes.length > 0) {
-        await runBundler(envelopes, outDir);
+        await runBundler(envelopes, outDir, projectRoot);
     }
 
     const assets = await collectAssets(outDir);

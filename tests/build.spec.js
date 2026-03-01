@@ -1,9 +1,14 @@
 import { build, createCompilerWarningEmitter } from '../src/build.js';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { jest } from '@jest/globals';
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
+
+const WORKSPACE_ROOT = join(process.cwd(), '..');
+
+jest.setTimeout(45000);
 
 async function makeProject(files) {
     const root = join(tmpdir(), `zenith-build-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -18,6 +23,12 @@ async function makeProject(files) {
     }
 
     return { root, pagesDir, outDir };
+}
+
+async function linkWorkspaceNodeModules(projectRoot) {
+    const workspaceNodeModules = join(WORKSPACE_ROOT, 'node_modules');
+    const target = join(projectRoot, 'node_modules');
+    await symlink(workspaceNodeModules, target, 'dir').catch(() => { });
 }
 
 async function walkFiles(dir) {
@@ -45,6 +56,14 @@ async function walkFiles(dir) {
     await walk(dir);
     out.sort((a, b) => a.localeCompare(b));
     return out;
+}
+
+async function findBuiltCssAsset(outDir) {
+    const assetsDir = join(outDir, 'assets');
+    const entries = await readdir(assetsDir);
+    const cssAsset = entries.find((name) => name.startsWith('styles.') && name.endsWith('.css'));
+    expect(cssAsset).toBeTruthy();
+    return join(assetsDir, String(cssAsset));
 }
 
 async function evaluateBuiltModule(source, identifier) {
@@ -80,6 +99,11 @@ async function evaluateBuiltModule(source, identifier) {
         'zeneffect',
         'zenEffect',
         'zenMount',
+        'zenWindow',
+        'zenDocument',
+        'zenOn',
+        'zenResize',
+        'collectRefs',
         'createRouter',
         'matchRoute',
         'resolveRequestRoute'
@@ -108,6 +132,11 @@ async function evaluateBuiltModule(source, identifier) {
                 this.setExport('zeneffect', noop);
                 this.setExport('zenEffect', noop);
                 this.setExport('zenMount', noop);
+                this.setExport('zenWindow', () => null);
+                this.setExport('zenDocument', () => null);
+                this.setExport('zenOn', noop);
+                this.setExport('zenResize', () => noop);
+                this.setExport('collectRefs', (...refs) => refs.map((ref) => ref?.current).filter(Boolean));
                 this.setExport('createRouter', () => ({ navigate: noop }));
                 this.setExport('matchRoute', () => null);
                 this.setExport('resolveRequestRoute', () => null);
@@ -455,6 +484,44 @@ describe('build orchestration', () => {
         expect(pageAsset.includes('___')).toBe(true);
         expect(pageAsset.includes('"literal":"items.map((item)')).toBe(false);
         expect(/const __zenith_state_keys = \[[^\]]+items/.test(pageAsset)).toBe(true);
+    });
+
+    test('build compiles local tailwind entry css internally', async () => {
+        const root = join(tmpdir(), `zenith-build-tailwind-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const stylesDir = join(srcDir, 'styles');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(stylesDir, { recursive: true });
+        await linkWorkspaceNodeModules(root);
+
+        await writeFile(
+            join(stylesDir, 'global.css'),
+            '@import "tailwindcss";\n:root { --zen-cli-tailwind-build: 1; }\n',
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            [
+                '<script setup="ts">',
+                'import "../styles/global.css";',
+                '</script>',
+                '<main class="text-red-500 font-bold">Home</main>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir });
+        const cssPath = await findBuiltCssAsset(outDir);
+        const css = await readFile(cssPath, 'utf8');
+
+        expect(css).not.toContain('@import "tailwindcss"');
+        expect(css.includes('.text-red-500') || css.includes('color:var(--color-red-500')).toBe(true);
+        expect(css).toContain('--zen-cli-tailwind-build');
     });
 
     test('keeps hoisted declarations at module scope while deferring zenMount/zenEffect calls', async () => {

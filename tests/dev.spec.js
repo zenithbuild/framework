@@ -6,13 +6,18 @@ import { createDevServer } from '../src/dev-server.js';
 import { createPreviewServer } from '../src/preview.js';
 import { cli } from '../src/index.js';
 import { build } from '../src/build.js';
-import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
+import { jest } from '@jest/globals';
+import { mkdir, writeFile, rm, readFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const WORKSPACE_ROOT = join(process.cwd(), '..');
+
+jest.setTimeout(45000);
 
 async function createTestProject(files) {
     const root = join(tmpdir(), `zenith-dev-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -27,6 +32,38 @@ async function createTestProject(files) {
     }
 
     return { root, pagesDir, outDir };
+}
+
+async function linkWorkspaceNodeModules(projectRoot) {
+    const workspaceNodeModules = join(WORKSPACE_ROOT, 'node_modules');
+    const target = join(projectRoot, 'node_modules');
+    await symlink(workspaceNodeModules, target, 'dir').catch(() => { });
+}
+
+function renderTailwindPage(className) {
+    return [
+        '<script setup="ts">',
+        'import "../styles/global.css";',
+        '</script>',
+        `<main class="${className} font-bold">Home</main>`
+    ].join('\n');
+}
+
+async function createTailwindDevProject(initialClass = 'text-red-500') {
+    const root = join(tmpdir(), `zenith-dev-tailwind-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const srcDir = join(root, 'src');
+    const pagesDir = join(srcDir, 'pages');
+    const stylesDir = join(srcDir, 'styles');
+    const outDir = join(root, 'dist');
+    const pageFile = join(pagesDir, 'index.zen');
+
+    await mkdir(pagesDir, { recursive: true });
+    await mkdir(stylesDir, { recursive: true });
+    await linkWorkspaceNodeModules(root);
+    await writeFile(join(stylesDir, 'global.css'), '@import "tailwindcss";\n', 'utf8');
+    await writeFile(pageFile, renderTailwindPage(initialClass), 'utf8');
+
+    return { root, pagesDir, outDir, pageFile };
 }
 
 function httpGet(url) {
@@ -270,23 +307,16 @@ describe('Dev Server', () => {
     });
 
     test('css_update event includes resolvable stylesheet href', async () => {
-        const root = join(tmpdir(), `zenith-dev-css-update-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        const pagesDir = join(root, 'pages');
-        const styleFile = join(root, 'styles.css');
-        const outDir = join(root, 'dist');
-        await mkdir(pagesDir, { recursive: true });
-        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
-        await writeFile(styleFile, '/* trigger */');
-        project = { root, pagesDir, outDir };
+        project = await createTailwindDevProject('text-red-500');
 
         dev = await createDevServer({
-            pagesDir,
-            outDir,
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
             port: 0
         });
 
         const cssUpdate = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('css_update timeout')), 5000);
+            const timeout = setTimeout(() => reject(new Error('css_update timeout')), 15000);
             let triggered = false;
             const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
                 let data = '';
@@ -294,7 +324,7 @@ describe('Dev Server', () => {
                     data += chunk.toString();
                     if (!triggered && data.includes('event: connected')) {
                         triggered = true;
-                        writeFile(styleFile, '/* trigger 2 */').catch(() => { });
+                        writeFile(project.pageFile, renderTailwindPage('text-blue-500'), 'utf8').catch(() => { });
                     }
                     if (data.includes('event: css_update')) {
                         const blocks = data.split('\n\n');
@@ -326,27 +356,22 @@ describe('Dev Server', () => {
         expect(css.status).toBe(200);
         expect(String(css.headers['content-type'] || '')).toContain('text/css');
         expect(css.body.length).toBeGreaterThan(0);
+        expect(css.body).not.toContain('@import "tailwindcss"');
+        expect(css.body.includes('.text-blue-500') || css.body.includes('color:var(--color-blue-500')).toBe(true);
     });
 
     test('css_update emits only after build_complete with same buildId (repeat updates)', async () => {
-        const root = join(tmpdir(), `zenith-dev-css-seq-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        const pagesDir = join(root, 'pages');
-        const styleFile = join(root, 'styles.css');
-        const outDir = join(root, 'dist');
-        await mkdir(pagesDir, { recursive: true });
-        await writeFile(join(pagesDir, 'index.zen'), '<main>home</main>');
-        await writeFile(styleFile, '/* seq-0 */');
-        project = { root, pagesDir, outDir };
+        project = await createTailwindDevProject('text-red-500');
 
         dev = await createDevServer({
-            pagesDir,
-            outDir,
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
             port: 0
         });
 
         const events = [];
         await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('css sequence timeout')), 8000);
+            const timeout = setTimeout(() => reject(new Error('css sequence timeout')), 25000);
             let buffer = '';
             let stage = 0;
             const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
@@ -363,10 +388,10 @@ describe('Dev Server', () => {
 
                         if (parsed.event === 'connected' && stage === 0) {
                             stage = 1;
-                            writeFile(styleFile, '/* seq-1 */').catch(() => { });
+                            writeFile(project.pageFile, renderTailwindPage('text-emerald-500'), 'utf8').catch(() => { });
                         } else if (parsed.event === 'css_update' && stage === 1) {
                             stage = 2;
-                            writeFile(styleFile, '/* seq-2 */').catch(() => { });
+                            writeFile(project.pageFile, renderTailwindPage('text-blue-500'), 'utf8').catch(() => { });
                         } else if (parsed.event === 'css_update' && stage === 2) {
                             clearTimeout(timeout);
                             response.destroy();
@@ -421,18 +446,11 @@ describe('Dev Server', () => {
     });
 
     test('stable /__zenith_dev/styles.css remains 200 during back-to-back css rebuilds', async () => {
-        const root = join(tmpdir(), `zenith-dev-css-race-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        const pagesDir = join(root, 'pages');
-        const styleFile = join(root, 'styles.css');
-        const outDir = join(root, 'dist');
-        await mkdir(pagesDir, { recursive: true });
-        await writeFile(join(pagesDir, 'index.zen'), '<main>race</main>');
-        await writeFile(styleFile, '/* race-0 */');
-        project = { root, pagesDir, outDir };
+        project = await createTailwindDevProject('text-red-500');
 
         dev = await createDevServer({
-            pagesDir,
-            outDir,
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
             port: 0
         });
 
@@ -440,7 +458,7 @@ describe('Dev Server', () => {
         let pollPromise = Promise.resolve();
 
         await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('css race timeout')), 10000);
+            const timeout = setTimeout(() => reject(new Error('css race timeout')), 25000);
             let buffer = '';
             let stage = 0;
             const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
@@ -454,11 +472,11 @@ describe('Dev Server', () => {
 
                         if (parsed.event === 'connected' && stage === 0) {
                             stage = 1;
-                            writeFile(styleFile, '/* race-1 */').catch(() => { });
+                            writeFile(project.pageFile, renderTailwindPage('text-emerald-500'), 'utf8').catch(() => { });
                         } else if (parsed.event === 'css_update' && stage === 1) {
                             stage = 2;
                             const href = new URL(String(parsed.data?.href || '/__zenith_dev/styles.css'), localOrigin(dev.port)).toString();
-                            writeFile(styleFile, '/* race-2 */').catch(() => { });
+                            writeFile(project.pageFile, renderTailwindPage('text-blue-500'), 'utf8').catch(() => { });
                             pollPromise = (async () => {
                                 for (let i = 0; i < 16; i += 1) {
                                     const css = await httpGet(href);
@@ -486,6 +504,63 @@ describe('Dev Server', () => {
         for (const status of cssStatuses) {
             expect(status).toBe(200);
         }
+    });
+
+    test('tailwind entry css compiles internally and refreshes compiled stylesheet after a .zen class edit', async () => {
+        project = await createTailwindDevProject('text-red-500');
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port: 0
+        });
+
+        const initialState = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
+        const initialCss = await httpGet(new URL(initialState.cssHref, localOrigin(dev.port)).toString());
+        expect(initialCss.status).toBe(200);
+        expect(initialCss.body).not.toContain('@import "tailwindcss"');
+        expect(initialCss.body.includes('.text-red-500') || initialCss.body.includes('color:var(--color-red-500')).toBe(true);
+
+        const cssUpdate = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('tailwind css_update timeout')), 8000);
+            let buffer = '';
+            let connected = false;
+            const req = http.get(`${localOrigin(dev.port)}/__zenith_dev/events`, (response) => {
+                response.on('data', (chunk) => {
+                    buffer += chunk.toString();
+                    let splitIndex = buffer.indexOf('\n\n');
+                    while (splitIndex !== -1) {
+                        const block = buffer.slice(0, splitIndex);
+                        buffer = buffer.slice(splitIndex + 2);
+                        const parsed = parseSseBlock(block);
+
+                        if (parsed.event === 'connected' && !connected) {
+                            connected = true;
+                            writeFile(
+                                project.pageFile,
+                                renderTailwindPage('text-blue-500'),
+                                'utf8'
+                            ).catch(reject);
+                        } else if (parsed.event === 'css_update') {
+                            clearTimeout(timeout);
+                            response.destroy();
+                            req.destroy();
+                            resolve(parsed.data);
+                            return;
+                        }
+
+                        splitIndex = buffer.indexOf('\n\n');
+                    }
+                });
+            });
+            req.on('error', reject);
+        });
+
+        expect(String(cssUpdate.href || '')).toContain('/__zenith_dev/styles.css?buildId=');
+        const updatedCss = await httpGet(new URL(String(cssUpdate.href), localOrigin(dev.port)).toString());
+        expect(updatedCss.status).toBe(200);
+        expect(updatedCss.body).not.toContain('@import "tailwindcss"');
+        expect(updatedCss.body.includes('.text-blue-500') || updatedCss.body.includes('color:var(--color-blue-500')).toBe(true);
     });
 
     test('SSE stays alive across build_error and subsequent recovery build', async () => {

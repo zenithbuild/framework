@@ -612,9 +612,15 @@ export async function createDevServer(options) {
             _broadcastEvent('build_start', { buildId: cycleBuildId, changedFiles: changed });
 
             const startTime = Date.now();
+            const previousCssAssetPath = currentCssAssetPath;
+            const previousCssContent = currentCssContent;
             try {
                 const buildResult = await build({ pagesDir, outDir, config });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
+                const cssChanged = cssReady && (
+                    currentCssAssetPath !== previousCssAssetPath ||
+                    currentCssContent !== previousCssContent
+                );
                 buildId = cycleBuildId;
                 buildStatus = 'ok';
                 buildError = null;
@@ -637,12 +643,20 @@ export async function createDevServer(options) {
                     changedFiles: changed
                 });
 
-                const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
-                if (onlyCss && cssReady && currentCssHref.length > 0) {
-                    // Let the client fetch the updated CSS automatically
+                if (cssChanged && currentCssHref.length > 0) {
                     _broadcastEvent('css_update', { href: currentCssHref, changedFiles: changed });
-                } else {
+                }
+
+                const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
+                if (!onlyCss) {
                     _broadcastEvent('reload', { changedFiles: changed });
+                } else {
+                    _trace('css_only_update', {
+                        buildId: cycleBuildId,
+                        cssHref: currentCssHref,
+                        cssChanged,
+                        changedFiles: changed
+                    });
                 }
             } catch (err) {
                 const fullError = err instanceof Error ? err.message : String(err);
