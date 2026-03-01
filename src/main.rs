@@ -156,6 +156,7 @@ struct CompilerImport {
     file_hash: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CompilerServerScript {
@@ -2706,7 +2707,7 @@ fn collect_css_imports_from_source(
         let normalized_specifier = strip_import_suffix(&specifier);
         if is_css_bare_import(&normalized_specifier) {
             return Err(format!(
-                "CSS import contract violation: bare CSS imports are not supported.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  reason: import a local precompiled CSS file (for example ./styles/output.css)"
+                "CSS import contract violation: bare CSS imports are not supported.\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  reason: import a local CSS entry file (for example ./styles/global.css). If you want Tailwind, put @import \"tailwindcss\" inside that local file."
             ));
         }
 
@@ -2779,6 +2780,14 @@ fn collect_css_imports_from_source(
                 canonical_path.display()
             )
         })?;
+        let content =
+            zenith_bundler::utils::compile_tailwind_entry(project_root, &canonical_path, &content)
+                .map_err(|err| {
+                    format!(
+                        "{err}\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}",
+                        canonical_path.display()
+                    )
+                })?;
 
         fragments.push(CssFragment {
             source_module_id: format!("{}::{}", page_key, resolved_module_id.clone()),

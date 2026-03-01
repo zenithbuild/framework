@@ -159,5 +159,6 @@ The bundler is a **pure structural transformer**.
 ## 12. CSS Input Contract
 
 - Zenith bundles local `.css` files deterministically as opaque input.
-- CSS framework processors (for example Tailwind) are out-of-band pre-steps in this phase.
-- Import the compiled CSS artifact (for example `./styles/output.css`) and Zenith will include it in the deterministic CSS pipeline and single injected stylesheet link.
+- Local Tailwind v4 entry files are compiled internally when the imported CSS contains `@import "tailwindcss"` or `@import 'tailwindcss'`.
+- Import a local CSS entry file (for example `./styles/global.css`) and put the raw Tailwind import inside that file.
+- Final emitted CSS must never ship a raw `@import "tailwindcss"` directive; that is a build-time-only input and remains a hard error if it survives emission.

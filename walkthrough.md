@@ -28,10 +28,11 @@ When external specifiers are present:
 
 ## CSS Framework Note
 
-Zenith currently treats CSS as deterministic opaque input.
+Zenith treats local CSS as deterministic opaque input and compiles local Tailwind v4 entry files internally.
 
-- Local CSS imports always work (for example `import "./styles/output.css";`).
-- Tailwind or other framework engines are a pre-step for now; compile them to plain CSS first, then import that output file into Zenith.
+- Local CSS imports always work (for example `import "./styles/global.css";`).
+- For Tailwind v4, put `@import "tailwindcss";` inside that local file and Zenith will compile it during `zenith dev` and `zenith build`.
+- Final emitted CSS must not contain raw `@import "tailwindcss"`.
 
 ## Framework Interop Policy (Hard Gate)
 

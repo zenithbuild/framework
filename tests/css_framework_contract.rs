@@ -7,6 +7,32 @@ use std::process::{Command, Stdio};
 use serde_json::json;
 use zenith_compiler::deterministic::sha256_hex;
 
+fn repo_root() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("bundler repo should live inside workspace root")
+        .to_path_buf()
+}
+
+fn link_workspace_node_modules(project_root: &Path) {
+    let workspace_node_modules = repo_root().join("node_modules");
+    if !workspace_node_modules.exists() {
+        return;
+    }
+
+    let target = project_root.join("node_modules");
+    if target.exists() {
+        return;
+    }
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&workspace_node_modules, &target)
+        .expect("symlink workspace node_modules into test project");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_dir(&workspace_node_modules, &target)
+        .expect("symlink workspace node_modules into test project");
+}
+
 fn bundler_bin() -> String {
     if let Ok(path) = env::var("CARGO_BIN_EXE_zenith-bundler") {
         return path;
@@ -29,15 +55,21 @@ fn bundler_bin() -> String {
 }
 
 fn run_bundler(payload: serde_json::Value, cwd: &Path, out_dir: &Path) -> std::process::Output {
-    let mut child = Command::new(bundler_bin())
+    let mut command = Command::new(bundler_bin());
+    command
         .arg("--out-dir")
         .arg(out_dir)
         .current_dir(cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn bundler");
+        .stderr(Stdio::piped());
+
+    let tailwind_bin = repo_root().join("node_modules/.bin/tailwindcss");
+    if tailwind_bin.exists() {
+        command.env("ZENITH_TAILWIND_BIN", tailwind_bin);
+    }
+
+    let mut child = command.spawn().expect("spawn bundler");
 
     child
         .stdin
@@ -166,6 +198,100 @@ fn precompiled_local_css_import_is_bundled_and_injected_once() {
     assert!(
         !html.contains("<!-- ZENITH_STYLES_ANCHOR -->"),
         "styles anchor must be removed"
+    );
+}
+
+#[test]
+fn local_tailwind_entry_is_compiled_internally() {
+    let tmp = tempfile::tempdir().expect("temp dir");
+    link_workspace_node_modules(tmp.path());
+    let pages_dir = tmp.path().join("pages");
+    let styles_dir = pages_dir.join("styles");
+    fs::create_dir_all(&styles_dir).expect("create styles dir");
+
+    let page_path = pages_dir.join("index.zen");
+    fs::write(
+        &page_path,
+        "<script>\nimport \"./styles/global.css\";\n</script>\n<main class=\"text-red-500 font-bold\">Home</main>\n",
+    )
+    .expect("write page");
+
+    fs::write(
+        styles_dir.join("global.css"),
+        "@import \"tailwindcss\";\n:root { --zenith-test: 1; }\n",
+    )
+    .expect("write tailwind entry");
+
+    let out_dir = tmp.path().join("dist");
+    let graph_hash = compute_graph_hash(&["index.zen"], &["index.zen->styles/global.css"]);
+
+    let payload = json!([
+        {
+            "route": "/",
+            "file": page_path,
+            "router": true,
+            "ir": {
+                "ir_version": 1,
+                "graph_hash": graph_hash,
+                "graph_nodes": [{ "id": "index.zen", "hoist_id": "index.zen" }],
+                "graph_edges": ["index.zen->styles/global.css"],
+                "html": "<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><main class=\"text-red-500 font-bold\">Home</main></body></html>",
+                "expressions": [],
+                "hoisted": {
+                    "imports": [],
+                    "declarations": [],
+                    "functions": [],
+                    "signals": [],
+                    "state": [],
+                    "code": []
+                },
+                "components_scripts": {},
+                "component_instances": [],
+                "imports": [],
+                "modules": [
+                    {
+                        "id": "index.zen",
+                        "source": "import \"./styles/global.css\";\\nexport const marker = true;",
+                        "deps": ["styles/global.css"]
+                    }
+                ],
+                "signals": [],
+                "expression_bindings": [],
+                "marker_bindings": [],
+                "event_bindings": [],
+                "style_blocks": []
+            }
+        }
+    ]);
+
+    let output = run_bundler(payload, tmp.path(), &out_dir);
+    assert!(
+        output.status.success(),
+        "bundler failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("manifest.json")).expect("read manifest"),
+    )
+    .expect("parse manifest");
+
+    let css_rel = manifest["css"].as_str().expect("manifest.css missing");
+    let css_abs = out_dir.join(css_rel.trim_start_matches('/'));
+    let css = fs::read_to_string(&css_abs).expect("read css asset");
+
+    assert!(
+        !css.contains("@import \"tailwindcss\""),
+        "emitted CSS must not contain raw Tailwind import"
+    );
+    assert!(
+        css.contains(".text-red-500") || css.contains("color:var(--color-red-500"),
+        "emitted CSS must include compiled Tailwind utility, got:\n{}",
+        css
+    );
+    assert!(
+        css.contains(":root") && css.contains("--zenith-test"),
+        "custom CSS from the Tailwind entry must survive compilation"
     );
 }
 
