@@ -24,7 +24,8 @@ assert.equal(sourceA.includes('fetch('), false, 'core template output must not c
 assert.equal(sourceA.includes('new Function'), false, 'core template output must not contain new Function');
 assert.equal(sourceA.includes('eval('), false, 'core template output must not contain eval(');
 
-const importLine = `import { signal, state, zeneffect } from ${JSON.stringify(runtimeImport)};`;
+const importLine =
+  `import { signal, state, zeneffect, zenEffect as __zenithZenEffect, zenMount as __zenithZenMount } from ${JSON.stringify(runtimeImport)};`;
 assert.equal(
   sourceA.includes(importLine),
   true,
