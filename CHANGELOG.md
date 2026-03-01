@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - JSON output includes `schemaVersion: 1` for LSP branching
 - JSON output includes `warnings` array (always present, empty or populated)
+- Expression bindings can now include `compiled_expr` and `signal_indices` for precompiled runtime evaluation
 - Stdin compile mode: `compile(source, filePath)` and `compile({ source, filePath })` for LSP
 - Warning shape: each warning has `code`, `message`, `severity`, `range.start`, `range.end`
 - Bridge tests for JSON schema contract stability
@@ -18,3 +19,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - CLI JSON structure extended; no breaking changes to existing fields
+- `state` shorthand lowers to `signal(...)`, and state assignments lower to `.set(...)` with `.get()` rewrites

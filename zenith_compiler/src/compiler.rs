@@ -7,7 +7,7 @@ use crate::script::{
 use crate::transform::{
     transform, EventBinding, MarkerBinding, MarkerKind, RefBinding, TransformWarning,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const IR_VERSION: u32 = 1;
 
@@ -59,10 +59,14 @@ pub struct SignalPayload {
 pub struct ExpressionBindingPayload {
     pub marker_index: usize,
     pub signal_index: Option<usize>,
+    pub signal_indices: Vec<usize>,
     pub state_index: Option<usize>,
     pub component_instance: Option<String>,
     pub component_binding: Option<String>,
     pub literal: Option<String>,
+    /// Precompiled expression for compound expressions that reference signals.
+    /// Replaces signal identifiers with `signalMap.get(id).get()` for runtime evaluation without eval.
+    pub compiled_expr: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -461,13 +465,6 @@ fn map_expression_bindings(
     hoisted: &HoistedOutput,
     signals: &[SignalPayload],
 ) -> Vec<ExpressionBindingPayload> {
-    let state_index_by_key = hoisted
-        .state_bindings
-        .iter()
-        .enumerate()
-        .map(|(idx, item)| (item.key.clone(), idx))
-        .collect::<BTreeMap<_, _>>();
-
     let signal_index_by_state = signals
         .iter()
         .map(|signal| (signal.state_index, signal.id))
@@ -477,38 +474,229 @@ fn map_expression_bindings(
         .iter()
         .enumerate()
         .map(|(index, expr)| {
-            if let Some(state_index) = state_index_by_key.get(expr) {
+            let trimmed = expr.trim();
+
+            if let Some(state_index) = resolve_direct_state_index(trimmed, &hoisted.state_bindings) {
+                let signal_indices = signal_index_by_state
+                    .get(&state_index)
+                    .copied()
+                    .into_iter()
+                    .collect::<Vec<_>>();
                 return ExpressionBindingPayload {
                     marker_index: index,
-                    signal_index: signal_index_by_state.get(state_index).copied(),
-                    state_index: Some(*state_index),
+                    signal_index: signal_indices.first().copied(),
+                    signal_indices,
+                    state_index: Some(state_index),
                     component_instance: None,
                     component_binding: None,
                     literal: None,
+                    compiled_expr: None,
                 };
             }
 
-            if let Some((instance, binding)) = parse_component_binding(expr) {
+            if let Some((instance, binding)) = parse_component_binding(trimmed) {
                 return ExpressionBindingPayload {
                     marker_index: index,
                     signal_index: None,
+                    signal_indices: Vec::new(),
                     state_index: None,
                     component_instance: Some(instance),
                     component_binding: Some(binding),
                     literal: None,
+                    compiled_expr: None,
                 };
             }
 
+            if is_safe_literal_binding(trimmed) {
+                return ExpressionBindingPayload {
+                    marker_index: index,
+                    signal_index: None,
+                    signal_indices: Vec::new(),
+                    state_index: None,
+                    component_instance: None,
+                    component_binding: None,
+                    literal: Some(expr.clone()),
+                    compiled_expr: None,
+                };
+            }
+
+            let state_index = resolve_state_index_from_expression(trimmed, &hoisted.state_bindings);
+            let signal_indices = collect_signal_indices_from_expression(
+                trimmed,
+                &hoisted.state_bindings,
+                &signal_index_by_state,
+            );
             ExpressionBindingPayload {
                 marker_index: index,
-                signal_index: None,
-                state_index: None,
+                signal_index: if signal_indices.len() == 1 {
+                    signal_indices.first().copied()
+                } else {
+                    None
+                },
+                signal_indices,
+                state_index,
                 component_instance: None,
                 component_binding: None,
                 literal: Some(expr.clone()),
+                compiled_expr: Some(compile_expression_for_runtime(
+                    trimmed,
+                    &hoisted.state_bindings,
+                    &signal_index_by_state,
+                )),
             }
         })
         .collect()
+}
+
+fn resolve_direct_state_index(expr: &str, state_bindings: &[HoistedStateBinding]) -> Option<usize> {
+    if !is_identifier(expr) {
+        return None;
+    }
+    resolve_state_index_from_expression(expr, state_bindings)
+}
+
+fn is_safe_literal_binding(expr: &str) -> bool {
+    is_primitive_literal(expr) || is_safe_member_chain_literal(expr)
+}
+
+fn is_identifier(expr: &str) -> bool {
+    regex::Regex::new(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
+        .map(|re| re.is_match(expr))
+        .unwrap_or(false)
+}
+
+fn is_primitive_literal(expr: &str) -> bool {
+    if matches!(expr, "true" | "false" | "null" | "undefined") {
+        return true;
+    }
+    if regex::Regex::new(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$")
+        .map(|re| re.is_match(expr))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    if expr.len() >= 2 {
+        let bytes = expr.as_bytes();
+        let first = bytes[0];
+        let last = bytes[bytes.len() - 1];
+        if (first == b'"' && last == b'"')
+            || (first == b'\'' && last == b'\'')
+            || (first == b'`' && last == b'`')
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_safe_member_chain_literal(expr: &str) -> bool {
+    let Ok(member_re) = regex::Regex::new(
+        r"^(?:params|data|ssr|props)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$",
+    ) else {
+        return false;
+    };
+    member_re.is_match(expr)
+}
+
+fn collect_signal_indices_from_expression(
+    expr: &str,
+    state_bindings: &[HoistedStateBinding],
+    signal_index_by_state: &BTreeMap<usize, usize>,
+) -> Vec<usize> {
+    let Ok(ident_re) = regex::Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b") else {
+        return Vec::new();
+    };
+    let mut signal_indices = BTreeSet::new();
+    for capture in ident_re.captures_iter(expr) {
+        let Some(ident) = capture.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        let Some(state_index) = resolve_direct_state_index(ident, state_bindings) else {
+            continue;
+        };
+        let Some(signal_index) = signal_index_by_state.get(&state_index).copied() else {
+            continue;
+        };
+        signal_indices.insert(signal_index);
+    }
+    signal_indices.into_iter().collect()
+}
+
+fn compile_expression_for_runtime(
+    expr: &str,
+    state_bindings: &[HoistedStateBinding],
+    signal_index_by_state: &BTreeMap<usize, usize>,
+) -> String {
+    let mut compiled = expr.to_string();
+    let mut replacements = Vec::new();
+
+    for (state_index, binding) in state_bindings.iter().enumerate() {
+        let Some(signal_id) = signal_index_by_state.get(&state_index).copied() else {
+            continue;
+        };
+        replacements.push((binding.key.clone(), signal_id));
+        if let Some(alias) = derive_state_alias(&binding.key) {
+            if alias != binding.key {
+                replacements.push((alias, signal_id));
+            }
+        }
+    }
+
+    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0)));
+    replacements.dedup_by(|a, b| a.0 == b.0);
+
+    for (ident, signal_id) in replacements {
+        let access_re = format!("{}.get()", ident);
+        let replacement = format!("signalMap.get({signal_id}).get()");
+        compiled = compiled.replace(&access_re, &replacement);
+
+        let Ok(re) = regex::Regex::new(&format!(r"\b{}\b", regex::escape(&ident))) else {
+            continue;
+        };
+        compiled = re.replace_all(&compiled, replacement.as_str()).into_owned();
+    }
+
+    compiled
+}
+
+fn derive_state_alias(key: &str) -> Option<String> {
+    if key.is_empty() || !key.starts_with("__") || key.starts_with("__z_frag_") {
+        return None;
+    }
+    let segments = key.split('_').filter(|segment| !segment.is_empty());
+    for candidate in segments.rev() {
+        if is_identifier(candidate) {
+            return Some(candidate.to_string());
+        }
+    }
+    None
+}
+
+/// Extract identifiers from an expression and resolve to state_index if exactly one
+/// state binding matches (by key suffix `_ident`).
+fn resolve_state_index_from_expression(
+    expr: &str,
+    state_bindings: &[HoistedStateBinding],
+) -> Option<usize> {
+    let ident_re = regex::Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b").ok()?;
+    let mut matched_index: Option<usize> = None;
+    for cap in ident_re.captures_iter(expr) {
+        let ident = cap.get(1)?.as_str();
+        if ident == "true" || ident == "false" || ident == "null" || ident == "undefined" {
+            continue;
+        }
+        let suffix = format!("_{}", ident);
+        for (idx, binding) in state_bindings.iter().enumerate() {
+            if binding.key == ident || binding.key.ends_with(&suffix) {
+                if matched_index.is_some() && matched_index != Some(idx) {
+                    return None;
+                }
+                matched_index = Some(idx);
+                break;
+            }
+        }
+    }
+    matched_index
 }
 
 fn parse_component_binding(expr: &str) -> Option<(String, String)> {

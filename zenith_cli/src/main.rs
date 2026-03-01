@@ -105,10 +105,12 @@ fn main() -> Result<()> {
             serde_json::json!({
                 "marker_index": entry.marker_index,
                 "signal_index": entry.signal_index,
+                "signal_indices": entry.signal_indices,
                 "state_index": entry.state_index,
                 "component_instance": entry.component_instance,
                 "component_binding": entry.component_binding,
-                "literal": entry.literal
+                "literal": entry.literal,
+                "compiled_expr": entry.compiled_expr
             })
         })
         .collect::<Vec<_>>();

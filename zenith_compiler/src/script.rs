@@ -403,6 +403,22 @@ fn analyze_component_script(
         declared.push((start, ident, HoistedBindingKind::Function));
     }
 
+    // Zenith shorthand: state name = value (reactive state declaration)
+    let state_decl_re = Regex::new(r"\bstate\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=").unwrap();
+    for capture in state_decl_re.captures_iter(source) {
+        let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
+        if !is_top_level_position(source, full_start) {
+            continue;
+        }
+        let ident = capture
+            .get(1)
+            .map(|m| m.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let start = capture.get(1).map(|m| m.start()).unwrap_or(0);
+        declared.push((start, ident, HoistedBindingKind::State));
+    }
+
     declared.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut bindings = Vec::new();
@@ -443,6 +459,37 @@ fn analyze_component_script(
             .replace_all(&renamed_source, binding.renamed.as_str())
             .into_owned();
     }
+    // Lower Zenith shorthand "state name = value" to valid JS "var name = signal(value)"
+    let state_kw_re = Regex::new(r"\bstate\s+").unwrap();
+    renamed_source = state_kw_re.replace_all(&renamed_source, "var ").into_owned();
+
+    // Wrap State declaration RHS in signal() so state vars become reactive
+    for binding in bindings.iter().filter(|b| matches!(b.kind, HoistedBindingKind::State)) {
+        let r = regex::escape(&binding.renamed);
+        let decl_re = Regex::new(&format!(r"var\s+{r}\s*=\s*([^;]+);")).unwrap();
+        renamed_source = decl_re
+            .replace_all(&renamed_source, format!("var {} = signal($1);", binding.renamed))
+            .into_owned();
+    }
+
+    // Lower assignments to State vars: R = RHS -> R.set(RHS') where RHS' has R -> R.get()
+    for binding in bindings.iter().filter(|b| matches!(b.kind, HoistedBindingKind::State)) {
+        let r = regex::escape(&binding.renamed);
+        // Match R = RHS at statement boundary (not in var/const/let declaration)
+        let assign_re =
+            Regex::new(&format!(r"((?:^|[\n;{{])\s*){r}\s*=\s*([^;]+)")).unwrap();
+        renamed_source = assign_re
+            .replace_all(&renamed_source, |caps: &regex::Captures<'_>| {
+                let prefix = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+                let rhs = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+                let rhs_with_get = Regex::new(&format!(r"\b{r}\b"))
+                    .unwrap()
+                    .replace_all(rhs, format!("{}.get()", binding.renamed))
+                    .into_owned();
+                format!("{}{}.set({})", prefix, binding.renamed, rhs_with_get)
+            })
+            .into_owned();
+    }
 
     let declarations = decl_line_re
         .find_iter(&renamed_source)
@@ -456,7 +503,7 @@ fn analyze_component_script(
         if matches!(binding.kind, HoistedBindingKind::Function) {
             functions.push(binding.renamed.clone());
         }
-        if matches!(binding.kind, HoistedBindingKind::Signal) {
+        if matches!(binding.kind, HoistedBindingKind::Signal | HoistedBindingKind::State) {
             signals.push(binding.renamed.clone());
         }
     }
