@@ -10,6 +10,14 @@ function flagEnabled(value) {
     return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+function parseLogLevel(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'quiet' || normalized === 'verbose') {
+        return normalized;
+    }
+    return 'normal';
+}
+
 /**
  * @param {{ env?: Record<string, string | undefined>, stdout?: { isTTY?: boolean } }} runtime
  */
@@ -21,10 +29,17 @@ export function getUiMode(runtime = process) {
     const noColor = env.NO_COLOR !== undefined && String(env.NO_COLOR).length >= 0;
     const forceColor = flagEnabled(env.FORCE_COLOR);
     const debug = flagEnabled(env.ZENITH_DEBUG);
+    let logLevel = parseLogLevel(env.ZENITH_LOG_LEVEL);
 
     const plain = noUi || ci || !tty;
     const color = !plain && !noColor && (forceColor || tty);
     const spinner = tty && !plain && !ci;
+    if (flagEnabled(env.ZENITH_DEV_TRACE)) {
+        logLevel = 'verbose';
+    }
+    if (debug && logLevel !== 'quiet') {
+        logLevel = 'verbose';
+    }
 
     return {
         plain,
@@ -32,7 +47,8 @@ export function getUiMode(runtime = process) {
         tty,
         ci,
         spinner,
-        debug
+        debug,
+        logLevel
     };
 }
 

@@ -1,53 +1,78 @@
-/**
- * Deterministic text formatters for CLI UX.
- */
-
+import pc from 'picocolors';
 import { relative, sep } from 'node:path';
 
-const ANSI = {
-    reset: '\x1b[0m',
-    bold: '\x1b[1m',
-    dim: '\x1b[2m',
-    red: '\x1b[31m',
-    yellow: '\x1b[33m',
-    green: '\x1b[32m',
-    cyan: '\x1b[36m'
-};
 const DEFAULT_PHASE = 'cli';
 const DEFAULT_FILE = '.';
 const DEFAULT_HINT_BASE = 'https://github.com/zenithbuild/zenith/blob/main/zenith-cli/CLI_CONTRACT.md';
+const PREFIX = '[zenith]';
+const TAG_WIDTH = 6;
 
-function colorize(mode, token, text) {
+const TAG_COLORS = {
+    DEV: (colors, value) => colors.cyan(value),
+    BUILD: (colors, value) => colors.blue(value),
+    HMR: (colors, value) => colors.magenta(value),
+    ROUTER: (colors, value) => colors.cyan(value),
+    CSS: (colors, value) => colors.yellow(value),
+    OK: (colors, value) => colors.green(value),
+    WARN: (colors, value) => colors.bold(colors.yellow(value)),
+    ERR: (colors, value) => colors.bold(colors.red(value))
+};
+
+function getColors(mode) {
+    return pc.createColors(Boolean(mode?.color));
+}
+
+export function formatPrefix(mode) {
+    return mode.color ? getColors(mode).dim(PREFIX) : PREFIX;
+}
+
+function colorizeTag(mode, tag) {
+    const padded = String(tag || '').padEnd(TAG_WIDTH, ' ');
     if (!mode.color) {
-        return text;
+        return padded;
     }
-    return `${ANSI[token]}${text}${ANSI.reset}`;
+    const colors = getColors(mode);
+    const colorizer = TAG_COLORS[tag] || ((_colors, value) => colors.white(value));
+    return colorizer(colors, padded);
+}
+
+function colorizeGlyph(mode, glyph, tag) {
+    if (!mode.color) {
+        return glyph;
+    }
+    const colors = getColors(mode);
+    const colorizer = TAG_COLORS[tag] || ((_colors, value) => value);
+    return colorizer(colors, glyph);
+}
+
+export function formatLine(mode, { glyph = '•', tag = 'DEV', text = '' }) {
+    return `${formatPrefix(mode)} ${colorizeGlyph(mode, glyph, tag)} ${colorizeTag(mode, tag)} ${String(text || '')}`;
+}
+
+export function formatStep(mode, text, tag = 'BUILD') {
+    return formatLine(mode, { glyph: '•', tag, text });
+}
+
+export function formatHint(mode, text) {
+    const body = `          hint: ${String(text || '').trim()}`;
+    return mode.color ? getColors(mode).dim(body) : body;
 }
 
 export function formatHeading(mode, text) {
-    const label = mode.plain ? 'ZENITH CLI' : colorize(mode, 'bold', 'Zenith CLI');
-    return `${label} ${text}`.trim();
+    const label = mode.color ? getColors(mode).bold('Zenith CLI') : 'Zenith CLI';
+    return `${label} ${String(text || '').trim()}`.trim();
 }
 
-export function formatStep(mode, text) {
-    if (mode.plain) {
-        return `[zenith] INFO: ${text}`;
-    }
-    const bullet = colorize(mode, 'cyan', '•');
-    return `[zenith] ${bullet} ${text}`;
-}
-
-export function formatSummaryTable(mode, rows) {
+export function formatSummaryTable(mode, rows, tag = 'BUILD') {
     if (!Array.isArray(rows) || rows.length === 0) {
         return '';
     }
-    const maxLabel = rows.reduce((acc, row) => Math.max(acc, String(row.label || '').length), 0);
     return rows
-        .map((row) => {
-            const label = String(row.label || '').padEnd(maxLabel, ' ');
-            const value = String(row.value || '');
-            return `[zenith] ${label} : ${value}`;
-        })
+        .map((row) => formatLine(mode, {
+            glyph: '•',
+            tag,
+            text: `${String(row.label || '')}: ${String(row.value || '')}`
+        }))
         .join('\n');
 }
 
@@ -131,36 +156,49 @@ export function normalizeError(err) {
     return new Error(sanitizeErrorMessage(err));
 }
 
+function firstMeaningfulLine(text) {
+    return String(text || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .find((line) => line.length > 0) || '';
+}
+
 /**
  * @param {unknown} err
- * @param {{ plain: boolean, color: boolean, debug: boolean }} mode
+ * @param {{ plain: boolean, color: boolean, debug?: boolean, logLevel?: string }} mode
  */
 export function formatErrorBlock(err, mode) {
     const normalized = normalizeError(err);
     const maybe = /** @type {{ code?: unknown, phase?: unknown, kind?: unknown, file?: unknown, hint?: unknown }} */ (normalized);
-    const kind = sanitizeErrorMessage(maybe.kind || maybe.code || 'CLI_ERROR');
     const phase = maybe.phase ? sanitizeErrorMessage(maybe.phase) : inferPhaseFromArgv();
     const code = maybe.code
         ? sanitizeErrorMessage(maybe.code)
         : `${phase.toUpperCase().replace(/[^A-Z0-9]+/g, '_') || 'CLI'}_FAILED`;
     const rawMessage = sanitizeErrorMessage(normalized.message || String(normalized));
     const message = normalizeErrorMessagePaths(rawMessage);
+    const compactMessage = firstMeaningfulLine(message) || 'Command failed';
     const file = normalizePathForDisplay(
         sanitizeErrorMessage(maybe.file || extractFileFromMessage(message) || DEFAULT_FILE)
     );
     const hint = sanitizeErrorMessage(maybe.hint || formatHintUrl(code));
 
+    if (mode.logLevel !== 'verbose' && !mode.debug) {
+        return [
+            formatLine(mode, { glyph: '✖', tag: 'ERR', text: compactMessage }),
+            formatHint(mode, hint)
+        ].join('\n');
+    }
+
     const lines = [];
-    lines.push('[zenith] ERROR: Command failed');
-    lines.push(`[zenith] Error Kind: ${kind}`);
-    lines.push(`[zenith] Phase: ${phase || DEFAULT_PHASE}`);
-    lines.push(`[zenith] Code: ${code || 'CLI_FAILED'}`);
-    lines.push(`[zenith] File: ${file || DEFAULT_FILE}`);
-    lines.push(`[zenith] Hint: ${hint || formatHintUrl(code)}`);
-    lines.push(`[zenith] Message: ${message}`);
+    lines.push(formatLine(mode, { glyph: '✖', tag: 'ERR', text: compactMessage }));
+    lines.push(formatHint(mode, hint || formatHintUrl(code)));
+    lines.push(`${formatPrefix(mode)}     code: ${code || 'CLI_FAILED'}`);
+    lines.push(`${formatPrefix(mode)}     phase: ${phase || DEFAULT_PHASE}`);
+    lines.push(`${formatPrefix(mode)}     file: ${file || DEFAULT_FILE}`);
+    lines.push(`${formatPrefix(mode)}     detail: ${message}`);
 
     if (mode.debug && normalized.stack) {
-        lines.push('[zenith] Stack:');
+        lines.push(`${formatPrefix(mode)}     stack:`);
         lines.push(...String(normalized.stack).split('\n').slice(0, 20));
     }
 

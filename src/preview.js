@@ -14,6 +14,7 @@ import { createServer } from 'node:http';
 import { access, readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createSilentLogger } from './ui/logger.js';
 import {
   compareRouteSpecificity,
   matchRoute as matchManifestRoute,
@@ -386,11 +387,13 @@ try {
 /**
  * Create and start a preview server.
  *
- * @param {{ distDir: string, port?: number, host?: string }} options
+ * @param {{ distDir: string, port?: number, host?: string, logger?: object | null }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createPreviewServer(options) {
-  const { distDir, port = 4000, host = '127.0.0.1' } = options;
+  const { distDir, port = 4000, host = '127.0.0.1', logger: providedLogger = null } = options;
+  const logger = providedLogger || createSilentLogger();
+  const verboseLogging = logger.mode?.logLevel === 'verbose';
   let actualPort = port;
 
   function publicHost() {
@@ -502,7 +505,11 @@ export async function createPreviewServer(options) {
       let htmlPath = null;
 
       if (resolved.matched && resolved.route) {
-        console.log(`[zenith] Request: ${url.pathname} | Route: ${resolved.route.path} | Params: ${JSON.stringify(resolved.params)}`);
+        if (verboseLogging) {
+          logger.router(
+            `${req.method || 'GET'} ${url.pathname} -> ${resolved.route.path} params=${JSON.stringify(resolved.params)}`
+          );
+        }
         const output = resolved.route.output.startsWith('/')
           ? resolved.route.output.slice(1)
           : resolved.route.output;
@@ -541,8 +548,9 @@ export async function createPreviewServer(options) {
 
         const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
         const routeId = resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '');
-        console.log(`[Zenith] guard(${routeId}) -> ${trace.guard}`);
-        console.log(`[Zenith] load(${routeId}) -> ${trace.load}`);
+        if (verboseLogging) {
+          logger.router(`${routeId} guard=${trace.guard} load=${trace.load}`);
+        }
 
         const result = routeExecution?.result;
         if (result && result.kind === 'redirect') {

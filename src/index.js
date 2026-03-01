@@ -13,7 +13,7 @@
 import { resolve, join, dirname } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createLogger } from './ui/logger.js';
+import { createZenithLogger } from './ui/logger.js';
 
 const COMMANDS = ['dev', 'build', 'preview'];
 const DEFAULT_VERSION = '0.0.0';
@@ -90,7 +90,7 @@ async function loadConfig(projectRoot) {
  * @param {string} [cwd] - Working directory override
  */
 export async function cli(args, cwd) {
-    const logger = createLogger(process);
+    const logger = createZenithLogger(process);
     const command = args[0];
     const cliVersion = getCliVersion();
 
@@ -118,10 +118,10 @@ export async function cli(args, cwd) {
 
     if (command === 'build') {
         const { build } = await import('./build.js');
-        logger.info('Building...');
-        const result = await build({ pagesDir, outDir, config });
-        logger.success(`Built ${result.pages} page(s), ${result.assets.length} asset(s)`);
-        logger.summary([{ label: 'Output', value: './dist' }]);
+        logger.build('Building…');
+        const result = await build({ pagesDir, outDir, config, logger, showBundlerInfo: false });
+        logger.ok(`Built ${result.pages} page(s), ${result.assets.length} asset(s)`);
+        logger.summary([{ label: 'Output', value: './dist' }], 'BUILD');
     }
 
     if (command === 'dev') {
@@ -130,9 +130,9 @@ export async function cli(args, cwd) {
             ? Number.parseInt(process.env.ZENITH_DEV_PORT, 10)
             : resolvePort(args.slice(1), 3000);
         const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
-        logger.info('Starting dev server...');
-        const dev = await createDevServer({ pagesDir, outDir, port, host, config });
-        logger.success(`Dev server running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
+        logger.dev('Starting dev server…');
+        const dev = await createDevServer({ pagesDir, outDir, port, host, config, logger });
+        logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
 
         // Graceful shutdown
         process.on('SIGINT', () => {
@@ -149,9 +149,9 @@ export async function cli(args, cwd) {
         const { createPreviewServer } = await import('./preview.js');
         const port = resolvePort(args.slice(1), 4000);
         const host = process.env.ZENITH_PREVIEW_HOST || '127.0.0.1';
-        logger.info('Starting preview server...');
-        const preview = await createPreviewServer({ distDir: outDir, port, host });
-        logger.success(`Preview server running at http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${preview.port}`);
+        logger.dev('Starting preview server…');
+        const preview = await createPreviewServer({ distDir: outDir, port, host, logger });
+        logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${preview.port}`);
 
         process.on('SIGINT', () => {
             preview.close();
@@ -172,7 +172,7 @@ const isDirectRun = process.argv[1] && (
 
 if (isDirectRun) {
     cli(process.argv.slice(2)).catch((error) => {
-        const logger = createLogger(process);
+        const logger = createZenithLogger(process);
         logger.error(error);
         process.exit(1);
     });

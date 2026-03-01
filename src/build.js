@@ -93,6 +93,35 @@ export function createCompilerWarningEmitter(sink = (line) => console.warn(line)
 }
 
 /**
+ * Forward child-process output line-by-line through the structured logger.
+ *
+ * @param {import('node:stream').Readable | null | undefined} stream
+ * @param {(line: string) => void} onLine
+ */
+function forwardStreamLines(stream, onLine) {
+    if (!stream || typeof stream.on !== 'function') {
+        return;
+    }
+    let pending = '';
+    stream.setEncoding?.('utf8');
+    stream.on('data', (chunk) => {
+        pending += String(chunk || '');
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop() || '';
+        for (const line of lines) {
+            if (line.trim().length > 0) {
+                onLine(line);
+            }
+        }
+    });
+    stream.on('end', () => {
+        if (pending.trim().length > 0) {
+            onLine(pending);
+        }
+    });
+}
+
+/**
  * Run the compiler process and parse its JSON stdout.
  *
  * If `stdinSource` is provided, pipes it to the compiler via stdin
@@ -241,6 +270,57 @@ function mergeExpressionRewriteMaps(pageMap, pageAmbiguous, componentRewrite) {
             continue;
         }
         pageMap.set(raw, rewritten);
+    }
+}
+
+function resolveStateKeyFromBindings(identifier, stateBindings, preferredKeys = null) {
+    const ident = String(identifier || '').trim();
+    if (!ident) {
+        return null;
+    }
+
+    const exact = stateBindings.find((entry) => String(entry?.key || '') === ident);
+    if (exact && typeof exact.key === 'string') {
+        return exact.key;
+    }
+
+    const suffix = `_${ident}`;
+    const matches = stateBindings
+        .map((entry) => String(entry?.key || ''))
+        .filter((key) => key.endsWith(suffix));
+
+    if (preferredKeys instanceof Set && preferredKeys.size > 0) {
+        const preferredMatches = matches.filter((key) => preferredKeys.has(key));
+        if (preferredMatches.length === 1) {
+            return preferredMatches[0];
+        }
+    }
+
+    if (matches.length === 1) {
+        return matches[0];
+    }
+
+    return null;
+}
+
+function rewriteRefBindingIdentifiers(pageIr, preferredKeys = null) {
+    if (!Array.isArray(pageIr?.ref_bindings) || pageIr.ref_bindings.length === 0) {
+        return;
+    }
+
+    const stateBindings = Array.isArray(pageIr?.hoisted?.state) ? pageIr.hoisted.state : [];
+    if (stateBindings.length === 0) {
+        return;
+    }
+
+    for (const binding of pageIr.ref_bindings) {
+        if (!binding || typeof binding !== 'object' || typeof binding.identifier !== 'string') {
+            continue;
+        }
+        const resolved = resolveStateKeyFromBindings(binding.identifier, stateBindings, preferredKeys);
+        if (resolved) {
+            binding.identifier = resolved;
+        }
     }
 }
 
@@ -751,7 +831,7 @@ function collectComponentUsageAttrs(source, registry) {
  * @param {{ includeCode: boolean, cssImportsOnly: boolean, documentMode?: boolean, componentAttrs?: string }} options
  * @param {Set<string>} seenStaticImports
  */
-function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStaticImports) {
+function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStaticImports, knownRefKeys = null) {
     // Merge components_scripts
     if (compIr.components_scripts) {
         for (const [hoistId, script] of Object.entries(compIr.components_scripts)) {
@@ -764,6 +844,17 @@ function mergeComponentIr(pageIr, compIr, compPath, pageFile, options, seenStati
     // Merge component_instances
     if (compIr.component_instances?.length) {
         pageIr.component_instances.push(...compIr.component_instances);
+    }
+
+    if (knownRefKeys instanceof Set && Array.isArray(compIr.ref_bindings)) {
+        const componentStateBindings = Array.isArray(compIr?.hoisted?.state) ? compIr.hoisted.state : [];
+        for (const binding of compIr.ref_bindings) {
+            if (!binding || typeof binding.identifier !== 'string' || binding.identifier.length === 0) {
+                continue;
+            }
+            const resolved = resolveStateKeyFromBindings(binding.identifier, componentStateBindings);
+            knownRefKeys.add(resolved || binding.identifier);
+        }
     }
 
     // Merge hoisted imports (deduplicated, rebased to the page file path)
@@ -1254,18 +1345,30 @@ function deferComponentRuntimeBlock(source) {
  * @param {object|object[]} envelope
  * @param {string} outDir
  * @param {string} projectRoot
+ * @param {object | null} [logger]
+ * @param {boolean} [showInfo]
  * @returns {Promise<void>}
  */
-function runBundler(envelope, outDir, projectRoot) {
+function runBundler(envelope, outDir, projectRoot, logger = null, showInfo = true) {
     return new Promise((resolvePromise, rejectPromise) => {
+        const useStructuredLogger = Boolean(logger && typeof logger.childLine === 'function');
         const child = spawn(
             getBundlerBin(),
             ['--out-dir', outDir],
             {
                 cwd: projectRoot,
-                stdio: ['pipe', 'inherit', 'inherit']
+                stdio: useStructuredLogger ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit']
             }
         );
+
+        if (useStructuredLogger) {
+            forwardStreamLines(child.stdout, (line) => {
+                logger.childLine('bundler', line, { stream: 'stdout', showInfo });
+            });
+            forwardStreamLines(child.stderr, (line) => {
+                logger.childLine('bundler', line, { stream: 'stderr', showInfo: true });
+            });
+        }
 
         child.on('error', (err) => {
             rejectPromise(new Error(`Bundler spawn failed: ${err.message}`));
@@ -1332,11 +1435,11 @@ async function collectAssets(rootDir) {
  *      d. Merge component IRs into page IR
  *   3. Send all envelopes to bundler
  *
- * @param {{ pagesDir: string, outDir: string, config?: object }} options
+ * @param {{ pagesDir: string, outDir: string, config?: object, logger?: object | null, showBundlerInfo?: boolean }} options
  * @returns {Promise<{ pages: number, assets: string[] }>}
  */
 export async function build(options) {
-    const { pagesDir, outDir, config = {} } = options;
+    const { pagesDir, outDir, config = {}, logger = null, showBundlerInfo = true } = options;
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
     const softNavigationEnabled = config.softNavigation === true || config.router === true;
     const compilerOpts = {
@@ -1354,7 +1457,13 @@ export async function build(options) {
     // 1. Build component registry
     const registry = buildComponentRegistry(srcDir);
     if (registry.size > 0) {
-        console.log(`[zenith] Component registry: ${registry.size} components`);
+        if (logger && typeof logger.build === 'function') {
+            logger.build(`registry=${registry.size} components`, {
+                onceKey: `component-registry:${registry.size}`
+            });
+        } else {
+            console.log(`[zenith] Component registry: ${registry.size} components`);
+        }
     }
 
     const manifest = await generateManifest(pagesDir);
@@ -1367,7 +1476,13 @@ export async function build(options) {
     const componentDocumentModeCache = new Map();
     /** @type {Map<string, { map: Map<string, string>, ambiguous: Set<string> }>} */
     const componentExpressionRewriteCache = new Map();
-    const emitCompilerWarning = createCompilerWarningEmitter((line) => console.warn(line));
+    const emitCompilerWarning = createCompilerWarningEmitter((line) => {
+        if (logger && typeof logger.warn === 'function') {
+            logger.warn(line, { onceKey: `compiler-warning:${line}` });
+            return;
+        }
+        console.warn(line);
+    });
 
     const envelopes = [];
     for (const entry of manifest) {
@@ -1436,6 +1551,7 @@ export async function build(options) {
         const seenStaticImports = new Set();
         const pageExpressionRewriteMap = new Map();
         const pageAmbiguousExpressionMap = new Set();
+        const knownRefKeys = new Set();
 
         // 2c. Compile each used component separately for its script IR
         for (const compName of usedComponents) {
@@ -1486,7 +1602,8 @@ export async function build(options) {
                     documentMode: isDocMode,
                     componentAttrs: (componentUsageAttrs.get(compName) || [])[0] || ''
                 },
-                seenStaticImports
+                seenStaticImports,
+                knownRefKeys
             );
         }
 
@@ -1497,6 +1614,7 @@ export async function build(options) {
         );
 
         rewriteLegacyMarkupIdentifiers(pageIr);
+        rewriteRefBindingIdentifiers(pageIr, knownRefKeys);
 
         envelopes.push({
             route: entry.path,
@@ -1507,7 +1625,7 @@ export async function build(options) {
     }
 
     if (envelopes.length > 0) {
-        await runBundler(envelopes, outDir, projectRoot);
+    await runBundler(envelopes, outDir, projectRoot, logger, showBundlerInfo);
     }
 
     const assets = await collectAssets(outDir);

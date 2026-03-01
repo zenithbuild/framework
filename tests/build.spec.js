@@ -620,6 +620,82 @@ describe('build orchestration', () => {
         expect(pageAsset.includes('resolvedTitle')).toBe(true);
     });
 
+    test('resolves propagated layout refs without colliding with nested prop aliases', async () => {
+        const root = join(tmpdir(), `zenith-build-propagated-ref-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const layoutsDir = join(srcDir, 'layouts');
+        const footerDir = join(srcDir, 'components', 'globals', 'footer');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(layoutsDir, { recursive: true });
+        await mkdir(footerDir, { recursive: true });
+
+        await writeFile(
+            join(layoutsDir, 'RootLayout.zen'),
+            [
+                '<script lang="ts">',
+                'import Footer from "../components/globals/footer/Footer.zen";',
+                'const mainRef = ref<HTMLElement>();',
+                '</script>',
+                '<div>',
+                '  <main ref={mainRef}><slot /></main>',
+                '  <Footer mainRef={mainRef} />',
+                '</div>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(footerDir, 'Footer.zen'),
+            [
+                '<script lang="ts">',
+                'import FooterCurvedText from "./FooterCurvedText.zen";',
+                'const incoming = props;',
+                'const mainRef = incoming.mainRef ?? { current: null };',
+                'const footerRef = ref<HTMLElement>();',
+                '</script>',
+                '<footer ref={footerRef}>',
+                '  <FooterCurvedText mainRef={mainRef} footerRef={footerRef} />',
+                '</footer>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(footerDir, 'FooterCurvedText.zen'),
+            [
+                '<script lang="ts">',
+                'const incoming = props;',
+                'const mainRef = incoming.mainRef ?? { current: null };',
+                'const footerRef = incoming.footerRef ?? { current: null };',
+                'const refPath = ref<SVGPathElement>();',
+                '</script>',
+                '<svg><path ref={refPath}></path></svg>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<RootLayout><section>ok</section></RootLayout>\n',
+            'utf8'
+        );
+
+        await expect(build({ pagesDir, outDir })).resolves.toMatchObject({ pages: 1 });
+
+        const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
+
+        expect(pageAsset).toContain('const __zenith_refs = [');
+        expect(pageAsset).not.toContain('const __zenith_refs = [];');
+    });
+
     test('keeps function-local zenEffect/zenMount variables out of module state table and evaluates cleanly', async () => {
         project = await makeProject({
             'index.zen': [

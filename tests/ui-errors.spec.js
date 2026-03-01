@@ -44,14 +44,9 @@ describe('cli ui error formatting', () => {
 
             expect(result.status).toBe(1);
             const output = `${result.stdout}${result.stderr}`.replace(/\r/g, '');
-            expect(output).toContain('[zenith] ERROR: Command failed');
-            expect(output).toContain('[zenith] Error Kind:');
-            expect(output).toContain('[zenith] Phase:');
-            expect(output).toContain('[zenith] Code:');
-            expect(output).toContain('[zenith] File:');
-            expect(output).toContain('[zenith] Hint: https://');
-            expect(output).toContain('[zenith] Message:');
-            expect(output).toContain('File: pages/index.zen');
+            expect(output).toContain('[zenith] ✖ ERR');
+            expect(output).toContain('hint: https://');
+            expect(output).toContain('Zenith server script contract violation:');
             expect(output).not.toContain(`File: ${projectRoot}`);
             expect(output).not.toMatch(SPINNER_REGEX);
         } finally {

@@ -16,6 +16,7 @@ import { existsSync, watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { build } from './build.js';
+import { createSilentLogger } from './ui/logger.js';
 import {
     executeServerRoute,
     injectSsrPayload,
@@ -41,7 +42,7 @@ const MIME_TYPES = {
 /**
  * Create and start a development server.
  *
- * @param {{ pagesDir: string, outDir: string, port?: number, host?: string, config?: object }} options
+ * @param {{ pagesDir: string, outDir: string, port?: number, host?: string, config?: object, logger?: object | null }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createDevServer(options) {
@@ -50,8 +51,10 @@ export async function createDevServer(options) {
         outDir,
         port = 3000,
         host = '127.0.0.1',
-        config = {}
+        config = {},
+        logger: providedLogger = null
     } = options;
+    const logger = providedLogger || createSilentLogger();
 
     const resolvedPagesDir = resolve(pagesDir);
     const resolvedOutDir = resolve(outDir);
@@ -83,6 +86,7 @@ export async function createDevServer(options) {
     let durationMs = 0;
     let buildError = null;
     const traceEnabled = config.devTrace === true || process.env.ZENITH_DEV_TRACE === '1';
+    const verboseLogging = traceEnabled || logger.mode?.logLevel === 'verbose';
 
     // Stable dev CSS endpoint points to this backing asset.
     let currentCssAssetPath = '';
@@ -104,8 +108,10 @@ export async function createDevServer(options) {
     function _trace(event, payload = {}) {
         if (!traceEnabled) return;
         try {
-            const timestamp = new Date().toISOString();
-            console.log(`[zenith-dev][${timestamp}] ${event} ${JSON.stringify(payload)}`);
+            const detail = Object.keys(payload).length > 0
+                ? `${event} ${JSON.stringify(payload)}`
+                : event;
+            logger.verbose('BUILD', detail);
         } catch {
             // tracing must never break the dev server
         }
@@ -243,11 +249,19 @@ export async function createDevServer(options) {
 
     // Initial build
     try {
-        const initialBuild = await build({ pagesDir, outDir, config });
+        logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
+        const initialBuild = await build({ pagesDir, outDir, config, logger });
         await _syncCssStateFromBuild(initialBuild, buildId);
+        if (currentCssHref.length > 0) {
+            logger.css(`ready (${currentCssHref})`, { onceKey: `css-ready:${buildId}:${currentCssHref}` });
+        }
     } catch (err) {
         buildStatus = 'error';
         buildError = { message: err instanceof Error ? err.message : String(err) };
+        logger.error('initial build failed', {
+            hint: 'fix the error and restart dev',
+            error: err
+        });
     }
 
     const server = createServer(async (req, res) => {
@@ -265,7 +279,10 @@ export async function createDevServer(options) {
                 'Connection': 'keep-alive',
                 'X-Zenith-Deprecated': 'true'
             });
-            console.warn('[zenith] Warning: /__zenith_hmr is legacy; use /__zenith_dev/events');
+            logger.warn('legacy HMR endpoint in use', {
+                hint: 'use /__zenith_dev/events',
+                onceKey: 'legacy-hmr-endpoint'
+            });
             res.write(': connected\n\n');
             hmrClients.push(res);
             req.on('close', () => {
@@ -448,7 +465,11 @@ export async function createDevServer(options) {
             let filePath = null;
 
             if (resolved.matched && resolved.route) {
-                console.log(`[zenith] Request: ${pathname} | Route: ${resolved.route.path} | Params: ${JSON.stringify(resolved.params)}`);
+                if (verboseLogging) {
+                    logger.router(
+                        `${req.method || 'GET'} ${pathname} -> ${resolved.route.path} params=${JSON.stringify(resolved.params)}`
+                    );
+                }
                 const output = resolved.route.output.startsWith('/')
                     ? resolved.route.output.slice(1)
                     : resolved.route.output;
@@ -490,8 +511,11 @@ export async function createDevServer(options) {
 
                 const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
                 const routeId = resolved.route.route_id || '';
-                console.log(`[Zenith] guard(${routeId || resolved.route.path}) -> ${trace.guard}`);
-                console.log(`[Zenith] load(${routeId || resolved.route.path}) -> ${trace.load}`);
+                if (verboseLogging) {
+                    logger.router(
+                        `${routeId || resolved.route.path} guard=${trace.guard} load=${trace.load}`
+                    );
+                }
 
                 const result = routeExecution?.result;
                 if (result && result.kind === 'redirect') {
@@ -609,13 +633,14 @@ export async function createDevServer(options) {
             const cycleBuildId = pendingBuildId + 1;
             pendingBuildId = cycleBuildId;
             buildStatus = 'building';
+            logger.build(`Rebuild (id=${cycleBuildId})`);
             _broadcastEvent('build_start', { buildId: cycleBuildId, changedFiles: changed });
 
             const startTime = Date.now();
             const previousCssAssetPath = currentCssAssetPath;
             const previousCssContent = currentCssContent;
             try {
-                const buildResult = await build({ pagesDir, outDir, config });
+                const buildResult = await build({ pagesDir, outDir, config, logger });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
                 const cssChanged = cssReady && (
                     currentCssAssetPath !== previousCssAssetPath ||
@@ -626,6 +651,7 @@ export async function createDevServer(options) {
                 buildError = null;
                 lastBuildMs = Date.now();
                 durationMs = lastBuildMs - startTime;
+                logger.build(`Complete (id=${cycleBuildId}, ${durationMs}ms)`);
 
                 _broadcastEvent('build_complete', {
                     buildId: cycleBuildId,
@@ -644,11 +670,14 @@ export async function createDevServer(options) {
                 });
 
                 if (cssChanged && currentCssHref.length > 0) {
+                    logger.css(`ready (${currentCssHref})`);
+                    logger.hmr(`css_update (buildId=${cycleBuildId})`);
                     _broadcastEvent('css_update', { href: currentCssHref, changedFiles: changed });
                 }
 
                 const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
                 if (!onlyCss) {
+                    logger.hmr(`reload (buildId=${cycleBuildId})`);
                     _broadcastEvent('reload', { changedFiles: changed });
                 } else {
                     _trace('css_only_update', {
@@ -664,6 +693,10 @@ export async function createDevServer(options) {
                 buildError = { message: fullError.length > 10000 ? fullError.slice(0, 10000) + '... (truncated)' : fullError };
                 lastBuildMs = Date.now();
                 durationMs = lastBuildMs - startTime;
+                logger.error('rebuild failed', {
+                    hint: 'fix the error and save again',
+                    error: err
+                });
 
                 _broadcastEvent('build_error', { buildId: cycleBuildId, ...buildError, changedFiles: changed });
                 _trace('state_snapshot', {

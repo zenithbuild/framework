@@ -46,14 +46,14 @@ describe('cli ui output', () => {
             const output = `${result.stdout}${result.stderr}`.replace(/\r/g, '');
             expect(output).not.toMatch(ANSI_REGEX);
             expect(output).not.toMatch(SPINNER_REGEX);
-            expect(output).toContain('[zenith] INFO: Building...');
-            expect(output).toContain('[zenith] OK: Built 1 page(s),');
-            expect(output).toContain('[zenith] Output');
+            expect(output).toContain('[zenith] • BUILD');
+            expect(output).toContain('[zenith] ✓ OK');
+            expect(output).toContain('[zenith] • BUILD  Output: ./dist');
 
             expect(output).toMatchInlineSnapshot(`
-"[zenith] INFO: Building...
-[zenith] OK: Built 1 page(s), 4 asset(s)
-[zenith] Output : ./dist
+"[zenith] • BUILD  Building…
+[zenith] ✓ OK     Built 1 page(s), 4 asset(s)
+[zenith] • BUILD  Output: ./dist
 "
 `);
         } finally {
