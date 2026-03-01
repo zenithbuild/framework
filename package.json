@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "scripts": {
     "build": "cargo build --release",
     "contract:deps": "node dependency_contract.spec.js",

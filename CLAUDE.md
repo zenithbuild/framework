@@ -14,6 +14,13 @@ Default to using Bun instead of Node.js.
 - Use `bunx <package> <command>` instead of `npx <package> <command>`
 - Bun automatically loads .env, so don't use dotenv.
 
+## File Size Rule
+
+- Treat `500` lines as a hard limit for any source file you create or edit.
+- Do not grow a file past `500` lines unless the user explicitly approves that exception.
+- If a change approaches the limit, split it into smaller modules/helpers first.
+- `2k+` line source files are not acceptable as a target state for new Zenith work.
+
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
