@@ -134,3 +134,47 @@ function toggleMenu() { isOpen = !isOpen; }
         code
     );
 }
+
+#[test]
+fn state_reads_in_control_flow_lower_to_get() {
+    let input = r#"<script lang="ts">
+state isOpen = false;
+state isAnimating = false;
+function toggleMenu() {
+    if (isAnimating) return;
+    isOpen = !isOpen;
+}
+function handleEscape() {
+    if (!isOpen || isAnimating) return;
+    isOpen = false;
+}
+</script>
+<div>{isOpen ? "close" : "menu"}</div>"#;
+
+    let output: CompilerOutput = compile_structured_with_source_options(
+        input,
+        "test.zen",
+        CompileOptions {
+            embedded_markup_expressions: true,
+            strict_dom_lints: false,
+        },
+    )
+    .expect("should compile");
+
+    let code = output.hoisted.code.join("\n");
+    assert!(
+        code.contains("if (__test_zen_script0_"),
+        "compiled control flow should be preserved, got: {}",
+        code
+    );
+    assert!(
+        code.contains(".get()) return;"),
+        "state read in if-condition must lower to .get(), got: {}",
+        code
+    );
+    assert!(
+        code.contains(".get() || __"),
+        "compound state condition must lower each read to .get(), got: {}",
+        code
+    );
+}

@@ -20,22 +20,14 @@ fn compiler_bin() -> PathBuf {
     path
 }
 
-#[test]
-fn compiler_cli_emits_schema_version_warnings_and_compiled_expr() {
+fn compile_fixture(source: &str, file_name: &str) -> serde_json::Value {
     let tmp_dir = std::env::temp_dir().join(format!(
         "zenith-compiler-json-contract-{}",
         std::process::id()
     ));
     fs::create_dir_all(&tmp_dir).expect("create temp dir");
-    let file_path = tmp_dir.join("index.zen");
-    fs::write(
-        &file_path,
-        r#"<script lang="ts">
-state isOpen = false;
-</script>
-<button>{isOpen ? "close" : "menu"}</button>"#,
-    )
-    .expect("write source");
+    let file_path = tmp_dir.join(file_name);
+    fs::write(&file_path, source).expect("write source");
 
     let output = Command::new(compiler_bin())
         .arg(&file_path)
@@ -48,8 +40,18 @@ state isOpen = false;
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("parse compiler json");
+    serde_json::from_slice(&output.stdout).expect("parse compiler json")
+}
+
+#[test]
+fn compiler_cli_emits_schema_version_warnings_and_compiled_expr() {
+    let json = compile_fixture(
+        r#"<script lang="ts">
+state isOpen = false;
+</script>
+<button>{isOpen ? "close" : "menu"}</button>"#,
+        "index.zen",
+    );
     assert_eq!(json["schemaVersion"], 1);
     assert_eq!(json["warnings"], serde_json::json!([]));
 
@@ -61,4 +63,32 @@ state isOpen = false;
         .find(|binding| binding["compiled_expr"].is_string())
         .expect("compiled_expr binding");
     assert_eq!(compiled["signal_indices"], serde_json::json!([0]));
+}
+
+#[test]
+fn compiler_cli_emits_non_empty_ref_bindings_when_refs_exist() {
+    let json = compile_fixture(
+        r#"<script lang="ts">
+const shell = ref<HTMLDivElement>();
+</script>
+<div ref={shell}></div>"#,
+        "with-ref.zen",
+    );
+
+    assert_eq!(json["schemaVersion"], 1);
+    assert_eq!(json["warnings"], serde_json::json!([]));
+
+    let refs = json["ref_bindings"].as_array().expect("ref_bindings array");
+    assert!(!refs.is_empty(), "expected non-empty ref_bindings: {json}");
+    assert_eq!(refs[0]["identifier"], "shell");
+    assert_eq!(refs[0]["selector"], r#"[data-zx-r="0"]"#);
+}
+
+#[test]
+fn compiler_cli_emits_empty_ref_bindings_when_no_refs_exist() {
+    let json = compile_fixture("<main>Hello</main>", "no-ref.zen");
+
+    assert_eq!(json["schemaVersion"], 1);
+    assert_eq!(json["warnings"], serde_json::json!([]));
+    assert_eq!(json["ref_bindings"], serde_json::json!([]));
 }

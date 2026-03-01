@@ -9,6 +9,10 @@ fn state_keys(output: &zenith_compiler::compiler::CompilerOutput) -> Vec<String>
         .collect::<Vec<_>>()
 }
 
+fn hoisted_code(output: &zenith_compiler::compiler::CompilerOutput) -> String {
+    output.hoisted.code.join("\n")
+}
+
 #[test]
 fn effect_cleanup_locals_remain_closure_scoped() {
     let input = r#"
@@ -109,5 +113,57 @@ const result = first("a") + second("b");
     assert!(
         !joined.contains("parsed"),
         "function-local parsed leaked into state table: {joined}"
+    );
+}
+
+#[test]
+fn zeneffect_reads_state_through_get_calls() {
+    let input = r#"
+<script lang="ts">
+state isOpen = false;
+
+zenEffect(() => {
+  if (isOpen) {
+    return;
+  }
+});
+</script>
+<main>{isOpen ? "close" : "menu"}</main>
+"#;
+
+    let output = compile_structured_with_source(input, "/tmp/zeneffect-state-read.zen")
+        .expect("component should compile");
+    let hoisted = hoisted_code(&output);
+
+    assert!(
+        hoisted.contains("if (___tmp_zeneffect_state_read_zen_script0_"),
+        "expected lowered script symbol in hoisted code: {hoisted}"
+    );
+    assert!(
+        hoisted.contains("_isOpen.get())"),
+        "expected zenEffect state read to lower to .get(): {hoisted}"
+    );
+}
+
+#[test]
+fn zeneffect_assignments_lower_to_signal_sets() {
+    let input = r#"
+<script lang="ts">
+state isAnimating = false;
+
+zenEffect(() => {
+  isAnimating = true;
+});
+</script>
+<main>{isAnimating ? "busy" : "idle"}</main>
+"#;
+
+    let output = compile_structured_with_source(input, "/tmp/zeneffect-state-write.zen")
+        .expect("component should compile");
+    let hoisted = hoisted_code(&output);
+
+    assert!(
+        hoisted.contains("_isAnimating.set(true);"),
+        "expected zenEffect assignment to lower to .set(true): {hoisted}"
     );
 }

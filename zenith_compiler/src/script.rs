@@ -454,9 +454,16 @@ fn analyze_component_script(
     let mut rename_order = bindings.clone();
     rename_order.sort_by(|a, b| b.original.len().cmp(&a.original.len()));
     for binding in &rename_order {
-        let pattern = Regex::new(&format!(r"\b{}\b", regex::escape(&binding.original))).unwrap();
+        let pattern = Regex::new(&format!(
+            r"(^|[^A-Za-z0-9_$.])({})([^A-Za-z0-9_$]|$)",
+            regex::escape(&binding.original)
+        ))
+        .unwrap();
         renamed_source = pattern
-            .replace_all(&renamed_source, binding.renamed.as_str())
+            .replace_all(
+                &renamed_source,
+                format!("${{1}}{}${{3}}", binding.renamed).as_str(),
+            )
             .into_owned();
     }
     // Lower Zenith shorthand "state name = value" to valid JS "var name = signal(value)"
@@ -490,6 +497,8 @@ fn analyze_component_script(
             })
             .into_owned();
     }
+
+    renamed_source = lower_state_reads_to_get(&renamed_source, &bindings);
 
     let declarations = decl_line_re
         .find_iter(&renamed_source)
@@ -525,6 +534,52 @@ fn analyze_component_script(
         signals,
         bindings,
     })
+}
+
+fn lower_state_reads_to_get(source: &str, bindings: &[HoistedBinding]) -> String {
+    let mut rewritten = source.to_string();
+
+    for (index, binding) in bindings
+        .iter()
+        .enumerate()
+        .filter(|(_, binding)| matches!(binding.kind, HoistedBindingKind::State))
+    {
+        let ident = regex::escape(&binding.renamed);
+        let decl_placeholder = format!("__ZENITH_STATE_DECL_{index}__");
+        let get_placeholder = format!("__ZENITH_STATE_GET_{index}__");
+        let set_placeholder = format!("__ZENITH_STATE_SET_{index}__");
+
+        let decl_re = Regex::new(&format!(r"\bvar\s+({ident})\b")).unwrap();
+        rewritten = decl_re
+            .replace_all(&rewritten, format!("var {decl_placeholder}"))
+            .into_owned();
+
+        rewritten = rewritten.replace(
+            &format!("{}.get", binding.renamed),
+            &format!("{get_placeholder}.get"),
+        );
+        rewritten = rewritten.replace(
+            &format!("{}.set", binding.renamed),
+            &format!("{set_placeholder}.set"),
+        );
+
+        let ident_re = Regex::new(&format!(r"\b{ident}\b")).unwrap();
+        rewritten = ident_re
+            .replace_all(&rewritten, format!("{}.get()", binding.renamed))
+            .into_owned();
+
+        rewritten = rewritten.replace(&decl_placeholder, &binding.renamed);
+        rewritten = rewritten.replace(
+            &format!("{get_placeholder}.get"),
+            &format!("{}.get", binding.renamed),
+        );
+        rewritten = rewritten.replace(
+            &format!("{set_placeholder}.set"),
+            &format!("{}.set", binding.renamed),
+        );
+    }
+
+    rewritten
 }
 
 fn is_top_level_position(source: &str, pos: usize) -> bool {

@@ -137,6 +137,17 @@ fn main() -> Result<()> {
             })
         })
         .collect::<Vec<_>>();
+    let ref_bindings = output
+        .ref_bindings
+        .iter()
+        .map(|entry| {
+            serde_json::json!({
+                "index": entry.index,
+                "identifier": entry.identifier,
+                "selector": entry.selector
+            })
+        })
+        .collect::<Vec<_>>();
 
     let mut component_scripts = serde_json::Map::new();
     for (hoist_id, script) in &output.components_scripts {
@@ -192,6 +203,7 @@ fn main() -> Result<()> {
         "expression_bindings": expression_bindings,
         "marker_bindings": marker_bindings,
         "event_bindings": event_bindings,
+        "ref_bindings": ref_bindings,
         "warnings": warnings_json
     });
 

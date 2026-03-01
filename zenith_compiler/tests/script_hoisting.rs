@@ -129,3 +129,33 @@ document.querySelector('#x')
         warnings
     );
 }
+
+#[test]
+fn component_script_property_accesses_are_not_renamed() {
+    let input = r#"
+<script lang="ts">
+export interface Props {
+  mainRef?: { current: HTMLElement | null };
+}
+
+const incoming = props as Props;
+const mainRef = incoming.mainRef ?? { current: null };
+</script>
+<div>{mainRef ? "ready" : "missing"}</div>
+"#;
+
+    let output = compile_structured_with_source(input, "/tmp/FooterLike.zen")
+        .expect("props member access should compile");
+
+    let code = output.hoisted.code.join("\n");
+    assert!(
+        code.contains("incoming.mainRef"),
+        "component prop member access must remain stable, got: {}",
+        code
+    );
+    assert!(
+        !code.contains("incoming.__"),
+        "component prop member access must not be renamed, got: {}",
+        code
+    );
+}

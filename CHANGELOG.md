@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-03-01
+
+### Added
+
+- CLI JSON now always emits `ref_bindings`, even when the array is empty
+- Regression tests covering `zenEffect` lowering through hoisted script code
+
+### Changed
+
+- Compiler JSON envelope remains additive with `schemaVersion: 1` and stable `warnings`
+- Ref hydration consumers can now depend on `ref_bindings` being present for every compile result
+
 ## [0.6.0] - 2026-02-28
 
 ### Added
