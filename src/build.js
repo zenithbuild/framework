@@ -63,10 +63,16 @@ const COMPILER_BIN = resolveBinary([
     resolve(CLI_ROOT, '../zenith-compiler/target/release/zenith-compiler')
 ]);
 
-const BUNDLER_BIN = resolveBinary([
-    resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler'),
-    resolve(CLI_ROOT, '../zenith-bundler/target/release/zenith-bundler')
-]);
+function getBundlerBin() {
+    const envBin = process.env.ZENITH_BUNDLER_BIN;
+    if (envBin && typeof envBin === 'string' && existsSync(envBin)) {
+        return envBin;
+    }
+    return resolveBinary([
+        resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler'),
+        resolve(CLI_ROOT, '../zenith-bundler/target/release/zenith-bundler')
+    ]);
+}
 
 /**
  * Build a per-build warning emitter that deduplicates repeated compiler lines.
@@ -270,6 +276,9 @@ function applyExpressionRewrites(pageIr, expressionMap, ambiguous) {
             bindings[index].literal === current
         ) {
             bindings[index].literal = rewritten;
+            if (bindings[index].compiled_expr === current) {
+                bindings[index].compiled_expr = rewritten;
+            }
         }
     }
 }
@@ -308,6 +317,15 @@ function rewriteLegacyMarkupIdentifiers(pageIr) {
         ) {
             _LEGACY_MARKUP_RE.lastIndex = 0;
             bindings[i].literal = bindings[i].literal.replace(_LEGACY_MARKUP_RE, '__ZENITH_INTERNAL_ZENHTML');
+        }
+        if (
+            bindings[i] &&
+            typeof bindings[i] === 'object' &&
+            typeof bindings[i].compiled_expr === 'string' &&
+            bindings[i].compiled_expr.includes(_LEGACY_MARKUP_IDENT)
+        ) {
+            _LEGACY_MARKUP_RE.lastIndex = 0;
+            bindings[i].compiled_expr = bindings[i].compiled_expr.replace(_LEGACY_MARKUP_RE, '__ZENITH_INTERNAL_ZENHTML');
         }
     }
 }
@@ -1240,7 +1258,7 @@ function deferComponentRuntimeBlock(source) {
 function runBundler(envelope, outDir) {
     return new Promise((resolvePromise, rejectPromise) => {
         const child = spawn(
-            BUNDLER_BIN,
+            getBundlerBin(),
             ['--out-dir', outDir],
             { stdio: ['pipe', 'inherit', 'inherit'] }
         );

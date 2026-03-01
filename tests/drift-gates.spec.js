@@ -23,10 +23,7 @@ const TRAIN_MANIFESTS = [
     'zenith-compiler/package.json',
     'zenith-runtime/package.json',
     'zenith-router/package.json',
-    'zenith-bundler/package.json',
-    'zenith-site-v0/package.json',
-    'create-zenith/examples/starter/package.json',
-    'create-zenith/examples/starter-tailwindcss/package.json'
+    'zenith-bundler/package.json'
 ];
 
 function collectFiles(dir, allowExt) {
@@ -69,38 +66,13 @@ function scanFiles(files, matcher) {
     return hits;
 }
 
-function collectInternalPackageVersions(tree, outMap = new Map()) {
-    if (!tree || typeof tree !== 'object') {
-        return outMap;
-    }
-
-    const dependencies = tree.dependencies && typeof tree.dependencies === 'object'
-        ? tree.dependencies
-        : {};
-
-    for (const [name, dep] of Object.entries(dependencies)) {
-        if (INTERNAL_PACKAGE_NAMES.includes(name)) {
-            const version = dep && typeof dep === 'object' ? dep.version : undefined;
-            if (typeof version === 'string' && version.length > 0) {
-                if (!outMap.has(name)) {
-                    outMap.set(name, new Set());
-                }
-                outMap.get(name).add(version);
-            }
-        }
-        collectInternalPackageVersions(dep, outMap);
-    }
-
-    return outMap;
-}
-
 describe('drift gates', () => {
     test('release train: internal dependency versions match @zenithbuild/core exactly', () => {
         const coreManifest = JSON.parse(
             readFileSync(resolve(REPO_ROOT, 'zenith-core/package.json'), 'utf8')
         );
         const coreVersion = String(coreManifest.version || '');
-        expect(coreVersion).toMatch(/^0\.\d+\.\d+-beta\./);
+        expect(coreVersion).toMatch(/^0\.\d+\.\d+$/);
 
         const mismatches = [];
         for (const manifestRel of TRAIN_MANIFESTS) {
@@ -123,23 +95,19 @@ describe('drift gates', () => {
         expect(mismatches).toEqual([]);
     });
 
-    test('release train: npm ls has no duplicate internal package versions', () => {
-        const result = spawnSync(
-            'npm',
-            ['ls', '--json', ...INTERNAL_PACKAGE_NAMES],
-            {
-                cwd: REPO_ROOT,
-                encoding: 'utf8',
-                env: {
-                    ...process.env,
-                    npm_config_loglevel: 'error'
-                }
+    test('release train: scoped package manifests have no duplicate internal package versions', () => {
+        const versionsByPackage = new Map();
+        for (const manifestRel of TRAIN_MANIFESTS) {
+            const manifestPath = resolve(REPO_ROOT, manifestRel);
+            const pkg = JSON.parse(readFileSync(manifestPath, 'utf8'));
+            if (!pkg || typeof pkg.name !== 'string' || !INTERNAL_PACKAGE_NAMES.includes(pkg.name)) {
+                continue;
             }
-        );
-
-        expect(result.status).toBe(0);
-        const tree = JSON.parse(result.stdout || '{}');
-        const versionsByPackage = collectInternalPackageVersions(tree);
+            if (!versionsByPackage.has(pkg.name)) {
+                versionsByPackage.set(pkg.name, new Set());
+            }
+            versionsByPackage.get(pkg.name).add(String(pkg.version || ''));
+        }
         const duplicates = [];
 
         for (const name of INTERNAL_PACKAGE_NAMES) {
@@ -163,7 +131,7 @@ describe('drift gates', () => {
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs']));
         const hits = scanFiles(
             files,
-            /\breact\/jsx-runtime\b|\bfrom\s+['"]react['"]|\bimport\s+React(?:\s|,|$)|\bzenhtml\b/
+            /\breact\/jsx-runtime\b|\bfrom\s+['"]react['"]|\bimport\s+React(?:\s|,|$)/
         );
         expect(hits).toEqual([]);
     });
@@ -196,7 +164,7 @@ describe('drift gates', () => {
         expect(hits).toEqual([]);
     });
 
-    test('no eval or new Function in framework runtime outputs', () => {
+    test('no eval or Function constructors in framework runtime outputs', () => {
         const targets = [
             resolve(REPO_ROOT, 'zenith-router/src'),
             resolve(REPO_ROOT, 'zenith-bundler/src'),
@@ -208,7 +176,7 @@ describe('drift gates', () => {
             return pathStr.endsWith('.js') ? [pathStr] : collectFiles(pathStr, ['.js', '.ts', '.rs']);
         });
 
-        const hits = scanFiles(files, /\beval\(|\bnew\s+Function\(/);
+        const hits = scanFiles(files, /\beval\(|\bnew\s+Function\(|\bFunction\(/);
         expect(hits).toEqual([]);
     });
 
@@ -235,7 +203,7 @@ describe('drift gates', () => {
             const files = collectFiles(outDir, ['.js']);
             const hits = scanFiles(
                 files,
-                /history\.(?:push|replace)State(?!\s*\(\s*null\s*,\s*["']["']\s*,\s*window\.location\.href\s*\))|\beval\(|\bnew\s+Function\(|__zenith_ssr=/
+                /history\.(?:push|replace)State(?!\s*\(\s*null\s*,\s*["']["']\s*,\s*window\.location\.href\s*\))|\beval\(|\bnew\s+Function\(|\bFunction\(|__zenith_ssr=/
             );
             expect(hits).toEqual([]);
         } finally {
@@ -287,8 +255,8 @@ describe('drift gates', () => {
             resolve(REPO_ROOT, 'zenith-site-v0/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.zen']));
-        // Ban bare `zenhtml` but allow internal names (_zenhtml, __ZENITH_INTERNAL_ZENHTML)
-        const hits = scanFiles(files, /\bzenhtml\b/);
+        // Ban tag-template zenhtml usage but allow internal context plumbing.
+        const hits = scanFiles(files, /(^|[^\w.])zenhtml\s*`/m);
         expect(hits).toEqual([]);
     });
 

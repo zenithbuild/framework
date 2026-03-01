@@ -77,6 +77,7 @@ export async function createDevServer(options) {
     }, 15000);
 
     let buildId = 0;
+    let pendingBuildId = 0;
     let buildStatus = 'ok'; // 'ok' | 'error' | 'building'
     let lastBuildMs = Date.now();
     let durationMs = 0;
@@ -219,13 +220,14 @@ export async function createDevServer(options) {
     }
 
     function _broadcastEvent(type, payload = {}) {
+        const eventBuildId = Number.isInteger(payload.buildId) ? payload.buildId : buildId;
         const data = JSON.stringify({
-            buildId,
+            buildId: eventBuildId,
             ...payload
         });
         _trace('sse_emit', {
             type,
-            buildId,
+            buildId: eventBuildId,
             status: buildStatus,
             cssHref: currentCssHref,
             changedFiles: Array.isArray(payload.changedFiles) ? payload.changedFiles : undefined
@@ -604,21 +606,23 @@ export async function createDevServer(options) {
             _queuedFiles.clear();
 
             _buildInFlight = true;
-            const cycleBuildId = buildId + 1;
-            buildId = cycleBuildId;
+            const cycleBuildId = pendingBuildId + 1;
+            pendingBuildId = cycleBuildId;
             buildStatus = 'building';
-            _broadcastEvent('build_start', { changedFiles: changed });
+            _broadcastEvent('build_start', { buildId: cycleBuildId, changedFiles: changed });
 
             const startTime = Date.now();
             try {
                 const buildResult = await build({ pagesDir, outDir, config });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
+                buildId = cycleBuildId;
                 buildStatus = 'ok';
                 buildError = null;
                 lastBuildMs = Date.now();
                 durationMs = lastBuildMs - startTime;
 
                 _broadcastEvent('build_complete', {
+                    buildId: cycleBuildId,
                     durationMs,
                     status: buildStatus,
                     cssHref: currentCssHref,
@@ -647,10 +651,10 @@ export async function createDevServer(options) {
                 lastBuildMs = Date.now();
                 durationMs = lastBuildMs - startTime;
 
-                _broadcastEvent('build_error', { ...buildError, changedFiles: changed });
+                _broadcastEvent('build_error', { buildId: cycleBuildId, ...buildError, changedFiles: changed });
                 _trace('state_snapshot', {
                     status: buildStatus,
-                    buildId: cycleBuildId,
+                    buildId,
                     cssHref: currentCssHref,
                     durationMs,
                     error: buildError

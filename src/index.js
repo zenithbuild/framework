@@ -126,7 +126,9 @@ export async function cli(args, cwd) {
 
     if (command === 'dev') {
         const { createDevServer } = await import('./dev-server.js');
-        const port = resolvePort(args.slice(1), 3000);
+        const port = process.env.ZENITH_DEV_PORT
+            ? Number.parseInt(process.env.ZENITH_DEV_PORT, 10)
+            : resolvePort(args.slice(1), 3000);
         const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
         logger.info('Starting dev server...');
         const dev = await createDevServer({ pagesDir, outDir, port, host, config });

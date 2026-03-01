@@ -654,6 +654,7 @@ describe('Contract Guardrails', () => {
             const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
             expect(source.includes('eval(')).toBe(false);
             expect(source.includes('new Function')).toBe(false);
+            expect(/\bFunction\(/.test(source)).toBe(false);
         }
     });
 
