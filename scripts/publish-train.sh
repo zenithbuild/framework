@@ -21,6 +21,7 @@ if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
 fi
 
 FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-train}"
+NPM_REGISTRY_URL="${PUBLISH_NPM_REGISTRY:-https://registry.npmjs.org/}"
 
 PACKAGES=(
   "packages/compiler|@zenithbuild/compiler"
@@ -112,7 +113,7 @@ npm_view_json() {
   shift
   local output
 
-  if output="$(npm view "$@" --json --loglevel=error 2>&1)"; then
+  if output="$(npm view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
     printf '%s' "$output"
     return 0
   fi
@@ -438,9 +439,9 @@ for entry in "${PACKAGES[@]}"; do
   (
     cd "${ROOT}/${package_dir}"
     if [[ -n "$publish_tag" ]]; then
-      npm publish --access public --tag "$publish_tag"
+      npm publish --access public --tag "$publish_tag" --registry "$NPM_REGISTRY_URL"
     else
-      npm publish --access public
+      npm publish --access public --registry "$NPM_REGISTRY_URL"
     fi
   )
   echo "  published"
