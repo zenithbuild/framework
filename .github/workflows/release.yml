@@ -14,22 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - run: bun install
-
-      - run: bunx playwright install --with-deps chromium
-
-      - run: bun run ci
-
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash

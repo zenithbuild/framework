@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "**"
+    tags-ignore:
+      - "v*"
   pull_request:
 
 jobs:
@@ -21,6 +23,43 @@ jobs:
           bun-version: latest
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: |
+          version="$(node -p "const pkg = require('./apps/smoke-test/package.json'); pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright ?? pkg.devDependencies?.['@playwright/test'] ?? pkg.dependencies?.['@playwright/test'] ?? ''")"
+          if [[ -z "$version" ]]; then
+            echo "Unable to determine Playwright version from apps/smoke-test/package.json" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/**/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - run: bun install
 
