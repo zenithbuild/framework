@@ -19,6 +19,15 @@
     "LICENSE",
     "package.json"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/runtime"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
   "scripts": {
     "build": "mkdir -p dist && cp -a src/* dist/",
     "test": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.js",

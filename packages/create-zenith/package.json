@@ -33,8 +33,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/zenithbuild/create-zenith.git"
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/create-zenith"
   },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
   "engines": {
     "node": ">=18.0.0"
   },

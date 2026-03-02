@@ -28,6 +28,15 @@
     "README.md",
     "contracts"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
   "publishConfig": {
     "access": "public"
   },

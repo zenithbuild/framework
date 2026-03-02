@@ -15,6 +15,15 @@
     "dist/**",
     "package.json"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
   "publishConfig": {
     "access": "public"
   },

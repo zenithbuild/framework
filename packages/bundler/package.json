@@ -24,6 +24,15 @@
     "README.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/bundler"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
   "dependencies": {
     "@zenithbuild/router": "0.6.6",
     "@zenithbuild/runtime": "0.6.6",

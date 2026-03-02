@@ -6,6 +6,10 @@
     "apps/*",
     "docs"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework"
+  },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",
     "tailwindcss": "^4.1.18",
