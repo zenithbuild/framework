@@ -37,6 +37,19 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Configure npm for trusted publishing
+        shell: bash
+        run: |
+          cat <<'EOF' > .npmrc
+          registry=https://registry.npmjs.org/
+          EOF
+
+          if [[ -n "${NPM_CONFIG_USERCONFIG:-}" ]]; then
+            cat <<'EOF' > "${NPM_CONFIG_USERCONFIG}"
+            registry=https://registry.npmjs.org/
+            EOF
+          fi
+
       - run: bun install
 
       - run: bunx playwright install --with-deps chromium

@@ -72,30 +72,93 @@ validate_publish_manifest() {
   ' "$manifest"
 }
 
+extract_npm_json() {
+  local description="$1"
+  local output="$2"
+  node -e '
+    const description = process.argv[1];
+    const raw = process.argv[2];
+    const objectStart = raw.indexOf("{");
+    const arrayStart = raw.indexOf("[");
+    const start =
+      objectStart === -1 ? arrayStart
+      : arrayStart === -1 ? objectStart
+      : Math.min(objectStart, arrayStart);
+
+    if (start === -1) {
+      console.error(`No JSON payload found in npm output for ${description}`);
+      process.exit(1);
+    }
+
+    const payload = raw.slice(start).trim();
+    try {
+      JSON.parse(payload);
+    } catch (error) {
+      console.error(`Invalid JSON payload in npm output for ${description}: ${error.message}`);
+      process.exit(1);
+    }
+
+    process.stdout.write(payload);
+  ' "$description" "$output"
+}
+
+npm_view_not_found() {
+  local output="$1"
+  grep -Eq 'E404|404[[:space:]]+No match found|npm[[:space:]]+error[[:space:]]+code[[:space:]]+E404' <<<"$output"
+}
+
+npm_view_json() {
+  local description="$1"
+  shift
+  local output
+
+  if output="$(npm view "$@" --json --loglevel=error 2>&1)"; then
+    printf '%s' "$output"
+    return 0
+  fi
+
+  if npm_view_not_found "$output"; then
+    return 3
+  fi
+
+  echo "npm view failed for ${description}:" >&2
+  echo "$output" >&2
+  return 1
+}
+
 package_exists_on_npm() {
   local package_name="$1"
   local version="$2"
   local output
+  local status
 
-  if output="$(npm view "${package_name}@${version}" version 2>&1)"; then
-    [[ "$output" == "$version" ]]
+  if output="$(npm_view_json "${package_name}@${version} dist-tags" "${package_name}@${version}" dist-tags)"; then
+    extract_npm_json "${package_name}@${version} dist-tags" "$output" >/dev/null
     return
+  else
+    status=$?
   fi
 
-  if grep -Eq 'E404|404[[:space:]]+No match found' <<<"$output"; then
+  if [[ "$status" -eq 3 ]]; then
     return 1
   fi
 
-  echo "npm view failed for ${package_name}@${version}:" >&2
-  echo "$output" >&2
-  exit 1
+  exit "$status"
 }
 
 highest_published_version() {
   local package_name="$1"
   local output
+  local json
+  local status
 
-  if output="$(npm view "${package_name}" versions --json 2>&1)"; then
+  if output="$(npm_view_json "${package_name} versions" "${package_name}" versions)"; then
+    if ! json="$(extract_npm_json "${package_name} versions" "$output")"; then
+      echo "Failed to extract JSON from npm output for ${package_name} versions" >&2
+      echo "$output" >&2
+      exit 1
+    fi
+
     node -e '
       function parseVersion(version) {
         const raw = String(version || "").trim();
@@ -184,17 +247,17 @@ highest_published_version() {
         }
       }
       process.stdout.write(highest);
-    ' "$output"
+    ' "$json"
     return
+  else
+    status=$?
   fi
 
-  if grep -Eq 'E404|404[[:space:]]+No match found' <<<"$output"; then
+  if [[ "$status" -eq 3 ]]; then
     return 0
   fi
 
-  echo "npm view failed for ${package_name} versions:" >&2
-  echo "$output" >&2
-  exit 1
+  exit "$status"
 }
 
 compare_versions() {
