@@ -79,6 +79,29 @@ function _safeJson(payload) {
     }
 }
 
+function _readProcessEnv(name) {
+    const runtime = typeof globalThis !== 'undefined' ? globalThis : {};
+    const runtimeProcess = typeof process !== 'undefined'
+        ? process
+        : runtime.process;
+
+    if (!runtimeProcess || typeof runtimeProcess !== 'object' || !runtimeProcess.env) {
+        return undefined;
+    }
+    const value = runtimeProcess.env[name];
+    return typeof value === 'string' ? value : undefined;
+}
+
+function _shouldLogRuntimeError() {
+    if (_readProcessEnv('ZENITH_LOG_RUNTIME_ERRORS') === '1') {
+        return true;
+    }
+    const isTestMode =
+        _readProcessEnv('NODE_ENV') === 'test'
+        || _readProcessEnv('ZENITH_TEST_MODE') === '1';
+    return !isTestMode;
+}
+
 function _isDevDiagnosticsMode() {
     const runtime = typeof globalThis !== 'undefined' ? globalThis : {};
     if (runtime.__ZENITH_RUNTIME_DEV__ === true || runtime.__ZENITH_DEV__ === true) {
@@ -269,7 +292,12 @@ function _reportRuntimeError(error) {
     if (!error || error.__zenithRuntimeErrorReported === true) return;
     error.__zenithRuntimeErrorReported = true;
     const payload = error.zenithRuntimeError;
-    if (payload && typeof console !== 'undefined' && typeof console.error === 'function') {
+    if (
+        payload
+        && _shouldLogRuntimeError()
+        && typeof console !== 'undefined'
+        && typeof console.error === 'function'
+    ) {
         console.error('[Zenith Runtime]', payload);
     }
     _renderOverlay(payload);
