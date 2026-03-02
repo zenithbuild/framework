@@ -1,0 +1,81 @@
+<script lang="ts">
+export interface Props {
+  href?: string;
+  target?: string;
+  rel?: string;
+  variant?: "primary" | "secondary" | "outline" | "ghost";
+  size?: "sm" | "md" | "lg";
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  ariaLabel?: string;
+  onPress?: (event: MouseEvent) => void;
+  onClick?: (event: MouseEvent) => void;
+  class?: string;
+}
+
+const variant = props.variant === "primary" || props.variant === "secondary" || props.variant === "outline" ? props.variant : "ghost";
+const size = props.size === "sm" || props.size === "lg" ? props.size : "md";
+const className = typeof props.class === "string" ? props.class : "";
+const hrefValue = typeof props.href === "string" ? props.href.trim() : "";
+const targetValue = typeof props.target === "string" ? props.target : "";
+const relValue = typeof props.rel === "string" ? props.rel : "";
+const disabledValue = props.disabled === true;
+const ariaLabelValue = typeof props.ariaLabel === "string" ? props.ariaLabel : "";
+const hasHref = hrefValue.length > 0;
+const buttonType = props.type || "button";
+const ariaDisabled = disabledValue ? "true" : undefined;
+
+const baseClasses = "inline-flex items-center justify-center rounded-full border transition-colors duration-200";
+const variantClasses =
+  variant === "primary"
+    ? "border-foreground/55 bg-foreground text-background hover:border-brand-cyan hover:bg-brand-cyan"
+    : variant === "secondary"
+    ? "border-foreground/18 bg-transparent text-foreground/72 hover:border-foreground/35 hover:text-foreground"
+    : variant === "outline"
+    ? "border-foreground/24 bg-transparent text-foreground hover:border-brand-cyan/55"
+    : "border-transparent bg-transparent text-foreground/75 hover:bg-foreground/[0.06] hover:text-foreground";
+const sizeClasses = size === "sm" ? "h-8 w-8" : size === "lg" ? "h-12 w-12" : "h-10 w-10";
+
+if (ariaLabelValue.trim().length === 0) {
+  throw new Error("[Zenith Site] IconButton requires a non-empty ariaLabel prop.");
+}
+
+const staticCls = (baseClasses + " " + variantClasses + " " + sizeClasses + " " + className).trim();
+const onClick =
+  typeof props.onPress === "function"
+    ? props.onPress
+    : typeof props.onClick === "function"
+    ? props.onClick
+    : (() => {});
+const linkClass = staticCls + (hasHref ? "" : " hidden");
+const buttonClass = staticCls + (hasHref ? " hidden" : "");
+const disabledAttr = disabledValue && !hasHref ? true : undefined;
+</script>
+
+<span class="contents">
+  <a
+    data-zen-icon-btn
+    data-zen-icon-btn-link
+    data-zen-link="true"
+    href={hrefValue || undefined}
+    target={targetValue || undefined}
+    rel={relValue || undefined}
+    class={linkClass}
+    aria-label={ariaLabelValue}
+    aria-disabled={ariaDisabled}
+    on:click={onClick}
+  >
+    <slot />
+  </a>
+  <button
+    data-zen-icon-btn
+    type={buttonType}
+    disabled={disabledAttr}
+    class={buttonClass}
+    aria-label={ariaLabelValue}
+    aria-disabled={ariaDisabled}
+    on:click={onClick}
+  >
+    <slot />
+  </button>
+</span>

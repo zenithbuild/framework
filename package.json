@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "docs"
   ],
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "demos": [
+    {
+      "id": "counter-basic",
+      "name": "Counter",
+      "source": "demos/Counter.zen",
+      "route": "/__docs-demo/counter-basic",
+      "height": 360,
+      "contracts": [
+        "ZEN-RULE-023"
+      ]
+    },
+    {
+      "id": "menu-basic",
+      "name": "Menu",
+      "source": "demos/Menu.zen",
+      "route": "/__docs-demo/menu-basic",
+      "height": 420,
+      "contracts": [
+        "ZEN-RULE-023"
+      ]
+    },
+    {
+      "id": "tabs-basic",
+      "name": "Tabs",
+      "source": "demos/Tabs.zen",
+      "route": "/__docs-demo/tabs-basic",
+      "height": 380,
+      "contracts": [
+        "ZEN-RULE-001",
+        "ZEN-RULE-023"
+      ]
+    },
+    {
+      "id": "modal-basic",
+      "name": "Modal",
+      "source": "demos/Modal.zen",
+      "route": "/__docs-demo/modal-basic",
+      "height": 440,
+      "contracts": [
+        "ZEN-RULE-023"
+      ]
+    },
+    {
+      "id": "form-validation",
+      "name": "FormValidation",
+      "source": "demos/FormValidation.zen",
+      "route": "/__docs-demo/form-validation",
+      "height": 460,
+      "contracts": [
+        "ZEN-RULE-001",
+        "ZEN-RULE-023"
+      ]
+    }
+  ]
+}

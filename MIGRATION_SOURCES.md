@@ -13,7 +13,7 @@ This file records the source repository or workspace snapshot used for each mono
 | `packages/runtime` | `git@github.com:zenithbuild/zenith-runtime.git` | `git subtree add` | `v0.6.5` | `c227cd7f519318551079bdd3cbcca9e2e463b88a` |
 | `packages/router` | `git@github.com:zenithbuild/zenith-router.git` | `git subtree add` | `v0.6.5` | `1f6427e4ab28f7a08cfc799eda4b01aa84ed635f` |
 | `packages/create-zenith` | `https://github.com/zenithbuild/create-zenith.git` | `git subtree add` | `v0.6.5` | `cbeeb7705daec2397d76e0c49e3e9f04c20db6a0` |
-| `packages/docs` | `git@github.com:zenithbuild/zenith-docs.git` | `git subtree add` | `v0.6.5` | `a81e28b9ad8cac9876dd0e84bc68250b633e9c61` |
+| `docs` | `git@github.com:zenithbuild/zenith-docs.git` | `git subtree add` | `v0.6.5` | `a81e28b9ad8cac9876dd0e84bc68250b633e9c61` |
 
 ## Apps
 
@@ -21,5 +21,6 @@ These app sources are local workspace directories, not standalone git repositori
 
 | Target | Source path | Import method | Ref | Commit SHA |
 | --- | --- | --- | --- | --- |
+| `apps/site-v0` | `git@github.com:zenithbuild/zenith-site-v0.git` | `direct copy snapshot` | `master` | `5d3a0d4d0b02353ccbb9252ac370b0ece4114c18` |
 | `apps/smoke-test` | `/Users/judahsullivan/Personal/zenith/smoke-test` | direct copy snapshot | `workspace-snapshot` | `n/a` |
 | `apps/integration-tests` | `/Users/judahsullivan/Personal/zenith/integration-tests` | direct copy snapshot | `workspace-snapshot` | `n/a` |

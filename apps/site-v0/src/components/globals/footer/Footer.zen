@@ -1,0 +1,66 @@
+<script lang="ts">
+import FooterNav from "./FooterNav.zen";
+import FooterCurvedText from "./FooterCurvedText.zen";
+
+const footerRef = ref<HTMLElement>();
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  if (!win || !footerRef.current) return;
+
+  const resolveMainWrapper = () => {
+    const sibling = footerRef.current?.previousElementSibling;
+    return sibling instanceof HTMLElement ? sibling : null;
+  };
+
+  const updateFooterMargin = () => {
+    const footerElement = footerRef.current;
+    const mainWrapper = resolveMainWrapper();
+    if (!footerElement || !mainWrapper) return;
+
+    const footerHeight = footerElement.getBoundingClientRect().height;
+    const windowHeight = win.innerHeight;
+
+    if (footerHeight > windowHeight * 0.95) {
+      footerElement.classList.remove("fixed", "bottom-0");
+      footerElement.classList.add("relative", "z-0");
+      mainWrapper.style.marginBottom = "0px";
+    } else {
+      footerElement.classList.add("fixed", "bottom-0", "z-0");
+      footerElement.classList.remove("relative");
+      mainWrapper.style.marginBottom = `${footerHeight}px`;
+    }
+  };
+
+  const waitForLayoutReady = () => {
+    const frame = win.requestAnimationFrame(() => {
+      if (!resolveMainWrapper()) {
+        waitForLayoutReady();
+        return;
+      }
+      updateFooterMargin();
+    });
+    ctx.cleanup(() => win.cancelAnimationFrame(frame));
+  };
+
+  updateFooterMargin();
+  waitForLayoutReady();
+  const offResize = zenResize(() => updateFooterMargin());
+  ctx.cleanup(offResize);
+});
+</script>
+
+<footer ref={footerRef} class="fixed bottom-0 left-0 w-full z-0 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 flex flex-col overflow-hidden border-t border-zinc-200 dark:border-zinc-800" data-zen-footer-container>
+ 
+  <div class="flex-grow flex items-end justify-center w-full mt-4 md:mt-12">
+    <FooterCurvedText />
+  </div>
+   <div class="w-full max-w-[1600px] mx-auto px-6 md:px-12 pt-24 md:pt-32 pb-12 flex flex-col items-center">
+    <FooterNav />
+  </div>
+  
+  <div class="w-full max-w-[1600px] mx-auto px-6 md:px-12 py-8 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-zinc-500 dark:text-zinc-500 uppercase tracking-[0.2em] border-t border-zinc-200 dark:border-zinc-800/60 z-10 relative">
+    <span>Zenith Framework © {new Date().getFullYear()}</span>
+    <span class="mt-4 md:mt-0">Designed & Engineered by Zenithbuild</span>
+  </div>
+</footer>

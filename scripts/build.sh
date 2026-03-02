@@ -12,5 +12,5 @@ bun run --cwd packages/create-zenith build
 cargo build --release --manifest-path packages/compiler/Cargo.toml
 cargo build --release --manifest-path packages/bundler/Cargo.toml
 
-bun run --cwd packages/docs docs:gate
+bun run --cwd docs docs:gate
 bun run --cwd apps/smoke-test build

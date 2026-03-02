@@ -11,7 +11,7 @@ bun run --cwd packages/core test
 bun run --cwd packages/runtime test
 bun run --cwd packages/router test
 bun run --cwd packages/create-zenith test
-bun run --cwd packages/docs docs:gate
+bun run --cwd docs docs:gate
 
 cargo test --manifest-path packages/compiler/Cargo.toml
 cargo test --manifest-path packages/bundler/Cargo.toml

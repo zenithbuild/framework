@@ -1,19 +1,28 @@
 # Zenithbuild Framework
 
-This repository is the Zenithbuild core framework monorepo. Governance and canonical contracts stay at the root, while core packages and apps live under workspaces for local development and a single CI gate.
+Zenithbuild Framework is the Zenith core monorepo for the compiler, bundler, runtime, router, CLI, core package, `create-zenith`, docs, and monorepo apps.
 
-Key entrypoints:
-- Governance: [`./governance/AGENTS.md`](./governance/AGENTS.md)
-- Contracts: [`./contracts/`](./contracts/)
-- Source manifest: [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md)
+Start with [`./docs/README.md`](./docs/README.md).
 
-## Layout
-- `packages/` contains imported core packages.
-- `apps/` contains non-published apps and smoke fixtures.
-- `scripts/` contains repository-level build and CI entrypoints.
+## What Lives Here
+- `packages/` for core packages: compiler, bundler, runtime, router, CLI, core, and `create-zenith`
+- `docs/` for canonical documentation and release notes
+- `apps/` for monorepo apps and smoke fixtures
+- `governance/` and `contracts/` for repo rules and canonical contracts
 
-## Current Policy
-- Source repos outside this monorepo remain authoritative until the monorepo train is stable.
-- Plugins remain separate and are not imported here.
-- Language tooling remains separate for now.
-- Core package versions are lockstep via [`./TRAIN_VERSION`](./TRAIN_VERSION).
+## What Stays Separate
+- Plugins live in separate repositories.
+- `zenith-language` and `zenith-language-server` remain separate repositories.
+- Imported source refs are tracked in [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md).
+
+## Repository Settings
+Maintainers should update the GitHub About description to:
+
+> Zenith core monorepo: compiler, bundler, runtime, router, CLI, docs, and apps. Plugins live in separate repos.
+
+Topics to add:
+- `zenith`
+- `compiler`
+- `ui-framework`
+- `rust`
+- `typescript`

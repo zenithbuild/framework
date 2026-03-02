@@ -1,0 +1,201 @@
+<script lang="ts">
+import ZenithLogo from "./ZenithLogo.zen";
+import Button from "./Button.zen";
+import { gsap } from "gsap";
+import { SplitText } from "gsap/SplitText";
+import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
+
+const refTitle = ref<HTMLSpanElement>();
+const refDesc = ref<HTMLParagraphElement>();
+const refVersion = ref<HTMLSpanElement>();
+const refBtnInit = ref<HTMLDivElement>();
+const refBtnSource = ref<HTMLDivElement>();
+const refMetasCol1 = ref<HTMLDivElement>();
+const refMetasCol2 = ref<HTMLDivElement>();
+const refWatermarkWrapper = ref<HTMLDivElement>();
+
+zenMount((ctx) => {
+  gsap.registerPlugin(SplitText, DrawSVGPlugin);
+
+  const title = refTitle.current;
+  const desc = refDesc.current;
+  const version = refVersion.current;
+  const btnInit = refBtnInit.current;
+  const btnSource = refBtnSource.current;
+  const metasCol1 = refMetasCol1.current;
+  const metasCol2 = refMetasCol2.current;
+  const watermarkWrapper = refWatermarkWrapper.current;
+
+  function fitTitle() {
+    const win = zenWindow();
+    const titleEl = refTitle.current;
+    if (!win || !titleEl) return;
+    
+    titleEl.style.fontSize = "100px";
+    void titleEl.offsetWidth;
+    const textWidth = titleEl.scrollWidth || 1;
+    // Stretch completely perfectly edge to edge without any padding subtracted
+    const targetWidth = win.innerWidth;
+    const newSize = Math.floor(100 * (targetWidth / textWidth));
+    titleEl.style.fontSize = `${newSize}px`;
+  }
+  
+  fitTitle();
+  const offResize = zenResize(fitTitle);
+  ctx.cleanup(offResize);
+
+  if (!title && !desc && !version && !btnInit && !btnSource && !metasCol1 && !metasCol2 && !watermarkWrapper) return;
+
+  const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
+
+  let textStartTime = 0;
+
+  if (watermarkWrapper) {
+    gsap.set(watermarkWrapper, { opacity: 1 });
+    // zen-allow:dom-query we query raw SVG paths to inject a manual draw-path animation loop
+    const paths = Array.from(watermarkWrapper.querySelectorAll("path"));
+    paths.forEach((p) => {
+      p.style.stroke = p.getAttribute("fill") || "currentColor";
+      p.style.fill = "transparent";
+      p.style.strokeWidth = "2";
+    });
+
+    gsap.set(paths, { drawSVG: "0%" });
+
+    tl.to(paths, {
+      drawSVG: "100%",
+      duration: 0.05,
+      stagger: 0.005,
+      ease: "power2.inOut"
+    }, 0).to(paths, {
+      fill: (i, el) => el.style.stroke,
+      stroke: "transparent",
+      duration: 0.8,
+      ease: "power2.out"
+    }, "-=0.6").to(watermarkWrapper, {
+      opacity: 0.05,
+      duration: 1.0,
+      ease: "power2.out"
+    }, "-=0.2");
+    
+    textStartTime = 2.0;
+  }
+
+  if (title) {
+    const titleSplit = new SplitText(title, { 
+      type: "chars",
+      charsClass: "text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-zenith-cyan)] via-[var(--color-zenith-purple)] to-[var(--color-zenith-magenta)] pb-4 inline-block "
+    });
+    // Applying the 3D perspective inside the chars wrapper by avoiding CSS conflicts
+    gsap.set(titleSplit.chars, { yPercent: 120, opacity: 0, rotationX: -80, transformOrigin: "0% 50% -50" });
+    tl.to(titleSplit.chars, {
+      yPercent: 0,
+      opacity: 1,
+      rotationX: 0,
+      duration: 1.2,
+      stagger: 0.03,
+      ease: "expo.out"
+    }, textStartTime);
+  }
+
+  if (desc) {
+    const descMasks = new SplitText(desc, { type: "lines", linesClass: "overflow-hidden" });
+    const descLines = new SplitText(descMasks.lines, { type: "lines" });
+    gsap.set(descLines.lines, { yPercent: 120 });
+    tl.to(descLines.lines, { yPercent: 0, duration: 0.85, stagger: 0.08, ease: "power3.out" }, textStartTime + 0.2);
+  }
+
+  if (version) {
+    const versionMasks = new SplitText(version, { type: "lines", linesClass: "overflow-hidden inline-block align-bottom" });
+    const versionLines = new SplitText(versionMasks.lines, { type: "lines" });
+    gsap.set(versionLines.lines, { yPercent: 120 });
+    tl.to(versionLines.lines, { yPercent: 0, duration: 0.85, ease: "power3.out" }, textStartTime + 0.1);
+  }
+
+  const buttons = collectRefs(refBtnInit, refBtnSource);
+  if (buttons.length > 0) {
+    gsap.set(buttons, { y: 30, opacity: 0 });
+    tl.to(buttons, { y: 0, opacity: 1, duration: 0.8, stagger: 0.1, ease: "power3.out" }, textStartTime + 0.4);
+  }
+
+  if (metasCol1 || metasCol2) {
+    const col1Children = metasCol1 ? Array.from(metasCol1.children) : [];
+    const col2Children = metasCol2 ? Array.from(metasCol2.children) : [];
+    const headers = [...col1Children.filter((el) => el.classList.contains("opacity-70")), ...col2Children.filter((el) => el.classList.contains("opacity-70"))];
+    const metasItems = [...col1Children.filter((el) => !el.classList.contains("opacity-70")), ...col2Children.filter((el) => !el.classList.contains("opacity-70"))];
+    gsap.set([...headers, ...metasItems], { y: 20, opacity: 0 });
+    tl.to(headers, { y: 0, opacity: 1, duration: 0.8, stagger: 0.05, ease: "power3.out" }, textStartTime + 0.3);
+    tl.to(metasItems, { y: 0, opacity: 1, duration: 0.8, stagger: 0.04, ease: "power3.out" }, textStartTime + 0.4);
+  }
+
+  ctx.cleanup(() => tl?.kill());
+});
+</script>
+
+<section class="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-transparent z-10 px-6 md:px-12 pt-24 md:pt-32 pb-12">
+  
+  <!-- Massive Nebula Background & Watermarks -->
+  <div class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+    <!-- Giant Logo Watermark -->
+    <div ref={refWatermarkWrapper} class="absolute text-zinc-950 dark:text-zinc-50 w-[150vw] sm:w-[100vw] lg:w-[80vw] max-w-[1200px] aspect-square flex items-center justify-center transform -rotate-12 opacity-0">
+      <ZenithLogo />
+    </div>
+
+    <div class="absolute w-[100vw] h-[100vw] max-h-[1000px] bg-[var(--color-zenith-cyan)]/20 dark:bg-[var(--color-zenith-cyan)]/25 blur-[120px] md:blur-[200px] rounded-full top-[-20%] left-[-20%] opacity-40 dark:opacity-30"></div>
+    <div class="absolute w-[90vw] h-[90vw] max-h-[900px] bg-[var(--color-zenith-purple)]/20 dark:bg-[var(--color-zenith-purple)]/30 blur-[150px] md:blur-[220px] rounded-full bottom-[-10%] right-[-10%] opacity-40 dark:opacity-30"></div>
+  </div>
+
+  <div class="relative z-10 flex flex-col h-full flex-grow w-full mx-auto" style="max-width: 100%;">
+    
+    <!-- Top Row -->
+    <div class="flex justify-between items-start w-full px-6 md:px-12 max-w-[1600px] mx-auto">
+      <div class="inline-flex items-center gap-3">
+        <div class="h-6 w-6 text-zinc-950 dark:text-zinc-50 drop-shadow-sm">
+          <ZenithLogo />
+        </div>
+        <span ref={refVersion} class="text-[10px] md:text-xs font-mono font-medium uppercase tracking-[0.2em] text-zinc-950 dark:text-zinc-50 mt-1">ZENITH BUILD · v0.6.0</span>
+      </div>
+      
+      <p ref={refDesc} class="text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-zinc-500 max-w-[200px] text-right leading-loose">
+        ENGINEERED FOR<br/>DETERMINISM.
+      </p>
+    </div>
+
+    <!-- Middle Giant Typography -->
+    <div class="flex flex-col justify-center flex-grow w-full py-16 md:py-24 overflow-visible">
+      <h1 class="w-full text-center font-[var(--zen-font-heading)] font-semibold tracking-tighter text-zinc-950 dark:text-zinc-50 uppercase m-0 leading-[0.85] flex flex-col mix-blend-normal [perspective:1000px]">
+        <span ref={refTitle} class="transform -translate-x-[0.02em] w-full text-center whitespace-nowrap inline-block [transform-style:preserve-3d] [transform:rotateX(15deg)]">ZENITH BUILD</span>
+      </h1>
+    </div>
+
+    <!-- Bottom Row (Action & Metas) -->
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12 w-full border-t border-zinc-200 dark:border-zinc-800/60 pt-8 md:pt-12 px-6 md:px-12 max-w-[1600px] mx-auto">
+      <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+        <div ref={refBtnInit} class="w-full md:w-auto">
+          <Button href="/docs" variant="primary" class="w-full md:w-auto rounded-none px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+            Initialize
+          </Button>
+        </div>
+        <div ref={refBtnSource} class="w-full md:w-auto">
+          <Button href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" variant="secondary" class="w-full md:w-auto rounded-none px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+            Source
+          </Button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-12 md:gap-24 text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-zinc-500">
+        <div ref={refMetasCol1} class="flex flex-col gap-3 md:gap-4">
+          <span class="text-zinc-950 dark:text-zinc-50 font-semibold mb-1 opacity-70">Architecture</span>
+          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Reactivity</span>
+          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Zero-JS</span>
+        </div>
+        <div ref={refMetasCol2} class="flex flex-col gap-3 md:gap-4">
+          <span class="text-zinc-950 dark:text-zinc-50 font-semibold mb-1 opacity-70">Ecosystem</span>
+          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Compiler</span>
+          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Subagents</span>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</section>
