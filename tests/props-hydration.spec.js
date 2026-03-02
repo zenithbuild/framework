@@ -58,35 +58,37 @@ describe('props hydration', () => {
         expect(indexHtml.includes('<!DOCTYPE html>')).toBe(true);
     });
 
-    test('T2 — two callsites: architectural awareness (shared identifier model)', async () => {
+    test('T2 — two callsites isolate repeated component props per instance', async () => {
         project = await makePropsProject({
             'components/PropsEcho.zen': [
                 '<script lang="ts">',
-                'interface Props { label?: string }',
-                'const { label = "fallback" } = (props as Props);',
+                'interface Props { label?: string; ariaLabel?: string }',
+                'const incoming = props as Props;',
+                'const label = typeof incoming.label === "string" ? incoming.label : "fallback";',
+                'const ariaLabel = typeof incoming.ariaLabel === "string" ? incoming.ariaLabel : "fallback";',
                 '</script>',
-                '<span data-echo>{label}</span>'
+                '<button aria-label={ariaLabel}><span data-echo>{label}</span></button>'
             ].join('\n'),
             'pages/index.zen': [
                 '<main>',
-                '<PropsEcho label="A" />',
-                '<PropsEcho label="B" />',
+                '<PropsEcho label="A" ariaLabel="alpha" />',
+                '<PropsEcho label="B" ariaLabel="beta" />',
                 '</main>'
             ].join('\n')
         });
 
         await build({ pagesDir: project.pagesDir, outDir: project.outDir });
         const indexHtml = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/src="([^"]+\.js)"/);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
+        const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
-        // Two expression marker spans exist (structural macro expanded twice)
-        const markerMatches = indexHtml.match(/data-zx-e=/g);
-        expect(markerMatches).toBeTruthy();
-        expect(markerMatches.length).toBeGreaterThanOrEqual(2);
-
-        // Architectural note: the current compiler produces one identifier per
-        // component type, so both slots reference the same variable. The first
-        // callsite's props win. This test documents behavior, NOT correctness.
-        // When per-instance identifiers are implemented, update this test.
+        expect(indexHtml).toContain('data-zx-aria-label=');
+        expect(pageJs).toContain('ariaLabel: "alpha"');
+        expect(pageJs).toContain('ariaLabel: "beta"');
+        expect(pageJs).toContain('label: "A"');
+        expect(pageJs).toContain('label: "B"');
     });
 
     test('T3 — client module does not throw ReferenceError: props is not defined', async () => {

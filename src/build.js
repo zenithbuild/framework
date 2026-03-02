@@ -18,6 +18,8 @@ import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { generateManifest } from './manifest.js';
 import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMode } from './resolve-components.js';
+import { collectExpandedComponentOccurrences } from './component-occurrences.js';
+import { applyOccurrenceRewritePlans, cloneComponentIrForInstance } from './component-instance-ir.js';
 import { resolveBundlerBin, resolveCompilerBin } from './toolchain-paths.js';
 import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
@@ -189,7 +191,8 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
         bindings: new Map(),
         signals: Array.isArray(compIr?.signals) ? compIr.signals : [],
         stateBindings: Array.isArray(compIr?.hoisted?.state) ? compIr.hoisted.state : [],
-        ambiguous: new Set()
+        ambiguous: new Set(),
+        sequence: []
     };
     const rewrittenExpressions = Array.isArray(compIr?.expressions) ? compIr.expressions : [];
     const rewrittenBindings = Array.isArray(compIr?.expression_bindings) ? compIr.expression_bindings : [];
@@ -234,6 +237,12 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
                 component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
             }
             : null;
+
+        out.sequence.push({
+            raw,
+            rewritten,
+            binding: normalizedBinding
+        });
 
         if (!out.ambiguous.has(raw) && normalizedBinding) {
             const existingBinding = out.bindings.get(raw);
@@ -2287,7 +2296,7 @@ export async function build(options) {
     for (const entry of manifest) {
         const sourceFile = join(pagesDir, entry.file);
         const rawSource = readFileSync(sourceFile, 'utf8');
-        const componentUsageAttrs = collectRecursiveComponentUsageAttrs(rawSource, registry, sourceFile);
+        const componentOccurrences = collectExpandedComponentOccurrences(rawSource, registry, sourceFile);
 
         const baseName = sourceFile.slice(0, -extname(sourceFile).length);
         let adjacentGuard = null;
@@ -2298,7 +2307,7 @@ export async function build(options) {
         }
 
         // 2a. Expand PascalCase component tags
-        const { expandedSource, usedComponents } = expandComponents(
+        const { expandedSource } = expandComponents(
             rawSource, registry, sourceFile
         );
         const extractedServer = extractServerScript(expandedSource, sourceFile, compilerOpts);
@@ -2352,10 +2361,17 @@ export async function build(options) {
         pageIr.hoisted.state = pageIr.hoisted.state || [];
         pageIr.hoisted.code = pageIr.hoisted.code || [];
         const seenStaticImports = new Set();
+        const occurrenceCountByPath = new Map();
+        for (const occurrence of componentOccurrences) {
+            const key = occurrence.componentPath || occurrence.name;
+            occurrenceCountByPath.set(key, (occurrenceCountByPath.get(key) || 0) + 1);
+        }
+
         const pageExpressionRewriteMap = new Map();
         const pageExpressionBindingMap = new Map();
         const pageAmbiguousExpressionMap = new Set();
         const knownRefKeys = new Set();
+        const componentOccurrencePlans = [];
         const pageScopeRewrite = buildScopedIdentifierRewrite(pageIr);
         const pageSelfExpressionRewrite = buildComponentExpressionRewrite(
             sourceFile,
@@ -2372,12 +2388,15 @@ export async function build(options) {
             pageIr
         );
         const componentScopeRewriteCache = new Map();
+        let componentInstanceCounter = 0;
 
         // 2c. Compile each used component separately for its script IR
-        for (const compName of usedComponents) {
-            const compPath = registry.get(compName);
+        for (const occurrence of componentOccurrences) {
+            const compName = occurrence.name;
+            const compPath = occurrence.componentPath || registry.get(compName);
             if (!compPath) continue;
             const componentSource = readFileSync(compPath, 'utf8');
+            const occurrenceCount = occurrenceCountByPath.get(compPath) || 0;
 
             let compIr;
             if (componentIrCache.has(compPath)) {
@@ -2414,15 +2433,10 @@ export async function build(options) {
                 componentExpressionRewriteCache.set(compPath, expressionRewrite);
             }
 
-            let usageEntry = (componentUsageAttrs.get(compName) || [])[0] || { attrs: '', ownerPath: sourceFile };
-            if (!usageEntry || typeof usageEntry !== 'object') {
-                usageEntry = { attrs: '', ownerPath: sourceFile };
-            }
-
             let attrExpressionRewrite = pageSelfExpressionRewrite;
             let attrScopeRewrite = pageScopeRewrite;
-            const ownerPath = typeof usageEntry.ownerPath === 'string' && usageEntry.ownerPath.length > 0
-                ? usageEntry.ownerPath
+            const ownerPath = typeof occurrence.ownerPath === 'string' && occurrence.ownerPath.length > 0
+                ? occurrence.ownerPath
                 : sourceFile;
 
             if (ownerPath !== sourceFile) {
@@ -2461,17 +2475,36 @@ export async function build(options) {
                 }
             }
 
+            const useIsolatedInstance = occurrenceCount > 1;
+            const { ir: instanceIr, refIdentifierPairs } = useIsolatedInstance
+                ? cloneComponentIrForInstance(
+                    compIr,
+                    componentInstanceCounter++,
+                    extractDeclaredIdentifiers,
+                    resolveStateKeyFromBindings
+                )
+                : { ir: compIr, refIdentifierPairs: [] };
+            const instanceRewrite = useIsolatedInstance
+                ? buildComponentExpressionRewrite(
+                    compPath,
+                    componentSource,
+                    instanceIr,
+                    compilerOpts,
+                    compilerBin
+                )
+                : expressionRewrite;
+
             // 2d. Merge component IR into page IR
             mergeComponentIr(
                 pageIr,
-                compIr,
+                instanceIr,
                 compPath,
                 sourceFile,
                 {
                     includeCode: true,
                     cssImportsOnly: isDocMode,
                     documentMode: isDocMode,
-                    componentAttrs: typeof usageEntry.attrs === 'string' ? usageEntry.attrs : '',
+                    componentAttrs: typeof occurrence.attrs === 'string' ? occurrence.attrs : '',
                     componentAttrsRewrite: {
                         expressionRewrite: attrExpressionRewrite,
                         scopeRewrite: attrScopeRewrite
@@ -2481,15 +2514,28 @@ export async function build(options) {
                 knownRefKeys
             );
 
-            mergeExpressionRewriteMaps(
-                pageExpressionRewriteMap,
-                pageExpressionBindingMap,
-                pageAmbiguousExpressionMap,
-                expressionRewrite,
-                pageIr
-            );
+            if (useIsolatedInstance) {
+                componentOccurrencePlans.push({
+                    rewrite: instanceRewrite,
+                    expressionSequence: instanceRewrite.sequence,
+                    refSequence: refIdentifierPairs
+                });
+            } else {
+                mergeExpressionRewriteMaps(
+                    pageExpressionRewriteMap,
+                    pageExpressionBindingMap,
+                    pageAmbiguousExpressionMap,
+                    expressionRewrite,
+                    pageIr
+                );
+            }
         }
 
+        applyOccurrenceRewritePlans(
+            pageIr,
+            componentOccurrencePlans,
+            (rewrite, binding) => resolveRewrittenBindingMetadata(pageIr, rewrite, binding)
+        );
         applyExpressionRewrites(
             pageIr,
             pageExpressionRewriteMap,
