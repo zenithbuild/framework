@@ -1,0 +1,19 @@
+<template>
+  <div class="hello">
+    <h1>Hello {{ name }}</h1>
+    <p class="description">Welcome to Zenith</p>
+  </div>
+</template>
+
+<script>
+  prop name: string;
+  
+  const greeting = "Hello";
+  console.log(greeting, name);
+</script>
+
+<style>
+  .hello { color: red; }
+  .description { font-size: 1.2rem; }
+  .unused { color: blue; } 
+</style>

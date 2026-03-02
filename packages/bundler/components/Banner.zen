@@ -1,0 +1,8 @@
+<script lang="ts">
+zenMount(({ cleanup }) => {
+  cleanup(() => {});
+});
+</script>
+<div data-banner>
+  <p>Banner</p>
+</div>
