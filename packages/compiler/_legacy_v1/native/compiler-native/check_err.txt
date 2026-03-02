@@ -1,0 +1,103 @@
+    Checking compiler-native v0.1.0 (/Users/judahsullivan/Personal/zenith/zenith-compiler/native/compiler-native)
+warning: unused import: `is_component_tag`
+  --> src/discovery.rs:13:20
+   |
+13 | use crate::parse::{is_component_tag, parse_script, parse_template};
+   |                    ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashSet`
+ --> src/finalize.rs:9:5
+  |
+9 | use std::collections::HashSet;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LoopContext`
+  --> src/finalize.rs:13:40
+   |
+13 | use crate::validate::{ExpressionInput, LoopContext, LoopContextInput, ZenIR};
+   |                                        ^^^^^^^^^^^
+
+warning: unused import: `oxc_syntax::scope::ScopeFlags`
+  --> src/jsx_lowerer.rs:10:5
+   |
+10 | use oxc_syntax::scope::ScopeFlags;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> src/parse.rs:12:13
+   |
+12 | use serde::{Deserialize, Serialize};
+   |             ^^^^^^^^^^^  ^^^^^^^^^
+
+error[E0382]: borrow of moved value: `script_locals`
+   --> src/codegen.rs:383:14
+    |
+181 |     let mut script_locals = HashSet::new();
+    |         ----------------- move occurs because `script_locals` has type `std::collections::HashSet<std::string::String>`, which does not implement the `Copy` trait
+...
+340 |     all_locals.extend(script_locals);
+    |                       ------------- value moved here
+...
+383 |         .map(|expr| {
+    |              ^^^^^^ value borrowed here after move
+384 |             let mut all_locals: HashSet<String> = loop_vars.clone();
+385 |             for local in &script_locals {
+    |                           ------------- borrow occurs due to use in closure
+    |
+help: consider cloning the value if the performance cost is acceptable
+    |
+340 |     all_locals.extend(script_locals.clone());
+    |                                    ++++++++
+
+warning: unused variable: `d`
+   --> src/codegen.rs:455:9
+    |
+455 |     for d in &state_decls {}
+    |         ^ help: if this is intentional, prefix it with an underscore: `_d`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/codegen.rs:762:25
+    |
+762 |                     let mut p_name = attr.name.clone();
+    |                         ----^^^^^^
+    |                         |
+    |                         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `lc`
+   --> src/component.rs:451:9
+    |
+451 |     let lc = loop_context.as_ref().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_lc`
+
+warning: unused variable: `script`
+   --> src/discovery.rs:483:30
+    |
+483 | fn extract_props_from_script(script: &str) -> Vec<String> {
+    |                              ^^^^^^ help: if this is intentional, prefix it with an underscore: `_script`
+
+warning: value assigned to `page_html` is never read
+  --> src/layout.rs:48:25
+   |
+48 |     let mut page_html = String::new();
+   |                         ^^^^^^^^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/parse.rs:618:10
+    |
+618 |     let (mut normalized, normalized_exprs) = normalize_all_expressions(&casing_preserved);
+    |          ----^^^^^^^^^^
+    |          |
+    |          help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0382`.
+warning: `compiler-native` (lib) generated 11 warnings
+error: could not compile `compiler-native` (lib) due to 1 previous error; 11 warnings emitted

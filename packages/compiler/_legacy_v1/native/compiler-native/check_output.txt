@@ -1,0 +1,173 @@
+    Checking compiler-native v0.1.0 (/Users/judahsullivan/Personal/zenith/zenith-compiler/native/compiler-native)
+error[E0583]: file not found for module `codegen_test_repro`
+  --> src/lib.rs:99:1
+   |
+99 | mod codegen_test_repro;
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: to create the module `codegen_test_repro`, create file "src/codegen_test_repro.rs" or "src/codegen_test_repro/mod.rs"
+   = note: if there is a `mod codegen_test_repro` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `repro_event_handler`
+   --> src/lib.rs:100:1
+    |
+100 | mod repro_event_handler;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `repro_event_handler`, create file "src/repro_event_handler.rs" or "src/repro_event_handler/mod.rs"
+    = note: if there is a `mod repro_event_handler` elsewhere in the crate already, import it with `use crate::...` instead
+
+error[E0583]: file not found for module `repro_prop_fallback`
+   --> src/lib.rs:101:1
+    |
+101 | mod repro_prop_fallback;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `repro_prop_fallback`, create file "src/repro_prop_fallback.rs" or "src/repro_prop_fallback/mod.rs"
+    = note: if there is a `mod repro_prop_fallback` elsewhere in the crate already, import it with `use crate::...` instead
+
+warning: unused import: `walk_mut`
+  --> src/codegen.rs:12:21
+   |
+12 | use oxc_ast_visit::{walk_mut, VisitMut};
+   |                     ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `SPAN`
+  --> src/component.rs:10:28
+   |
+10 | use oxc_span::{SourceType, SPAN};
+   |                            ^^^^
+
+warning: unused import: `is_component_tag`
+  --> src/discovery.rs:14:20
+   |
+14 | use crate::parse::{is_component_tag, parse_script, parse_template};
+   |                    ^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashSet`
+  --> src/finalize.rs:10:5
+   |
+10 | use std::collections::HashSet;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+  --> src/finalize.rs:11:5
+   |
+11 | use std::path::Path;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::static_eval::static_eval`
+  --> src/finalize.rs:22:9
+   |
+22 |     use crate::static_eval::static_eval;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CodegenInput` and `generate_runtime_code_internal`
+ --> src/sanity_check_phase_0.rs:1:22
+  |
+1 | use crate::codegen::{generate_runtime_code_internal, CodegenInput};
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^
+
+warning: unused import: `crate::validate::ExpressionInput`
+ --> src/sanity_check_phase_0.rs:2:5
+  |
+2 | use crate::validate::ExpressionInput;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/sanity_check_phase_0.rs:3:5
+  |
+3 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src/codegen.rs:239:45
+    |
+239 |         if let Statement::ImportDeclaration(mut import_decl) = stmt {
+    |                                             ----^^^^^^^^^^^
+    |                                             |
+    |                                             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `state_decl_re`
+   --> src/codegen.rs:121:9
+    |
+121 |     let state_decl_re = Regex::new(r"(?m)^\s*state\s+([a-zA-Z_$][a-zA-Z0-9_$]*)").unwrap();
+    |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_state_decl_re`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `prop_decl_re`
+   --> src/codegen.rs:122:9
+    |
+122 |     let prop_decl_re = Regex::new(r"(?m)^\s*prop\s+([a-zA-Z_$][a-zA-Z0-9_$]*)").unwrap();
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prop_decl_re`
+
+warning: unused variable: `d`
+   --> src/codegen.rs:571:9
+    |
+571 |     for d in &state_decls {}
+    |         ^ help: if this is intentional, prefix it with an underscore: `_d`
+
+warning: unused variable: `lc`
+   --> src/component.rs:664:9
+    |
+664 |     let lc = loop_context.as_ref().unwrap();
+    |         ^^ help: if this is intentional, prefix it with an underscore: `_lc`
+
+warning: unused variable: `used_preprocessing`
+   --> src/component.rs:844:9
+    |
+844 |     let used_preprocessing = parsable_code != code;
+    |         ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_used_preprocessing`
+
+warning: unused variable: `i`
+   --> src/document.rs:108:10
+    |
+108 |     for (i, node) in nodes.iter().enumerate() {
+    |          ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `props`
+  --> src/finalize.rs:20:5
+   |
+20 |     props: &std::collections::HashMap<String, String>,
+   |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_props`
+
+warning: unused variable: `rest`
+   --> src/jsx_lowerer.rs:689:29
+    |
+689 |                 if let Some(rest) = &obj.rest {
+    |                             ^^^^ help: if this is intentional, prefix it with an underscore: `_rest`
+
+warning: variable does not need to be mutable
+    --> src/parse.rs:1123:9
+     |
+1123 |     let mut result = serde_json::json!({
+     |         ----^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: unused variable: `name`
+    --> src/parse.rs:1082:14
+     |
+1082 |         for (name, comp_val) in &components_map {
+     |              ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `e`
+    --> src/parse.rs:1098:17
+     |
+1098 |             Err(e) => {
+     |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `name`
+    --> src/parse.rs:1237:14
+     |
+1237 |         for (name, comp_val) in &options.components {
+     |              ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+For more information about this error, try `rustc --explain E0583`.
+warning: `compiler-native` (lib) generated 22 warnings
+error: could not compile `compiler-native` (lib) due to 3 previous errors; 22 warnings emitted

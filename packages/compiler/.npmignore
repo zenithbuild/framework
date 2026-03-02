@@ -1,0 +1,7 @@
+native/compiler-native/target
+node_modules
+.git
+bun.lock
+package-lock.json
+src
+native/compiler-native/src

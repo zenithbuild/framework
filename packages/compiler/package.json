@@ -1,0 +1,23 @@
+{
+  "name": "@zenithbuild/compiler",
+  "version": "0.6.5",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "COMPILER_JS_BRIDGE_CONTRACT.md",
+    "dist/**",
+    "target/release/zenith-compiler",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "private": false,
+  "scripts": {
+    "build": "cargo build --release",
+    "prepublishOnly": "npm run build"
+  }
+}
