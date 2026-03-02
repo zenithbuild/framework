@@ -1,0 +1,19 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Starter Docs"
+    };
+</script>
+
+<DefaultLayout>
+    <section class="container">
+        <h1>Starter Docs</h1>
+        <p>
+            Use this route as a baseline docs shell. Add nested pages under <code>src/pages/docs</code> as needed.
+        </p>
+        <div class="actions">
+            <a href="/" class="link">Home</a>
+            <a href="/about" class="link">About</a>
+            <a href="/blog" class="link">Blog</a>
+        </div>
+    </section>
+</DefaultLayout>

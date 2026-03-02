@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+@source "../**/*.{zen,ts,js}";
+/* css patch test */
+body { background: #000; }

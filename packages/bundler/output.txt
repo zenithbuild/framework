@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running tests/performance_guardrails.rs (target/debug/deps/performance_guardrails-2ab1dd6410618c40)
+
+running 1 test
+DEBUG: Failed to find placeholder 0 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 1 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 2 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 3 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 4 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 5 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 6 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 7 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 8 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+DEBUG: Failed to find placeholder 9 in HTML: <div data-zx-e="0 1 2 3 4 5 6 7 8 9"></div>
+
+thread 'memory_growth_linear' (114505) panicked at tests/performance_guardrails.rs:44:69:
+called `Result::unwrap()` on an `Err` value: ValidationError("Missing placeholder for expression index 0; Missing placeholder for expression index 1; Missing placeholder for expression index 2; Missing placeholder for expression index 3; Missing placeholder for expression index 4; Missing placeholder for expression index 5; Missing placeholder for expression index 6; Missing placeholder for expression index 7; Missing placeholder for expression index 8; Missing placeholder for expression index 9")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test memory_growth_linear ... FAILED
+
+failures:
+
+failures:
+    memory_growth_linear
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--test performance_guardrails`

@@ -1,0 +1,61 @@
+# dependencies (bun install)
+node_modules
+
+# editors
+.cursor
+.vscode
+
+# output
+out
+dist
+**/dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Shell scripts (local setup scripts)
+*.sh
+scripts/*.sh
+**/*.sh
+
+# Local editor configs
+.vscode-icons/
+
+# Local tickets/issue tracking
+tickets/
+
+# dist output (build artifacts - should not be committed)
+**/dist/
+dist/
+test-dist/
+app/dist/
+dev.log
+dist/
+node_modules/
+.DS_Store
+bun.lock

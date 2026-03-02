@@ -1,0 +1,26 @@
+---
+title: "Routing Awareness Fix: What Changed and Why"
+description: "How Zenith locked route parity, manifest usage, and hard-reload defaults."
+date: "2026-02-22"
+authors: ["Judah Sullivan"]
+tags: ["release", "routing", "ssr"]
+status: "published"
+---
+
+# Routing Awareness Fix
+
+Zenith now enforces server-first routing invariants across dev and preview:
+
+- Server route matching uses manifest data for every request.
+- Default links retain hard reload behavior.
+- Soft navigation remains explicit and marker-based.
+
+## Why this matters
+
+Route correctness no longer depends on runtime assumptions. A direct URL visit and an in-app link resolve the same route and parameters.
+
+## What to verify
+
+- Route parity for static, dynamic, and catch-all URLs.
+- No runtime URL mutation primitives in framework outputs.
+- Inline SSR payload present exactly once.

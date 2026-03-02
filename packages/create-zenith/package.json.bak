@@ -1,0 +1,54 @@
+{
+  "name": "create-zenith",
+  "version": "0.5.0-beta.2.1",
+  "description": "Create a new Zenith application - the modern reactive web framework",
+  "type": "module",
+  "bin": {
+    "create-zenith": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node --format esm && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/index.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c);fs.chmodSync('dist/cli.js','755')\"",
+    "prepublishOnly": "npm run build",
+    "create": "bun src/index.ts",
+    "example": "rm -rf examples/test-template && bun src/index.ts test-template && mv test-template examples/",
+    "test": "node dist/cli.js --help",
+    "release": "bun run scripts/release.ts",
+    "release:dry": "bun run scripts/release.ts --dry-run",
+    "release:patch": "bun run scripts/release.ts --bump=patch",
+    "release:minor": "bun run scripts/release.ts --bump=minor",
+    "release:major": "bun run scripts/release.ts --bump=major"
+  },
+  "keywords": [
+    "zenith",
+    "create",
+    "scaffold",
+    "cli",
+    "framework",
+    "reactive"
+  ],
+  "author": "Zenith Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/zenithbuild/create-zenith.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": false,
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/gradient-string": "^1.1.6",
+    "@types/node": "^20.0.0"
+  }
+}

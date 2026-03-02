@@ -1,0 +1,19 @@
+{
+  "name": "@zenithbuild/compiler-native",
+  "version": "0.1.1",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "compiler-native",
+    "package": {
+      "name": "@zenithbuild/compiler-native"
+    }
+  },
+  "scripts": {
+    "build": "napi build --release",
+    "build:debug": "napi build"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  }
+}

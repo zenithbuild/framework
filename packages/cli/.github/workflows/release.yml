@@ -1,0 +1,261 @@
+# =============================================================================
+# Zenith Automated Release Workflow
+# =============================================================================
+# This workflow handles automated releases for all Zenith repositories.
+# 
+# TRIGGERS:
+# - Push to 'main' branch (analyzes commits for version bump)
+# - Manual trigger via workflow_dispatch (with optional dry-run mode)
+# - Tag creation (v*) for explicit version releases
+#
+# FEATURES:
+# - Conventional Commits parsing for automatic version determination
+# - Automatic CHANGELOG.md generation
+# - GitHub Release creation
+# - Optional NPM publishing
+# - Commits updated files back to repo
+# - Dry-run mode for testing
+# - Monorepo support (detects changed packages)
+#
+# REQUIRED SECRETS:
+# - NPM_TOKEN: For publishing to NPM (if enabled)
+# - GITHUB_TOKEN: Automatically provided by GitHub Actions
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/release.yml'
+  
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (no actual release)'
+        required: false
+        default: false
+        type: boolean
+      package:
+        description: 'Specific package to release (for monorepo, leave empty for auto-detect)'
+        required: false
+        default: ''
+        type: string
+      bump_type:
+        description: 'Force version bump type (leave empty for auto-detect from commits)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - patch
+          - minor
+          - major
+      publish_npm:
+        description: 'Publish to NPM'
+        required: false
+        default: true
+        type: boolean
+
+# Prevent concurrent releases
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: '1.1.38'
+
+jobs:
+  # ==========================================================================
+  # Detect Changes (for monorepo support)
+  # ==========================================================================
+  detect-changes:
+    name: Detect Changed Packages
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.detect.outputs.packages }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Detect Changed Packages
+        id: detect
+        run: |
+          # First, check if this is a single-package repo (package.json in root)
+          if [ -f "./package.json" ]; then
+            # Count subdirectories with package.json (excluding node_modules)
+            SUB_PACKAGES=$(find . -mindepth 2 -name "package.json" -not -path "*/node_modules/*" | wc -l)
+            
+            if [ "$SUB_PACKAGES" -eq 0 ]; then
+              # Single package repo - always release from root
+              echo "Single package repository detected"
+              echo "packages=[\".\"]" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          
+          # Monorepo detection
+          PACKAGES=$(find . -name "package.json" -not -path "*/node_modules/*" -not -path "*/.git/*" | xargs -I {} dirname {} | sed 's|^\./||' | grep -v "^$" | sort -u)
+          
+          # For monorepos, detect which packages changed
+          CHANGED_PACKAGES="[]"
+          if [ "${{ github.event.inputs.package }}" != "" ]; then
+            CHANGED_PACKAGES="[\"${{ github.event.inputs.package }}\"]"
+          else
+            # Get changed files since last tag or in the current push
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -z "$LAST_TAG" ]; then
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+            else
+              CHANGED_FILES=$(git diff --name-only $LAST_TAG HEAD)
+            fi
+            
+            # Match changed files to packages
+            CHANGED_PKGS=""
+            for pkg in $PACKAGES; do
+              MATCHED=false
+              if [ "$pkg" = "." ]; then
+                if [ -n "$CHANGED_FILES" ]; then MATCHED=true; fi
+              elif echo "$CHANGED_FILES" | grep -q "^$pkg/"; then
+                MATCHED=true
+              fi
+
+              if [ "$MATCHED" = "true" ]; then
+                if [ -z "$CHANGED_PKGS" ]; then
+                  CHANGED_PKGS="\"$pkg\""
+                else
+                  CHANGED_PKGS="$CHANGED_PKGS, \"$pkg\""
+                fi
+              fi
+            done
+            CHANGED_PACKAGES="[$CHANGED_PKGS]"
+          fi
+          
+          echo "packages=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+          if [ "$CHANGED_PACKAGES" = "[]" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+
+  # ==========================================================================
+  # Release Job
+  # ==========================================================================
+  release:
+    name: Release
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Dependencies
+        working-directory: ${{ matrix.package }}
+        run: bun install
+
+      - name: Run Release Script
+        id: release
+        working-directory: ${{ matrix.package }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          BUMP_TYPE: ${{ github.event.inputs.bump_type || '' }}
+          PUBLISH_NPM: ${{ github.event.inputs.publish_npm || 'true' }}
+        run: |
+          # Run the Bun release script
+          bun run scripts/release.ts
+
+      - name: Build Package
+        if: steps.release.outputs.should_release == 'true'
+        working-directory: ${{ matrix.package }}
+        run: |
+          if bun run build 2>/dev/null; then
+            echo "Build completed successfully"
+          else
+            echo "No build script found or build not required"
+          fi
+
+      - name: Commit Changes
+        if: steps.release.outputs.should_release == 'true' && github.event.inputs.dry_run != 'true'
+        working-directory: ${{ matrix.package }}
+        run: |
+          git add CHANGELOG.md package.json
+          git commit -m "chore(release): v${{ steps.release.outputs.new_version }} [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: Create GitHub Release
+        if: steps.release.outputs.should_release == 'true' && github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.release.outputs.new_version }}
+          name: Release v${{ steps.release.outputs.new_version }}
+          body_path: ${{ matrix.package }}/RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to NPM
+        if: steps.release.outputs.should_release == 'true' && github.event.inputs.dry_run != 'true' && (github.event.inputs.publish_npm == 'true' || github.event.inputs.publish_npm == '')
+        working-directory: ${{ matrix.package }}
+        run: |
+          # Check if package is not private
+          PRIVATE=$(cat package.json | bun -e "console.log(JSON.parse(await Bun.stdin.text()).private || false)")
+          if [ "$PRIVATE" = "false" ]; then
+            echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+            bun publish --access public || npm publish --access public
+          else
+            echo "Package is private, skipping NPM publish"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "⚠️ **DRY RUN MODE** - No actual release was created" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package**: ${{ matrix.package }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.release.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump Type**: ${{ steps.release.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY

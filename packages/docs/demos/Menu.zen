@@ -1,0 +1,77 @@
+<script setup="ts">
+const open = signal(false);
+const selected = signal("None");
+
+const menuToggleLabelRef = ref<HTMLElement>();
+const menuPanelRef = ref<HTMLElement>();
+const selectedValueRef = ref<HTMLElement>();
+
+function renderMenu() {
+  const menuOpen = open.get();
+  const selectedLabel = selected.get();
+
+  if (menuToggleLabelRef.current) {
+    menuToggleLabelRef.current.textContent = menuOpen ? "Close menu" : "Open menu";
+  }
+
+  if (menuPanelRef.current) {
+    menuPanelRef.current.className = menuOpen
+      ? "mt-2 w-44 rounded-md border border-zinc-200 bg-white p-2 shadow"
+      : "hidden";
+  }
+
+  if (selectedValueRef.current) {
+    selectedValueRef.current.textContent = selectedLabel;
+  }
+}
+
+function toggleMenu() {
+  open.set(!open.get());
+  renderMenu();
+}
+
+function choose(item: string) {
+  selected.set(item);
+  open.set(false);
+  renderMenu();
+}
+
+function chooseDocs() {
+  choose("Docs");
+}
+
+function chooseBlog() {
+  choose("Blog");
+}
+
+function chooseGuides() {
+  choose("Guides");
+}
+
+zenMount(() => {
+  renderMenu();
+});
+
+zeneffect([open, selected], () => {
+  renderMenu();
+});
+</script>
+
+<section class="p-6 font-sans">
+  <h1 class="text-2xl font-semibold">Menu Demo</h1>
+  <p class="mt-2 text-sm text-zinc-600">Object-based event handlers only.</p>
+
+  <div class="mt-5 relative inline-block">
+    <button class="rounded-md bg-zinc-900 px-4 py-2 text-white" on:click={toggleMenu}>
+      <span ref={menuToggleLabelRef} data-demo-menu-toggle-runtime>Open menu</span>
+    </button>
+
+    <div ref={menuPanelRef} data-demo-menu-panel-runtime class="hidden">
+      <button class="block w-full rounded px-3 py-2 text-left hover:bg-zinc-100" on:click={chooseDocs}>Docs</button>
+      <button class="block w-full rounded px-3 py-2 text-left hover:bg-zinc-100" on:click={chooseBlog}>Blog</button>
+      <button class="block w-full rounded px-3 py-2 text-left hover:bg-zinc-100" on:click={chooseGuides}>Guides</button>
+    </div>
+  </div>
+
+  <p class="mt-4 text-sm">Selected: <strong ref={selectedValueRef} data-demo-menu-selected-runtime>None</strong></p>
+</section>

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "types": {
+    "feat": {
+      "title": "✨ Features",
+      "bump": "minor",
+      "description": "New features or functionality"
+    },
+    "fix": {
+      "title": "🐛 Bug Fixes",
+      "bump": "patch",
+      "description": "Bug fixes and corrections"
+    },
+    "perf": {
+      "title": "⚡ Performance Improvements",
+      "bump": "patch",
+      "description": "Performance optimizations"
+    },
+    "refactor": {
+      "title": "♻️ Code Refactoring",
+      "bump": "patch",
+      "description": "Code changes that neither fix bugs nor add features"
+    },
+    "docs": {
+      "title": "📚 Documentation",
+      "bump": null,
+      "description": "Documentation only changes"
+    },
+    "style": {
+      "title": "💄 Styles",
+      "bump": null,
+      "description": "Code style changes (formatting, whitespace)"
+    },
+    "test": {
+      "title": "✅ Tests",
+      "bump": null,
+      "description": "Adding or updating tests"
+    },
+    "build": {
+      "title": "📦 Build System",
+      "bump": "patch",
+      "description": "Build system or dependency changes"
+    },
+    "ci": {
+      "title": "🔧 CI Configuration",
+      "bump": null,
+      "description": "CI/CD configuration changes"
+    },
+    "chore": {
+      "title": "🔨 Chores",
+      "bump": null,
+      "description": "Maintenance tasks and other changes"
+    },
+    "revert": {
+      "title": "⏪ Reverts",
+      "bump": "patch",
+      "description": "Reverting previous commits"
+    }
+  },
+  "skipCI": [
+    "[skip ci]",
+    "[ci skip]",
+    "[no ci]",
+    "chore(release)"
+  ],
+  "tagPrefix": "v",
+  "branches": {
+    "main": "latest",
+    "next": "next",
+    "beta": "beta",
+    "alpha": "alpha"
+  }
+}

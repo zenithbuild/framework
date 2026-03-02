@@ -1,0 +1,4 @@
+<div>
+  <h1 id="user-id">{params.id}</h1>
+  <a id="home-link" href="/">Home</a>
+</div>

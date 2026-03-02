@@ -1,0 +1,19 @@
+# OS X
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Node (in case of future tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Build outputs
+dist/
+build/
+out/

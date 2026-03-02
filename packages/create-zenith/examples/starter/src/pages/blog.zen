@@ -1,0 +1,19 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Starter Blog"
+    };
+</script>
+
+<DefaultLayout>
+    <section class="container">
+        <h1>Starter Blog</h1>
+        <p>
+            This sample route confirms routing and SSR payload wiring in preview and production builds.
+        </p>
+        <div class="actions">
+            <a href="/" class="link">Home</a>
+            <a href="/about" class="link">About</a>
+            <a href="/docs" class="link">Docs</a>
+        </div>
+    </section>
+</DefaultLayout>

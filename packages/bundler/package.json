@@ -1,0 +1,38 @@
+{
+  "name": "@zenithbuild/bundler",
+  "version": "0.6.5",
+  "scripts": {
+    "build": "cargo build --release",
+    "contract:deps": "node dependency_contract.spec.js",
+    "contract:scan": "node contract-scan.mjs",
+    "contract:imports": "node --test tests/template_import_boundary.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  },
+  "main": "./package.json",
+  "exports": {
+    ".": "./package.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "target/release/zenith-bundler",
+    "scripts",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@zenithbuild/router": "^0.6.5",
+    "@zenithbuild/runtime": "^0.6.5",
+    "chokidar": "^5.0.0",
+    "esbuild": "^0.27.3",
+    "express": "^4.21.2",
+    "rolldown": "^1.0.0-rc.3",
+    "ws": "^8.19.0"
+  },
+  "type": "module",
+  "private": false
+}

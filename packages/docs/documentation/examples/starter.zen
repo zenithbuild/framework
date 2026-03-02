@@ -1,0 +1,46 @@
+<script>
+  /**
+   * ZENITH STARTER TEMPLATE
+   * 
+   * This is a canonical example of a Zenith component.
+   * It demonstrates state, symbolic event handling, and reactive text.
+   */
+  
+  state count = 0;
+  state name = 'Developer';
+
+  function increment() {
+    count++;
+  }
+
+  function reset() {
+    count = 0;
+  }
+</script>
+
+<div class="p-8 border rounded-lg shadow-xl bg-white dark:bg-gray-800">
+  <h1 class="text-2xl font-bold mb-4">
+    Hello, {name}!
+  </h1>
+
+  <p class="mb-6 text-gray-600 dark:text-gray-400">
+    This component is pre-compiled. The button below uses a 
+    symbolic instruction ("increment") rather than a closure.
+  </p>
+
+  <div class="flex items-center gap-4">
+    <button 
+      on:click="increment"
+      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+    >
+      Count: {count}
+    </button>
+
+    <button 
+      on:click="reset"
+      class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+    >
+      Reset
+    </button>
+  </div>
+</div>
