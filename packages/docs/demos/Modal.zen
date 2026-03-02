@@ -1,0 +1,47 @@
+<script setup="ts">
+const open = signal(false);
+const modalOverlayRef = ref<HTMLElement>();
+
+function renderModal() {
+  if (modalOverlayRef.current) {
+    modalOverlayRef.current.className = open.get()
+      ? "fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-6"
+      : "hidden";
+  }
+}
+
+function showModal() {
+  open.set(true);
+  renderModal();
+}
+
+function hideModal() {
+  open.set(false);
+  renderModal();
+}
+
+zenMount(() => {
+  renderModal();
+});
+
+zeneffect([open], () => {
+  renderModal();
+});
+</script>
+
+<section class="p-6 font-sans">
+  <h1 class="text-2xl font-semibold">Modal Demo</h1>
+  <p class="mt-2 text-sm text-zinc-600">Visibility is controlled by explicit state transitions.</p>
+
+  <button class="mt-4 rounded-md bg-indigo-600 px-4 py-2 text-white" on:click={showModal}>Open modal</button>
+
+  <div ref={modalOverlayRef} data-demo-modal-overlay-runtime class="hidden">
+    <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+      <h2 class="text-xl font-semibold">Deterministic Modal</h2>
+      <p class="mt-2 text-sm text-zinc-600">No framework magic. No runtime parser.</p>
+      <div class="mt-4 flex justify-end">
+        <button class="rounded-md border border-zinc-300 px-4 py-2" on:click={hideModal}>Close</button>
+      </div>
+    </div>
+  </div>
+</section>

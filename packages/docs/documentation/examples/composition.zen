@@ -1,0 +1,38 @@
+<script>
+  /**
+   * ZENITH COMPOSITION EXAMPLE
+   * 
+   * Demonstrates how to pass props and handle events across components
+   * while maintaining the symbolic constraint.
+   */
+  import CustomButton from './CustomButton.zen';
+
+  state status = 'idle';
+  state message = '';
+
+  function startProcess() {
+    status = 'loading';
+    message = 'Processing signals...';
+    
+    // Simulations use standard timeouts, 
+    // but updates are tracked via the state proxy
+    setTimeout(() => {
+      status = 'success';
+      message = 'Process complete!';
+    }, 2000);
+  }
+</script>
+
+<section class="max-w-md mx-auto space-y-4">
+  <div class="p-4 rounded border" class:border-green-500="{status === 'success'}">
+    <h2 class="font-medium">Status: {status}</h2>
+    <p class="text-sm opacity-70">{message}</p>
+  </div>
+
+  <!-- Passing static and dynamic props -->
+  <CustomButton 
+    label="Start Execution" 
+    on:click="startProcess"
+    disabled="{status === 'loading'}"
+  />
+</section>

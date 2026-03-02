@@ -1,0 +1,29 @@
+{
+  "name": "zenith-docs-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx zenith dev",
+    "build": "npx zenith build",
+    "build:stage": "npx zenith build && node scripts/stage-public.mjs",
+    "preview": "npx zenith preview",
+    "docs:structure": "node scripts/gates/docs-structure.mjs",
+    "docs:syntax": "node scripts/gates/docs-syntax.mjs",
+    "docs:snippets": "node scripts/gates/docs-snippets.mjs",
+    "docs:gate": "npm run docs:structure && npm run docs:syntax && npm run docs:snippets && node scripts/generate-ai-endpoints.mjs --check",
+    "check:ai": "npm run docs:gate",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@zenithbuild/bundler": "^0.6.5",
+    "@zenithbuild/cli": "^0.6.5",
+    "@zenithbuild/compiler": "^0.6.5",
+    "@zenithbuild/core": "^0.6.5",
+    "@zenithbuild/router": "^0.6.5",
+    "@zenithbuild/runtime": "^0.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.3"
+  }
+}

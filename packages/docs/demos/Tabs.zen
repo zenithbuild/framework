@@ -1,0 +1,81 @@
+<script setup="ts">
+const tab = signal("overview");
+
+const overviewButtonRef = ref<HTMLElement>();
+const apiButtonRef = ref<HTMLElement>();
+const contractsButtonRef = ref<HTMLElement>();
+
+const overviewPanelRef = ref<HTMLElement>();
+const apiPanelRef = ref<HTMLElement>();
+const contractsPanelRef = ref<HTMLElement>();
+
+function renderTabs() {
+  const current = tab.get();
+
+  if (overviewButtonRef.current) {
+    overviewButtonRef.current.className = current === "overview"
+      ? "rounded-md bg-zinc-900 px-3 py-2 text-white"
+      : "rounded-md border border-zinc-300 px-3 py-2";
+  }
+  if (apiButtonRef.current) {
+    apiButtonRef.current.className = current === "api"
+      ? "rounded-md bg-zinc-900 px-3 py-2 text-white"
+      : "rounded-md border border-zinc-300 px-3 py-2";
+  }
+  if (contractsButtonRef.current) {
+    contractsButtonRef.current.className = current === "contracts"
+      ? "rounded-md bg-zinc-900 px-3 py-2 text-white"
+      : "rounded-md border border-zinc-300 px-3 py-2";
+  }
+
+  if (overviewPanelRef.current) {
+    overviewPanelRef.current.className = current === "overview" ? "block" : "hidden";
+  }
+  if (apiPanelRef.current) {
+    apiPanelRef.current.className = current === "api" ? "block" : "hidden";
+  }
+  if (contractsPanelRef.current) {
+    contractsPanelRef.current.className = current === "contracts" ? "block" : "hidden";
+  }
+}
+
+function showOverview() {
+  tab.set("overview");
+  renderTabs();
+}
+
+function showApi() {
+  tab.set("api");
+  renderTabs();
+}
+
+function showContracts() {
+  tab.set("contracts");
+  renderTabs();
+}
+
+zenMount(() => {
+  renderTabs();
+});
+
+zeneffect([tab], () => {
+  renderTabs();
+});
+</script>
+
+<section class="p-6 font-sans">
+  <h1 class="text-2xl font-semibold">Tabs Demo</h1>
+  <p class="mt-2 text-sm text-zinc-600">Reactive state drives deterministic branch rendering.</p>
+
+  <div class="mt-5 flex gap-2">
+    <button ref={overviewButtonRef} data-demo-tabs-button-overview-runtime class="rounded-md bg-zinc-900 px-3 py-2 text-white" on:click={showOverview}>Overview</button>
+    <button ref={apiButtonRef} data-demo-tabs-button-api-runtime class="rounded-md border border-zinc-300 px-3 py-2" on:click={showApi}>API</button>
+    <button ref={contractsButtonRef} data-demo-tabs-button-contracts-runtime class="rounded-md border border-zinc-300 px-3 py-2" on:click={showContracts}>Contracts</button>
+  </div>
+
+  <div class="mt-4 rounded-lg border border-zinc-200 p-4">
+    <p ref={overviewPanelRef} data-demo-tabs-panel-overview-runtime class="block">Overview: Zenith is compile-time first.</p>
+    <p ref={apiPanelRef} data-demo-tabs-panel-api-runtime class="hidden">API: Keep public surfaces explicit and small.</p>
+    <p ref={contractsPanelRef} data-demo-tabs-panel-contracts-runtime class="hidden">Contracts: Compiler/runtime boundaries are hard law.</p>
+  </div>
+</section>
