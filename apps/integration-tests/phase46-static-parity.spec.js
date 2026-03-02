@@ -292,7 +292,7 @@ describe('Phase 4.6: static serve parity & substrate certification', () => {
       expect(snapshot2.routerRel).not.toBe(snapshot1.routerRel);
 
       // Dev server purity checks (no mutation/stubbing/HMR/patching logic).
-      const devServerPath = path.join(repoRoot, 'zenith-cli', 'src', 'dev-server.js');
+      const devServerPath = path.join(repoRoot, 'packages', 'cli', 'src', 'dev-server.js');
       const devServerSource = await fs.readFile(devServerPath, 'utf8');
       expect(devServerSource.includes('__zenith_hmr')).toBe(false);
       expect(devServerSource.includes('router-manifest.json')).toBe(false);

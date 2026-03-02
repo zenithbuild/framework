@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { build } from '../src/build.js';
 
-const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const REPO_ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const INTERNAL_PACKAGE_NAMES = [
     '@zenithbuild/core',
     '@zenithbuild/cli',
@@ -18,12 +18,12 @@ const INTERNAL_PACKAGE_NAMES = [
 ];
 const INTERNAL_DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 const TRAIN_MANIFESTS = [
-    'zenith-core/package.json',
-    'zenith-cli/package.json',
-    'zenith-compiler/package.json',
-    'zenith-runtime/package.json',
-    'zenith-router/package.json',
-    'zenith-bundler/package.json'
+    'packages/core/package.json',
+    'packages/cli/package.json',
+    'packages/compiler/package.json',
+    'packages/runtime/package.json',
+    'packages/router/package.json',
+    'packages/bundler/package.json'
 ];
 
 function collectFiles(dir, allowExt) {
@@ -69,7 +69,7 @@ function scanFiles(files, matcher) {
 describe('drift gates', () => {
     test('release train: internal dependency versions match @zenithbuild/core exactly', () => {
         const coreManifest = JSON.parse(
-            readFileSync(resolve(REPO_ROOT, 'zenith-core/package.json'), 'utf8')
+            readFileSync(resolve(REPO_ROOT, 'packages/core/package.json'), 'utf8')
         );
         const coreVersion = String(coreManifest.version || '');
         expect(coreVersion).toMatch(/^0\.\d+\.\d+$/);
@@ -122,11 +122,11 @@ describe('drift gates', () => {
 
     test('framework sources do not import React or jsx-runtime', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-cli/src'),
-            resolve(REPO_ROOT, 'zenith-runtime/src'),
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src'),
-            resolve(REPO_ROOT, 'zenith-compiler/zenith_compiler/src')
+            resolve(REPO_ROOT, 'packages/cli/src'),
+            resolve(REPO_ROOT, 'packages/runtime/src'),
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src'),
+            resolve(REPO_ROOT, 'packages/compiler/zenith_compiler/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs']));
         const hits = scanFiles(
@@ -138,10 +138,10 @@ describe('drift gates', () => {
 
     test('query-param SSR channel remains removed', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-cli/src'),
-            resolve(REPO_ROOT, 'zenith-runtime/src'),
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src')
+            resolve(REPO_ROOT, 'packages/cli/src'),
+            resolve(REPO_ROOT, 'packages/runtime/src'),
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs']));
         const hits = scanFiles(files, /__zenith_ssr=/);
@@ -150,10 +150,10 @@ describe('drift gates', () => {
 
     test('no pushState or replaceState soft-nav escapes into the router runtime', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src'),
-            resolve(REPO_ROOT, 'zenith-router/template.js'),
-            resolve(REPO_ROOT, 'zenith-runtime/src')
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src'),
+            resolve(REPO_ROOT, 'packages/router/template.js'),
+            resolve(REPO_ROOT, 'packages/runtime/src')
         ];
 
         const files = targets.flatMap((pathStr) => {
@@ -166,10 +166,10 @@ describe('drift gates', () => {
 
     test('no eval or Function constructors in framework runtime outputs', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src'),
-            resolve(REPO_ROOT, 'zenith-router/template.js'),
-            resolve(REPO_ROOT, 'zenith-runtime/src')
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src'),
+            resolve(REPO_ROOT, 'packages/router/template.js'),
+            resolve(REPO_ROOT, 'packages/runtime/src')
         ];
 
         const files = targets.flatMap((pathStr) => {
@@ -212,7 +212,7 @@ describe('drift gates', () => {
     });
 
     test('app source does not include frozen cms snapshots or svelte block tags', () => {
-        const appSrc = resolve(REPO_ROOT, 'zenith-site-v0/src');
+        const appSrc = resolve(REPO_ROOT, 'apps/site-v0/src');
         const files = collectFiles(appSrc, ['.zen', '.ts', '.js']);
 
         const snapshotHits = scanFiles(
@@ -230,15 +230,15 @@ describe('drift gates', () => {
 
     test('no use of Object.freeze across app or framework source (except runtime)', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-cli/src'),
+            resolve(REPO_ROOT, 'packages/cli/src'),
             // zenith-runtime/src is intentionally excluded: Object.freeze is used
             // for internal state snapshots (state.js) and payload validation
             // (hydrate.js). Audited as safe in beta.2.
             // zenith-compiler is excluded: script.rs emits JS code containing
             // Object.freeze for IR descriptor tables.
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src'),
-            resolve(REPO_ROOT, 'zenith-site-v0/src')
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src'),
+            resolve(REPO_ROOT, 'apps/site-v0/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs', '.zen']));
         const hits = scanFiles(files, /Object\.freeze\(/);
@@ -249,10 +249,10 @@ describe('drift gates', () => {
 
     test('no use of bare zenhtml macro across the framework or app', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-cli/src'),
-            resolve(REPO_ROOT, 'zenith-runtime/src'),
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-site-v0/src')
+            resolve(REPO_ROOT, 'packages/cli/src'),
+            resolve(REPO_ROOT, 'packages/runtime/src'),
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'apps/site-v0/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.zen']));
         // Ban tag-template zenhtml usage but allow internal context plumbing.
@@ -263,14 +263,14 @@ describe('drift gates', () => {
     test('compiler→runtime naming contract: __ZENITH_INTERNAL_ZENHTML binding matches across packages', () => {
         // Verify the runtime registers the internal binding
         const hydrateSource = readFileSync(
-            resolve(REPO_ROOT, 'zenith-runtime/src/hydrate.js'),
+            resolve(REPO_ROOT, 'packages/runtime/src/hydrate.js'),
             'utf8'
         );
         expect(hydrateSource).toContain('scope.__ZENITH_INTERNAL_ZENHTML');
 
         // Verify the CLI rewrites the legacy identifier to the same internal name
         const buildSource = readFileSync(
-            resolve(REPO_ROOT, 'zenith-cli/src/build.js'),
+            resolve(REPO_ROOT, 'packages/cli/src/build.js'),
             'utf8'
         );
         expect(buildSource).toContain('__ZENITH_INTERNAL_ZENHTML');
@@ -280,11 +280,11 @@ describe('drift gates', () => {
 
     test('no site specifics or cms leakage in core tooling', () => {
         const targets = [
-            resolve(REPO_ROOT, 'zenith-cli/src'),
-            resolve(REPO_ROOT, 'zenith-runtime/src'),
-            resolve(REPO_ROOT, 'zenith-router/src'),
-            resolve(REPO_ROOT, 'zenith-bundler/src'),
-            resolve(REPO_ROOT, 'zenith-compiler/zenith_compiler/src')
+            resolve(REPO_ROOT, 'packages/cli/src'),
+            resolve(REPO_ROOT, 'packages/runtime/src'),
+            resolve(REPO_ROOT, 'packages/router/src'),
+            resolve(REPO_ROOT, 'packages/bundler/src'),
+            resolve(REPO_ROOT, 'packages/compiler/zenith_compiler/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs']));
         const hits = scanFiles(files, /Directus|docs_pages|cmsDocs|cmsPosts/i);
@@ -292,7 +292,7 @@ describe('drift gates', () => {
     });
 
     test('no absolute machine paths leak into generated type definitions', () => {
-        const typesDir = resolve(REPO_ROOT, 'zenith-site-v0/.zenith');
+        const typesDir = resolve(REPO_ROOT, 'apps/site-v0/.zenith');
         if (existsSync(typesDir)) {
             const files = collectFiles(typesDir, ['.ts']);
             const absoluteHits = scanFiles(files, new RegExp('/Users/|C:\\\\', 'i'));
@@ -301,7 +301,7 @@ describe('drift gates', () => {
     });
 
     test('create-zenith templates use only canonical event binding (on:click={...}, no onclick="..." or @click)', () => {
-        const createZenithRoot = resolve(REPO_ROOT, 'create-zenith');
+        const createZenithRoot = resolve(REPO_ROOT, 'packages/create-zenith');
         const files = collectFiles(createZenithRoot, ['.zen']);
         const onclickHits = scanFiles(files, /onclick\s*=\s*["']/);
         const atClickHits = scanFiles(files, /@click\b/);
@@ -310,7 +310,7 @@ describe('drift gates', () => {
     });
 
     test('no magic globals (data, params, ctx) leak into generated type definitions', () => {
-        const typesDir = resolve(REPO_ROOT, 'zenith-site-v0/.zenith');
+        const typesDir = resolve(REPO_ROOT, 'apps/site-v0/.zenith');
 
         // Disallow skipping the test if types aren't initially checked in or present
         expect(existsSync(typesDir)).toBe(true);
@@ -407,12 +407,12 @@ describe('drift gates', () => {
 
             // Install local packages and build
             const localPackages = [
-                resolve(REPO_ROOT, 'zenith-core'),
-                resolve(REPO_ROOT, 'zenith-cli'),
-                resolve(REPO_ROOT, 'zenith-compiler'),
-                resolve(REPO_ROOT, 'zenith-runtime'),
-                resolve(REPO_ROOT, 'zenith-router'),
-                resolve(REPO_ROOT, 'zenith-bundler')
+                resolve(REPO_ROOT, 'packages/core'),
+                resolve(REPO_ROOT, 'packages/cli'),
+                resolve(REPO_ROOT, 'packages/compiler'),
+                resolve(REPO_ROOT, 'packages/runtime'),
+                resolve(REPO_ROOT, 'packages/router'),
+                resolve(REPO_ROOT, 'packages/bundler')
             ];
             for (const lp of localPackages) {
                 expect(existsSync(lp)).toBe(true);

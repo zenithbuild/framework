@@ -9,8 +9,10 @@ import {
     getBundlerVersion,
     maybeWarnAboutZenithVersionMismatch
 } from '../src/version-check.js';
+import { readCliPackageVersion } from '../src/toolchain-paths.js';
 
 const CLI_ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const CLI_VERSION = readCliPackageVersion();
 
 function createRuntime(env = {}) {
     const stdout = [];
@@ -140,12 +142,12 @@ describe('zenith version check', () => {
         const runtime = createRuntime();
         const logger = createZenithLogger(runtime);
         const projectRoot = createFakeProject({
-            core: '0.6.4',
-            cli: '0.6.4',
-            compiler: '0.6.4',
+            core: CLI_VERSION,
+            cli: CLI_VERSION,
+            compiler: CLI_VERSION,
             runtime: '0.6.3',
-            router: '0.6.4',
-            bundler: '0.6.4'
+            router: CLI_VERSION,
+            bundler: CLI_VERSION
         });
         const bundler = createBundlerStub('0.6.2');
 
@@ -167,7 +169,7 @@ describe('zenith version check', () => {
             expect(stderr.match(/Version mismatch detected/g) || []).toHaveLength(1);
             expect(stderr).toContain('npm i');
             expect(stderr).toContain('ZENITH_SKIP_VERSION_CHECK=1');
-            expect(stderr).toContain('bundler bin 0.6.2 != 0.6.4');
+            expect(stderr).toContain(`bundler bin 0.6.2 != ${CLI_VERSION}`);
         } finally {
             rmSync(projectRoot, { recursive: true, force: true });
             rmSync(bundler.root, { recursive: true, force: true });
@@ -176,12 +178,12 @@ describe('zenith version check', () => {
 
     test('runs the check from the real build command path', () => {
         const projectRoot = createFakeProject({
-            core: '0.6.4',
-            cli: '0.6.4',
-            compiler: '0.6.4',
+            core: CLI_VERSION,
+            cli: CLI_VERSION,
+            compiler: CLI_VERSION,
             runtime: '0.6.3',
-            router: '0.6.4',
-            bundler: '0.6.4'
+            router: CLI_VERSION,
+            bundler: CLI_VERSION
         });
         const bundler = createBundlerStub('0.6.2');
 

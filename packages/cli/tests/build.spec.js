@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 
-const WORKSPACE_ROOT = join(process.cwd(), '..');
+const WORKSPACE_ROOT = join(process.cwd(), '..', '..');
 
 jest.setTimeout(45000);
 

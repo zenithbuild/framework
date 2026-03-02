@@ -5,10 +5,7 @@
     "type": "module",
     "scripts": {
         "sync:demos": "node scripts/sync-doc-demos.mjs",
-        "sync:local-zenith": "node scripts/sync-local-zenith.mjs",
-        "predev": "npm run sync:local-zenith",
         "dev": "zenith dev",
-        "prebuild": "npm run sync:local-zenith",
         "build": "zenith build",
         "typecheck": "tsc --noEmit",
         "preview": "zenith preview",
@@ -19,24 +16,21 @@
     "dependencies": {
         "@directus/sdk": "^21.1.0",
         "@tailwindcss/typography": "^0.5.19",
-        "@zenithbuild/core": "file:../zenith-core",
+        "@zenithbuild/core": "0.6.5",
         "clsx": "^2.1.1",
         "gsap": "^3.14.2",
         "markdown-it": "^14.1.0",
         "tailwind-merge": "^3.5.0"
     },
-    "overrides": {
-        "@zenithbuild/core": "file:../zenith-core",
-        "@zenithbuild/cli": "file:../zenith-cli",
-        "@zenithbuild/compiler": "file:../zenith-compiler",
-        "@zenithbuild/runtime": "file:../zenith-runtime",
-        "@zenithbuild/router": "file:../zenith-router",
-        "@zenithbuild/bundler": "file:../zenith-bundler"
-    },
     "devDependencies": {
         "@playwright/test": "^1.58.2",
         "@tailwindcss/cli": "^4.1.18",
         "@types/markdown-it": "^14.1.2",
+        "@zenithbuild/bundler": "0.6.5",
+        "@zenithbuild/cli": "0.6.5",
+        "@zenithbuild/compiler": "0.6.5",
+        "@zenithbuild/router": "0.6.5",
+        "@zenithbuild/runtime": "0.6.5",
         "jsdom": "^28.0.0",
         "playwright": "^1.58.2",
         "tailwindcss": "^4.1.18",

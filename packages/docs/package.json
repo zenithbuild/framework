@@ -1,5 +1,6 @@
 {
   "name": "zenith-docs-site",
+  "version": "0.6.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,12 +16,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@zenithbuild/bundler": "^0.6.5",
-    "@zenithbuild/cli": "^0.6.5",
-    "@zenithbuild/compiler": "^0.6.5",
-    "@zenithbuild/core": "^0.6.5",
-    "@zenithbuild/router": "^0.6.5",
-    "@zenithbuild/runtime": "^0.6.5"
+    "@zenithbuild/bundler": "0.6.5",
+    "@zenithbuild/cli": "0.6.5",
+    "@zenithbuild/compiler": "0.6.5",
+    "@zenithbuild/core": "0.6.5",
+    "@zenithbuild/router": "0.6.5",
+    "@zenithbuild/runtime": "0.6.5"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -29,8 +29,8 @@ export async function scaffoldZenithProject(rootDir, options = {}) {
       preview: 'zenith preview'
     },
     dependencies: {
-      '@zenithbuild/cli': fileDep(path.join(repoRoot, 'zenith-cli')),
-      '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'zenith-compiler'))
+      '@zenithbuild/cli': fileDep(path.join(repoRoot, 'packages', 'cli')),
+      '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler'))
     }
   };
 

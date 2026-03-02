@@ -110,7 +110,7 @@ export type BlogPostEntry = {
 };
 
 const CONTENT_STORE_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)));
-const STORAGE_ROOT = resolve(CONTENT_STORE_DIR, "..", "..", "..", "zenith-docs");
+const STORAGE_ROOT = resolve(CONTENT_STORE_DIR, "..", "..", "..", "..", "packages", "docs");
 const DOCS_ROOT = resolve(STORAGE_ROOT, "documentation");
 const BLOG_ROOT = resolve(STORAGE_ROOT, "blog");
 const DEMOS_ROOT = resolve(STORAGE_ROOT, "demos");

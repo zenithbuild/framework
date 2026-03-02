@@ -1,15 +1,19 @@
-# Zenithbuild Monorepo Shell
+# Zenithbuild Framework
 
-This repo is the **Zenithbuild coordination monorepo shell**.
+This repository is the Zenithbuild core framework monorepo. Governance and canonical contracts stay at the root, while core packages and apps live under workspaces for local development and a single CI gate.
 
-**No package wiring yet. Existing packages remain in separate repos for now.**
+Key entrypoints:
+- Governance: [`./governance/AGENTS.md`](./governance/AGENTS.md)
+- Contracts: [`./contracts/`](./contracts/)
+- Source manifest: [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md)
 
-## Canonical entrypoints
-- Governance / agent rules: [`./governance/AGENTS.md`](./governance/AGENTS.md)
-- Contracts / doctrine: [`./contracts/`](./contracts/)
-- Root entrypoint mirror: [`./AGENTS.md`](./AGENTS.md)
+## Layout
+- `packages/` contains imported core packages.
+- `apps/` contains non-published apps and smoke fixtures.
+- `scripts/` contains repository-level build and CI entrypoints.
 
-## Next steps (planned)
-1. Decide packaging + npm publishing model
-2. Decide how/when to migrate packages
-3. Add workspace tooling (later)
+## Current Policy
+- Source repos outside this monorepo remain authoritative until the monorepo train is stable.
+- Plugins remain separate and are not imported here.
+- Language tooling remains separate for now.
+- Core package versions are lockstep via [`./TRAIN_VERSION`](./TRAIN_VERSION).

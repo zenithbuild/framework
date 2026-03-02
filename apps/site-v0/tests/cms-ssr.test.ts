@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createPreviewServer } from "../../zenith-cli/src/preview.js";
+import { createPreviewServer } from "../../../packages/cli/src/preview.js";
 import { chromium } from "playwright";
 
 const projectRoot = resolve(import.meta.dir, "..");

@@ -1,0 +1,19 @@
+{
+  "name": "@zenithbuild/framework",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.7.3"
+  },
+  "scripts": {
+    "build": "bash ./scripts/build.sh",
+    "ci": "bash ./scripts/ci.sh",
+    "smoke": "bash ./scripts/smoke.sh",
+    "test": "bun run ci"
+  }
+}

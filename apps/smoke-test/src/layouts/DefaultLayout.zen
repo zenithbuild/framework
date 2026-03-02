@@ -6,14 +6,14 @@ import "../styles/globals.css";
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zenith Tailwind Starter</title>
+    <title>Zenith Smoke App</title>
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
-    <header class="border-b border-slate-800">
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
         <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-            <a href="/" class="font-semibold text-slate-100">Zenith Tailwind Starter</a>
-            <div class="flex items-center gap-4 text-sm">
+            <a href="/" class="font-semibold text-slate-100">Zenith Smoke App</a>
+            <div class="flex items-center gap-4 text-sm text-slate-300">
                 <a href="/">Home</a>
                 <a href="/about">About</a>
             </div>

@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const projectRoot = process.cwd();
-const sourceRoot = path.resolve(projectRoot, "..", "zenith-docs", "demos");
+const sourceRoot = path.resolve(projectRoot, "..", "..", "packages", "docs", "demos");
 const targetRoot = path.resolve(projectRoot, "src", "components", "docs-demos");
 const registryOut = path.resolve(projectRoot, "src", "server", "docs-demo-registry.generated.json");
 

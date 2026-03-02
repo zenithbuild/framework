@@ -7,17 +7,17 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const CLI_PATH = resolve(process.cwd(), 'dist', 'cli.js');
-const WORKSPACE_ROOT = resolve(process.cwd(), '..');
+const WORKSPACE_ROOT = resolve(process.cwd(), '..', '..');
 const CORE_VERSION = JSON.parse(
-    readFileSync(resolve(WORKSPACE_ROOT, 'zenith-core', 'package.json'), 'utf8')
+    readFileSync(resolve(WORKSPACE_ROOT, 'packages', 'core', 'package.json'), 'utf8')
 ).version;
 const LOCAL_ZENITH_PACKAGES = [
-    resolve(WORKSPACE_ROOT, 'zenith-core'),
-    resolve(WORKSPACE_ROOT, 'zenith-cli'),
-    resolve(WORKSPACE_ROOT, 'zenith-compiler'),
-    resolve(WORKSPACE_ROOT, 'zenith-runtime'),
-    resolve(WORKSPACE_ROOT, 'zenith-router'),
-    resolve(WORKSPACE_ROOT, 'zenith-bundler')
+    resolve(WORKSPACE_ROOT, 'packages', 'core'),
+    resolve(WORKSPACE_ROOT, 'packages', 'cli'),
+    resolve(WORKSPACE_ROOT, 'packages', 'compiler'),
+    resolve(WORKSPACE_ROOT, 'packages', 'runtime'),
+    resolve(WORKSPACE_ROOT, 'packages', 'router'),
+    resolve(WORKSPACE_ROOT, 'packages', 'bundler')
 ];
 const LOCAL_TAILWIND_PACKAGES = [
     resolve(WORKSPACE_ROOT, 'node_modules', '@tailwindcss', 'cli'),

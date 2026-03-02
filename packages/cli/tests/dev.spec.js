@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const WORKSPACE_ROOT = join(process.cwd(), '..');
+const WORKSPACE_ROOT = join(process.cwd(), '..', '..');
 
 jest.setTimeout(45000);
 

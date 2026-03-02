@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createPreviewServer } from "../../zenith-cli/src/preview.js";
+import { createPreviewServer } from "../../cli/src/preview.js";
 
 const projectRoot = resolve(import.meta.dir, "..");
 const distDir = join(projectRoot, "dist");

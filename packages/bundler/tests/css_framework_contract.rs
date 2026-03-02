@@ -10,7 +10,8 @@ use zenith_compiler::deterministic::sha256_hex;
 fn repo_root() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .expect("bundler repo should live inside workspace root")
+        .and_then(Path::parent)
+        .expect("bundler crate should live at <repo>/packages/bundler")
         .to_path_buf()
 }
 

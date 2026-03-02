@@ -37,7 +37,7 @@ function isWithin(root, target) {
 }
 
 async function loadCompiler() {
-  const compilerPath = path.resolve(ROOT, "..", "zenith-compiler", "dist", "index.js");
+  const compilerPath = path.resolve(ROOT, "..", "compiler", "dist", "index.js");
   const mod = await import(pathToFileURL(compilerPath).href);
   if (!mod || typeof mod.compile !== "function") {
     throw new Error(`Compiler module missing compile(): ${compilerPath}`);

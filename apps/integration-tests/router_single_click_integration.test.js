@@ -43,7 +43,7 @@ async function waitForDevReady(dev, url, timeoutMs) {
 }
 
 test('single click internal navigation updates UI on first click', { timeout: 120000 }, async () => {
-  const siteRoot = path.join(repoRoot, 'zenith-site-v0');
+  const siteRoot = path.join(repoRoot, 'apps', 'site-v0');
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
 
