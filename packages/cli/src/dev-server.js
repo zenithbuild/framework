@@ -17,6 +17,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { build } from './build.js';
 import { createSilentLogger } from './ui/logger.js';
+import { readChangeFingerprint } from './dev-watch.js';
 import {
     executeServerRoute,
     injectSsrPayload,
@@ -570,6 +571,7 @@ export async function createDevServer(options) {
 
     let _buildDebounce = null;
     let _queuedFiles = new Set();
+    const _lastQueuedFingerprints = new Map();
     let _buildInFlight = false;
 
     function _isWithin(parent, child) {
@@ -726,8 +728,15 @@ export async function createDevServer(options) {
                     if (_shouldIgnoreChange(changedPath)) {
                         return;
                     }
-                    _queuedFiles.add(changedPath);
-                    triggerBuildDrain();
+                    void (async () => {
+                        const fingerprint = await readChangeFingerprint(changedPath);
+                        if (_lastQueuedFingerprints.get(changedPath) === fingerprint) {
+                            return;
+                        }
+                        _lastQueuedFingerprints.set(changedPath, fingerprint);
+                        _queuedFiles.add(changedPath);
+                        triggerBuildDrain();
+                    })();
                 });
                 _watchers.push(watcher);
             } catch {

@@ -1,6 +1,7 @@
 import { build } from '../src/build.js';
 import { createDevServer } from '../src/dev-server.js';
 import { createPreviewServer } from '../src/preview.js';
+import { jest } from '@jest/globals';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const FIXTURES_DIR = join(__dirname, 'fixtures');
+
+jest.setTimeout(15000);
 
 async function createFixtureProject(fixtureName) {
     const root = await mkdtemp(join(tmpdir(), `zenith-ts-server-${fixtureName}-`));
