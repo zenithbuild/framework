@@ -1,0 +1,14 @@
+<script server lang="ts">
+export const load: Zenith.Load = async (ctx) => ({
+    ok: true,
+    route: ctx.route
+});
+</script>
+<html>
+<head>
+    <title>TS Server Script Fixture</title>
+</head>
+<body>
+    <main>Valid TS server script fixture</main>
+</body>
+</html>
