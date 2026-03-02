@@ -1,0 +1,45 @@
+# Preconditions for npm Trusted Publishing:
+# - Configure each published package for GitHub Actions trusted publishing on npm.
+# - npm publisher settings must use:
+#   - org: zenithbuild
+#   - repo: framework
+#   - workflow file: publish.yml
+#   - environment: npm-release
+# - This repository must remain public so npm provenance stays available for publishes.
+
+name: Publish (npm)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: bun install
+
+      - run: bunx playwright install --with-deps chromium
+
+      - run: bun run ci
+
+      - run: ./scripts/publish-train.sh
