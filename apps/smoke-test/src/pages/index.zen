@@ -1,0 +1,33 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Tailwind Starter Home"
+    };
+</script>
+
+<script setup="ts">
+const count = signal(0);
+
+function increment() {
+    count.set(count.get() + 1;
+}
+</script>
+
+<DefaultLayout>
+    <section class="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-100">Zenith + Tailwind Starter</h1>
+        <p class="text-slate-300">Compile-time first templates with an opt-in Tailwind build step.</p>
+        <div class="flex flex-wrap items-center gap-3">
+            <button
+                on:click={increment}
+                class="rounded-lg bg-sky-500 px-4 py-2 font-semibold text-sky-50 transition hover:bg-sky-400"
+            >
+                Count: {count}
+            </button>
+            <a href="/about" class="text-sky-300 underline-offset-4 hover:underline">Visit about page</a>
+        </div>
+    </section>
+</DefaultLayout>
+<!-- test reload -->
+<!-- test error < -->
+<!-- test error < -->
+{{ invalid_zenith_syntax }}

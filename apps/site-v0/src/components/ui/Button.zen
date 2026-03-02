@@ -1,0 +1,200 @@
+<script lang="ts">
+import { twMerge } from "tailwind-merge";
+import { gsap } from "gsap";
+
+export interface Props {
+  href?: string;
+  target?: string;
+  rel?: string;
+  variant?: string;
+  size?: string;
+  disabled?: boolean;
+  type?: string;
+  ariaLabel?: string;
+  ariaControls?: string;
+  ariaExpanded?: string;
+  ariaPressed?: string;
+  onPress?: (event: MouseEvent) => void;
+  onClick?: (event: MouseEvent) => void;
+  elementRef?: any;
+  class?: string;
+}
+
+const incoming = props as Props;
+const hrefValue = typeof incoming.href === "string" ? incoming.href.trim() : "";
+const targetValue = typeof incoming.target === "string" ? incoming.target : "";
+const relValue = typeof incoming.rel === "string" ? incoming.rel : "";
+const variant =
+  incoming.variant === "secondary"
+    ? "secondary"
+    : incoming.variant === "outline"
+    ? "outline"
+    : incoming.variant === "ghost"
+    ? "ghost"
+    : "primary";
+const size = incoming.size === "sm" ? "sm" : incoming.size === "lg" ? "lg" : "md";
+const className = typeof incoming.class === "string" ? incoming.class : "";
+const disabledValue = incoming.disabled === true;
+const buttonType = typeof incoming.type === "string" && incoming.type.length > 0 ? incoming.type : "button";
+const ariaLabelValue = typeof incoming.ariaLabel === "string" ? incoming.ariaLabel : undefined;
+const ariaControlsValue = typeof incoming.ariaControls === "string" ? incoming.ariaControls : undefined;
+const ariaExpandedValue = typeof incoming.ariaExpanded === "string" ? incoming.ariaExpanded : undefined;
+const ariaPressedValue = typeof incoming.ariaPressed === "string" ? incoming.ariaPressed : undefined;
+const hasHref = hrefValue.length > 0;
+const ariaDisabled = disabledValue ? "true" : undefined;
+
+const forwardedElementRef = incoming.elementRef;
+const rootRef = ref<HTMLButtonElement>();
+const overlayRef = ref<HTMLSpanElement>();
+
+const baseClass = "group relative isolate overflow-hidden inline-flex items-center justify-center rounded-full border font-mono uppercase tracking-[0.18em] transition-colors duration-200";
+const variantClassesMap: Record<string, string> = {
+  primary: "border-[#5A1DA8] bg-[#5A1DA8] text-white dark:border-[#FDC458] dark:bg-[#FDC458] dark:text-zinc-950",
+  secondary: "border-zinc-300 bg-zinc-100 text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200",
+  outline: "border-zinc-300 bg-transparent text-zinc-950 dark:border-zinc-700 dark:text-zinc-100",
+  ghost: "border-transparent bg-transparent text-zinc-700 dark:text-zinc-300",
+};
+const sizeClassesMap: Record<string, string> = {
+  sm: "px-4 py-2 text-[10px]",
+  md: "px-5 py-2.5 text-[10px]",
+  lg: "px-7 py-3 text-[11px]",
+};
+const overlayClassesMap: Record<string, string> = {
+  primary: "bg-[#F5D3FD]/35 dark:bg-[#FDC458]/28",
+  secondary: "bg-[#F5D3FD]/80 dark:bg-[#5A1DA8]/35",
+  outline: "bg-[#FDC458]/80 dark:bg-[#4F5CD8]/34",
+  ghost: "bg-[#F5D3FD]/70 dark:bg-[#4F5CD8]/28",
+};
+
+const resolvedClass = twMerge(
+  baseClass,
+  variantClassesMap[variant] ? variantClassesMap[variant] : variantClassesMap.primary,
+  sizeClassesMap[size] ? sizeClassesMap[size] : sizeClassesMap.md,
+  className
+);
+const overlayClass = overlayClassesMap[variant] ? overlayClassesMap[variant] : overlayClassesMap.primary;
+const clickHandler =
+  typeof incoming.onPress === "function"
+    ? incoming.onPress
+    : typeof incoming.onClick === "function"
+    ? incoming.onClick
+    : undefined;
+const rootRefValue = forwardedElementRef ? forwardedElementRef : rootRef;
+const roleValue = hasHref ? "link" : undefined;
+
+function getRootElement() {
+  if (forwardedElementRef && forwardedElementRef.current) {
+    return forwardedElementRef.current as HTMLButtonElement;
+  }
+  return rootRef.current;
+}
+
+function resolveDirection(event: PointerEvent, element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const distances = {
+    top: Math.abs(event.clientY - rect.top),
+    right: Math.abs(rect.right - event.clientX),
+    bottom: Math.abs(rect.bottom - event.clientY),
+    left: Math.abs(event.clientX - rect.left),
+  };
+  const nearest = Object.entries(distances).sort((a, b) => a[1] - b[1])[0];
+  return nearest ? nearest[0] : "bottom";
+}
+
+function edgeState(direction: string) {
+  if (direction === "left") {
+    return { scaleX: 0, scaleY: 1, transformOrigin: "0% 50%" };
+  }
+  if (direction === "right") {
+    return { scaleX: 0, scaleY: 1, transformOrigin: "100% 50%" };
+  }
+  if (direction === "top") {
+    return { scaleX: 1, scaleY: 0, transformOrigin: "50% 0%" };
+  }
+  return { scaleX: 1, scaleY: 0, transformOrigin: "50% 100%" };
+}
+
+function animateOverlayIn(event: PointerEvent) {
+  if (disabledValue) return;
+  const overlay = overlayRef.current;
+  const root = getRootElement();
+  if (!overlay || !root) return;
+  const nextState = edgeState(resolveDirection(event, root));
+  gsap.killTweensOf(overlay);
+  gsap.set(overlay, nextState);
+  gsap.to(overlay, {
+    scaleX: 1,
+    scaleY: 1,
+    duration: 0.32,
+    ease: "power3.out",
+    overwrite: true
+  });
+}
+
+function animateOverlayOut(event: PointerEvent) {
+  if (disabledValue) return;
+  const overlay = overlayRef.current;
+  const root = getRootElement();
+  if (!overlay || !root) return;
+  const nextState = edgeState(resolveDirection(event, root));
+  gsap.killTweensOf(overlay);
+  gsap.to(overlay, {
+    scaleX: nextState.scaleX,
+    scaleY: nextState.scaleY,
+    transformOrigin: nextState.transformOrigin,
+    duration: 0.24,
+    ease: "power2.in",
+    overwrite: true
+  });
+}
+
+function navigateToHref(event: MouseEvent) {
+  if (!hasHref || event.defaultPrevented) return;
+  const win = zenWindow();
+  if (!win) return;
+  const openInNewTab = targetValue === "_blank" || event.metaKey || event.ctrlKey;
+  if (openInNewTab) {
+    win.open(hrefValue, "_blank", relValue.includes("noreferrer") ? "noreferrer" : "noopener");
+    return;
+  }
+  win.location.href = hrefValue;
+}
+
+function handleClick(event: MouseEvent) {
+  if (disabledValue) {
+    event.preventDefault();
+    return;
+  }
+  if (typeof clickHandler === "function") {
+    clickHandler(event);
+  }
+  navigateToHref(event);
+}
+</script>
+
+<button
+  ref={rootRefValue}
+  data-zen-btn
+  data-zen-link={hasHref ? "true" : undefined}
+  type={buttonType}
+  role={roleValue}
+  disabled={disabledValue ? true : undefined}
+  class={resolvedClass}
+  aria-label={ariaLabelValue}
+  aria-controls={ariaControlsValue}
+  aria-expanded={ariaExpandedValue}
+  aria-pressed={ariaPressedValue}
+  aria-disabled={ariaDisabled}
+  on:click={handleClick}
+  on:hoverin={animateOverlayIn}
+  on:hoverout={animateOverlayOut}
+>
+  <span
+    ref={overlayRef}
+    aria-hidden="true"
+    data-zen-btn-overlay
+    class={"pointer-events-none absolute inset-0 z-0 will-change-transform " + overlayClass}
+    style="transform: scale3d(1, 0, 1); transform-origin: 50% 100%;"
+  ></span>
+  <span class="relative z-10"><slot /></span>
+</button>

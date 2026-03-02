@@ -1,0 +1,5 @@
+<div>
+  <h1>E2E Home</h1>
+  <a id="about-link" href="/about">About</a>
+  <a id="user-link" href="/users/1">User 1</a>
+</div>

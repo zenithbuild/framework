@@ -1,0 +1,5 @@
+<div>
+  <h1>Router Home</h1>
+  <a id="about-link" href="/about">About</a>
+  <a id="user-link" href="/users/42">User 42</a>
+</div>
