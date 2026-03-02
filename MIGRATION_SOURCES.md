@@ -21,6 +21,5 @@ These app sources are local workspace directories, not standalone git repositori
 
 | Target | Source path | Import method | Ref | Commit SHA |
 | --- | --- | --- | --- | --- |
-| `apps/site-v0` | `/Users/judahsullivan/Personal/zenith/zenith-site-v0` | direct copy snapshot | `workspace-snapshot` | `n/a` |
 | `apps/smoke-test` | `/Users/judahsullivan/Personal/zenith/smoke-test` | direct copy snapshot | `workspace-snapshot` | `n/a` |
 | `apps/integration-tests` | `/Users/judahsullivan/Personal/zenith/integration-tests` | direct copy snapshot | `workspace-snapshot` | `n/a` |

@@ -43,7 +43,7 @@ async function waitForDevReady(dev, url, timeoutMs) {
 }
 
 test('single click internal navigation updates UI on first click', { timeout: 120000 }, async () => {
-  const siteRoot = path.join(repoRoot, 'apps', 'site-v0');
+  const siteRoot = path.join(repoRoot, 'apps', 'smoke-test');
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -59,8 +59,8 @@ test('single click internal navigation updates UI on first click', { timeout: 12
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
 
-    const homeMarker = 'Ship exact HTML, CSS, and JS from static intent.';
-    const aboutMarker = 'Move certainty upstream.';
+    const homeMarker = 'Monorepo Smoke Gate';
+    const aboutMarker = 'About This Smoke Fixture';
 
     await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await page.getByText(homeMarker, { exact: true }).waitFor({ timeout: 10000 });

@@ -13,5 +13,4 @@ cargo build --release --manifest-path packages/compiler/Cargo.toml
 cargo build --release --manifest-path packages/bundler/Cargo.toml
 
 bun run --cwd packages/docs docs:gate
-bun run --cwd apps/site-v0 build
 bun run --cwd apps/smoke-test build

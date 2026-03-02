@@ -1,9 +1,0 @@
-<script lang="ts">
-import RootLayout from "../layouts/RootLayout.zen";
-import Hero from "../components/ui/Hero.zen";
-import About from "../components/ui/About.zen";
-</script>
-
-<RootLayout pageTitle="Zenith">
-  <Hero />
-</RootLayout>

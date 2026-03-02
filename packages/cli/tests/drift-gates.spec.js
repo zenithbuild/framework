@@ -212,7 +212,7 @@ describe('drift gates', () => {
     });
 
     test('app source does not include frozen cms snapshots or svelte block tags', () => {
-        const appSrc = resolve(REPO_ROOT, 'apps/site-v0/src');
+        const appSrc = resolve(REPO_ROOT, 'apps/smoke-test/src');
         const files = collectFiles(appSrc, ['.zen', '.ts', '.js']);
 
         const snapshotHits = scanFiles(
@@ -238,7 +238,7 @@ describe('drift gates', () => {
             // Object.freeze for IR descriptor tables.
             resolve(REPO_ROOT, 'packages/router/src'),
             resolve(REPO_ROOT, 'packages/bundler/src'),
-            resolve(REPO_ROOT, 'apps/site-v0/src')
+            resolve(REPO_ROOT, 'apps/smoke-test/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.rs', '.zen']));
         const hits = scanFiles(files, /Object\.freeze\(/);
@@ -252,7 +252,7 @@ describe('drift gates', () => {
             resolve(REPO_ROOT, 'packages/cli/src'),
             resolve(REPO_ROOT, 'packages/runtime/src'),
             resolve(REPO_ROOT, 'packages/router/src'),
-            resolve(REPO_ROOT, 'apps/site-v0/src')
+            resolve(REPO_ROOT, 'apps/smoke-test/src')
         ];
         const files = targets.flatMap((dir) => collectFiles(dir, ['.js', '.ts', '.zen']));
         // Ban tag-template zenhtml usage but allow internal context plumbing.
@@ -292,7 +292,7 @@ describe('drift gates', () => {
     });
 
     test('no absolute machine paths leak into generated type definitions', () => {
-        const typesDir = resolve(REPO_ROOT, 'apps/site-v0/.zenith');
+        const typesDir = resolve(REPO_ROOT, 'apps/smoke-test/.zenith');
         if (existsSync(typesDir)) {
             const files = collectFiles(typesDir, ['.ts']);
             const absoluteHits = scanFiles(files, new RegExp('/Users/|C:\\\\', 'i'));
@@ -310,7 +310,7 @@ describe('drift gates', () => {
     });
 
     test('no magic globals (data, params, ctx) leak into generated type definitions', () => {
-        const typesDir = resolve(REPO_ROOT, 'apps/site-v0/.zenith');
+        const typesDir = resolve(REPO_ROOT, 'apps/smoke-test/.zenith');
 
         // Disallow skipping the test if types aren't initially checked in or present
         expect(existsSync(typesDir)).toBe(true);
