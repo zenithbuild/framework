@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: bun install
+
+      - run: bunx playwright install --with-deps chromium
+
+      - run: bun run ci
+
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          notes_path="${RUNNER_TEMP}/release-notes.md"
+
+          awk -v version="$version" '
+            BEGIN { capture = 0 }
+            $0 ~ "^## \\[" version "\\]" { capture = 1 }
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
+            capture { print }
+          ' CHANGELOG.md > "$notes_path"
+
+          if [ -s "$notes_path" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release from CHANGELOG.md
+        if: steps.changelog.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: ${{ steps.changelog.outputs.notes_path }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with generated notes fallback
+        if: steps.changelog.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            No matching section was found in `CHANGELOG.md` for `${{ github.ref_name }}`.
+            Maintainers should add a matching train section before the next release.
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
