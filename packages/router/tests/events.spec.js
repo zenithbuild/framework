@@ -12,7 +12,7 @@ import {
     on,
     off,
     _dispatchRouteEvent
-} from '../src/events.js';
+} from '../dist/events.js';
 
 describe('Route Change Events', () => {
     afterEach(() => {

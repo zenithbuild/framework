@@ -2,7 +2,7 @@
 // match.spec.js — Path matching tests
 // ---------------------------------------------------------------------------
 
-import { matchPath, matchRoute } from '../src/match.js';
+import { matchPath, matchRoute } from '../dist/match.js';
 
 describe('matchPath', () => {
     test('exact root match', () => {

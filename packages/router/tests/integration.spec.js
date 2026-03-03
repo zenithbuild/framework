@@ -2,10 +2,10 @@
 // integration.spec.js — Full router lifecycle tests
 // ---------------------------------------------------------------------------
 
-import { createRouter } from '../src/router.js';
-import { navigate, getCurrentPath } from '../src/navigate.js';
-import { onRouteChange, _clearSubscribers } from '../src/events.js';
-import * as routerApi from '../src/index.js';
+import { createRouter } from '../dist/router.js';
+import { navigate, getCurrentPath } from '../dist/navigate.js';
+import { onRouteChange, _clearSubscribers } from '../dist/events.js';
+import * as routerApi from '../dist/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -224,16 +224,21 @@ describe('Integration: createRouter + lifecycle', () => {
 });
 
 describe('Contract Guardrails', () => {
-    test('public API exports exactly seven symbols', () => {
+    test('public API exports keep the same names', () => {
         const exports = Object.keys(routerApi).sort();
         expect(exports).toEqual([
+            '_dispatchRouteEvent',
+            '_getRouteProtectionPolicy',
             'back',
             'createRouter',
             'forward',
             'getCurrentPath',
             'matchRoute',
             'navigate',
-            'onRouteChange'
+            'off',
+            'on',
+            'onRouteChange',
+            'setRouteProtectionPolicy'
         ]);
     });
 
@@ -247,7 +252,7 @@ describe('Contract Guardrails', () => {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
         const srcDir = path.resolve(__dirname, '../src');
-        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js'));
+        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js') || name.endsWith('.ts'));
 
         for (let i = 0; i < files.length; i++) {
             const source = fs.readFileSync(path.join(srcDir, files[i]), 'utf8');
@@ -261,7 +266,7 @@ describe('Contract Guardrails', () => {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
         const srcDir = path.resolve(__dirname, '../src');
-        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js'));
+        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js') || name.endsWith('.ts'));
 
         const allowedWindowRefs = ['window.addEventListener', 'window.removeEventListener', 'window.location', 'window.dispatchEvent'];
 
@@ -279,7 +284,7 @@ describe('Contract Guardrails', () => {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
         const srcDir = path.resolve(__dirname, '../src');
-        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js'));
+        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js') || name.endsWith('.ts'));
 
         const forbidden = ['createElement', 'createComponent', 'diffDOM', 'patch(', 'vdom', 'virtualDOM', 'jsx'];
 

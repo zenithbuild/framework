@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// match.js — Zenith Router V0
+// match.ts — Zenith Router V0
 // ---------------------------------------------------------------------------
 // Deterministic path matching engine.
 //
@@ -16,44 +16,45 @@
 // No regex.
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {{ path: string, load: Function }} RouteEntry
- * @typedef {{ route: RouteEntry, params: Record<string, string> }} MatchResult
- */
+type RouteParams = Record<string, string>;
+
+type RouteEntry = {
+    path: string;
+    load: (params: RouteParams) => unknown;
+};
+
+type MatchResult = {
+    route: RouteEntry;
+    params: RouteParams;
+};
 
 /**
  * Match a pathname against a single route definition.
- *
- * @param {string} routePath - The route pattern (e.g. '/users/:id')
- * @param {string} pathname  - The actual URL path (e.g. '/users/42')
- * @returns {{ matched: boolean, params: Record<string, string> }}
  */
-export function matchPath(routePath, pathname) {
-    const routeSegments = _splitPath(routePath);
-    const pathSegments = _splitPath(pathname);
+export function matchPath(routePath: string, pathname: string): { matched: boolean; params: RouteParams } {
+    const routeSegments = splitPath(routePath);
+    const pathSegments = splitPath(pathname);
 
-    /** @type {Record<string, string>} */
-    const params = {};
+    const params: RouteParams = {};
     let routeIndex = 0;
     let pathIndex = 0;
 
     while (routeIndex < routeSegments.length) {
         const routeSeg = routeSegments[routeIndex] || '';
         if (routeSeg.startsWith('*')) {
-            // Catch-all must be terminal.
             const optionalCatchAll = routeSeg.endsWith('?');
-            const paramName = optionalCatchAll
-                ? routeSeg.slice(1, -1)
-                : routeSeg.slice(1);
+            const paramName = optionalCatchAll ? routeSeg.slice(1, -1) : routeSeg.slice(1);
             if (routeIndex !== routeSegments.length - 1) {
                 return { matched: false, params: {} };
             }
+
             const rest = pathSegments.slice(pathIndex);
             const rootRequiredCatchAll = !optionalCatchAll && routeSegments.length === 1;
             if (rest.length === 0 && !optionalCatchAll && !rootRequiredCatchAll) {
                 return { matched: false, params: {} };
             }
-            params[paramName] = _normalizeCatchAll(rest);
+
+            params[paramName] = normalizeCatchAll(rest);
             pathIndex = pathSegments.length;
             routeIndex = routeSegments.length;
             break;
@@ -65,11 +66,8 @@ export function matchPath(routePath, pathname) {
 
         const pathSeg = pathSegments[pathIndex] || '';
         if (routeSeg.startsWith(':')) {
-            // Dynamic param — extract value as string
-            const paramName = routeSeg.slice(1);
-            params[paramName] = pathSeg;
+            params[routeSeg.slice(1)] = pathSeg;
         } else if (routeSeg !== pathSeg) {
-            // Literal mismatch
             return { matched: false, params: {} };
         }
 
@@ -87,17 +85,11 @@ export function matchPath(routePath, pathname) {
 /**
  * Match a pathname against an ordered array of route definitions.
  * Returns the first match (deterministic, first-match-wins).
- *
- * @param {RouteEntry[]} routes - Ordered route manifest
- * @param {string} pathname     - The URL path to match
- * @returns {MatchResult | null}
  */
-export function matchRoute(routes, pathname) {
-    const ordered = [...routes].sort((a, b) => _compareRouteSpecificity(a.path, b.path));
-    for (let i = 0; i < ordered.length; i++) {
-        const route = ordered[i];
+export function matchRoute(routes: RouteEntry[], pathname: string): MatchResult | null {
+    const ordered = [...routes].sort((a, b) => compareRouteSpecificity(a.path, b.path));
+    for (const route of ordered) {
         const result = matchPath(route.path, pathname);
-
         if (result.matched) {
             return { route, params: result.params };
         }
@@ -106,49 +98,30 @@ export function matchRoute(routes, pathname) {
     return null;
 }
 
-/**
- * Split a path string into non-empty segments.
- *
- * @param {string} path
- * @returns {string[]}
- */
-function _splitPath(path) {
+function splitPath(path: string): string[] {
     return path.split('/').filter(Boolean);
 }
 
-/**
- * Catch-all params are normalized as slash-joined, non-empty path segments.
- * Segments keep raw URL-encoded bytes (no decodeURIComponent).
- *
- * @param {string[]} segments
- * @returns {string}
- */
-function _normalizeCatchAll(segments) {
+function normalizeCatchAll(segments: string[]): string {
     return segments.filter(Boolean).join('/');
 }
 
-/**
- * @param {string} a
- * @param {string} b
- * @returns {number}
- */
-function _compareRouteSpecificity(a, b) {
+function compareRouteSpecificity(a: string, b: string): number {
     if (a === '/' && b !== '/') return -1;
     if (b === '/' && a !== '/') return 1;
 
-    const aSegs = _splitPath(a);
-    const bSegs = _splitPath(b);
-    const aClass = _routeClass(aSegs);
-    const bClass = _routeClass(bSegs);
+    const aSegs = splitPath(a);
+    const bSegs = splitPath(b);
+    const aClass = routeClass(aSegs);
+    const bClass = routeClass(bSegs);
     if (aClass !== bClass) {
         return bClass - aClass;
     }
 
     const max = Math.min(aSegs.length, bSegs.length);
-
-    for (let i = 0; i < max; i++) {
-        const aWeight = _segmentWeight(aSegs[i]);
-        const bWeight = _segmentWeight(bSegs[i]);
+    for (let index = 0; index < max; index += 1) {
+        const aWeight = segmentWeight(aSegs[index]);
+        const bWeight = segmentWeight(bSegs[index]);
         if (aWeight !== bWeight) {
             return bWeight - aWeight;
         }
@@ -161,11 +134,7 @@ function _compareRouteSpecificity(a, b) {
     return a.localeCompare(b);
 }
 
-/**
- * @param {string[]} segments
- * @returns {number}
- */
-function _routeClass(segments) {
+function routeClass(segments: string[]): number {
     let hasParam = false;
     let hasCatchAll = false;
     for (const segment of segments) {
@@ -175,16 +144,13 @@ function _routeClass(segments) {
             hasParam = true;
         }
     }
+
     if (!hasParam && !hasCatchAll) return 3;
     if (hasCatchAll) return 1;
     return 2;
 }
 
-/**
- * @param {string | undefined} segment
- * @returns {number}
- */
-function _segmentWeight(segment) {
+function segmentWeight(segment: string | undefined): number {
     if (!segment) return 0;
     if (segment.startsWith('*')) return 1;
     if (segment.startsWith(':')) return 2;

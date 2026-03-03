@@ -2,7 +2,7 @@
 // navigate.spec.js — Navigation API tests
 // ---------------------------------------------------------------------------
 
-import { navigate, back, forward, getCurrentPath, _setNavigationResolver } from '../src/navigate.js';
+import { navigate, back, forward, getCurrentPath, _setNavigationResolver } from '../dist/navigate.js';
 
 describe('Navigation API', () => {
     afterEach(() => {

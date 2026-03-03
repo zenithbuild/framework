@@ -41,7 +41,7 @@
     "format": "prettier --write \"**/*.ts\"",
     "format:check": "prettier --check \"**/*.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "mkdir -p dist && cp -a src/* dist/ && cp src/ZenLink.zen dist/ZenLink.zen",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/ZenLink.zen dist/ZenLink.zen",
     "release": "bun run scripts/release.ts",
     "release:dry": "bun run scripts/release.ts --dry-run",
     "release:patch": "bun run scripts/release.ts --bump=patch",
