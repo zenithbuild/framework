@@ -2,6 +2,8 @@
 
 This document records the stable dist-tag policy for the core Zenith framework packages.
 
+Core packages are TS-authored and JS-shipped: the source of truth is TypeScript, while published consumers continue to receive JS from `dist/` plus declaration files.
+
 ## Dist tags
 
 - `latest` is the stable default for `@zenithbuild/core` and `@zenithbuild/cli`.

@@ -2,6 +2,8 @@
 
 Zenithbuild Framework is the Zenith core monorepo for the compiler, bundler, runtime, router, CLI, core package, `create-zenith`, docs, and monorepo apps.
 
+The core packages are TS-authored, ship JS from `dist/`, and publish `dist/*.d.ts` for consumers.
+
 Start with [`./docs/README.md`](./docs/README.md).
 
 ## What Lives Here
