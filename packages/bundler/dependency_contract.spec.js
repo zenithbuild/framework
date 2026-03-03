@@ -12,6 +12,10 @@ const deps = Object.keys(packageJson.dependencies || {});
 const optionalDeps = Object.keys(packageJson.optionalDependencies || {});
 const zenithDeps = deps.filter((dep) => dep.startsWith('@zenithbuild/'));
 const zenithOptionalDeps = optionalDeps.filter((dep) => dep.startsWith('@zenithbuild/'));
+const requiredDeps = new Set([
+  '@zenithbuild/router',
+  '@zenithbuild/runtime'
+]);
 
 const allowedOptional = new Set([
   '@zenithbuild/bundler-darwin-arm64',
@@ -22,9 +26,17 @@ const allowedOptional = new Set([
 
 for (const dep of zenithDeps) {
   assert.equal(
+    requiredDeps.has(dep),
+    true,
+    `Dependency contract violation: @zenithbuild/bundler must not hard-depend on ${dep}`
+  );
+}
+
+for (const dep of requiredDeps) {
+  assert.equal(
     zenithDeps.includes(dep),
-    false,
-    `Dependency contract violation: @zenithbuild/bundler meta package must not hard-depend on ${dep}`
+    true,
+    `Dependency contract violation: @zenithbuild/bundler must include dependency ${dep}`
   );
 }
 

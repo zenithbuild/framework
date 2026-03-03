@@ -34,6 +34,10 @@
     "url": "https://github.com/zenithbuild/framework/issues"
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
+  "dependencies": {
+    "@zenithbuild/router": "0.6.8",
+    "@zenithbuild/runtime": "0.6.8"
+  },
   "optionalDependencies": {
     "@zenithbuild/bundler-darwin-arm64": "0.6.8",
     "@zenithbuild/bundler-darwin-x64": "0.6.8",
