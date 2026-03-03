@@ -189,6 +189,25 @@ package_exists_on_npm() {
   exit "$status"
 }
 
+package_has_any_published_version() {
+  local package_name="$1"
+  local output
+  local status
+
+  if output="$(npm_view_json "${package_name} package" "${package_name}" version)"; then
+    extract_npm_json "${package_name} package" "$output" >/dev/null
+    return 0
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq 3 ]]; then
+    return 1
+  fi
+
+  exit "$status"
+}
+
 highest_published_version() {
   local package_name="$1"
   local output
@@ -519,6 +538,13 @@ for entry in "${PACKAGES[@]}"; do
     echo "  skip: already published"
     skipped+=("${actual_name}@${version}")
     continue
+  fi
+
+  if [[ "$DRY_RUN" -eq 0 ]] && ! package_has_any_published_version "$actual_name"; then
+    echo "  fail: ${actual_name} has not been published to npm before." >&2
+    echo "  Trusted publishing cannot bootstrap a brand-new npm package name." >&2
+    echo "  Publish ${actual_name} once manually (or with a temporary token), configure npm trusted publishing for that package, then rerun this train." >&2
+    exit 1
   fi
 
   highest_version="$(highest_published_version "$actual_name")"
