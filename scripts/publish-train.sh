@@ -278,6 +278,38 @@ highest_published_version() {
   exit "$status"
 }
 
+latest_dist_tag_version() {
+  local package_name="$1"
+  local output
+  local json
+  local status
+
+  if output="$(npm_view_json "${package_name} dist-tags" "${package_name}" dist-tags)"; then
+    if ! json="$(extract_npm_json "${package_name} dist-tags" "$output")"; then
+      echo "Failed to extract JSON from npm output for ${package_name} dist-tags" >&2
+      echo "$output" >&2
+      exit 1
+    fi
+
+    node -e '
+      const payload = JSON.parse(process.argv[1]);
+      const latest = payload && typeof payload === "object" && typeof payload.latest === "string"
+        ? payload.latest.trim()
+        : "";
+      process.stdout.write(latest);
+    ' "$json"
+    return
+  else
+    status=$?
+  fi
+
+  if [[ "$status" -eq 3 ]]; then
+    return 0
+  fi
+
+  exit "$status"
+}
+
 compare_versions() {
   local left_version="$1"
   local right_version="$2"
@@ -361,6 +393,30 @@ compare_versions() {
   ' "$left_version" "$right_version"
 }
 
+assert_latest_publish_is_monotonic() {
+  local package_name="$1"
+  local version="$2"
+  local publish_tag="${3:-}"
+  local latest_version=""
+  local compare_result=""
+
+  if [[ -n "$publish_tag" && "$publish_tag" != "latest" ]]; then
+    return 0
+  fi
+
+  latest_version="$(latest_dist_tag_version "$package_name")"
+  if [[ -z "$latest_version" ]]; then
+    return 0
+  fi
+
+  compare_result="$(compare_versions "$version" "$latest_version")"
+  if (( compare_result < 0 )); then
+    echo "Refusing implicit latest publish for ${package_name}: local version ${version} is lower than npm latest ${latest_version}." >&2
+    echo "Publish this version on --tag ${FALLBACK_DIST_TAG} or bump the package version before publishing to latest." >&2
+    exit 1
+  fi
+}
+
 print_list() {
   local heading="$1"
   local array_name="$2"
@@ -441,6 +497,8 @@ for entry in "${PACKAGES[@]}"; do
       echo "  highest published version is ${highest_version}; using --tag ${publish_tag}"
     fi
   fi
+
+  assert_latest_publish_is_monotonic "$actual_name" "$version" "$publish_tag"
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
     if [[ -n "$publish_tag" ]]; then
