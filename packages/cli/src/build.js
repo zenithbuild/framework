@@ -21,6 +21,13 @@ import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMo
 import { collectExpandedComponentOccurrences } from './component-occurrences.js';
 import { applyOccurrenceRewritePlans, cloneComponentIrForInstance } from './component-instance-ir.js';
 import { resolveBundlerBin, resolveCompilerBin } from './toolchain-paths.js';
+import {
+    createBundlerToolchain,
+    createCompilerToolchain,
+    ensureToolchainCompatibility,
+    getActiveToolchainCandidate,
+    runToolchainSync
+} from './toolchain-runner.js';
 import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
 const require = createRequire(import.meta.url);
@@ -99,11 +106,18 @@ function forwardStreamLines(stream, onLine) {
  * @param {object} compilerRunOptions
  * @param {(warning: string) => void} [compilerRunOptions.onWarning]
  * @param {boolean} [compilerRunOptions.suppressWarnings]
- * @param {string} [compilerRunOptions.compilerBin]
+ * @param {string|object} [compilerRunOptions.compilerBin]
+ * @param {object} [compilerRunOptions.compilerToolchain]
  * @returns {object}
  */
 function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOptions = {}) {
-    const compilerBin = compilerRunOptions.compilerBin || resolveCompilerBin();
+    const compilerToolchain = compilerRunOptions.compilerToolchain
+        || (compilerRunOptions.compilerBin && typeof compilerRunOptions.compilerBin === 'object'
+            ? compilerRunOptions.compilerBin
+            : null);
+    const compilerBin = !compilerToolchain && typeof compilerRunOptions.compilerBin === 'string'
+        ? compilerRunOptions.compilerBin
+        : resolveCompilerBin();
     const args = stdinSource !== undefined
         ? ['--stdin', filePath]
         : [filePath];
@@ -118,7 +132,17 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOption
         opts.input = stdinSource;
     }
 
-    const result = spawnSync(compilerBin, args, opts);
+    const result = compilerToolchain
+        ? runToolchainSync(compilerToolchain, args, opts).result
+        : (compilerBin
+            ? spawnSync(compilerBin, args, opts)
+            : runToolchainSync(
+                createCompilerToolchain({
+                    logger: compilerRunOptions.logger || null
+                }),
+                args,
+                opts
+            ).result);
 
     if (result.error) {
         throw new Error(`Compiler spawn failed for ${filePath}: ${result.error.message}`);
@@ -169,7 +193,7 @@ function stripStyleBlocks(source) {
  * @param {string} componentSource
  * @param {object} compIr
  * @param {object} compilerOpts
- * @param {string} compilerBin
+ * @param {string|object} compilerBin
  * @returns {{
  *   map: Map<string, string>,
  *   bindings: Map<string, {
@@ -209,7 +233,7 @@ function buildComponentExpressionRewrite(compPath, componentSource, compIr, comp
     try {
         templateIr = runCompiler(compPath, templateOnly, compilerOpts, {
             suppressWarnings: true,
-            compilerBin
+            compilerToolchain: compilerBin
         });
     } catch {
         return out;
@@ -2136,7 +2160,7 @@ function deferComponentRuntimeBlock(source) {
  * @param {string} projectRoot
  * @param {object | null} [logger]
  * @param {boolean} [showInfo]
- * @param {string} [bundlerBin]
+ * @param {string|object} [bundlerBin]
  * @returns {Promise<void>}
  */
 function runBundler(
@@ -2149,9 +2173,21 @@ function runBundler(
 ) {
     return new Promise((resolvePromise, rejectPromise) => {
         const useStructuredLogger = Boolean(logger && typeof logger.childLine === 'function');
+        const bundlerToolchain = bundlerBin && typeof bundlerBin === 'object'
+            ? bundlerBin
+            : null;
+        const bundlerCandidate = bundlerToolchain
+            ? getActiveToolchainCandidate(bundlerToolchain)
+            : null;
+        const bundlerPath = bundlerCandidate?.command || bundlerBin;
+        const bundlerArgs = [
+            ...(Array.isArray(bundlerCandidate?.argsPrefix) ? bundlerCandidate.argsPrefix : []),
+            '--out-dir',
+            outDir
+        ];
         const child = spawn(
-            bundlerBin,
-            ['--out-dir', outDir],
+            bundlerPath,
+            bundlerArgs,
             {
                 cwd: projectRoot,
                 stdio: useStructuredLogger ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit']
@@ -2238,8 +2274,8 @@ async function collectAssets(rootDir) {
 export async function build(options) {
     const { pagesDir, outDir, config = {}, logger = null, showBundlerInfo = true } = options;
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
-    const compilerBin = resolveCompilerBin(projectRoot);
-    const bundlerBin = resolveBundlerBin(projectRoot);
+    const compilerBin = createCompilerToolchain({ projectRoot, logger });
+    const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const softNavigationEnabled = config.softNavigation === true || config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
@@ -2250,12 +2286,15 @@ export async function build(options) {
     await rm(outDir, { recursive: true, force: true });
     await mkdir(outDir, { recursive: true });
 
+    ensureToolchainCompatibility(bundlerBin);
+    const resolvedBundlerCandidate = getActiveToolchainCandidate(bundlerBin);
+
     if (logger) {
         await maybeWarnAboutZenithVersionMismatch({
             projectRoot,
             logger,
             command: 'build',
-            bundlerBinPath: bundlerBin
+            bundlerBinPath: resolvedBundlerCandidate?.path || resolveBundlerBin(projectRoot)
         });
     }
 
@@ -2319,7 +2358,7 @@ export async function build(options) {
             compileSource,
             compilerOpts,
             {
-                compilerBin,
+                compilerToolchain: compilerBin,
                 onWarning: emitCompilerWarning
             }
         );
@@ -2408,7 +2447,7 @@ export async function build(options) {
                     componentCompileSource,
                     compilerOpts,
                     {
-                        compilerBin,
+                        compilerToolchain: compilerBin,
                         onWarning: emitCompilerWarning
                     }
                 );
@@ -2448,7 +2487,7 @@ export async function build(options) {
                         stripStyleBlocks(ownerSource),
                         compilerOpts,
                         {
-                            compilerBin,
+                            compilerToolchain: compilerBin,
                             onWarning: emitCompilerWarning
                         }
                     );

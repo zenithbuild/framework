@@ -7,6 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_ROOT = resolve(__dirname, '..');
 const localRequire = createRequire(import.meta.url);
+const IS_WINDOWS = process.platform === 'win32';
+const COMPILER_BRIDGE_RUNNER = resolve(__dirname, 'compiler-bridge-runner.js');
 
 function safeCreateRequire(projectRoot) {
     if (!projectRoot) {
@@ -27,13 +29,66 @@ function safeResolve(requireFn, specifier) {
     }
 }
 
+function resolveExecutablePath(candidatePath) {
+    if (typeof candidatePath !== 'string' || candidatePath.length === 0) {
+        return '';
+    }
+    if (!IS_WINDOWS || candidatePath.toLowerCase().endsWith('.exe')) {
+        return candidatePath;
+    }
+
+    if (existsSync(candidatePath)) {
+        return candidatePath;
+    }
+
+    const exePath = `${candidatePath}.exe`;
+    return existsSync(exePath) ? exePath : candidatePath;
+}
+
+function createBinaryCandidate(tool, source, candidatePath) {
+    const resolvedPath = resolveExecutablePath(candidatePath);
+    return {
+        tool,
+        mode: 'binary',
+        source,
+        sourceKey: `${tool}:${source}:${resolvedPath}`,
+        label: source,
+        path: resolvedPath,
+        command: resolvedPath,
+        argsPrefix: []
+    };
+}
+
+function createCompilerBridgeCandidate(modulePath) {
+    if (typeof modulePath !== 'string' || modulePath.length === 0) {
+        return null;
+    }
+    return {
+        tool: 'compiler',
+        mode: 'node-bridge',
+        source: 'JS bridge',
+        sourceKey: `compiler:js-bridge:${modulePath}`,
+        label: 'JS bridge',
+        path: modulePath,
+        command: process.execPath,
+        argsPrefix: [COMPILER_BRIDGE_RUNNER, '--bridge-module', modulePath]
+    };
+}
+
 export function resolveBinary(candidates) {
     for (const candidate of candidates) {
-        if (existsSync(candidate)) {
-            return candidate;
+        const path = typeof candidate === 'string'
+            ? candidate
+            : (typeof candidate?.path === 'string' ? candidate.path : '');
+        if (path && existsSync(path)) {
+            return path;
         }
     }
-    return candidates[0] || '';
+    const first = candidates[0];
+    if (typeof first === 'string') {
+        return first;
+    }
+    return typeof first?.path === 'string' ? first.path : '';
 }
 
 export function resolvePackageRoot(packageName, projectRoot = null) {
@@ -69,42 +124,90 @@ export function readCliPackageVersion() {
     }
 }
 
-export function compilerBinCandidates(projectRoot = null) {
-    const candidates = [
-        resolve(CLI_ROOT, '../compiler/target/release/zenith-compiler'),
-        resolve(CLI_ROOT, '../zenith-compiler/target/release/zenith-compiler')
+function compilerWorkspaceBinaryCandidates() {
+    return [
+        createBinaryCandidate('compiler', 'workspace binary', resolve(CLI_ROOT, '../compiler/target/release/zenith-compiler')),
+        createBinaryCandidate('compiler', 'workspace binary', resolve(CLI_ROOT, '../zenith-compiler/target/release/zenith-compiler'))
     ];
+}
+
+function bundlerWorkspaceBinaryCandidates() {
+    return [
+        createBinaryCandidate('bundler', 'workspace binary', resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler')),
+        createBinaryCandidate('bundler', 'workspace binary', resolve(CLI_ROOT, '../zenith-bundler/target/release/zenith-bundler'))
+    ];
+}
+
+export function compilerCommandCandidates(projectRoot = null, env = process.env) {
+    const candidates = [];
+    const envBin = env?.ZENITH_COMPILER_BIN;
+    if (typeof envBin === 'string' && envBin.length > 0) {
+        candidates.push({
+            ...createBinaryCandidate('compiler', 'env override (ZENITH_COMPILER_BIN)', envBin),
+            explicit: true
+        });
+    }
+
     const installedRoot = resolvePackageRoot('@zenithbuild/compiler', projectRoot);
     if (installedRoot) {
-        candidates.unshift(resolve(installedRoot, 'target/release/zenith-compiler'));
+        candidates.push(
+            createBinaryCandidate('compiler', 'installed package binary', resolve(installedRoot, 'target/release/zenith-compiler'))
+        );
     }
+
+    candidates.push(...compilerWorkspaceBinaryCandidates());
+
+    if (installedRoot) {
+        const bridgeCandidate = createCompilerBridgeCandidate(resolve(installedRoot, 'dist/index.js'));
+        if (bridgeCandidate) {
+            candidates.push(bridgeCandidate);
+        }
+    }
+
     return candidates;
 }
 
-export function resolveCompilerBin(projectRoot = null) {
-    return resolveBinary(compilerBinCandidates(projectRoot));
+export function compilerBinCandidates(projectRoot = null, env = process.env) {
+    return compilerCommandCandidates(projectRoot, env)
+        .filter((candidate) => candidate.mode === 'binary')
+        .map((candidate) => candidate.path);
 }
 
-export function bundlerBinCandidates(projectRoot = null, env = process.env) {
+export function resolveCompilerBin(projectRoot = null, env = process.env) {
+    return resolveBinary(compilerBinCandidates(projectRoot, env));
+}
+
+export function bundlerCommandCandidates(projectRoot = null, env = process.env) {
     const candidates = [];
     const envBin = env?.ZENITH_BUNDLER_BIN;
     if (typeof envBin === 'string' && envBin.length > 0) {
-        candidates.push(envBin);
+        candidates.push({
+            ...createBinaryCandidate('bundler', 'env override (ZENITH_BUNDLER_BIN)', envBin),
+            explicit: true
+        });
     }
 
     const installedRoot = resolvePackageRoot('@zenithbuild/bundler', projectRoot);
     if (installedRoot) {
-        candidates.push(resolve(installedRoot, 'target/release/zenith-bundler'));
+        candidates.push(
+            createBinaryCandidate('bundler', 'installed package binary', resolve(installedRoot, 'target/release/zenith-bundler'))
+        );
     }
 
-    candidates.push(
-        resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler'),
-        resolve(CLI_ROOT, '../zenith-bundler/target/release/zenith-bundler')
-    );
-
+    candidates.push(...bundlerWorkspaceBinaryCandidates());
     return candidates;
 }
 
 export function resolveBundlerBin(projectRoot = null, env = process.env) {
-    return resolveBinary(bundlerBinCandidates(projectRoot, env));
+    return resolveBinary(
+        bundlerCommandCandidates(projectRoot, env)
+            .filter((candidate) => candidate.mode === 'binary')
+            .map((candidate) => candidate.path)
+    );
+}
+
+export function bundlerBinCandidates(projectRoot = null, env = process.env) {
+    return bundlerCommandCandidates(projectRoot, env)
+        .filter((candidate) => candidate.mode === 'binary')
+        .map((candidate) => candidate.path);
 }
