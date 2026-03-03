@@ -28,9 +28,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "mkdir -p dist && cp -a src/* dist/",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node -e \"const fs=require('fs');if(fs.existsSync('dist/index.js')) fs.chmodSync('dist/index.js',0o755)\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand",
+    "test": "bun run build && node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

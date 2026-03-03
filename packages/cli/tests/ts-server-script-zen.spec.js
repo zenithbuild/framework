@@ -1,6 +1,6 @@
-import { build } from '../src/build.js';
-import { createDevServer } from '../src/dev-server.js';
-import { createPreviewServer } from '../src/preview.js';
+import { build } from '../dist/build.js';
+import { createDevServer } from '../dist/dev-server.js';
+import { createPreviewServer } from '../dist/preview.js';
 import { jest } from '@jest/globals';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -3,16 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { jest } from '@jest/globals';
-import { compilerCommandCandidates } from '../src/toolchain-paths.js';
+import { compilerCommandCandidates } from '../dist/toolchain-paths.js';
 import {
     createToolchainStateForTests,
     ensureToolchainCompatibility,
     getActiveToolchainCandidate,
     resetToolchainWarningsForTests,
     runToolchainSync
-} from '../src/toolchain-runner.js';
+} from '../dist/toolchain-runner.js';
 
-const COMPILER_BRIDGE_RUNNER = fileURLToPath(new URL('../src/compiler-bridge-runner.js', import.meta.url));
+const COMPILER_BRIDGE_RUNNER = fileURLToPath(new URL('../dist/compiler-bridge-runner.js', import.meta.url));
 
 function makeBinaryCandidate(tool, label, candidatePath, command = candidatePath, argsPrefix = []) {
     return {

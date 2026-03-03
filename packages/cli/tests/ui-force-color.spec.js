@@ -1,5 +1,5 @@
-import { getUiMode } from '../src/ui/env.js';
-import { containsAnsi, formatStep } from '../src/ui/format.js';
+import { getUiMode } from '../dist/ui/env.js';
+import { containsAnsi, formatStep } from '../dist/ui/format.js';
 
 describe('cli ui force-color mode', () => {
     test('FORCE_COLOR enables ANSI when tty is true and NO_COLOR is unset', () => {

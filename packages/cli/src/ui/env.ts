@@ -1,12 +1,23 @@
-/**
- * UI environment mode detection for deterministic CLI output.
- */
+export type UiLogLevel = 'quiet' | 'normal' | 'verbose';
 
-/**
- * @param {string | number | boolean | null | undefined} value
- * @returns {boolean}
- */
-function flagEnabled(value) {
+export interface UiMode {
+    plain: boolean;
+    color: boolean;
+    tty: boolean;
+    ci: boolean;
+    spinner: boolean;
+    debug: boolean;
+    logLevel: UiLogLevel;
+}
+
+export interface UiRuntime {
+    env?: Record<string, string | undefined>;
+    stdout?: {
+        isTTY?: boolean;
+    };
+}
+
+function flagEnabled(value: string | number | boolean | null | undefined): boolean {
     if (value === undefined || value === null) {
         return false;
     }
@@ -14,11 +25,7 @@ function flagEnabled(value) {
     return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-/**
- * @param {string | null | undefined} value
- * @returns {'quiet' | 'normal' | 'verbose'}
- */
-function parseLogLevel(value) {
+function parseLogLevel(value: string | null | undefined): UiLogLevel {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'quiet' || normalized === 'verbose') {
         return normalized;
@@ -26,10 +33,7 @@ function parseLogLevel(value) {
     return 'normal';
 }
 
-/**
- * @param {{ env?: Record<string, string | undefined>, stdout?: { isTTY?: boolean } }} runtime
- */
-export function getUiMode(runtime = process) {
+export function getUiMode(runtime: UiRuntime = process): UiMode {
     const env = runtime.env || {};
     const tty = Boolean(runtime.stdout?.isTTY);
     const ci = flagEnabled(env.CI);
@@ -60,6 +64,6 @@ export function getUiMode(runtime = process) {
     };
 }
 
-export function isUiPlain(runtime = process) {
+export function isUiPlain(runtime: UiRuntime = process): boolean {
     return getUiMode(runtime).plain;
 }

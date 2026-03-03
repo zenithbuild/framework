@@ -5,7 +5,7 @@ import { join, resolve, dirname, basename, extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { build } from '../src/build.js';
+import { build } from '../dist/build.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const INTERNAL_PACKAGE_NAMES = [

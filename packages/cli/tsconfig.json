@@ -15,14 +15,16 @@
     "types": ["node"]
   },
   "include": [
-    "src/toolchain-paths.js",
-    "src/toolchain-runner.js",
+    "src/toolchain-paths.ts",
+    "src/toolchain-runner.ts",
     "src/compiler-bridge-runner.js",
-    "src/version-check.js",
+    "src/version-check.ts",
     "src/types/index.js",
     "src/types/generate-env-dts.js",
     "src/types/generate-routes-dts.js",
-    "src/ui/env.js"
+    "src/ui/env.ts",
+    "src/ui/format.ts",
+    "src/ui/logger.ts"
   ],
   "exclude": [
     "dist",

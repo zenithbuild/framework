@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CLI_ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const CLI_ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const SPINNER_REGEX = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g;
 
 function makeInvalidProject() {

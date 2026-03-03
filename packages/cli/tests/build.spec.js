@@ -1,4 +1,4 @@
-import { build, createCompilerWarningEmitter } from '../src/build.js';
+import { build, createCompilerWarningEmitter } from '../dist/build.js';
 import { jest } from '@jest/globals';
 import { mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

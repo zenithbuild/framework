@@ -2,10 +2,10 @@
 // dev.spec.js — Dev server & CLI integration tests
 // ---------------------------------------------------------------------------
 
-import { createDevServer } from '../src/dev-server.js';
-import { createPreviewServer } from '../src/preview.js';
-import { cli } from '../src/index.js';
-import { build } from '../src/build.js';
+import { createDevServer } from '../dist/dev-server.js';
+import { createPreviewServer } from '../dist/preview.js';
+import { cli } from '../dist/index.js';
+import { build } from '../dist/build.js';
 import { jest } from '@jest/globals';
 import { mkdir, writeFile, rm, readFile, symlink } from 'node:fs/promises';
 import { join } from 'node:path';

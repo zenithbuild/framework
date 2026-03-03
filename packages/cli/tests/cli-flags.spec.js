@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CLI_ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const CLI_ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const CLI_PACKAGE_JSON = resolve(fileURLToPath(new URL('..', import.meta.url)), 'package.json');
 const CLI_VERSION = JSON.parse(readFileSync(CLI_PACKAGE_JSON, 'utf8')).version;
 

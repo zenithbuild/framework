@@ -5,13 +5,77 @@ import {
     formatLine,
     formatSummaryTable
 } from './format.js';
-import { getUiMode } from './env.js';
+import { getUiMode, type UiLogLevel, type UiMode, type UiRuntime } from './env.js';
 
-function write(out, text) {
+type LoggerTag = 'DEV' | 'BUILD' | 'HMR' | 'ROUTER' | 'CSS' | 'OK' | 'WARN' | 'ERR' | string;
+type LoggerStream = 'stdout' | 'stderr';
+type WriterSink = (stream: LoggerStream, text: string) => void;
+
+interface LoggerRuntime extends UiRuntime {
+    stdout: {
+        isTTY?: boolean;
+        write: (value: string) => void;
+    };
+    stderr: {
+        isTTY?: boolean;
+        write: (value: string) => void;
+    };
+}
+
+interface Spinner {
+    start(): void;
+    update(): void;
+    stop(): void;
+    succeed(): void;
+    fail(): void;
+}
+
+interface SummaryRow {
+    label?: unknown;
+    value?: unknown;
+}
+
+interface EmitOptions {
+    onceKey?: string;
+    hint?: string;
+    stream?: LoggerStream;
+    showInfo?: boolean;
+    prefix?: string;
+    error?: unknown;
+}
+
+interface ChildLineEntry {
+    tag: LoggerTag;
+    glyph: string;
+    message: string;
+    onceKey?: string;
+}
+
+export interface ZenithLogger {
+    mode: UiMode;
+    spinner: Spinner;
+    heading(text: string): void;
+    print(text: string): void;
+    summary(rows: SummaryRow[], tag?: LoggerTag): void;
+    dev(message: string, options?: EmitOptions): boolean;
+    build(message: string, options?: EmitOptions): boolean;
+    hmr(message: string, options?: EmitOptions): boolean;
+    router(message: string, options?: EmitOptions): boolean;
+    css(message: string, options?: EmitOptions): boolean;
+    ok(message: string, options?: EmitOptions): boolean;
+    warn(message: string, options?: EmitOptions): boolean;
+    error(messageOrError: unknown, options?: EmitOptions): boolean;
+    verbose(tag: LoggerTag, message: string, options?: EmitOptions): boolean;
+    childLine(source: string, line: string, options?: EmitOptions): boolean;
+    info(message: string): boolean;
+    success(message: string): boolean;
+}
+
+function write(out: { write: (value: string) => void }, text: string): void {
     out.write(`${text}\n`);
 }
 
-const SILENT_MODE = {
+const SILENT_MODE: UiMode = {
     plain: true,
     color: false,
     tty: false,
@@ -21,7 +85,7 @@ const SILENT_MODE = {
     logLevel: 'quiet'
 };
 
-function createNoopSpinner() {
+function createNoopSpinner(): Spinner {
     return {
         start() { },
         update() { },
@@ -31,11 +95,11 @@ function createNoopSpinner() {
     };
 }
 
-function normalizeLevel(level) {
+function normalizeLevel(level: string | undefined): UiLogLevel {
     return level === 'quiet' || level === 'verbose' ? level : 'normal';
 }
 
-function shouldEmit(mode, tag) {
+function shouldEmit(mode: UiMode, tag: LoggerTag): boolean {
     const level = normalizeLevel(mode.logLevel);
     if (level === 'quiet') {
         return tag === 'OK' || tag === 'WARN' || tag === 'ERR';
@@ -43,7 +107,7 @@ function shouldEmit(mode, tag) {
     return true;
 }
 
-function createWriter(runtime, mode, sink = null) {
+function createWriter(runtime: LoggerRuntime, mode: UiMode, sink: WriterSink | null = null): WriterSink {
     if (typeof sink === 'function') {
         return sink;
     }
@@ -53,7 +117,7 @@ function createWriter(runtime, mode, sink = null) {
     };
 }
 
-function classifyChildLine(line) {
+function classifyChildLine(line: string): ChildLineEntry | null {
     const trimmed = String(line || '').trim();
     if (!trimmed) {
         return null;
@@ -132,12 +196,24 @@ function classifyChildLine(line) {
     };
 }
 
-function createBaseLogger({ runtime = process, mode, sink = null, silent = false } = {}) {
+function createBaseLogger(
+    {
+        runtime = process as unknown as LoggerRuntime,
+        mode,
+        sink = null,
+        silent = false
+    }: {
+        runtime?: LoggerRuntime;
+        mode?: UiMode;
+        sink?: WriterSink | null;
+        silent?: boolean;
+    } = {}
+): ZenithLogger {
     const resolvedMode = mode || (silent ? SILENT_MODE : getUiMode(runtime));
-    const once = new Set();
+    const once = new Set<string>();
     const writeLine = createWriter(runtime, resolvedMode, sink);
 
-    function emit(tag, glyph, message, options = {}) {
+    function emit(tag: LoggerTag, glyph: string, message: string, options: EmitOptions = {}): boolean {
         if (options.onceKey) {
             if (once.has(options.onceKey)) {
                 return false;
@@ -218,12 +294,11 @@ function createBaseLogger({ runtime = process, mode, sink = null, silent = false
             }
             return emit(tag, '•', message, options);
         },
-        childLine(source, line, options = {}) {
+        childLine(_source, line, options = {}) {
             const entry = classifyChildLine(line);
             if (!entry) {
                 return false;
             }
-            const streamHint = options.stream === 'stderr';
             const isVerbose = resolvedMode.logLevel === 'verbose';
             const isSeverity = entry.tag === 'WARN' || entry.tag === 'ERR';
             if (!isVerbose && !isSeverity && options.showInfo === false) {
@@ -236,8 +311,7 @@ function createBaseLogger({ runtime = process, mode, sink = null, silent = false
             return emit(entry.tag, entry.glyph, message, {
                 ...options,
                 onceKey,
-                hint: options.hint,
-                stream: streamHint ? 'stderr' : undefined
+                hint: options.hint
             });
         },
         info(message) {
@@ -249,7 +323,7 @@ function createBaseLogger({ runtime = process, mode, sink = null, silent = false
     };
 }
 
-export function createZenithLogger(runtime = process, options = {}) {
+export function createZenithLogger(runtime: LoggerRuntime = process as unknown as LoggerRuntime, options: { logLevel?: string } = {}): ZenithLogger {
     const mode = getUiMode(runtime);
     if (options.logLevel) {
         mode.logLevel = normalizeLevel(options.logLevel);
@@ -257,7 +331,7 @@ export function createZenithLogger(runtime = process, options = {}) {
     return createBaseLogger({ runtime, mode });
 }
 
-export function createSilentLogger() {
+export function createSilentLogger(): ZenithLogger {
     return createBaseLogger({
         mode: SILENT_MODE,
         sink: () => { },
@@ -265,6 +339,6 @@ export function createSilentLogger() {
     });
 }
 
-export function createLogger(runtime = process, options = {}) {
+export function createLogger(runtime: LoggerRuntime = process as unknown as LoggerRuntime, options: { logLevel?: string } = {}): ZenithLogger {
     return createZenithLogger(runtime, options);
 }

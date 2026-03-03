@@ -3,15 +3,15 @@ import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createZenithLogger } from '../src/ui/logger.js';
+import { createZenithLogger } from '../dist/ui/logger.js';
 import {
     checkCompatibility,
     getBundlerVersion,
     maybeWarnAboutZenithVersionMismatch
-} from '../src/version-check.js';
-import { readCliPackageVersion } from '../src/toolchain-paths.js';
+} from '../dist/version-check.js';
+import { readCliPackageVersion } from '../dist/toolchain-paths.js';
 
-const CLI_ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const CLI_ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const CLI_VERSION = readCliPackageVersion();
 
 function createRuntime(env = {}) {

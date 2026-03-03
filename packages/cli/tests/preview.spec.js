@@ -1,4 +1,4 @@
-import { executeServerScript, injectSsrPayload, matchRoute } from '../src/preview.js';
+import { executeServerScript, injectSsrPayload, matchRoute } from '../dist/preview.js';
 
 describe('preview.matchRoute', () => {
     test('deterministic precedence: static > param > catch-all', () => {

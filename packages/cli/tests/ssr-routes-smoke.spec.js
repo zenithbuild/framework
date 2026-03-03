@@ -1,6 +1,6 @@
-import { build } from '../src/build.js';
-import { createDevServer } from '../src/dev-server.js';
-import { createPreviewServer } from '../src/preview.js';
+import { build } from '../dist/build.js';
+import { createDevServer } from '../dist/dev-server.js';
+import { createPreviewServer } from '../dist/preview.js';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

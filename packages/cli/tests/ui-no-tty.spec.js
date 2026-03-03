@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const CLI_ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
+const CLI_ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const ANSI_REGEX = /\x1b\[[0-9;]*m/g;
 const SPINNER_REGEX = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g;
 

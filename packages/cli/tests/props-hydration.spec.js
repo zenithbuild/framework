@@ -1,4 +1,4 @@
-import { build } from '../src/build.js';
+import { build } from '../dist/build.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

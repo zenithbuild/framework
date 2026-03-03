@@ -1,4 +1,4 @@
-import { createZenithLogger } from '../src/ui/logger.js';
+import { createZenithLogger } from '../dist/ui/logger.js';
 
 function createRuntime(env = {}) {
     const stdout = [];

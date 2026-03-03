@@ -1,5 +1,13 @@
 import pc from 'picocolors';
 import { relative, sep } from 'node:path';
+import type { UiMode } from './env.js';
+
+type FormatTag = keyof typeof TAG_COLORS | string;
+
+interface SummaryRow {
+    label?: unknown;
+    value?: unknown;
+}
 
 const DEFAULT_PHASE = 'cli';
 const DEFAULT_FILE = '.';
@@ -8,62 +16,62 @@ const PREFIX = '[zenith]';
 const TAG_WIDTH = 6;
 
 const TAG_COLORS = {
-    DEV: (colors, value) => colors.cyan(value),
-    BUILD: (colors, value) => colors.blue(value),
-    HMR: (colors, value) => colors.magenta(value),
-    ROUTER: (colors, value) => colors.cyan(value),
-    CSS: (colors, value) => colors.yellow(value),
-    OK: (colors, value) => colors.green(value),
-    WARN: (colors, value) => colors.bold(colors.yellow(value)),
-    ERR: (colors, value) => colors.bold(colors.red(value))
+    DEV: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.cyan(value),
+    BUILD: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.blue(value),
+    HMR: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.magenta(value),
+    ROUTER: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.cyan(value),
+    CSS: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.yellow(value),
+    OK: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.green(value),
+    WARN: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.bold(colors.yellow(value)),
+    ERR: (colors: ReturnType<typeof pc.createColors>, value: string) => colors.bold(colors.red(value))
 };
 
-function getColors(mode) {
-    return pc.createColors(Boolean(mode?.color));
+function getColors(mode: UiMode): ReturnType<typeof pc.createColors> {
+    return pc.createColors(Boolean(mode.color));
 }
 
-export function formatPrefix(mode) {
+export function formatPrefix(mode: UiMode): string {
     return mode.color ? getColors(mode).dim(PREFIX) : PREFIX;
 }
 
-function colorizeTag(mode, tag) {
+function colorizeTag(mode: UiMode, tag: FormatTag): string {
     const padded = String(tag || '').padEnd(TAG_WIDTH, ' ');
     if (!mode.color) {
         return padded;
     }
     const colors = getColors(mode);
-    const colorizer = TAG_COLORS[tag] || ((_colors, value) => colors.white(value));
+    const colorizer = TAG_COLORS[tag as keyof typeof TAG_COLORS] || ((_colors: typeof colors, value: string) => colors.white(value));
     return colorizer(colors, padded);
 }
 
-function colorizeGlyph(mode, glyph, tag) {
+function colorizeGlyph(mode: UiMode, glyph: string, tag: FormatTag): string {
     if (!mode.color) {
         return glyph;
     }
     const colors = getColors(mode);
-    const colorizer = TAG_COLORS[tag] || ((_colors, value) => value);
+    const colorizer = TAG_COLORS[tag as keyof typeof TAG_COLORS] || ((_colors: typeof colors, value: string) => value);
     return colorizer(colors, glyph);
 }
 
-export function formatLine(mode, { glyph = '•', tag = 'DEV', text = '' }) {
+export function formatLine(mode: UiMode, { glyph = '•', tag = 'DEV', text = '' }: { glyph?: string; tag?: FormatTag; text?: unknown }): string {
     return `${formatPrefix(mode)} ${colorizeGlyph(mode, glyph, tag)} ${colorizeTag(mode, tag)} ${String(text || '')}`;
 }
 
-export function formatStep(mode, text, tag = 'BUILD') {
+export function formatStep(mode: UiMode, text: unknown, tag: FormatTag = 'BUILD'): string {
     return formatLine(mode, { glyph: '•', tag, text });
 }
 
-export function formatHint(mode, text) {
+export function formatHint(mode: UiMode, text: unknown): string {
     const body = `          hint: ${String(text || '').trim()}`;
     return mode.color ? getColors(mode).dim(body) : body;
 }
 
-export function formatHeading(mode, text) {
+export function formatHeading(mode: UiMode, text: unknown): string {
     const label = mode.color ? getColors(mode).bold('Zenith CLI') : 'Zenith CLI';
     return `${label} ${String(text || '').trim()}`.trim();
 }
 
-export function formatSummaryTable(mode, rows, tag = 'BUILD') {
+export function formatSummaryTable(mode: UiMode, rows: SummaryRow[], tag: FormatTag = 'BUILD'): string {
     if (!Array.isArray(rows) || rows.length === 0) {
         return '';
     }
@@ -76,13 +84,13 @@ export function formatSummaryTable(mode, rows, tag = 'BUILD') {
         .join('\n');
 }
 
-export function sanitizeErrorMessage(input) {
+export function sanitizeErrorMessage(input: unknown): string {
     return String(input ?? '')
         .replace(/\r/g, '')
         .trim();
 }
 
-function normalizeFileLinePath(line) {
+function normalizeFileLinePath(line: string): string {
     const match = line.match(/^(\s*File:\s+)(.+)$/);
     if (!match) {
         return line;
@@ -94,7 +102,7 @@ function normalizeFileLinePath(line) {
     return `${prefix}${normalized}`;
 }
 
-function normalizePathForDisplay(filePath) {
+function normalizePathForDisplay(filePath: string): string {
     const value = String(filePath || '').trim();
     if (!value) {
         return DEFAULT_FILE;
@@ -116,7 +124,7 @@ function normalizePathForDisplay(filePath) {
     return value;
 }
 
-function inferPhaseFromArgv() {
+function inferPhaseFromArgv(): string {
     const knownPhases = new Set(['build', 'dev', 'preview']);
     for (const arg of process.argv.slice(2)) {
         if (knownPhases.has(arg)) {
@@ -126,12 +134,12 @@ function inferPhaseFromArgv() {
     return DEFAULT_PHASE;
 }
 
-function extractFileFromMessage(message) {
+function extractFileFromMessage(message: string): string {
     const match = String(message || '').match(/\bFile:\s+([^\n]+)/);
     return match ? match[1].trim() : '';
 }
 
-function formatHintUrl(code) {
+function formatHintUrl(code: string): string {
     const slug = String(code || 'CLI_ERROR')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -139,37 +147,36 @@ function formatHintUrl(code) {
     return `${DEFAULT_HINT_BASE}#${slug || 'cli-error'}`;
 }
 
-export function normalizeErrorMessagePaths(message) {
+export function normalizeErrorMessagePaths(message: string): string {
     return String(message || '')
         .split('\n')
         .map((line) => normalizeFileLinePath(line))
         .join('\n');
 }
 
-/**
- * @param {unknown} err
- */
-export function normalizeError(err) {
+export function normalizeError(err: unknown): Error {
     if (err instanceof Error) {
         return err;
     }
     return new Error(sanitizeErrorMessage(err));
 }
 
-function firstMeaningfulLine(text) {
+function firstMeaningfulLine(text: string): string {
     return String(text || '')
         .split('\n')
         .map((line) => line.trim())
         .find((line) => line.length > 0) || '';
 }
 
-/**
- * @param {unknown} err
- * @param {{ plain: boolean, color: boolean, debug?: boolean, logLevel?: string }} mode
- */
-export function formatErrorBlock(err, mode) {
+export function formatErrorBlock(err: unknown, mode: UiMode): string {
     const normalized = normalizeError(err);
-    const maybe = /** @type {{ code?: unknown, phase?: unknown, kind?: unknown, file?: unknown, hint?: unknown }} */ (normalized);
+    const maybe = normalized as Error & {
+        code?: unknown;
+        phase?: unknown;
+        kind?: unknown;
+        file?: unknown;
+        hint?: unknown;
+    };
     const phase = maybe.phase ? sanitizeErrorMessage(maybe.phase) : inferPhaseFromArgv();
     const code = maybe.code
         ? sanitizeErrorMessage(maybe.code)
@@ -189,7 +196,7 @@ export function formatErrorBlock(err, mode) {
         ].join('\n');
     }
 
-    const lines = [];
+    const lines: string[] = [];
     lines.push(formatLine(mode, { glyph: '✖', tag: 'ERR', text: compactMessage }));
     lines.push(formatHint(mode, hint || formatHintUrl(code)));
     lines.push(`${formatPrefix(mode)}     code: ${code || 'CLI_FAILED'}`);
@@ -205,6 +212,6 @@ export function formatErrorBlock(err, mode) {
     return lines.join('\n');
 }
 
-export function containsAnsi(value) {
+export function containsAnsi(value: unknown): boolean {
     return /\x1b\[[0-9;]*m/.test(String(value || ''));
 }

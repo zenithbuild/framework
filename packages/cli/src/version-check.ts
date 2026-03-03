@@ -1,14 +1,71 @@
-// @ts-nocheck
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import {
     readCliPackageVersion,
     readInstalledPackageVersion,
     resolveBundlerBin
 } from './toolchain-paths.js';
 
-const PACKAGE_KEYS = [
+type PackageKey = 'core' | 'compiler' | 'runtime' | 'router' | 'bundlerPackage';
+type CompatibilityStatus = 'ok' | 'warn';
+type DifferenceKind = 'unknown' | 'exact' | 'hard' | 'soft';
+
+interface ParsedVersion {
+    raw: string;
+    major: number;
+    minor: number;
+    patch: number;
+    prerelease: string;
+    prereleaseParts: string[];
+}
+
+interface ProjectManifest {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+}
+
+interface BundlerVersionResult {
+    version: string | null;
+    path: string;
+    rawOutput: string;
+    ok: boolean;
+}
+
+interface VersionIssue {
+    code: string;
+    summary: string;
+    message: string;
+    hint: string;
+    fixCommand: string;
+}
+
+export type ZenithVersions = Record<PackageKey, string | null> & {
+    cli: string;
+    projectCli: string | null;
+    bundlerBinary: string | null;
+    bundlerBinPath: string;
+    bundlerBinRawOutput: string;
+    targetVersion: string | null;
+    projectRoot?: string | null;
+};
+
+interface CompatibilityResult {
+    status: CompatibilityStatus;
+    issues: VersionIssue[];
+    details: {
+        targetVersion: string;
+        versions: Record<string, unknown>;
+        summary: string;
+    };
+}
+
+interface VersionCheckLogger {
+    warn: (message: string, options?: { onceKey?: string; hint?: string }) => void;
+    verbose: (tag: string, message: string) => void;
+}
+
+const PACKAGE_KEYS: ReadonlyArray<readonly [PackageKey, string]> = [
     ['core', '@zenithbuild/core'],
     ['compiler', '@zenithbuild/compiler'],
     ['runtime', '@zenithbuild/runtime'],
@@ -16,7 +73,7 @@ const PACKAGE_KEYS = [
     ['bundlerPackage', '@zenithbuild/bundler']
 ];
 
-function parseVersion(version) {
+function parseVersion(version: string | null | undefined): ParsedVersion | null {
     const raw = String(version || '').trim();
     const match = raw.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
     if (!match) {
@@ -32,7 +89,7 @@ function parseVersion(version) {
     };
 }
 
-function compareIdentifiers(left, right) {
+function compareIdentifiers(left: string, right: string): number {
     const leftNumeric = /^\d+$/.test(left);
     const rightNumeric = /^\d+$/.test(right);
     if (leftNumeric && rightNumeric) {
@@ -47,7 +104,7 @@ function compareIdentifiers(left, right) {
     return left.localeCompare(right);
 }
 
-export function compareVersions(leftVersion, rightVersion) {
+export function compareVersions(leftVersion: string | null | undefined, rightVersion: string | null | undefined): number {
     const left = parseVersion(leftVersion);
     const right = parseVersion(rightVersion);
     if (!left && !right) return 0;
@@ -92,7 +149,7 @@ export function compareVersions(leftVersion, rightVersion) {
     return 0;
 }
 
-function prereleaseChannel(parsed) {
+function prereleaseChannel(parsed: ParsedVersion | null): string {
     if (!parsed || !parsed.prerelease) {
         return 'stable';
     }
@@ -103,7 +160,7 @@ function prereleaseChannel(parsed) {
     return label;
 }
 
-function classifyDifference(expectedVersion, actualVersion) {
+function classifyDifference(expectedVersion: string | null | undefined, actualVersion: string | null | undefined): DifferenceKind {
     if (!expectedVersion || !actualVersion) {
         return 'unknown';
     }
@@ -124,7 +181,7 @@ function classifyDifference(expectedVersion, actualVersion) {
     return 'soft';
 }
 
-function readProjectPackage(projectRoot) {
+function readProjectPackage(projectRoot: string | null | undefined): ProjectManifest | null {
     if (!projectRoot) {
         return null;
     }
@@ -133,13 +190,13 @@ function readProjectPackage(projectRoot) {
         if (!existsSync(manifestPath)) {
             return null;
         }
-        return JSON.parse(readFileSync(manifestPath, 'utf8'));
+        return JSON.parse(readFileSync(manifestPath, 'utf8')) as ProjectManifest;
     } catch {
         return null;
     }
 }
 
-function buildFixCommand(projectRoot, targetVersion) {
+function buildFixCommand(projectRoot: string | null | undefined, targetVersion: string): string {
     const manifest = readProjectPackage(projectRoot);
     const dependencyNames = [
         '@zenithbuild/core',
@@ -150,8 +207,8 @@ function buildFixCommand(projectRoot, targetVersion) {
         '@zenithbuild/bundler'
     ];
 
-    const deps = [];
-    const devDeps = [];
+    const deps: string[] = [];
+    const devDeps: string[] = [];
     for (const name of dependencyNames) {
         if (manifest?.dependencies && Object.prototype.hasOwnProperty.call(manifest.dependencies, name)) {
             deps.push(`${name}@${targetVersion}`);
@@ -160,7 +217,7 @@ function buildFixCommand(projectRoot, targetVersion) {
         devDeps.push(`${name}@${targetVersion}`);
     }
 
-    const commands = [];
+    const commands: string[] = [];
     if (deps.length > 0) {
         commands.push(`npm i ${deps.join(' ')}`);
     }
@@ -173,8 +230,8 @@ function buildFixCommand(projectRoot, targetVersion) {
     return commands.join(' && ');
 }
 
-function describeVersions(versions) {
-    const entries = [
+function describeVersions(versions: Partial<ZenithVersions>): string {
+    const entries: Array<[string, string | null | undefined]> = [
         ['cli', versions.cli],
         ['project cli', versions.projectCli],
         ['core', versions.core],
@@ -185,18 +242,18 @@ function describeVersions(versions) {
         ['bundler bin', versions.bundlerBinary]
     ];
     return entries
-        .filter(([, version]) => typeof version === 'string' && version.length > 0)
+        .filter((entry) => typeof entry[1] === 'string' && entry[1].length > 0)
         .map(([label, version]) => `${label}=${version}`)
         .join(' ');
 }
 
-function summarizeIssues(issues) {
+function summarizeIssues(issues: VersionIssue[]): string {
     const preview = issues.slice(0, 3).map((issue) => issue.summary);
     const suffix = issues.length > 3 ? ` +${issues.length - 3} more` : '';
     return `${preview.join('; ')}${suffix}`;
 }
 
-function determineTargetVersion(versions) {
+function determineTargetVersion(versions: Partial<ZenithVersions>): string {
     const candidates = [
         versions.projectCli,
         versions.core,
@@ -205,7 +262,7 @@ function determineTargetVersion(versions) {
         versions.router,
         versions.bundlerPackage,
         versions.cli
-    ].filter((value) => typeof value === 'string' && value.length > 0);
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
     if (candidates.length === 0) {
         return '0.0.0';
@@ -220,7 +277,7 @@ function determineTargetVersion(versions) {
     return highest;
 }
 
-export function getBundlerVersion(bundlerBinPath) {
+export function getBundlerVersion(bundlerBinPath: string | null | undefined): BundlerVersionResult {
     const path = String(bundlerBinPath || '').trim();
     if (!path) {
         return { version: null, path: '', rawOutput: '', ok: false };
@@ -245,12 +302,19 @@ export function getBundlerVersion(bundlerBinPath) {
     };
 }
 
-export function getLocalZenithVersions({ projectRoot, bundlerBinPath } = {}) {
-    const resolvedBundlerBin = bundlerBinPath || resolveBundlerBin(projectRoot);
+export function getLocalZenithVersions(
+    { projectRoot, bundlerBinPath }: { projectRoot?: string | null; bundlerBinPath?: string | null } = {}
+): ZenithVersions {
+    const resolvedBundlerBin = bundlerBinPath || resolveBundlerBin(projectRoot ?? null);
     const bundlerVersion = getBundlerVersion(resolvedBundlerBin);
-    const versions = {
+    const versions: ZenithVersions = {
         cli: readCliPackageVersion(),
-        projectCli: readInstalledPackageVersion('@zenithbuild/cli', projectRoot),
+        projectCli: readInstalledPackageVersion('@zenithbuild/cli', projectRoot ?? null),
+        core: null,
+        compiler: null,
+        runtime: null,
+        router: null,
+        bundlerPackage: null,
         bundlerBinary: bundlerVersion.version,
         bundlerBinPath: bundlerVersion.path,
         bundlerBinRawOutput: bundlerVersion.rawOutput,
@@ -258,19 +322,19 @@ export function getLocalZenithVersions({ projectRoot, bundlerBinPath } = {}) {
     };
 
     for (const [key, packageName] of PACKAGE_KEYS) {
-        versions[key] = readInstalledPackageVersion(packageName, projectRoot);
+        versions[key] = readInstalledPackageVersion(packageName, projectRoot ?? null);
     }
 
     versions.targetVersion = determineTargetVersion(versions);
     return versions;
 }
 
-export function checkCompatibility(versions) {
-    const targetVersion = versions?.targetVersion || determineTargetVersion(versions || {});
-    const issues = [];
-    const fixCommand = buildFixCommand(versions?.projectRoot, targetVersion);
+export function checkCompatibility(versions: Partial<ZenithVersions>): CompatibilityResult {
+    const targetVersion = versions.targetVersion || determineTargetVersion(versions);
+    const issues: VersionIssue[] = [];
+    const fixCommand = buildFixCommand(versions.projectRoot, targetVersion);
 
-    const addIssue = (code, summary, message) => {
+    const addIssue = (code: string, summary: string, message: string): void => {
         issues.push({
             code,
             summary,
@@ -295,8 +359,8 @@ export function checkCompatibility(versions) {
         ['runtime', 'runtime'],
         ['router', 'router'],
         ['bundlerPackage', 'bundler package']
-    ]) {
-        const actual = versions[key];
+    ] as const) {
+        const actual = versions[key] ?? null;
         const difference = classifyDifference(targetVersion, actual);
         if (difference === 'hard') {
             addIssue(
@@ -342,18 +406,25 @@ export function checkCompatibility(versions) {
     };
 }
 
-export async function maybeWarnAboutZenithVersionMismatch({
-    projectRoot,
-    logger,
-    command = 'build',
-    bundlerBinPath = null
-} = {}) {
+export async function maybeWarnAboutZenithVersionMismatch(
+    {
+        projectRoot,
+        logger,
+        command = 'build',
+        bundlerBinPath = null
+    }: {
+        projectRoot?: string | null;
+        logger?: VersionCheckLogger | null;
+        command?: string;
+        bundlerBinPath?: string | null;
+    } = {}
+): Promise<CompatibilityResult> {
     if (!logger || process.env.ZENITH_SKIP_VERSION_CHECK === '1') {
-        return { status: 'ok', issues: [], details: {} };
+        return { status: 'ok', issues: [], details: { targetVersion: '0.0.0', versions: {}, summary: '' } };
     }
 
     const versions = getLocalZenithVersions({ projectRoot, bundlerBinPath });
-    versions.projectRoot = projectRoot;
+    versions.projectRoot = projectRoot ?? null;
     const result = checkCompatibility(versions);
     const onceKey = `zenith-version-check:${describeVersions(versions)}:${result.status}`;
     const verboseTag = command === 'dev' ? 'DEV' : 'BUILD';

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
-const CLI_ENTRY = resolve(ROOT, 'packages/cli/src/index.js');
+const CLI_ENTRY = resolve(ROOT, 'packages/cli/dist/index.js');
 
 function writeJson(filePath, value) {
     writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
