@@ -9,7 +9,7 @@ import {
     isDynamic,
     validateRouteParams,
     canonicalize
-} from '../src/path.js';
+} from '../dist/path.js';
 
 describe('normalizeSeparators', () => {
     test('replaces backslashes with forward slashes', () => {

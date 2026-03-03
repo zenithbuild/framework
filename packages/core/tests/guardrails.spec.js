@@ -12,13 +12,13 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const srcDir = path.resolve(__dirname, '../src');
-const srcFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.js'));
+const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith('.ts'));
 
 describe('Contract Guardrails', () => {
     test('no eval() or new Function in source', () => {
         for (const file of srcFiles) {
             // guards.js contains these as string literals in FORBIDDEN_PATTERNS
-            if (file === 'guards.js') continue;
+            if (file === 'guards.ts') continue;
 
             const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
             expect(source.includes('eval(')).toBe(false);
@@ -32,7 +32,7 @@ describe('Contract Guardrails', () => {
             const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
 
             // Skip files that intentionally contain browser-global tokens in template strings.
-            if (file === 'guards.js' || file === 'core-template.js') continue;
+            if (file === 'guards.ts' || file === 'core-template.ts') continue;
 
             // Check for browser global references (word boundary match)
             const windowRefs = source.match(/\bwindow\b/g) || [];
@@ -63,10 +63,10 @@ describe('Contract Guardrails', () => {
     });
 
     test('all expected source files exist', () => {
-        const expected = [
-            'config.js', 'path.js', 'order.js', 'hash.js',
-            'errors.js', 'version.js', 'guards.js', 'schema.js',
-            'core-template.js', 'index.js'
+            const expected = [
+            'config.ts', 'path.ts', 'order.ts', 'hash.ts',
+            'errors.ts', 'version.ts', 'guards.ts', 'schema.ts',
+            'core-template.ts', 'index.ts'
         ];
         for (const file of expected) {
             expect(fs.existsSync(path.join(srcDir, file))).toBe(true);
@@ -78,7 +78,7 @@ describe('Contract Guardrails', () => {
             const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
 
             // config.js is allowed one async function (loadConfig)
-            if (file === 'config.js') {
+            if (file === 'config.ts') {
                 const asyncCount = (source.match(/\basync\b/g) || []).length;
                 expect(asyncCount).toBeLessThanOrEqual(1);
                 continue;

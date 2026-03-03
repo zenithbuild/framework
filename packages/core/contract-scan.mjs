@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { IR_VERSION } from './src/ir/index.js';
-import { coreModuleSource } from './src/core-template.js';
+import { IR_VERSION } from './dist/ir/index.js';
+import { coreModuleSource } from './dist/core-template.js';
 
 assert.equal(typeof IR_VERSION, 'number', 'IR_VERSION must be numeric');
 assert.equal(IR_VERSION > 0, true, 'IR_VERSION must be positive');

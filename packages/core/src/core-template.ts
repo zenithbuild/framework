@@ -1,14 +1,10 @@
-// ---------------------------------------------------------------------------
-// core-template.js — source template for emitted core asset
-// ---------------------------------------------------------------------------
-
-function assertRuntimeImport(runtimeImport) {
+function assertRuntimeImport(runtimeImport: string): void {
     if (typeof runtimeImport !== 'string' || runtimeImport.trim().length === 0) {
         throw new Error('[Zenith Core] coreModuleSource(runtimeImport) requires non-empty runtimeImport');
     }
 }
 
-export function coreModuleSource(runtimeImport) {
+export function coreModuleSource(runtimeImport: string): string {
     assertRuntimeImport(runtimeImport);
     const runtimeImportLiteral = JSON.stringify(runtimeImport);
 

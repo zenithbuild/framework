@@ -2,19 +2,30 @@
 // config.spec.js — Config loader tests
 // ---------------------------------------------------------------------------
 
-import { validateConfig, loadConfig, getDefaults } from '../src/config.js';
+import { validateConfig, loadConfig, getDefaults } from '../dist/config.js';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+const DEFAULT_CONFIG = {
+    router: false,
+    embeddedMarkupExpressions: false,
+    types: true,
+    typescriptDefault: true,
+    outDir: 'dist',
+    pagesDir: 'pages',
+    experimental: {},
+    strictDomLints: false
+};
+
 describe('validateConfig', () => {
     test('null/undefined returns defaults', () => {
-        expect(validateConfig(null)).toEqual({ router: false, outDir: 'dist', pagesDir: 'pages' });
-        expect(validateConfig(undefined)).toEqual({ router: false, outDir: 'dist', pagesDir: 'pages' });
+        expect(validateConfig(null)).toEqual(DEFAULT_CONFIG);
+        expect(validateConfig(undefined)).toEqual(DEFAULT_CONFIG);
     });
 
     test('empty object returns defaults', () => {
-        expect(validateConfig({})).toEqual({ router: false, outDir: 'dist', pagesDir: 'pages' });
+        expect(validateConfig({})).toEqual(DEFAULT_CONFIG);
     });
 
     test('valid config with overrides', () => {
@@ -51,7 +62,12 @@ describe('validateConfig', () => {
 
     test('multiple overrides at once', () => {
         const config = validateConfig({ router: true, outDir: 'out', pagesDir: 'src/pages' });
-        expect(config).toEqual({ router: true, outDir: 'out', pagesDir: 'src/pages' });
+        expect(config).toEqual({
+            ...DEFAULT_CONFIG,
+            router: true,
+            outDir: 'out',
+            pagesDir: 'src/pages'
+        });
     });
 });
 
@@ -78,7 +94,7 @@ describe('loadConfig', () => {
         tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
         await mkdir(tmpDir, { recursive: true });
         const config = await loadConfig(tmpDir);
-        expect(config).toEqual({ router: false, outDir: 'dist', pagesDir: 'pages' });
+        expect(config).toEqual(DEFAULT_CONFIG);
     });
 
     test('loads valid config from file', async () => {

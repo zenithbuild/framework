@@ -2,7 +2,7 @@
 // errors.spec.js — Error formatting tests
 // ---------------------------------------------------------------------------
 
-import { createError, formatError, isZenithError, ErrorCodes } from '../src/errors.js';
+import { createError, formatError, isZenithError, ErrorCodes } from '../dist/errors.js';
 
 describe('createError', () => {
     test('creates Error with Zenith prefix', () => {

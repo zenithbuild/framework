@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// schema.js — Zenith Core IR authority
-// ---------------------------------------------------------------------------
-
 export const IR_VERSION = 1;
 
 export const IR_SCHEMA = Object.freeze({

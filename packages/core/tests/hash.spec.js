@@ -2,7 +2,7 @@
 // hash.spec.js — Hash utility tests
 // ---------------------------------------------------------------------------
 
-import { hash, hashShort } from '../src/hash.js';
+import { hash, hashShort } from '../dist/hash.js';
 
 describe('hash', () => {
     test('identical strings produce identical hashes', () => {

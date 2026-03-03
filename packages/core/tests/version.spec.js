@@ -2,7 +2,7 @@
 // version.spec.js — Version utility tests
 // ---------------------------------------------------------------------------
 
-import { parseSemver, formatVersion, validateCompatibility } from '../src/version.js';
+import { parseSemver, formatVersion, validateCompatibility } from '../dist/version.js';
 
 describe('parseSemver', () => {
     test('parses standard semver', () => {

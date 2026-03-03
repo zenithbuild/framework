@@ -13,6 +13,7 @@ export default {
         '**/tests/guardrails.spec.js',
         '**/tests/ir-schema.spec.js',
         '**/tests/core-template.spec.js',
-        '**/tests/side-effects.spec.js'
+        '**/tests/side-effects.spec.js',
+        '**/tests/package-surface.spec.js'
     ]
 };

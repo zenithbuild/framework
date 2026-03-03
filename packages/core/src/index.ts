@@ -1,9 +1,3 @@
-// ---------------------------------------------------------------------------
-// index.js — Zenith Core V0
-// ---------------------------------------------------------------------------
-// Public API. Re-exports frozen module namespaces only.
-// ---------------------------------------------------------------------------
-
 export { validateConfig, loadConfig, getDefaults } from './config.js';
 export {
     normalizeSeparators,

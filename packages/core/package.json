@@ -4,29 +4,31 @@
   "description": "Deterministic utility substrate for the Zenith framework",
   "license": "MIT",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
     "zenith": "bin/zenith.js"
   },
   "exports": {
-    ".": "./src/index.js",
-    "./config": "./src/config.js",
-    "./path": "./src/path.js",
-    "./order": "./src/order.js",
-    "./hash": "./src/hash.js",
-    "./errors": "./src/errors.js",
-    "./version": "./src/version.js",
-    "./guards": "./src/guards.js",
-    "./schema": "./src/schema.js",
-    "./core-template": "./src/core-template.js",
-    "./ir": "./src/ir/index.js"
+    ".": "./dist/index.js",
+    "./config": "./dist/config.js",
+    "./path": "./dist/path.js",
+    "./order": "./dist/order.js",
+    "./hash": "./dist/hash.js",
+    "./errors": "./dist/errors.js",
+    "./version": "./dist/version.js",
+    "./guards": "./dist/guards.js",
+    "./schema": "./dist/schema.js",
+    "./core-template": "./dist/core-template.js",
+    "./ir": "./dist/ir/index.js"
   },
   "files": [
-    "src",
+    "dist",
     "bin",
     "CORE_CONTRACT.md",
     "README.md",
-    "contracts"
+    "LICENSE",
+    "package.json"
   ],
   "repository": {
     "type": "git",
@@ -48,17 +50,22 @@
     "@zenithbuild/bundler": "0.6.6"
   },
   "scripts": {
-    "test": "npm run contract:deps && npm run contract:scan && npm run contract:api && npm run contract:template && npm run contract:golden",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && npm run contract:deps && npm run contract:scan && npm run contract:api && npm run contract:template && npm run contract:golden && npm run test:legacy",
     "test:legacy": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.js",
     "contract:deps": "node dependency_contract.spec.js",
     "contract:scan": "node contract-scan.mjs",
     "contract:api": "node core_api_lock.spec.js",
     "contract:template": "node template-contract.spec.js",
-    "contract:golden": "node golden-contract.spec.js"
+    "contract:golden": "node golden-contract.spec.js",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@types/node": "latest",
     "@jest/globals": "^30.2.0",
-    "jest": "^30.2.0"
+    "jest": "^30.2.0",
+    "typescript": "^5.7.3"
   },
   "private": false
 }

@@ -8,7 +8,7 @@ import {
     validateConfigSchema,
     FORBIDDEN_PATTERNS,
     BROWSER_GLOBALS
-} from '../src/guards.js';
+} from '../dist/guards.js';
 
 describe('containsForbiddenPattern', () => {
     test('detects eval', () => {

@@ -1,4 +1,4 @@
-import { coreModuleSource } from '../src/core-template.js';
+import { coreModuleSource } from '../dist/core-template.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

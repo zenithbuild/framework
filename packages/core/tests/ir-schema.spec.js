@@ -1,6 +1,6 @@
-import { IR_VERSION } from '../src/schema.js';
-import { IR_VERSION as IrFromSubpath } from '../src/ir/index.js';
-import * as core from '../src/index.js';
+import { IR_VERSION } from '../dist/schema.js';
+import { IR_VERSION as IrFromSubpath } from '../dist/ir/index.js';
+import * as core from '../dist/index.js';
 
 describe('IR schema authority', () => {
     test('IR_VERSION is stable and numeric', () => {

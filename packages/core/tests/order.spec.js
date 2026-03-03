@@ -2,7 +2,7 @@
 // order.spec.js — Order utility tests
 // ---------------------------------------------------------------------------
 
-import { sortRoutes, sortAlpha, isCorrectOrder } from '../src/order.js';
+import { sortRoutes, sortAlpha, isCorrectOrder } from '../dist/order.js';
 
 describe('sortRoutes', () => {
     test('static routes sort before dynamic routes', () => {
