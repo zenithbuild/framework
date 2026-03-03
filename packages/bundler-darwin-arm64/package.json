@@ -1,0 +1,31 @@
+{
+  "name": "@zenithbuild/bundler-darwin-arm64",
+  "version": "0.6.7",
+  "description": "Internal darwin-arm64 native binary for @zenithbuild/bundler",
+  "license": "MIT",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/**",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/bundler-darwin-arm64"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": false
+}

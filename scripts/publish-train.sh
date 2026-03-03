@@ -24,17 +24,42 @@ FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-train}"
 NPM_REGISTRY_URL="${PUBLISH_NPM_REGISTRY:-https://registry.npmjs.org/}"
 
 PACKAGES=(
-  "packages/compiler|@zenithbuild/compiler"
+  "packages/bundler-darwin-arm64|@zenithbuild/bundler-darwin-arm64"
+  "packages/bundler-darwin-x64|@zenithbuild/bundler-darwin-x64"
+  "packages/bundler-linux-x64|@zenithbuild/bundler-linux-x64"
+  "packages/bundler-win32-x64|@zenithbuild/bundler-win32-x64"
   "packages/bundler|@zenithbuild/bundler"
+  "packages/compiler|@zenithbuild/compiler"
   "packages/runtime|@zenithbuild/runtime"
   "packages/router|@zenithbuild/router"
   "packages/core|@zenithbuild/core"
   "packages/cli|@zenithbuild/cli"
 )
+PUBLISH_PACKAGE_FILTER="${PUBLISH_PACKAGE_FILTER:-}"
 
 published=()
 skipped=()
 pending=()
+
+package_selected_for_publish() {
+  local package_dir="$1"
+  local package_name="$2"
+  local filter="${PUBLISH_PACKAGE_FILTER// /}"
+
+  if [[ -z "$filter" ]]; then
+    return 0
+  fi
+
+  local entry
+  IFS=',' read -r -a selected <<<"$filter"
+  for entry in "${selected[@]}"; do
+    if [[ "$entry" == "$package_dir" || "$entry" == "$package_name" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
 
 read_manifest_field() {
   local manifest="$1"
@@ -453,6 +478,9 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 else
   echo "Mode=publish"
 fi
+if [[ -n "$PUBLISH_PACKAGE_FILTER" ]]; then
+  echo "Filter=${PUBLISH_PACKAGE_FILTER}"
+fi
 echo
 
 for entry in "${PACKAGES[@]}"; do
@@ -464,6 +492,10 @@ for entry in "${PACKAGES[@]}"; do
   if [[ ! -f "$manifest" ]]; then
     echo "Missing package manifest: ${manifest}" >&2
     exit 1
+  fi
+
+  if ! package_selected_for_publish "$package_dir" "$expected_name"; then
+    continue
   fi
 
   validate_publish_manifest "$manifest"

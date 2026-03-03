@@ -89,7 +89,7 @@ jobs:
           echo "publish_train=${publish_train}" >> "$GITHUB_OUTPUT"
           echo "publish_scaffolder=${publish_scaffolder}" >> "$GITHUB_OUTPUT"
 
-  publish:
+  gate:
     needs: detect
     if: needs.detect.outputs.publish_train == 'true' || needs.detect.outputs.publish_scaffolder == 'true'
     runs-on: ubuntu-latest
@@ -150,8 +150,121 @@ jobs:
 
       - run: bun run ci
 
-      - if: needs.detect.outputs.publish_train == 'true'
+  publish-bundler-platforms:
+    needs: [detect, gate]
+    if: needs.detect.outputs.publish_train == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            package_dir: packages/bundler-darwin-arm64
+          - runner: macos-13
+            package_dir: packages/bundler-darwin-x64
+          - runner: ubuntu-latest
+            package_dir: packages/bundler-linux-x64
+          - runner: windows-latest
+            package_dir: packages/bundler-win32-x64
+    runs-on: ${{ matrix.runner }}
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build bundler binary for current platform package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --manifest-path packages/bundler/Cargo.toml
+          node scripts/stage-bundler-platform-package.mjs
+
+      - name: Publish platform package
+        shell: bash
+        env:
+          PUBLISH_PACKAGE_FILTER: ${{ matrix.package_dir }}
         run: ./scripts/publish-train.sh
 
-      - if: needs.detect.outputs.publish_scaffolder == 'true'
-        run: ./scripts/publish-scaffolder.sh
+  publish-train:
+    needs: [detect, gate, publish-bundler-platforms]
+    if: needs.detect.outputs.publish_train == 'true'
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/**/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: bun install
+
+      - name: Build compiler and bundler meta package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --manifest-path packages/compiler/Cargo.toml
+          bun run --cwd packages/bundler build
+
+      - name: Publish train packages
+        shell: bash
+        env:
+          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli
+        run: ./scripts/publish-train.sh
+
+  publish-scaffolder:
+    needs: [detect, gate]
+    if: needs.detect.outputs.publish_scaffolder == 'true'
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - run: bun install
+
+      - run: ./scripts/publish-scaffolder.sh

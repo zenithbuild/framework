@@ -2,24 +2,25 @@
   "name": "@zenithbuild/bundler",
   "version": "0.6.7",
   "scripts": {
-    "build": "cargo build --release",
+    "build": "rm -rf dist && cargo build --release && tsc -p tsconfig.meta.json && node ../../scripts/stage-bundler-platform-package.mjs",
     "contract:deps": "node dependency_contract.spec.js",
     "contract:scan": "node contract-scan.mjs",
     "contract:imports": "node --test tests/template_import_boundary.test.js",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
+    "@types/node": "latest",
     "@types/bun": "latest",
     "typescript": "^5"
   },
-  "main": "./package.json",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./package.json",
+    ".": "./dist/index.js",
     "./package.json": "./package.json"
   },
   "files": [
-    "target/release/zenith-bundler",
-    "scripts",
+    "dist",
     "package.json",
     "README.md",
     "LICENSE"
@@ -33,14 +34,11 @@
     "url": "https://github.com/zenithbuild/framework/issues"
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
-  "dependencies": {
-    "@zenithbuild/router": "0.6.7",
-    "@zenithbuild/runtime": "0.6.7",
-    "chokidar": "^5.0.0",
-    "esbuild": "^0.27.3",
-    "express": "^4.21.2",
-    "rolldown": "^1.0.0-rc.3",
-    "ws": "^8.19.0"
+  "optionalDependencies": {
+    "@zenithbuild/bundler-darwin-arm64": "0.6.7",
+    "@zenithbuild/bundler-darwin-x64": "0.6.7",
+    "@zenithbuild/bundler-linux-x64": "0.6.7",
+    "@zenithbuild/bundler-win32-x64": "0.6.7"
   },
   "type": "module",
   "private": false
