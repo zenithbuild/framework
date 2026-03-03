@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import * as brand from './branding.js'
 import * as prompts from './prompts.js'
 import { getUiMode } from './ui/env.js'
+import { applyPackageFeatures, selectedTemplateFeaturePaths } from './template-features.js'
 
 export interface ProjectOptions {
     name: string
@@ -52,6 +53,16 @@ function flagEnabled(value: string | undefined): boolean {
 function resolveLocalTemplatePath(templatePath: string): string | null {
     const candidate = path.resolve(__dirname, '..', templatePath)
     return fs.existsSync(candidate) ? candidate : null
+}
+
+function copyDirectoryContents(sourceDir: string, targetDir: string): void {
+    fs.mkdirSync(targetDir, { recursive: true })
+    for (const entry of fs.readdirSync(sourceDir)) {
+        fs.cpSync(path.join(sourceDir, entry), path.join(targetDir, entry), {
+            recursive: true,
+            force: true
+        })
+    }
 }
 
 /**
@@ -96,18 +107,24 @@ function hasGit(): boolean {
 /**
  * Download template from GitHub
  */
-async function downloadTemplate(targetDir: string, templatePath: string): Promise<void> {
-    const localTemplatePath = resolveLocalTemplatePath(templatePath)
+async function downloadTemplate(targetDir: string, templatePaths: string[]): Promise<void> {
+    const localTemplatePaths = templatePaths.map((templatePath) => ({
+        templatePath,
+        localPath: resolveLocalTemplatePath(templatePath)
+    }))
     const forceLocal = process.env.CREATE_ZENITH_TEMPLATE_MODE === 'local' || flagEnabled(process.env.CREATE_ZENITH_OFFLINE)
     const preferLocal = process.env.CREATE_ZENITH_PREFER_LOCAL !== '0'
 
-    if (localTemplatePath && (forceLocal || preferLocal)) {
-        fs.cpSync(localTemplatePath, targetDir, { recursive: true })
+    if (localTemplatePaths.every((entry) => entry.localPath) && (forceLocal || preferLocal)) {
+        for (const entry of localTemplatePaths) {
+            copyDirectoryContents(entry.localPath as string, targetDir)
+        }
         return
     }
 
-    if (forceLocal && !localTemplatePath) {
-        throw new Error(`Local template not found: ${templatePath}`)
+    if (forceLocal) {
+        const missingPath = localTemplatePaths.find((entry) => !entry.localPath)?.templatePath
+        throw new Error(`Local template not found: ${missingPath}`)
     }
 
     const tempDir = path.join(os.tmpdir(), `zenith-template-${Date.now()}`)
@@ -118,15 +135,16 @@ async function downloadTemplate(targetDir: string, templatePath: string): Promis
             execSync(`git clone --depth 1 --filter=blob:none --sparse https://github.com/${GITHUB_REPO}.git "${tempDir}"`, {
                 stdio: 'pipe'
             })
-            const repoTemplatePath = `packages/create-zenith/${templatePath}`
-            execSync(`git sparse-checkout set ${repoTemplatePath}`, {
+            const repoTemplatePaths = templatePaths.map((templatePath) => `packages/create-zenith/${templatePath}`)
+            execSync(`git sparse-checkout set ${repoTemplatePaths.join(' ')}`, {
                 cwd: tempDir,
                 stdio: 'pipe'
             })
 
-            // Copy template contents to target
-            const templateSource = path.join(tempDir, repoTemplatePath)
-            fs.cpSync(templateSource, targetDir, { recursive: true })
+            for (const repoTemplatePath of repoTemplatePaths) {
+                const templateSource = path.join(tempDir, repoTemplatePath)
+                copyDirectoryContents(templateSource, targetDir)
+            }
         } else {
             // Fallback: download tarball via curl/fetch
             const tarballUrl = `https://github.com/${GITHUB_REPO}/archive/refs/heads/main.tar.gz`
@@ -145,9 +163,10 @@ async function downloadTemplate(targetDir: string, templatePath: string): Promis
                 throw new Error('Failed to extract template from GitHub')
             }
 
-            // Copy template contents
-            const templateSource = path.join(tempDir, extractedDir, 'packages/create-zenith', templatePath)
-            fs.cpSync(templateSource, targetDir, { recursive: true })
+            for (const templatePath of templatePaths) {
+                const templateSource = path.join(tempDir, extractedDir, 'packages/create-zenith', templatePath)
+                copyDirectoryContents(templateSource, targetDir)
+            }
 
             // Cleanup tarball
             fs.unlinkSync(tarballPath)
@@ -160,10 +179,22 @@ async function downloadTemplate(targetDir: string, templatePath: string): Promis
     }
 }
 
+function readOptionOverride(name: string): boolean | undefined {
+    const value = process.env[name]
+    if (value == null || value.trim() === '') {
+        return undefined
+    }
+    return flagEnabled(value)
+}
+
 /**
  * Gather all project options through interactive prompts
  */
 async function gatherOptions(providedName?: string, withTailwind?: boolean): Promise<ProjectOptions> {
+    const eslintOverride = readOptionOverride('CREATE_ZENITH_ESLINT')
+    const prettierOverride = readOptionOverride('CREATE_ZENITH_PRETTIER')
+    const pathAliasOverride = readOptionOverride('CREATE_ZENITH_PATH_ALIAS')
+
     // Project name - REQUIRED
     let name = providedName
 
@@ -209,9 +240,9 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
         prompts.log.info('Non-interactive mode detected, using defaults...')
         return {
             name,
-            eslint: true,
-            prettier: true,
-            pathAlias: true,
+            eslint: eslintOverride ?? true,
+            prettier: prettierOverride ?? true,
+            pathAlias: pathAliasOverride ?? true,
             tailwind: withTailwind ?? false
         }
     }
@@ -222,23 +253,23 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
         initialValue: true
     })
     if (prompts.isCancel(tailwindResult)) prompts.handleCancel()
-    const eslintResult = await prompts.confirm({
+    const eslintResult = eslintOverride ?? await prompts.confirm({
         message: 'Add ESLint for code linting?',
         initialValue: true
     })
-    if (prompts.isCancel(eslintResult)) prompts.handleCancel()
+    if (eslintOverride === undefined && prompts.isCancel(eslintResult)) prompts.handleCancel()
 
-    const prettierResult = await prompts.confirm({
+    const prettierResult = prettierOverride ?? await prompts.confirm({
         message: 'Add Prettier for code formatting?',
         initialValue: true
     })
-    if (prompts.isCancel(prettierResult)) prompts.handleCancel()
+    if (prettierOverride === undefined && prompts.isCancel(prettierResult)) prompts.handleCancel()
 
-    const pathAliasResult = await prompts.confirm({
+    const pathAliasResult = pathAliasOverride ?? await prompts.confirm({
         message: 'Add TypeScript path alias (@/*)?',
         initialValue: true
     })
-    if (prompts.isCancel(pathAliasResult)) prompts.handleCancel()
+    if (pathAliasOverride === undefined && prompts.isCancel(pathAliasResult)) prompts.handleCancel()
 
     return {
         name,
@@ -255,40 +286,17 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
 async function createProject(options: ProjectOptions): Promise<void> {
     const targetDir = path.resolve(process.cwd(), options.name)
     const templatePath = options.tailwind ? TAILWIND_TEMPLATE : DEFAULT_TEMPLATE
+    const templateFeaturePaths = selectedTemplateFeaturePaths(options)
 
     // Download template from GitHub
-    await downloadTemplate(targetDir, templatePath)
+    await downloadTemplate(targetDir, [templatePath, ...templateFeaturePaths])
 
     // Update package.json
     const pkgPath = path.join(targetDir, 'package.json')
     if (fs.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+        const pkg = applyPackageFeatures(JSON.parse(fs.readFileSync(pkgPath, 'utf8')), options)
         pkg.name = options.name
         pkg.version = '0.1.0'
-
-        // Remove ESLint dependencies and scripts if not selected
-        if (!options.eslint) {
-            delete pkg.devDependencies?.['eslint']
-            delete pkg.devDependencies?.['@typescript-eslint/eslint-plugin']
-            delete pkg.devDependencies?.['@typescript-eslint/parser']
-            delete pkg.scripts?.lint
-
-            // Remove config file
-            const eslintPath = path.join(targetDir, '.eslintrc.json')
-            if (fs.existsSync(eslintPath)) fs.unlinkSync(eslintPath)
-        }
-
-        // Remove Prettier dependencies and scripts if not selected
-        if (!options.prettier) {
-            delete pkg.devDependencies?.['prettier']
-            delete pkg.scripts?.format
-
-            // Remove config files
-            const prettierRc = path.join(targetDir, '.prettierrc')
-            const prettierIgnore = path.join(targetDir, '.prettierignore')
-            if (fs.existsSync(prettierRc)) fs.unlinkSync(prettierRc)
-            if (fs.existsSync(prettierIgnore)) fs.unlinkSync(prettierIgnore)
-        }
 
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4))
     }

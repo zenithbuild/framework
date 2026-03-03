@@ -7,9 +7,7 @@
         "dev": "zenith dev",
         "build": "zenith build",
         "preview": "zenith preview",
-        "test": "bun test",
-        "lint": "eslint .",
-        "format": "prettier --write ."
+        "test": "bun test"
     },
     "dependencies": {
         "@zenithbuild/core": "latest"
@@ -17,10 +15,6 @@
     "devDependencies": {
         "@tailwindcss/cli": "^4.1.18",
         "@types/bun": "latest",
-        "@typescript-eslint/eslint-plugin": "^8.53.0",
-        "@typescript-eslint/parser": "^8.53.0",
-        "eslint": "^9.39.2",
-        "prettier": "^3.7.4",
         "tailwindcss": "^4.1.18"
     }
 }

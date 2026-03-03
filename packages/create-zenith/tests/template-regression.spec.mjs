@@ -97,6 +97,26 @@ function assertPackageDependencies(projectDir) {
     );
 }
 
+function assertToolingSelection(projectDir, { eslint, prettier }) {
+    const pkgPath = join(projectDir, 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    const devDependencies = pkg.devDependencies || {};
+    const scripts = pkg.scripts || {};
+
+    assert.equal(existsSync(join(projectDir, 'eslint.config.js')), eslint, 'eslint config presence mismatch');
+    assert.equal(existsSync(join(projectDir, '.eslintrc.json')), false, 'legacy eslint config should never be scaffolded');
+    assert.equal(existsSync(join(projectDir, '.prettierrc')), prettier, 'prettier config presence mismatch');
+    assert.equal(existsSync(join(projectDir, '.prettierignore')), prettier, 'prettier ignore presence mismatch');
+
+    assert.equal(typeof scripts.lint === 'string', eslint, 'lint script presence mismatch');
+    assert.equal(typeof scripts.format === 'string', prettier, 'format script presence mismatch');
+
+    assert.equal(typeof devDependencies.eslint === 'string', eslint, 'eslint dependency presence mismatch');
+    assert.equal(typeof devDependencies['@typescript-eslint/eslint-plugin'] === 'string', eslint, 'eslint plugin dependency presence mismatch');
+    assert.equal(typeof devDependencies['@typescript-eslint/parser'] === 'string', eslint, 'eslint parser dependency presence mismatch');
+    assert.equal(typeof devDependencies.prettier === 'string', prettier, 'prettier dependency presence mismatch');
+}
+
 function assertBuildArtifacts(projectDir) {
     const distDir = join(projectDir, 'dist');
     const indexHtmlPath = join(distDir, 'index.html');
@@ -176,7 +196,7 @@ function patchRuntimeTemplateExport(projectDir) {
     }
 }
 
-function scaffoldProject(tempRoot, name, withTailwind) {
+function scaffoldProject(tempRoot, name, withTailwind, { eslint = true, prettier = true } = {}) {
     const args = [CLI_PATH, name];
     if (withTailwind) {
         args.push('--with-tailwind');
@@ -187,6 +207,8 @@ function scaffoldProject(tempRoot, name, withTailwind) {
         ZENITH_NO_UI: '1',
         CI: '1',
         NO_COLOR: '1',
+        CREATE_ZENITH_ESLINT: eslint ? '1' : '0',
+        CREATE_ZENITH_PRETTIER: prettier ? '1' : '0',
         CREATE_ZENITH_TEMPLATE_MODE: 'local',
         CREATE_ZENITH_SKIP_INSTALL: '1'
     });
@@ -212,6 +234,29 @@ test('starter template scaffolds, installs, and builds clean', async () => {
         rmSync(tempRoot, { recursive: true, force: true });
     }
 });
+
+for (const [eslint, prettier] of [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false]
+]) {
+    test(`starter template applies optional tooling correctly (eslint=${eslint}, prettier=${prettier})`, () => {
+        assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
+
+        const tempRoot = mkdtempSync(join(tmpdir(), `create-zenith-tooling-${eslint}-${prettier}-`));
+        const projectDir = scaffoldProject(tempRoot, `starter-tooling-${eslint}-${prettier}`, false, {
+            eslint,
+            prettier
+        });
+
+        try {
+            assertToolingSelection(projectDir, { eslint, prettier });
+        } finally {
+            rmSync(tempRoot, { recursive: true, force: true });
+        }
+    });
+}
 
 test('starter-tailwindcss template scaffolds, installs, and builds clean', async () => {
     assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');

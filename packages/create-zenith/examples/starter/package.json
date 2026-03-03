@@ -7,18 +7,12 @@
         "dev": "zenith dev",
         "build": "zenith build",
         "preview": "zenith preview",
-        "test": "bun test",
-        "lint": "eslint .",
-        "format": "prettier --write ."
+        "test": "bun test"
     },
     "dependencies": {
         "@zenithbuild/core": "latest"
     },
     "devDependencies": {
-        "@types/bun": "latest",
-        "eslint": "^9.39.2",
-        "@typescript-eslint/eslint-plugin": "^8.53.0",
-        "@typescript-eslint/parser": "^8.53.0",
-        "prettier": "^3.7.4"
+        "@types/bun": "latest"
     }
 }
