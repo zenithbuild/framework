@@ -3,6 +3,21 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * @typedef {'compiler' | 'bundler'} ToolchainTool
+ * @typedef {{
+ *   tool: ToolchainTool,
+ *   mode: 'binary' | 'node-bridge',
+ *   source: string,
+ *   sourceKey: string,
+ *   label: string,
+ *   path: string,
+ *   command: string,
+ *   argsPrefix: string[],
+ *   explicit?: boolean
+ * }} ToolchainCandidate
+ */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_ROOT = resolve(__dirname, '..');
@@ -10,6 +25,10 @@ const localRequire = createRequire(import.meta.url);
 const IS_WINDOWS = process.platform === 'win32';
 const COMPILER_BRIDGE_RUNNER = resolve(__dirname, 'compiler-bridge-runner.js');
 
+/**
+ * @param {string | null | undefined} projectRoot
+ * @returns {NodeRequire}
+ */
 function safeCreateRequire(projectRoot) {
     if (!projectRoot) {
         return localRequire;
@@ -21,6 +40,11 @@ function safeCreateRequire(projectRoot) {
     }
 }
 
+/**
+ * @param {NodeRequire} requireFn
+ * @param {string} specifier
+ * @returns {string | null}
+ */
 function safeResolve(requireFn, specifier) {
     try {
         return requireFn.resolve(specifier);
@@ -29,6 +53,10 @@ function safeResolve(requireFn, specifier) {
     }
 }
 
+/**
+ * @param {string} candidatePath
+ * @returns {string}
+ */
 function resolveExecutablePath(candidatePath) {
     if (typeof candidatePath !== 'string' || candidatePath.length === 0) {
         return '';
@@ -45,6 +73,12 @@ function resolveExecutablePath(candidatePath) {
     return existsSync(exePath) ? exePath : candidatePath;
 }
 
+/**
+ * @param {ToolchainTool} tool
+ * @param {string} source
+ * @param {string} candidatePath
+ * @returns {ToolchainCandidate}
+ */
 function createBinaryCandidate(tool, source, candidatePath) {
     const resolvedPath = resolveExecutablePath(candidatePath);
     return {
@@ -59,6 +93,10 @@ function createBinaryCandidate(tool, source, candidatePath) {
     };
 }
 
+/**
+ * @param {string} modulePath
+ * @returns {ToolchainCandidate | null}
+ */
 function createCompilerBridgeCandidate(modulePath) {
     if (typeof modulePath !== 'string' || modulePath.length === 0) {
         return null;
@@ -75,6 +113,10 @@ function createCompilerBridgeCandidate(modulePath) {
     };
 }
 
+/**
+ * @param {Array<string | ToolchainCandidate>} candidates
+ * @returns {string}
+ */
 export function resolveBinary(candidates) {
     for (const candidate of candidates) {
         const path = typeof candidate === 'string'
@@ -91,6 +133,11 @@ export function resolveBinary(candidates) {
     return typeof first?.path === 'string' ? first.path : '';
 }
 
+/**
+ * @param {string} packageName
+ * @param {string | null} [projectRoot]
+ * @returns {string | null}
+ */
 export function resolvePackageRoot(packageName, projectRoot = null) {
     const projectRequire = safeCreateRequire(projectRoot);
     const projectPath = safeResolve(projectRequire, `${packageName}/package.json`);
@@ -102,6 +149,11 @@ export function resolvePackageRoot(packageName, projectRoot = null) {
     return localPath ? dirname(localPath) : null;
 }
 
+/**
+ * @param {string} packageName
+ * @param {string | null} [projectRoot]
+ * @returns {string | null}
+ */
 export function readInstalledPackageVersion(packageName, projectRoot = null) {
     const packageRoot = resolvePackageRoot(packageName, projectRoot);
     if (!packageRoot) {
@@ -124,6 +176,9 @@ export function readCliPackageVersion() {
     }
 }
 
+/**
+ * @returns {ToolchainCandidate[]}
+ */
 function compilerWorkspaceBinaryCandidates() {
     return [
         createBinaryCandidate('compiler', 'workspace binary', resolve(CLI_ROOT, '../compiler/target/release/zenith-compiler')),
@@ -131,6 +186,9 @@ function compilerWorkspaceBinaryCandidates() {
     ];
 }
 
+/**
+ * @returns {ToolchainCandidate[]}
+ */
 function bundlerWorkspaceBinaryCandidates() {
     return [
         createBinaryCandidate('bundler', 'workspace binary', resolve(CLI_ROOT, '../bundler/target/release/zenith-bundler')),
@@ -138,6 +196,11 @@ function bundlerWorkspaceBinaryCandidates() {
     ];
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {ToolchainCandidate[]}
+ */
 export function compilerCommandCandidates(projectRoot = null, env = process.env) {
     const candidates = [];
     const envBin = env?.ZENITH_COMPILER_BIN;
@@ -167,16 +230,31 @@ export function compilerCommandCandidates(projectRoot = null, env = process.env)
     return candidates;
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
+ */
 export function compilerBinCandidates(projectRoot = null, env = process.env) {
     return compilerCommandCandidates(projectRoot, env)
         .filter((candidate) => candidate.mode === 'binary')
         .map((candidate) => candidate.path);
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string}
+ */
 export function resolveCompilerBin(projectRoot = null, env = process.env) {
     return resolveBinary(compilerBinCandidates(projectRoot, env));
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {ToolchainCandidate[]}
+ */
 export function bundlerCommandCandidates(projectRoot = null, env = process.env) {
     const candidates = [];
     const envBin = env?.ZENITH_BUNDLER_BIN;
@@ -198,6 +276,11 @@ export function bundlerCommandCandidates(projectRoot = null, env = process.env) 
     return candidates;
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string}
+ */
 export function resolveBundlerBin(projectRoot = null, env = process.env) {
     return resolveBinary(
         bundlerCommandCandidates(projectRoot, env)
@@ -206,6 +289,11 @@ export function resolveBundlerBin(projectRoot = null, env = process.env) {
     );
 }
 
+/**
+ * @param {string | null} [projectRoot]
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
+ */
 export function bundlerBinCandidates(projectRoot = null, env = process.env) {
     return bundlerCommandCandidates(projectRoot, env)
         .filter((candidate) => candidate.mode === 'binary')

@@ -22,7 +22,7 @@ let _resolveNavigation = null;
  * Wire the navigation resolver.
  * Called once by createRouter() to bind match → mount logic.
  *
- * @param {(path: string) => Promise<void>} resolver
+ * @param {((path: string) => Promise<void>) | null} resolver
  */
 export function _setNavigationResolver(resolver) {
     _resolveNavigation = resolver;

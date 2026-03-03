@@ -15,10 +15,7 @@
     "types": ["node"]
   },
   "include": [
-    "src/env.js",
-    "src/platform.js",
-    "src/ref.js",
-    "src/effect.js"
+    "src/**/*.js"
   ],
   "exclude": [
     "dist",

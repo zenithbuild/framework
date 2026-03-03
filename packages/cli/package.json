@@ -29,6 +29,7 @@
   },
   "scripts": {
     "build": "mkdir -p dist && cp -a src/* dist/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand",
     "prepublishOnly": "npm run build"
   },
@@ -37,6 +38,7 @@
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
+    "@types/node": "latest",
     "@jest/globals": "^30.2.0",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",

@@ -3,6 +3,15 @@ import { generateRoutesDts } from './generate-routes-dts.js';
 import { join } from 'node:path';
 import { access, constants } from 'node:fs/promises';
 
+/**
+ * @typedef {typeof globalThis & { __zenithTypesWarned?: boolean }} ZenithTypesGlobal
+ */
+
+/**
+ * @param {string} projectRoot
+ * @param {Array<{ path?: string }>} [manifest]
+ * @returns {Promise<void>}
+ */
 export async function ensureZenithTypes(projectRoot, manifest) {
     try {
         await generateEnvDts(projectRoot);
@@ -23,9 +32,11 @@ export async function ensureZenithTypes(projectRoot, manifest) {
         if (hasTsConfig) {
             // In a real implementation this would parse the JSON and check "include".
             // For now, we simply inform the user to include it if they haven't.
-            if (!globalThis.__zenithTypesWarned) {
+            /** @type {ZenithTypesGlobal} */
+            const globalScope = globalThis;
+            if (!globalScope.__zenithTypesWarned) {
                 console.warn('\\x1b[33m[zenith]\\x1b[0m For the best TypeScript experience, ensure ".zenith/**/*.d.ts" is in your tsconfig.json "include" array.');
-                globalThis.__zenithTypesWarned = true;
+                globalScope.__zenithTypesWarned = true;
             }
         }
     } catch (err) {

@@ -27,8 +27,14 @@ export function createRouter(config) {
     const { routes, container } = config;
 
     // Allow injecting mount/cleanup for testing without importing runtime
-    const mountFn = config.mount || null;
-    const cleanupFn = config.cleanup || null;
+    /** @type {((target: HTMLElement, pageModule: unknown) => void) | null} */
+    const mountFn = typeof config.mount === 'function'
+        ? /** @type {(target: HTMLElement, pageModule: unknown) => void} */ (config.mount)
+        : null;
+    /** @type {(() => void) | null} */
+    const cleanupFn = typeof config.cleanup === 'function'
+        ? /** @type {() => void} */ (config.cleanup)
+        : null;
 
     if (!container || !(container instanceof HTMLElement)) {
         throw new Error('[Zenith Router] createRouter() requires an HTMLElement container');
@@ -38,6 +44,7 @@ export function createRouter(config) {
         throw new Error('[Zenith Router] createRouter() requires a non-empty routes array');
     }
 
+    /** @type {(() => void) | null} */
     let _unlisten = null;
     let _started = false;
     let _hasMounted = false;

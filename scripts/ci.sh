@@ -6,6 +6,10 @@ cd "$ROOT"
 
 bash ./scripts/build.sh
 
+bun run --cwd packages/runtime typecheck
+bun run --cwd packages/router typecheck
+bun run --cwd packages/cli typecheck
+
 bun run --cwd packages/cli test
 bun run --cwd packages/core test
 bun run --cwd packages/runtime test

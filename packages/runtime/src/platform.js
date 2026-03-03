@@ -9,6 +9,10 @@
 import { zenWindow } from './env.js';
 
 /**
+ * @typedef {number} ZenTimerHandle
+ */
+
+/**
  * SSR-safe event subscription. Returns disposer.
  * @param {EventTarget | null} target
  * @param {string} eventName
@@ -37,34 +41,45 @@ export function zenResize(handler) {
     if (!win || typeof win.addEventListener !== 'function') {
         return () => {};
     }
+    /** @type {Window} */
+    const activeWindow = win;
     const hasRaf =
-        typeof win.requestAnimationFrame === 'function'
-        && typeof win.cancelAnimationFrame === 'function';
+        typeof activeWindow.requestAnimationFrame === 'function'
+        && typeof activeWindow.cancelAnimationFrame === 'function';
+    /** @type {ZenTimerHandle | null} */
     let scheduledId = null;
     let lastW = Number.NaN;
     let lastH = Number.NaN;
 
+    /**
+     * @param {FrameRequestCallback} callback
+     * @returns {ZenTimerHandle}
+     */
     const schedule = (callback) => {
         if (hasRaf) {
-            return win.requestAnimationFrame(callback);
+            return activeWindow.requestAnimationFrame(callback);
         }
-        return win.setTimeout(callback, 0);
+        return activeWindow.setTimeout(callback, 0);
     };
 
+    /**
+     * @param {ZenTimerHandle} id
+     * @returns {void}
+     */
     const cancel = (id) => {
         if (hasRaf) {
-            win.cancelAnimationFrame(id);
+            activeWindow.cancelAnimationFrame(id);
             return;
         }
-        win.clearTimeout(id);
+        activeWindow.clearTimeout(id);
     };
 
     function onResize() {
         if (scheduledId !== null) return;
         scheduledId = schedule(() => {
             scheduledId = null;
-            const w = win.innerWidth;
-            const h = win.innerHeight;
+            const w = activeWindow.innerWidth;
+            const h = activeWindow.innerHeight;
             if (w !== lastW || h !== lastH) {
                 lastW = w;
                 lastH = h;
@@ -73,7 +88,7 @@ export function zenResize(handler) {
         });
     }
 
-    win.addEventListener('resize', onResize);
+    activeWindow.addEventListener('resize', onResize);
     onResize();
 
     return () => {
@@ -81,7 +96,7 @@ export function zenResize(handler) {
             cancel(scheduledId);
             scheduledId = null;
         }
-        win.removeEventListener('resize', onResize);
+        activeWindow.removeEventListener('resize', onResize);
     };
 }
 

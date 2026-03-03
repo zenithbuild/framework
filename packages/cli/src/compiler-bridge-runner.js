@@ -1,7 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
+/**
+ * @typedef {{ bridgeModule: string, filePath: string, stdin: boolean }} BridgeArgs
+ */
+
+/**
+ * @param {string[]} argv
+ * @returns {BridgeArgs}
+ */
 function readArgs(argv) {
+    /** @type {BridgeArgs} */
     const args = {
         bridgeModule: '',
         filePath: '',
@@ -62,7 +71,7 @@ async function main() {
     process.stdout.write(JSON.stringify(result));
 }
 
-main().catch(async (error) => {
+main().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     if (message) {
         process.stderr.write(`${message}\n`);

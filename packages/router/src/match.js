@@ -32,12 +32,13 @@ export function matchPath(routePath, pathname) {
     const routeSegments = _splitPath(routePath);
     const pathSegments = _splitPath(pathname);
 
+    /** @type {Record<string, string>} */
     const params = {};
     let routeIndex = 0;
     let pathIndex = 0;
 
     while (routeIndex < routeSegments.length) {
-        const routeSeg = routeSegments[routeIndex];
+        const routeSeg = routeSegments[routeIndex] || '';
         if (routeSeg.startsWith('*')) {
             // Catch-all must be terminal.
             const optionalCatchAll = routeSeg.endsWith('?');
@@ -62,7 +63,7 @@ export function matchPath(routePath, pathname) {
             return { matched: false, params: {} };
         }
 
-        const pathSeg = pathSegments[pathIndex];
+        const pathSeg = pathSegments[pathIndex] || '';
         if (routeSeg.startsWith(':')) {
             // Dynamic param — extract value as string
             const paramName = routeSeg.slice(1);

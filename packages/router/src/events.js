@@ -8,13 +8,24 @@
 // No batching. No queue. Synchronous dispatch.
 // ---------------------------------------------------------------------------
 
-/** @type {Set<(detail: object) => void>} */
+/**
+ * @typedef {{ path: string, params?: Record<string, string>, matched: boolean }} RouteChangeDetail
+ * @typedef {{ beforeResolve?: boolean, emitRedirects?: boolean }} RouteProtectionPolicy
+ * @typedef {(payload: unknown) => void} RouteEventHandler
+ * @typedef {{ [eventName: string]: Set<RouteEventHandler> }} RouteEventListeners
+ * @typedef {{
+ *   __zenith_route_protection_policy?: RouteProtectionPolicy,
+ *   __zenith_route_event_listeners?: RouteEventListeners
+ * }} RouteProtectionScope
+ */
+
+/** @type {Set<(detail: RouteChangeDetail) => void>} */
 const _subscribers = new Set();
 
 /**
  * Subscribe to route change events.
  *
- * @param {(detail: { path: string, params?: Record<string, string>, matched: boolean }) => void} callback
+ * @param {(detail: RouteChangeDetail) => void} callback
  * @returns {() => void} unsubscribe
  */
 export function onRouteChange(callback) {
@@ -28,7 +39,7 @@ export function onRouteChange(callback) {
 /**
  * Dispatch a route change to all subscribers.
  *
- * @param {{ path: string, params?: Record<string, string>, matched: boolean }} detail
+ * @param {RouteChangeDetail} detail
  */
 export function _dispatchRouteChange(detail) {
     for (const cb of _subscribers) {
@@ -67,9 +78,14 @@ const ROUTE_EVENT_NAMES = [
 ];
 
 function getRouteProtectionScope() {
-    return typeof globalThis === 'object' && globalThis ? globalThis : {};
+    return /** @type {RouteProtectionScope} */ (
+        typeof globalThis === 'object' && globalThis ? globalThis : {}
+    );
 }
 
+/**
+ * @returns {{ policy: RouteProtectionPolicy, listeners: RouteEventListeners }}
+ */
 function ensureRouteProtectionState() {
     const scope = getRouteProtectionScope();
 
@@ -84,19 +100,24 @@ function ensureRouteProtectionState() {
         listeners = Object.create(null);
         scope[ROUTE_EVENT_LISTENERS_KEY] = listeners;
     }
+    const routeEventListeners = /** @type {RouteEventListeners} */ (listeners);
 
     for (const eventName of ROUTE_EVENT_NAMES) {
-        if (!(listeners[eventName] instanceof Set)) {
-            listeners[eventName] = new Set();
+        const existingListeners = routeEventListeners[eventName];
+        if (!(existingListeners instanceof Set)) {
+            routeEventListeners[eventName] = new Set();
         }
     }
 
-    return { policy, listeners };
+    return {
+        policy: /** @type {RouteProtectionPolicy} */ (policy),
+        listeners: routeEventListeners
+    };
 }
 
 /**
  * Configure default behaviors for route protection.
- * @param {import('../index').RouteProtectionPolicy} policy 
+ * @param {RouteProtectionPolicy} policy
  */
 export function setRouteProtectionPolicy(policy) {
     const state = ensureRouteProtectionState();
@@ -110,35 +131,42 @@ export function _getRouteProtectionPolicy() {
 
 /**
  * Listen to route protection lifecycle events.
- * @param {string} eventName 
- * @param {Function} handler 
+ * @param {string} eventName
+ * @param {RouteEventHandler} handler
  */
 export function on(eventName, handler) {
     const listeners = ensureRouteProtectionState().listeners;
-    if (listeners[eventName] instanceof Set) {
-        listeners[eventName].add(handler);
+    const eventListeners = listeners[eventName];
+    if (eventListeners instanceof Set) {
+        eventListeners.add(handler);
     }
 }
 
 /**
  * Remove a route protection lifecycle event listener.
- * @param {string} eventName 
- * @param {Function} handler 
+ * @param {string} eventName
+ * @param {RouteEventHandler} handler
  */
 export function off(eventName, handler) {
     const listeners = ensureRouteProtectionState().listeners;
-    if (listeners[eventName] instanceof Set) {
-        listeners[eventName].delete(handler);
+    const eventListeners = listeners[eventName];
+    if (eventListeners instanceof Set) {
+        eventListeners.delete(handler);
     }
 }
 
+/**
+ * @param {string} eventName
+ * @param {unknown} payload
+ * @returns {void}
+ */
 export function _dispatchRouteEvent(eventName, payload) {
-    const listeners = ensureRouteProtectionState().listeners[eventName];
-    if (!(listeners instanceof Set)) {
+    const eventListeners = ensureRouteProtectionState().listeners[eventName];
+    if (!(eventListeners instanceof Set)) {
         return;
     }
 
-    for (const handler of listeners) {
+    for (const handler of eventListeners) {
         try {
             handler(payload);
         } catch (e) {

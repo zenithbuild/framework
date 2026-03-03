@@ -1,10 +1,15 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 
+/**
+ * @param {string} projectRoot
+ * @param {Array<{ path?: string | null }>} [manifest]
+ * @returns {Promise<void>}
+ */
 export async function generateRoutesDts(projectRoot, manifest) {
-    const routes = (manifest || []).map(r => r.path).filter(Boolean);
+    const routes = (manifest || []).map((route) => route.path).filter(Boolean);
     const typeDef = routes.length > 0
-        ? routes.map(r => '"' + r + '"').join(' | ')
+        ? routes.map((route) => `"${route}"`).join(' | ')
         : 'string';
 
     const content = '// .zenith/zenith-routes.d.ts\\n' +

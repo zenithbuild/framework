@@ -2,6 +2,10 @@
  * UI environment mode detection for deterministic CLI output.
  */
 
+/**
+ * @param {string | number | boolean | null | undefined} value
+ * @returns {boolean}
+ */
 function flagEnabled(value) {
     if (value === undefined || value === null) {
         return false;
@@ -10,6 +14,10 @@ function flagEnabled(value) {
     return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+/**
+ * @param {string | null | undefined} value
+ * @returns {'quiet' | 'normal' | 'verbose'}
+ */
 function parseLogLevel(value) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'quiet' || normalized === 'verbose') {
