@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.8] - 2026-03-03
+
+### Changed
+
+- Fixed cross-OS `@zenithbuild/bundler` installs by moving native bundler delivery to platform-specific packages, with the `@zenithbuild/bundler` meta package resolving the correct installed binary for the active OS and CPU.
+
 ## [0.6.7] - 2026-03-03
 
 ### Changed
