@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.9] - 2026-03-03
+
+### Changed
+
+- Fixed the `@zenithbuild/bundler` meta package dependency surface so fresh installs can resolve runtime and router assets correctly while still using platform-specific native bundler packages.
+
 ## [0.6.8] - 2026-03-03
 
 ### Changed

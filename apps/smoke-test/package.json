@@ -13,7 +13,7 @@
         "format": "prettier --write ."
     },
     "dependencies": {
-        "@zenithbuild/core": "0.6.8"
+        "@zenithbuild/core": "0.6.9"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.2",
@@ -21,11 +21,11 @@
         "@types/bun": "latest",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
         "@typescript-eslint/parser": "^8.53.0",
-        "@zenithbuild/bundler": "0.6.8",
-        "@zenithbuild/cli": "0.6.8",
-        "@zenithbuild/compiler": "0.6.8",
-        "@zenithbuild/router": "0.6.8",
-        "@zenithbuild/runtime": "0.6.8",
+        "@zenithbuild/bundler": "0.6.9",
+        "@zenithbuild/cli": "0.6.9",
+        "@zenithbuild/compiler": "0.6.9",
+        "@zenithbuild/router": "0.6.9",
+        "@zenithbuild/runtime": "0.6.9",
         "eslint": "^9.39.2",
         "playwright": "^1.58.2",
         "prettier": "^3.7.4",
