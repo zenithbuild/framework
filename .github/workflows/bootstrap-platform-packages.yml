@@ -25,15 +25,23 @@ jobs:
           - runner: macos-14
             package_name: bundler-darwin-arm64
             package_dir: packages/bundler-darwin-arm64
+            rust_target: aarch64-apple-darwin
+            platform_key: darwin-arm64
           - runner: macos-13
             package_name: bundler-darwin-x64
             package_dir: packages/bundler-darwin-x64
+            rust_target: x86_64-apple-darwin
+            platform_key: darwin-x64
           - runner: ubuntu-latest
             package_name: bundler-linux-x64
             package_dir: packages/bundler-linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            platform_key: linux-x64
           - runner: windows-latest
             package_name: bundler-win32-x64
             package_dir: packages/bundler-win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            platform_key: win32-x64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -96,9 +104,13 @@ jobs:
       - name: Build bundler binary for target platform
         if: steps.target.outputs.selected == 'true'
         shell: bash
+        env:
+          BUNDLER_PLATFORM_KEY: ${{ matrix.platform_key }}
+          BUNDLER_TARGET_TRIPLE: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
-          cargo build --release --manifest-path packages/bundler/Cargo.toml
+          rustup target add "${BUNDLER_TARGET_TRIPLE}"
+          cargo build --release --target "${BUNDLER_TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
           node scripts/stage-bundler-platform-package.mjs
 
       - name: Bootstrap platform package

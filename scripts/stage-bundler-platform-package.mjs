@@ -32,14 +32,19 @@ function currentPlatformKey() {
 }
 
 function stageCurrentBundlerBinary() {
-    const platform = PLATFORM_PACKAGES[currentPlatformKey()];
+    const platformKey = process.env.BUNDLER_PLATFORM_KEY || currentPlatformKey();
+    const platform = PLATFORM_PACKAGES[platformKey];
     if (!platform) {
-        throw new Error(`Unsupported bundler platform package target: ${currentPlatformKey()}`);
+        throw new Error(`Unsupported bundler platform package target: ${platformKey}`);
     }
 
+    const targetTriple = process.env.BUNDLER_TARGET_TRIPLE || '';
+    const targetDir = targetTriple
+        ? resolve(ROOT, 'packages/bundler/target', targetTriple, 'release')
+        : resolve(ROOT, 'packages/bundler/target/release');
+
     const sourceBinary = resolve(
-        ROOT,
-        'packages/bundler/target/release',
+        targetDir,
         platform.binaryName
     );
     if (!existsSync(sourceBinary)) {
