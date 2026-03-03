@@ -12,6 +12,10 @@ name: Publish (npm)
 on:
   workflow_dispatch:
   push:
+    branches:
+      - master
+    paths:
+      - "packages/create-zenith/package.json"
     tags:
       - "v*"
 
@@ -20,7 +24,74 @@ permissions:
   id-token: write
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      publish_train: ${{ steps.detect.outputs.publish_train }}
+      publish_scaffolder: ${{ steps.detect.outputs.publish_scaffolder }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect publish targets
+        id: detect
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          manifest="packages/create-zenith/package.json"
+
+          read_version_at_revision() {
+            local revision="$1"
+            if [[ -z "$revision" ]]; then
+              return 1
+            fi
+            if ! git cat-file -e "${revision}:${manifest}" 2>/dev/null; then
+              return 1
+            fi
+            git show "${revision}:${manifest}" | node -e '
+              let data = "";
+              process.stdin.setEncoding("utf8");
+              process.stdin.on("data", (chunk) => { data += chunk; });
+              process.stdin.on("end", () => {
+                const pkg = JSON.parse(data);
+                process.stdout.write(typeof pkg.version === "string" ? pkg.version : "");
+              });
+            '
+          }
+
+          publish_train=false
+          publish_scaffolder=false
+
+          case "$EVENT_NAME" in
+            workflow_dispatch)
+              publish_train=true
+              publish_scaffolder=true
+              ;;
+            push)
+              if [[ "$REF_NAME" == v* ]]; then
+                publish_train=true
+              elif [[ "$REF_NAME" == "master" ]]; then
+                previous_version="$(read_version_at_revision "$BEFORE_SHA" || true)"
+                current_version="$(read_version_at_revision "$CURRENT_SHA" || true)"
+                if [[ -n "$current_version" && "$current_version" != "$previous_version" ]]; then
+                  publish_scaffolder=true
+                fi
+              fi
+              ;;
+          esac
+
+          echo "publish_train=${publish_train}" >> "$GITHUB_OUTPUT"
+          echo "publish_scaffolder=${publish_scaffolder}" >> "$GITHUB_OUTPUT"
+
   publish:
+    needs: detect
+    if: needs.detect.outputs.publish_train == 'true' || needs.detect.outputs.publish_scaffolder == 'true'
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
@@ -79,6 +150,8 @@ jobs:
 
       - run: bun run ci
 
-      - run: ./scripts/publish-train.sh
+      - if: needs.detect.outputs.publish_train == 'true'
+        run: ./scripts/publish-train.sh
 
-      - run: ./scripts/publish-scaffolder.sh
+      - if: needs.detect.outputs.publish_scaffolder == 'true'
+        run: ./scripts/publish-scaffolder.sh

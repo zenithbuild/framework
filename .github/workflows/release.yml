@@ -2,6 +2,10 @@ name: release
 
 on:
   push:
+    branches:
+      - master
+    paths:
+      - "packages/create-zenith/package.json"
     tags:
       - "v*"
 
@@ -9,7 +13,73 @@ permissions:
   contents: write
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      release_train: ${{ steps.detect.outputs.release_train }}
+      release_scaffolder: ${{ steps.detect.outputs.release_scaffolder }}
+      scaffolder_version: ${{ steps.detect.outputs.scaffolder_version }}
+      scaffolder_tag: ${{ steps.detect.outputs.scaffolder_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release targets
+        id: detect
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          manifest="packages/create-zenith/package.json"
+
+          read_version_at_revision() {
+            local revision="$1"
+            if [[ -z "$revision" ]]; then
+              return 1
+            fi
+            if ! git cat-file -e "${revision}:${manifest}" 2>/dev/null; then
+              return 1
+            fi
+            git show "${revision}:${manifest}" | node -e '
+              let data = "";
+              process.stdin.setEncoding("utf8");
+              process.stdin.on("data", (chunk) => { data += chunk; });
+              process.stdin.on("end", () => {
+                const pkg = JSON.parse(data);
+                process.stdout.write(typeof pkg.version === "string" ? pkg.version : "");
+              });
+            '
+          }
+
+          release_train=false
+          release_scaffolder=false
+          scaffolder_version=""
+          scaffolder_tag=""
+
+          if [[ "$REF_NAME" == v* ]]; then
+            release_train=true
+          elif [[ "$REF_NAME" == "master" ]]; then
+            previous_version="$(read_version_at_revision "$BEFORE_SHA" || true)"
+            current_version="$(read_version_at_revision "$CURRENT_SHA" || true)"
+            if [[ -n "$current_version" && "$current_version" != "$previous_version" ]]; then
+              release_scaffolder=true
+              scaffolder_version="$current_version"
+              scaffolder_tag="create-zenith-v${current_version}"
+            fi
+          fi
+
+          echo "release_train=${release_train}" >> "$GITHUB_OUTPUT"
+          echo "release_scaffolder=${release_scaffolder}" >> "$GITHUB_OUTPUT"
+          echo "scaffolder_version=${scaffolder_version}" >> "$GITHUB_OUTPUT"
+          echo "scaffolder_tag=${scaffolder_tag}" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: detect
+    if: needs.detect.outputs.release_train == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,5 +125,77 @@ jobs:
           body: |
             No matching section was found in `CHANGELOG.md` for `${{ github.ref_name }}`.
             Maintainers should add a matching train section before the next release.
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release-create-zenith:
+    needs: detect
+    if: needs.detect.outputs.release_scaffolder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from packages/create-zenith/CHANGELOG.md
+        id: changelog
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          notes_path="${RUNNER_TEMP}/create-zenith-release-notes.md"
+
+          awk -v version="$VERSION" '
+            BEGIN { capture = 0 }
+            $0 ~ "^## \\[" version "\\]" { capture = 1 }
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
+            capture { print }
+          ' packages/create-zenith/CHANGELOG.md > "$notes_path"
+
+          if [ -s "$notes_path" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create create-zenith release tag
+        shell: bash
+        env:
+          TAG_NAME: ${{ needs.detect.outputs.scaffolder_tag }}
+          VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" "$GITHUB_SHA" -m "create-zenith v${VERSION}"
+          git push origin "$TAG_NAME"
+
+      - name: Create GitHub Release from package changelog
+        if: steps.changelog.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.detect.outputs.scaffolder_tag }}
+          tag_name: ${{ needs.detect.outputs.scaffolder_tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: ${{ steps.changelog.outputs.notes_path }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with generated notes fallback
+        if: steps.changelog.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.detect.outputs.scaffolder_tag }}
+          tag_name: ${{ needs.detect.outputs.scaffolder_tag }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            No matching section was found in `packages/create-zenith/CHANGELOG.md` for `${{ needs.detect.outputs.scaffolder_version }}`.
+            Maintainers should add a matching package changelog section before the next create-zenith release.
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
