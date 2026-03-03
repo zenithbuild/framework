@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.7] - 2026-03-03
+
+### Changed
+
+- TypeScript strictness ramp (Level 1) for `@zenithbuild/router` and `@zenithbuild/core`, plus a partial Level 1 ramp for TS leaf modules in `@zenithbuild/runtime` and `@zenithbuild/cli`, with no public API changes.
+
 ## [0.6.6] - 2026-03-02
 
 ### Added

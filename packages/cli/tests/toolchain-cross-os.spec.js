@@ -100,7 +100,7 @@ function createCompilerProjectFixture({ includeInstalledBinary = true, includeBr
     mkdirSync(compilerRoot, { recursive: true });
     writeFileSync(
         join(compilerRoot, 'package.json'),
-        JSON.stringify({ name: '@zenithbuild/compiler', version: '0.6.6', type: 'module' }, null, 2),
+        JSON.stringify({ name: '@zenithbuild/compiler', version: '0.6.7', type: 'module' }, null, 2),
         'utf8'
     );
 
@@ -205,7 +205,7 @@ describe('toolchain cross-OS fallback', () => {
     test('bundler preflight falls back to env override when the installed binary is incompatible', () => {
         const root = createTempRoot('zenith-bundler-fallback-');
         const incompatible = createIncompatibleCandidate(root, 'bundler', 'installed package binary');
-        const overridePath = createExecutableScript(root, 'bundler-override.js', 'process.stdout.write("zenith-bundler 0.6.6\\n");');
+        const overridePath = createExecutableScript(root, 'bundler-override.js', 'process.stdout.write("zenith-bundler 0.6.7\\n");');
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
         try {

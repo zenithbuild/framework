@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "scripts": {
     "build": "cargo build --release",
     "contract:deps": "node dependency_contract.spec.js",
@@ -34,8 +34,8 @@
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
   "dependencies": {
-    "@zenithbuild/router": "0.6.6",
-    "@zenithbuild/runtime": "0.6.6",
+    "@zenithbuild/router": "0.6.7",
+    "@zenithbuild/runtime": "0.6.7",
     "chokidar": "^5.0.0",
     "esbuild": "^0.27.3",
     "express": "^4.21.2",
