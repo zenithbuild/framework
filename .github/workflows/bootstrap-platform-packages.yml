@@ -1,0 +1,118 @@
+name: Bootstrap Platform Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      train_version:
+        description: Optional train version override. Uses TRAIN_VERSION when empty.
+        required: false
+        type: string
+      packages:
+        description: Comma-separated platform package names to bootstrap.
+        required: false
+        default: bundler-darwin-arm64,bundler-darwin-x64,bundler-linux-x64,bundler-win32-x64
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-platform-packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            package_name: bundler-darwin-arm64
+            package_dir: packages/bundler-darwin-arm64
+          - runner: macos-13
+            package_name: bundler-darwin-x64
+            package_dir: packages/bundler-darwin-x64
+          - runner: ubuntu-latest
+            package_name: bundler-linux-x64
+            package_dir: packages/bundler-linux-x64
+          - runner: windows-latest
+            package_name: bundler-win32-x64
+            package_dir: packages/bundler-win32-x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve bootstrap target
+        id: target
+        shell: bash
+        env:
+          INPUT_TRAIN_VERSION: ${{ inputs.train_version }}
+          INPUT_PACKAGES: ${{ inputs.packages }}
+          MATRIX_PACKAGE: ${{ matrix.package_name }}
+        run: |
+          set -euo pipefail
+
+          train_version="${INPUT_TRAIN_VERSION}"
+          if [[ -z "$train_version" ]]; then
+            train_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
+          fi
+
+          selected=false
+          IFS=',' read -r -a packages <<<"${INPUT_PACKAGES// /}"
+          for package in "${packages[@]}"; do
+            if [[ "$package" == "$MATRIX_PACKAGE" ]]; then
+              selected=true
+              break
+            fi
+          done
+
+          echo "train_version=${train_version}" >> "$GITHUB_OUTPUT"
+          echo "selected=${selected}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure npm bootstrap auth
+        if: steps.target.outputs.selected == 'true'
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Missing required secret: NPM_BOOTSTRAP_TOKEN" >&2
+            exit 1
+          fi
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
+
+      - name: Install workspace dependencies
+        if: steps.target.outputs.selected == 'true'
+        shell: bash
+        run: bun install
+
+      - name: Build bundler binary for target platform
+        if: steps.target.outputs.selected == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --manifest-path packages/bundler/Cargo.toml
+          node scripts/stage-bundler-platform-package.mjs
+
+      - name: Bootstrap platform package
+        if: steps.target.outputs.selected == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/bootstrap-platform-package.mjs \
+            "${{ matrix.package_dir }}" \
+            "@zenithbuild/${{ matrix.package_name }}" \
+            "${{ steps.target.outputs.train_version }}" \
+            "https://registry.npmjs.org/"
+
+      - name: Skip unselected package
+        if: steps.target.outputs.selected != 'true'
+        shell: bash
+        run: echo "skipped @zenithbuild/${{ matrix.package_name }} (not requested)"

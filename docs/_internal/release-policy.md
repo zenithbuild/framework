@@ -26,3 +26,11 @@ After a stable train publish completes:
 ## Current blocker
 
 Full-package `latest` promotion is not unconditional yet. Native compiler and bundler distribution still needs platform-correct packaging before the ecosystem can assume every install path is cross-OS safe without fallback.
+
+## Platform package bootstrap
+
+Platform binary packages require a one-time bootstrap publish before npm Trusted Publishing can take over for that package name.
+
+- Use the `Bootstrap Platform Packages` workflow with the `NPM_BOOTSTRAP_TOKEN` secret for first publish only.
+- Bootstrap is limited to platform packages such as `@zenithbuild/bundler-<platform>`.
+- After the first publish succeeds, configure npm Trusted Publishing for each new package name and return to the normal OIDC-only publish flow.
