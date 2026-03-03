@@ -1,0 +1,20 @@
+{
+    "name": "site",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "zenith dev",
+        "build": "zenith build",
+        "preview": "zenith preview",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "@zenithbuild/core": "latest"
+    },
+    "devDependencies": {
+        "@tailwindcss/cli": "^4.1.18",
+        "@types/bun": "latest",
+        "tailwindcss": "^4.1.18"
+    }
+}

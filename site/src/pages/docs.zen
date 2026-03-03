@@ -1,0 +1,19 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Tailwind Starter Docs"
+    };
+</script>
+
+<DefaultLayout>
+    <section class="mx-auto max-w-3xl space-y-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
+        <h1 class="text-3xl font-semibold text-slate-100">Starter Docs</h1>
+        <p class="text-slate-300">
+            Start documentation pages here. Add nested routes under <code>src/pages/docs</code> as your site grows.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-sky-300">
+            <a href="/" class="underline-offset-4 hover:underline">Home</a>
+            <a href="/about" class="underline-offset-4 hover:underline">About</a>
+            <a href="/blog" class="underline-offset-4 hover:underline">Blog</a>
+        </div>
+    </section>
+</DefaultLayout>
