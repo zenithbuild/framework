@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { jest } from '@jest/globals';
-import { compilerCommandCandidates } from '../dist/toolchain-paths.js';
+import { bundlerCommandCandidates, compilerCommandCandidates } from '../dist/toolchain-paths.js';
 import {
     createToolchainStateForTests,
     ensureToolchainCompatibility,
@@ -100,7 +100,7 @@ function createCompilerProjectFixture({ includeInstalledBinary = true, includeBr
     mkdirSync(compilerRoot, { recursive: true });
     writeFileSync(
         join(compilerRoot, 'package.json'),
-        JSON.stringify({ name: '@zenithbuild/compiler', version: '0.6.7', type: 'module' }, null, 2),
+        JSON.stringify({ name: '@zenithbuild/compiler', version: '0.0.0-test', type: 'module' }, null, 2),
         'utf8'
     );
 
@@ -114,6 +114,59 @@ function createCompilerProjectFixture({ includeInstalledBinary = true, includeBr
         const distDir = join(compilerRoot, 'dist');
         mkdirSync(distDir, { recursive: true });
         writeFileSync(join(distDir, 'index.js'), 'export function compile() { return {}; }\n', 'utf8');
+    }
+
+    return root;
+}
+
+function createBundlerProjectFixture({
+    includePlatformPackage = true,
+    includeLegacyBinary = true
+} = {}) {
+    const root = createTempRoot('zenith-bundler-project-');
+    const bundlerRoot = join(root, 'node_modules', '@zenithbuild', 'bundler');
+    mkdirSync(join(root, 'node_modules', '@zenithbuild'), { recursive: true });
+    writeFileSync(
+        join(root, 'package.json'),
+        JSON.stringify({ name: 'toolchain-bundler-fixture', private: true }, null, 2),
+        'utf8'
+    );
+    mkdirSync(bundlerRoot, { recursive: true });
+    writeFileSync(
+        join(bundlerRoot, 'package.json'),
+        JSON.stringify({ name: '@zenithbuild/bundler', version: '0.0.0-test', type: 'module' }, null, 2),
+        'utf8'
+    );
+
+    if (includeLegacyBinary) {
+        const targetDir = join(bundlerRoot, 'target', 'release');
+        mkdirSync(targetDir, { recursive: true });
+        createExecutableScript(
+            targetDir,
+            process.platform === 'win32' ? 'zenith-bundler.exe' : 'zenith-bundler',
+            'process.stdout.write("zenith-bundler 0.0.0-test\\n");'
+        );
+    }
+
+    if (includePlatformPackage) {
+        const packageName = process.platform === 'darwin'
+            ? `bundler-darwin-${process.arch}`
+            : process.platform === 'linux'
+                ? `bundler-linux-${process.arch}`
+                : `bundler-win32-${process.arch}`;
+        const platformRoot = join(root, 'node_modules', '@zenithbuild', packageName);
+        const binaryName = process.platform === 'win32' ? 'zenith-bundler.exe' : 'zenith-bundler';
+        mkdirSync(join(platformRoot, 'bin'), { recursive: true });
+        writeFileSync(
+            join(platformRoot, 'package.json'),
+            JSON.stringify({ name: `@zenithbuild/${packageName}`, version: '0.0.0-test', type: 'module' }, null, 2),
+            'utf8'
+        );
+        createExecutableScript(
+            join(platformRoot, 'bin'),
+            binaryName,
+            'process.stdout.write("zenith-bundler 0.0.0-test\\n");'
+        );
     }
 
     return root;
@@ -205,7 +258,7 @@ describe('toolchain cross-OS fallback', () => {
     test('bundler preflight falls back to env override when the installed binary is incompatible', () => {
         const root = createTempRoot('zenith-bundler-fallback-');
         const incompatible = createIncompatibleCandidate(root, 'bundler', 'installed package binary');
-        const overridePath = createExecutableScript(root, 'bundler-override.js', 'process.stdout.write("zenith-bundler 0.6.7\\n");');
+        const overridePath = createExecutableScript(root, 'bundler-override.js', 'process.stdout.write("zenith-bundler 0.0.0-test\\n");');
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
         try {
@@ -222,6 +275,40 @@ describe('toolchain cross-OS fallback', () => {
             );
         } finally {
             rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('bundler candidate ordering prefers the installed platform package before legacy and workspace fallbacks', () => {
+        const projectRoot = createBundlerProjectFixture();
+
+        try {
+            const candidates = bundlerCommandCandidates(projectRoot, {});
+
+            expect(candidates[0].label).toBe('installed platform package binary');
+            expect(candidates[1].label).toBe('installed package binary');
+            expect(candidates.slice(2).every((candidate) => candidate.label === 'workspace binary')).toBe(true);
+        } finally {
+            rmSync(projectRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('bundler throws a deterministic missing-install error when no platform binary is installed', () => {
+        const projectRoot = createBundlerProjectFixture({
+            includePlatformPackage: false,
+            includeLegacyBinary: false
+        });
+
+        try {
+            const candidates = bundlerCommandCandidates(projectRoot, {}).filter(
+                (candidate) => candidate.label !== 'workspace binary'
+            );
+            const toolchain = createToolchainStateForTests('bundler', candidates);
+
+            expect(() => ensureToolchainCompatibility(toolchain)).toThrow(
+                `[zenith] Bundler binary not installed for ${process.platform}/${process.arch}. Reinstall @zenithbuild/bundler or ensure optional dependency installed.`
+            );
+        } finally {
+            rmSync(projectRoot, { recursive: true, force: true });
         }
     });
 

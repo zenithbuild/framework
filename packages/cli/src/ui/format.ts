@@ -11,7 +11,7 @@ interface SummaryRow {
 
 const DEFAULT_PHASE = 'cli';
 const DEFAULT_FILE = '.';
-const DEFAULT_HINT_BASE = 'https://github.com/zenithbuild/zenith/blob/main/zenith-cli/CLI_CONTRACT.md';
+const DEFAULT_HINT_BASE = 'https://github.com/zenithbuild/framework/blob/master/packages/cli/CLI_CONTRACT.md';
 const PREFIX = '[zenith]';
 const TAG_WIDTH = 6;
 

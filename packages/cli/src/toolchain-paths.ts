@@ -24,6 +24,24 @@ const CLI_ROOT = resolve(__dirname, '..');
 const localRequire = createRequire(import.meta.url);
 const IS_WINDOWS = process.platform === 'win32';
 const COMPILER_BRIDGE_RUNNER = resolve(__dirname, 'compiler-bridge-runner.js');
+const BUNDLER_PLATFORM_PACKAGES: Record<string, { packageName: string; binaryName: string }> = {
+    'darwin-arm64': {
+        packageName: '@zenithbuild/bundler-darwin-arm64',
+        binaryName: 'zenith-bundler'
+    },
+    'darwin-x64': {
+        packageName: '@zenithbuild/bundler-darwin-x64',
+        binaryName: 'zenith-bundler'
+    },
+    'linux-x64': {
+        packageName: '@zenithbuild/bundler-linux-x64',
+        binaryName: 'zenith-bundler'
+    },
+    'win32-x64': {
+        packageName: '@zenithbuild/bundler-win32-x64',
+        binaryName: 'zenith-bundler.exe'
+    }
+};
 
 function safeCreateRequire(projectRoot: string | null | undefined): NodeRequire {
     if (!projectRoot) {
@@ -92,6 +110,10 @@ function createCompilerBridgeCandidate(modulePath: string): ToolchainCandidate |
         command: process.execPath,
         argsPrefix: [COMPILER_BRIDGE_RUNNER, '--bridge-module', modulePath]
     };
+}
+
+function currentBundlerPlatformPackage(): { packageName: string; binaryName: string } | null {
+    return BUNDLER_PLATFORM_PACKAGES[`${process.platform}-${process.arch}`] || null;
 }
 
 export function resolveBinary(candidates: Array<string | ToolchainCandidate>): string {
@@ -209,6 +231,20 @@ export function bundlerCommandCandidates(
             ...createBinaryCandidate('bundler', 'env override (ZENITH_BUNDLER_BIN)', envBin),
             explicit: true
         });
+    }
+
+    const platformPackage = currentBundlerPlatformPackage();
+    if (platformPackage) {
+        const platformPackageRoot = resolvePackageRoot(platformPackage.packageName, projectRoot);
+        if (platformPackageRoot) {
+            candidates.push(
+                createBinaryCandidate(
+                    'bundler',
+                    'installed platform package binary',
+                    resolve(platformPackageRoot, 'bin', platformPackage.binaryName)
+                )
+            );
+        }
     }
 
     const installedRoot = resolvePackageRoot('@zenithbuild/bundler', projectRoot);

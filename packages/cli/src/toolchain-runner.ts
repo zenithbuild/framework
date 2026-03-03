@@ -81,6 +81,20 @@ function emitFallbackWarning(toolchain: ToolchainState, nextCandidate: Toolchain
     console.warn(message);
 }
 
+function missingToolchainError(toolchain: ToolchainState): Error {
+    if (toolchain.tool === 'bundler') {
+        return new Error(
+            `[zenith] Bundler binary not installed for ${process.platform}/${process.arch}. ` +
+            'Reinstall @zenithbuild/bundler or ensure optional dependency installed.'
+        );
+    }
+
+    return new Error(
+        `[zenith] ${toolchain.tool} binary not installed for ${currentPlatformLabel()}; ` +
+        `reinstall or set ${toolEnvVar(toolchain.tool)}=...`
+    );
+}
+
 function incompatibleBinaryError(toolchain: ToolchainState): Error {
     return new Error(
         `[zenith] ${toolchain.tool} binary is incompatible for ${currentPlatformLabel()}; ` +
@@ -183,6 +197,14 @@ export function ensureToolchainCompatibility(
         if (!candidate) {
             break;
         }
+        if (!candidateExists(candidate)) {
+            const nextIndex = findNextFallbackIndex(toolchain, probeArgs);
+            if (nextIndex === -1) {
+                throw missingToolchainError(toolchain);
+            }
+            toolchain.activeIndex = nextIndex;
+            continue;
+        }
         if (!candidateSupportsArgs(candidate, probeArgs)) {
             const nextIndex = findNextFallbackIndex(toolchain, probeArgs);
             if (nextIndex === -1) {
@@ -209,7 +231,7 @@ export function ensureToolchainCompatibility(
         emitFallbackWarning(toolchain, toolchain.candidates[nextIndex]);
     }
 
-    throw incompatibleBinaryError(toolchain);
+    throw missingToolchainError(toolchain);
 }
 
 export function runToolchainSync(
@@ -221,6 +243,14 @@ export function runToolchainSync(
         const candidate = activeCandidate(toolchain);
         if (!candidate) {
             break;
+        }
+        if (!candidateExists(candidate)) {
+            const nextIndex = findNextFallbackIndex(toolchain, args);
+            if (nextIndex === -1) {
+                throw missingToolchainError(toolchain);
+            }
+            toolchain.activeIndex = nextIndex;
+            continue;
         }
         if (!candidateSupportsArgs(candidate, args)) {
             const nextIndex = findNextFallbackIndex(toolchain, args);
@@ -245,5 +275,5 @@ export function runToolchainSync(
         emitFallbackWarning(toolchain, toolchain.candidates[nextIndex]);
     }
 
-    throw incompatibleBinaryError(toolchain);
+    throw missingToolchainError(toolchain);
 }
