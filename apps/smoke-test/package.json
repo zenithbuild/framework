@@ -1,0 +1,34 @@
+{
+    "name": "smoke-test",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "zenith dev",
+        "build": "zenith build",
+        "preview": "zenith preview",
+        "smoke": "playwright test",
+        "test": "playwright test",
+        "lint": "eslint .",
+        "format": "prettier --write ."
+    },
+    "dependencies": {
+        "@zenithbuild/core": "0.6.6"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.58.2",
+        "@tailwindcss/cli": "^4.1.18",
+        "@types/bun": "latest",
+        "@typescript-eslint/eslint-plugin": "^8.53.0",
+        "@typescript-eslint/parser": "^8.53.0",
+        "@zenithbuild/bundler": "0.6.6",
+        "@zenithbuild/cli": "0.6.6",
+        "@zenithbuild/compiler": "0.6.6",
+        "@zenithbuild/router": "0.6.6",
+        "@zenithbuild/runtime": "0.6.6",
+        "eslint": "^9.39.2",
+        "playwright": "^1.58.2",
+        "prettier": "^3.7.4",
+        "tailwindcss": "^4.1.18"
+    }
+}
