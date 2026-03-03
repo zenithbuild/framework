@@ -29,7 +29,7 @@
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
   "scripts": {
-    "build": "mkdir -p dist && cp -a src/* dist/",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.js",
     "prepublishOnly": "npm run build"

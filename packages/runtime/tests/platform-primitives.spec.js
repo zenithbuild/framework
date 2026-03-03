@@ -1,4 +1,4 @@
-import { zenWindow, zenDocument, zenOn, zenResize, collectRefs } from '../src/index.js';
+import { zenWindow, zenDocument, zenOn, zenResize, collectRefs } from '../dist/index.js';
 
 describe('platform primitives', () => {
     describe('zenWindow', () => {

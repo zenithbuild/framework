@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// signal.js — Zenith Runtime V0
+// signal.ts — Zenith Runtime V0
 // ---------------------------------------------------------------------------
 // Minimal explicit signal primitive.
 //
@@ -15,17 +15,19 @@
 //   - No scheduler
 //   - No async queue
 // ---------------------------------------------------------------------------
+
 import { _nextReactiveId, _trackDependency } from './zeneffect.js';
 
-/**
- * Create a deterministic signal with explicit subscription semantics.
- *
- * @param {*} initialValue
- * @returns {{ get: () => *, set: (next: *) => *, subscribe: (fn: (value: *) => void) => () => void }}
- */
-export function signal(initialValue) {
+export type ZenithSignal<T> = {
+    __zenith_id: number;
+    get(): T;
+    set(nextValue: T): T;
+    subscribe(fn: (value: T) => void): () => void;
+};
+
+export function signal<T>(initialValue: T): ZenithSignal<T> {
     let value = initialValue;
-    const subscribers = new Set();
+    const subscribers = new Set<(value: T) => void>();
     const reactiveId = _nextReactiveId();
 
     return {
@@ -42,8 +44,8 @@ export function signal(initialValue) {
             value = nextValue;
 
             const snapshot = [...subscribers];
-            for (let i = 0; i < snapshot.length; i++) {
-                snapshot[i](value);
+            for (let index = 0; index < snapshot.length; index += 1) {
+                snapshot[index](value);
             }
 
             return value;

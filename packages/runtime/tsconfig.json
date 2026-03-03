@@ -15,9 +15,12 @@
     "types": ["node"]
   },
   "include": [
-    "src/env.js",
-    "src/platform.js",
-    "src/ref.js",
+    "src/env.ts",
+    "src/platform.ts",
+    "src/ref.ts",
+    "src/signal.ts",
+    "src/state.ts",
+    "src/zeneffect.ts",
     "src/effect.js"
   ],
   "exclude": [

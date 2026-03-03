@@ -1,6 +1,6 @@
 // @ts-nocheck
 // ---------------------------------------------------------------------------
-// zeneffect.js — Zenith Runtime V0
+// zeneffect.ts — Zenith Runtime V0
 // ---------------------------------------------------------------------------
 // Explicit dependency effect primitive.
 //

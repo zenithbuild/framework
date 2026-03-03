@@ -1,6 +1,6 @@
-import { signal } from '../src/signal.js';
-import { state } from '../src/state.js';
-import { zeneffect } from '../src/zeneffect.js';
+import { signal } from '../dist/signal.js';
+import { state } from '../dist/state.js';
+import { zeneffect } from '../dist/zeneffect.js';
 
 describe('signal()', () => {
     test('uses explicit get/set API', () => {

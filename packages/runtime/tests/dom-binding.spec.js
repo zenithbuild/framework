@@ -1,6 +1,6 @@
-import { hydrate } from '../src/hydrate.js';
-import { cleanup } from '../src/cleanup.js';
-import { signal } from '../src/signal.js';
+import { hydrate } from '../dist/hydrate.js';
+import { cleanup } from '../dist/cleanup.js';
+import { signal } from '../dist/signal.js';
 
 describe('hydrate() marker contract', () => {
     const OVERLAY_ID = '__zenith_runtime_error_overlay';

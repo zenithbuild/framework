@@ -1,5 +1,5 @@
-import { hydrate } from '../src/hydrate.js';
-import { cleanup, _getCounts } from '../src/cleanup.js';
+import { hydrate } from '../dist/hydrate.js';
+import { cleanup, _getCounts } from '../dist/cleanup.js';
 
 describe('hydrate() event contract', () => {
     const OVERLAY_ID = '__zenith_runtime_error_overlay';

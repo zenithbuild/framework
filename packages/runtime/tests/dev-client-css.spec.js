@@ -1,4 +1,4 @@
-import { runtimeDevClientSource } from '../src/template.js';
+import { runtimeDevClientSource } from '../dist/template.js';
 
 describe('runtime dev client css contract', () => {
     test('uses atomic stylesheet swap with load commit and error rollback', () => {

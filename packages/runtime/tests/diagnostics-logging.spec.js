@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
-import { hydrate } from '../src/hydrate.js';
-import { cleanup } from '../src/cleanup.js';
+import { hydrate } from '../dist/hydrate.js';
+import { cleanup } from '../dist/cleanup.js';
 
 describe('runtime diagnostics logging', () => {
     const OVERLAY_ID = '__zenith_runtime_error_overlay';

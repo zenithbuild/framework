@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// ref.js — Zenith Runtime ref primitive
+// ref.ts — Zenith Runtime ref primitive
 // ---------------------------------------------------------------------------
 // A structural DOM pointer. NOT reactive.
 // ref.current is a plain property — no tracking, no proxies, no subscriptions.
@@ -11,13 +11,10 @@
 //   - .current is set to null on component disposal
 //   - Reading .current does NOT register a dependency in zenEffect
 
-/**
- * Create a deterministic ref for structural DOM binding.
- *
- * @template T
- * @param {T} [initialValue]
- * @returns {{ current: T | null }}
- */
-export function ref(initialValue) {
+export type ZenithRef<T> = {
+    current: T | null;
+};
+
+export function ref<T>(initialValue?: T): ZenithRef<T> {
     return { current: initialValue ?? null };
 }

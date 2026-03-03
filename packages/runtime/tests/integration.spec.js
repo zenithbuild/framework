@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as runtimeApi from '../src/index.js';
-import { hydrate } from '../src/hydrate.js';
-import { cleanup } from '../src/cleanup.js';
-import { zenOn, zenWindow } from '../src/index.js';
+import * as runtimeApi from '../dist/index.js';
+import { hydrate } from '../dist/hydrate.js';
+import { cleanup } from '../dist/cleanup.js';
+import { zenOn, zenWindow } from '../dist/index.js';
 
 describe('runtime API lock', () => {
     test('exports explicit hydration/reactivity functions', () => {

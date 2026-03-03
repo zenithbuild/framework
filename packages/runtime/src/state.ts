@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// state.js — Zenith Runtime V0
+// state.ts — Zenith Runtime V0
 // ---------------------------------------------------------------------------
 // Proxy-free immutable state helper.
 //
@@ -9,34 +9,39 @@
 //   store.set({ count: 1 });
 //   store.set((prev) => ({ ...prev, count: prev.count + 1 }));
 // ---------------------------------------------------------------------------
+
 import { _nextReactiveId, _trackDependency } from './zeneffect.js';
 
-function isPlainObject(value) {
+type PlainState = Record<string, unknown>;
+type StateUpdater<T extends PlainState> = T | ((prev: Readonly<T>) => T);
+
+function isPlainObject(value: unknown): value is PlainState {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return false;
     }
     return Object.prototype.toString.call(value) === '[object Object]';
 }
 
-function cloneSnapshot(value) {
+function cloneSnapshot<T>(value: T): T {
     if (Array.isArray(value)) {
-        return [...value];
+        return [...value] as T;
     }
     if (isPlainObject(value)) {
-        return { ...value };
+        return { ...value } as T;
     }
     return value;
 }
 
-/**
- * Create a proxy-free immutable state container.
- *
- * @param {object} initialValue
- * @returns {{ get: () => object, set: (patch: object | ((prev: object) => object)) => object, subscribe: (fn: (next: object) => void) => () => void }}
- */
-export function state(initialValue) {
-    let current = Object.freeze(cloneSnapshot(initialValue));
-    const subscribers = new Set();
+export type ZenithState<T extends PlainState> = {
+    __zenith_id: number;
+    get(): Readonly<T>;
+    set(patch: StateUpdater<T>): Readonly<T>;
+    subscribe(fn: (next: Readonly<T>) => void): () => void;
+};
+
+export function state<T extends PlainState>(initialValue: T): ZenithState<T> {
+    let current = Object.freeze(cloneSnapshot(initialValue)) as Readonly<T>;
+    const subscribers = new Set<(next: Readonly<T>) => void>();
     const reactiveId = _nextReactiveId();
 
     return {
@@ -50,11 +55,11 @@ export function state(initialValue) {
                 ? nextPatch(current)
                 : { ...current, ...nextPatch };
 
-            if (!nextValue || typeof nextValue !== 'object' || Array.isArray(nextValue)) {
+            if (!isPlainObject(nextValue)) {
                 throw new Error('[Zenith Runtime] state.set(next) must resolve to a plain object');
             }
 
-            const nextSnapshot = Object.freeze(cloneSnapshot(nextValue));
+            const nextSnapshot = Object.freeze(cloneSnapshot(nextValue)) as Readonly<T>;
             if (Object.is(current, nextSnapshot)) {
                 return current;
             }
@@ -62,8 +67,8 @@ export function state(initialValue) {
             current = nextSnapshot;
 
             const snapshot = [...subscribers];
-            for (let i = 0; i < snapshot.length; i++) {
-                snapshot[i](current);
+            for (let index = 0; index < snapshot.length; index += 1) {
+                snapshot[index](current);
             }
 
             return current;

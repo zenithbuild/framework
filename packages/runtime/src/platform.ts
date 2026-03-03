@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// platform.js — Zenith Runtime canonical DOM/platform helpers
+// platform.ts — Zenith Runtime canonical DOM/platform helpers
 // ---------------------------------------------------------------------------
 // zenOn: SSR-safe event subscription with disposer
 // zenResize: window resize handler with rAF throttle
@@ -8,65 +8,47 @@
 
 import { zenWindow } from './env.js';
 
-/**
- * @typedef {number} ZenTimerHandle
- */
+type ZenTimerHandle = number;
+type ResizeSize = { w: number; h: number };
 
-/**
- * SSR-safe event subscription. Returns disposer.
- * @param {EventTarget | null} target
- * @param {string} eventName
- * @param {EventListener} handler
- * @param {AddEventListenerOptions | boolean} [options]
- * @returns {() => void}
- */
-export function zenOn(target, eventName, handler, options) {
+export function zenOn(
+    target: EventTarget | null,
+    eventName: string,
+    handler: EventListener,
+    options?: AddEventListenerOptions | boolean
+): () => void {
     if (!target || typeof target.addEventListener !== 'function') {
         return () => {};
     }
+
     target.addEventListener(eventName, handler, options);
     return () => {
         target.removeEventListener(eventName, handler, options);
     };
 }
 
-/**
- * Window resize handler with requestAnimationFrame throttle.
- * Returns disposer.
- * @param {(size: { w: number; h: number }) => void} handler
- * @returns {() => void}
- */
-export function zenResize(handler) {
+export function zenResize(handler: (size: ResizeSize) => void): () => void {
     const win = zenWindow();
     if (!win || typeof win.addEventListener !== 'function') {
         return () => {};
     }
-    /** @type {Window} */
+
     const activeWindow = win;
     const hasRaf =
         typeof activeWindow.requestAnimationFrame === 'function'
         && typeof activeWindow.cancelAnimationFrame === 'function';
-    /** @type {ZenTimerHandle | null} */
-    let scheduledId = null;
+    let scheduledId: ZenTimerHandle | null = null;
     let lastW = Number.NaN;
     let lastH = Number.NaN;
 
-    /**
-     * @param {FrameRequestCallback} callback
-     * @returns {ZenTimerHandle}
-     */
-    const schedule = (callback) => {
+    const schedule = (callback: FrameRequestCallback): ZenTimerHandle => {
         if (hasRaf) {
             return activeWindow.requestAnimationFrame(callback);
         }
         return activeWindow.setTimeout(callback, 0);
     };
 
-    /**
-     * @param {ZenTimerHandle} id
-     * @returns {void}
-     */
-    const cancel = (id) => {
+    const cancel = (id: ZenTimerHandle): void => {
         if (hasRaf) {
             activeWindow.cancelAnimationFrame(id);
             return;
@@ -74,7 +56,7 @@ export function zenResize(handler) {
         activeWindow.clearTimeout(id);
     };
 
-    function onResize() {
+    function onResize(): void {
         if (scheduledId !== null) return;
         scheduledId = schedule(() => {
             scheduledId = null;
@@ -100,15 +82,12 @@ export function zenResize(handler) {
     };
 }
 
-/**
- * Deterministic null-filtered collection of ref.current values.
- * @param {...{ current?: Element | null }} refs
- * @returns {Element[]}
- */
-export function collectRefs(...refs) {
-    const out = [];
-    for (let i = 0; i < refs.length; i++) {
-        const node = refs[i] && refs[i].current;
+type RefLike<T extends Element> = { current?: T | null } | null | undefined;
+
+export function collectRefs<T extends Element>(...refs: RefLike<T>[]): T[] {
+    const out: T[] = [];
+    for (let index = 0; index < refs.length; index += 1) {
+        const node = refs[index]?.current;
         if (node && typeof node === 'object' && typeof node.nodeType === 'number') {
             out.push(node);
         }
