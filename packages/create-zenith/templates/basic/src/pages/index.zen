@@ -1,0 +1,24 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Basic Starter"
+    };
+</script>
+
+<script setup="ts">
+const count = signal(0);
+
+function increment() {
+    count.set(count.get() + 1);
+}
+</script>
+
+<DefaultLayout>
+    <section class="container">
+        <h1>Zenith Basic Starter</h1>
+        <p>Start with a single route, a minimal layout, and plain global CSS.</p>
+        <div class="actions">
+            <button on:click={increment} class="button">Count: {count}</button>
+            <span class="link">Add routes later under <code>src/pages</code>.</span>
+        </div>
+    </section>
+</DefaultLayout>

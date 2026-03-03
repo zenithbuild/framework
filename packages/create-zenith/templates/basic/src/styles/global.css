@@ -1,0 +1,61 @@
+:root {
+    color-scheme: dark;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #030712;
+    color: #e2e8f0;
+}
+
+a {
+    color: #60a5fa;
+}
+
+.site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #1e293b;
+}
+
+.brand {
+    color: #f8fafc;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.site-main {
+    padding: 2rem 1.5rem 3rem;
+}
+
+.container {
+    max-width: 48rem;
+    margin: 0 auto;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.button {
+    border: 1px solid #334155;
+    background: #1d4ed8;
+    color: #ffffff;
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.link {
+    font-weight: 600;
+}

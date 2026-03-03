@@ -1,12 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+    cpSync,
+    existsSync,
+    mkdtempSync,
+    readFileSync,
+    readdirSync,
+    rmSync,
+    writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const CLI_PATH = resolve(process.cwd(), 'dist', 'cli.js');
+const PACKAGE_ROOT = resolve(process.cwd());
 const WORKSPACE_ROOT = resolve(process.cwd(), '..', '..');
 const LOCAL_ZENITH_PACKAGES = [
     resolve(WORKSPACE_ROOT, 'packages', 'core'),
@@ -33,6 +42,53 @@ const FORBIDDEN_BUILD_PATTERNS = [
     /history\.pushState/,
     /history\.replaceState/
 ];
+const TEMPLATE_MATRIX = {
+    basic: {
+        styleFile: 'src/styles/global.css',
+        usesTailwind: false,
+        routes: ['/'],
+        presentFiles: [
+            'src/layouts/DefaultLayout.zen',
+            'src/pages/index.zen',
+            'src/public/logo.svg'
+        ],
+        absentFiles: [
+            'pages',
+            'src/pages/about.zen',
+            'src/pages/blog.zen',
+            'src/pages/docs.zen',
+            'src/styles/globals.css'
+        ]
+    },
+    css: {
+        styleFile: 'src/styles/global.css',
+        usesTailwind: false,
+        routes: ['/', '/about', '/blog', '/docs'],
+        presentFiles: [
+            'src/layouts/DefaultLayout.zen',
+            'src/pages/index.zen',
+            'src/pages/about.zen',
+            'src/pages/blog.zen',
+            'src/pages/docs.zen',
+            'src/public/logo.svg'
+        ],
+        absentFiles: ['src/styles/globals.css']
+    },
+    tailwind: {
+        styleFile: 'src/styles/globals.css',
+        usesTailwind: true,
+        routes: ['/', '/about', '/blog', '/docs'],
+        presentFiles: [
+            'src/layouts/DefaultLayout.zen',
+            'src/pages/index.zen',
+            'src/pages/about.zen',
+            'src/pages/blog.zen',
+            'src/pages/docs.zen',
+            'src/public/logo.svg'
+        ],
+        absentFiles: ['src/styles/global.css']
+    }
+};
 
 function sanitizeChildEnv(env) {
     const next = { ...env };
@@ -59,9 +115,9 @@ function collectFiles(rootDir, matcher) {
     const queue = [rootDir];
     while (queue.length > 0) {
         const current = queue.pop();
-        for (const name of readdirSync(current, { withFileTypes: true })) {
-            const fullPath = join(current, name.name);
-            if (name.isDirectory()) {
+        for (const entry of readdirSync(current, { withFileTypes: true })) {
+            const fullPath = join(current, entry.name);
+            if (entry.isDirectory()) {
                 queue.push(fullPath);
                 continue;
             }
@@ -70,7 +126,28 @@ function collectFiles(rootDir, matcher) {
             }
         }
     }
-    return files;
+    return files.sort();
+}
+
+function scaffoldProject(
+    tempRoot,
+    name,
+    template,
+    { eslint = true, prettier = true, cliPath = CLI_PATH } = {}
+) {
+    const args = [cliPath, name, '--template', template];
+    run(process.execPath, args, tempRoot, {
+        ...process.env,
+        ZENITH_NO_UI: '1',
+        CI: '1',
+        NO_COLOR: '1',
+        CREATE_ZENITH_ESLINT: eslint ? '1' : '0',
+        CREATE_ZENITH_PRETTIER: prettier ? '1' : '0',
+        CREATE_ZENITH_TEMPLATE_MODE: 'local',
+        CREATE_ZENITH_SKIP_INSTALL: '1'
+    });
+
+    return join(tempRoot, name);
 }
 
 function assertSourceContracts(projectDir) {
@@ -84,22 +161,19 @@ function assertSourceContracts(projectDir) {
     assert.equal(combined.includes('on:click={'), true, 'Expected at least one on:click handler in template source');
 }
 
-function assertPackageDependencies(projectDir) {
-    const pkgPath = join(projectDir, 'package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+function assertPackageDependencies(projectDir, template) {
+    const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
     const zenithDeps = Object.keys(pkg.dependencies || {}).filter((dep) => dep.startsWith('@zenithbuild/'));
+    const devDependencies = pkg.devDependencies || {};
 
     assert.deepEqual(zenithDeps, ['@zenithbuild/core'], 'Template must only directly depend on @zenithbuild/core');
-    assert.equal(
-        String(pkg.dependencies['@zenithbuild/core']),
-        'latest',
-        'Core dependency must install the current stable @zenithbuild/core release'
-    );
+    assert.equal(String(pkg.dependencies['@zenithbuild/core']), 'latest');
+    assert.equal(typeof devDependencies.tailwindcss === 'string', TEMPLATE_MATRIX[template].usesTailwind);
+    assert.equal(typeof devDependencies['@tailwindcss/cli'] === 'string', TEMPLATE_MATRIX[template].usesTailwind);
 }
 
 function assertToolingSelection(projectDir, { eslint, prettier }) {
-    const pkgPath = join(projectDir, 'package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
     const devDependencies = pkg.devDependencies || {};
     const scripts = pkg.scripts || {};
 
@@ -117,51 +191,31 @@ function assertToolingSelection(projectDir, { eslint, prettier }) {
     assert.equal(typeof devDependencies.prettier === 'string', prettier, 'prettier dependency presence mismatch');
 }
 
-function assertBuildArtifacts(projectDir) {
-    const distDir = join(projectDir, 'dist');
-    const indexHtmlPath = join(distDir, 'index.html');
-    const aboutHtmlPath = join(distDir, 'about', 'index.html');
-    const blogHtmlPath = join(distDir, 'blog', 'index.html');
-    const docsHtmlPath = join(distDir, 'docs', 'index.html');
+function assertTemplateShape(projectDir, template) {
+    const config = TEMPLATE_MATRIX[template];
+    const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
 
-    assert.equal(existsSync(distDir), true, 'dist directory was not created');
-    assert.equal(existsSync(indexHtmlPath), true, 'dist/index.html missing');
-    assert.equal(existsSync(aboutHtmlPath), true, 'dist/about/index.html missing');
-    assert.equal(existsSync(blogHtmlPath), true, 'dist/blog/index.html missing');
-    assert.equal(existsSync(docsHtmlPath), true, 'dist/docs/index.html missing');
-}
+    assert.equal(existsSync(join(projectDir, config.styleFile)), true, `Missing template style file for ${template}`);
 
-async function assertPreviewPayload(projectDir) {
-    const previewModulePath = join(projectDir, 'node_modules', '@zenithbuild', 'cli', 'dist', 'preview.js');
-    assert.equal(existsSync(previewModulePath), true, `Missing preview module at ${previewModulePath}`);
-    const { createPreviewServer } = await import(pathToFileURL(previewModulePath).href);
-    const preview = await createPreviewServer({
-        distDir: join(projectDir, 'dist'),
-        port: 0
-    });
-    try {
-        for (const route of ['/', '/about', '/blog', '/docs']) {
-            const response = await fetch(`http://127.0.0.1:${preview.port}${route}`);
-            const html = await response.text();
-
-            assert.equal(response.status, 200, `Preview server did not return 200 for "${route}"`);
-            const payloadMatches = html.match(/id=\"zenith-ssr-data\"/g) || [];
-            assert.equal(payloadMatches.length, 1, `Expected exactly one SSR payload script in "${route}"`);
-
-            for (const pattern of FORBIDDEN_BUILD_PATTERNS) {
-                assert.equal(pattern.test(html), false, `Forbidden build output pattern (${route}): ${pattern}`);
-            }
-        }
-    } finally {
-        preview.close();
-    }
-}
-
-function installForBuild(projectDir, withTailwind) {
-    for (const localPackage of LOCAL_ZENITH_PACKAGES) {
-        assert.equal(existsSync(localPackage), true, `Missing local package path: ${localPackage}`);
+    for (const relativePath of config.presentFiles) {
+        assert.equal(existsSync(join(projectDir, relativePath)), true, `Missing ${relativePath} for ${template}`);
     }
 
+    for (const relativePath of config.absentFiles) {
+        assert.equal(existsSync(join(projectDir, relativePath)), false, `Unexpected ${relativePath} for ${template}`);
+    }
+
+    const configSource = readFileSync(join(projectDir, 'zenith.config.js'), 'utf8');
+    if (template === 'basic') {
+        assert.match(configSource, /router:\s*false/);
+    } else {
+        assert.doesNotMatch(configSource, /router:\s*false/);
+    }
+
+    assert.equal(pkg.name, basename(projectDir), 'scaffolded package name should match project directory');
+}
+
+function installForBuild(projectDir, template) {
     const args = [
         'install',
         '--no-save',
@@ -172,10 +226,7 @@ function installForBuild(projectDir, withTailwind) {
         ...LOCAL_ZENITH_PACKAGES
     ];
 
-    if (withTailwind) {
-        for (const localPackage of LOCAL_TAILWIND_PACKAGES) {
-            assert.equal(existsSync(localPackage), true, `Missing local package path: ${localPackage}`);
-        }
+    if (TEMPLATE_MATRIX[template].usesTailwind) {
         args.push(...LOCAL_TAILWIND_PACKAGES);
     }
 
@@ -184,8 +235,6 @@ function installForBuild(projectDir, withTailwind) {
 
 function patchRuntimeTemplateExport(projectDir) {
     const runtimePackagePath = join(projectDir, 'node_modules', '@zenithbuild', 'runtime', 'package.json');
-    assert.equal(existsSync(runtimePackagePath), true, `Missing runtime package.json at ${runtimePackagePath}`);
-
     const runtimePkg = JSON.parse(readFileSync(runtimePackagePath, 'utf8'));
     const exportsMap = runtimePkg.exports && typeof runtimePkg.exports === 'object' ? runtimePkg.exports : {};
 
@@ -196,83 +245,167 @@ function patchRuntimeTemplateExport(projectDir) {
     }
 }
 
-function scaffoldProject(tempRoot, name, withTailwind, { eslint = true, prettier = true } = {}) {
-    const args = [CLI_PATH, name];
-    if (withTailwind) {
-        args.push('--with-tailwind');
+function assertBuildArtifacts(projectDir, template) {
+    const distDir = join(projectDir, 'dist');
+
+    assert.equal(existsSync(distDir), true, 'dist directory was not created');
+    assert.equal(existsSync(join(distDir, 'index.html')), true, 'dist/index.html missing');
+
+    for (const route of TEMPLATE_MATRIX[template].routes.filter((routePath) => routePath !== '/')) {
+        const routeDir = route.slice(1);
+        assert.equal(existsSync(join(distDir, routeDir, 'index.html')), true, `dist/${routeDir}/index.html missing`);
     }
 
-    run(process.execPath, args, tempRoot, {
-        ...process.env,
-        ZENITH_NO_UI: '1',
-        CI: '1',
-        NO_COLOR: '1',
-        CREATE_ZENITH_ESLINT: eslint ? '1' : '0',
-        CREATE_ZENITH_PRETTIER: prettier ? '1' : '0',
-        CREATE_ZENITH_TEMPLATE_MODE: 'local',
-        CREATE_ZENITH_SKIP_INSTALL: '1'
-    });
-
-    return join(tempRoot, name);
+    if (template === 'basic') {
+        for (const routeDir of ['about', 'blog', 'docs']) {
+            assert.equal(existsSync(join(distDir, routeDir, 'index.html')), false, `dist/${routeDir}/index.html should not exist`);
+        }
+    }
 }
 
-test('starter template scaffolds, installs, and builds clean', async () => {
-    assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
-
-    const tempRoot = mkdtempSync(join(tmpdir(), 'create-zenith-starter-'));
-    const projectDir = scaffoldProject(tempRoot, 'starter-smoke', false);
+async function assertPreviewPayload(projectDir, template) {
+    const previewModulePath = join(projectDir, 'node_modules', '@zenithbuild', 'cli', 'dist', 'preview.js');
+    const { createPreviewServer } = await import(pathToFileURL(previewModulePath).href);
+    const preview = await createPreviewServer({
+        distDir: join(projectDir, 'dist'),
+        port: 0
+    });
 
     try {
-        assertPackageDependencies(projectDir);
-        assertSourceContracts(projectDir);
-        installForBuild(projectDir, false);
-        patchRuntimeTemplateExport(projectDir);
-        run('npx', ['--no-install', 'zenith', 'build'], projectDir);
-        assertBuildArtifacts(projectDir);
-        await assertPreviewPayload(projectDir);
+        for (const route of TEMPLATE_MATRIX[template].routes) {
+            const response = await fetch(`http://127.0.0.1:${preview.port}${route}`);
+            const html = await response.text();
+
+            assert.equal(response.status, 200, `Preview server did not return 200 for "${route}"`);
+            assert.equal((html.match(/id=\"zenith-ssr-data\"/g) || []).length, 1, `Expected exactly one SSR payload script in "${route}"`);
+
+            for (const pattern of FORBIDDEN_BUILD_PATTERNS) {
+                assert.equal(pattern.test(html), false, `Forbidden build output pattern (${route}): ${pattern}`);
+            }
+        }
+    } finally {
+        preview.close();
+    }
+}
+
+function snapshotTree(rootDir) {
+    const files = collectFiles(rootDir, (file) => {
+        const rel = relative(rootDir, file);
+        return !rel.startsWith('dist/')
+            && !rel.startsWith('node_modules/')
+            && rel !== 'package-lock.json'
+            && rel !== 'bun.lock';
+    });
+
+    return files.map((file) => {
+        const rel = relative(rootDir, file);
+        return `${rel}\n${readFileSync(file, 'utf8')}`;
+    }).join('\n---\n');
+}
+
+function createExamplesFreeCliFixture() {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'create-zenith-package-fixture-'));
+    const packageRoot = join(fixtureRoot, 'create-zenith');
+
+    cpSync(join(PACKAGE_ROOT, 'dist'), join(packageRoot, 'dist'), { recursive: true });
+    cpSync(join(PACKAGE_ROOT, 'templates'), join(packageRoot, 'templates'), { recursive: true });
+    cpSync(join(PACKAGE_ROOT, 'package.json'), join(packageRoot, 'package.json'));
+
+    return {
+        fixtureRoot,
+        packageRoot,
+        cliPath: join(packageRoot, 'dist', 'cli.js')
+    };
+}
+
+test('scaffolder works without examples present', () => {
+    assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
+
+    const fixture = createExamplesFreeCliFixture();
+    const tempRoot = mkdtempSync(join(tmpdir(), 'create-zenith-no-examples-'));
+
+    try {
+        const projectDir = scaffoldProject(tempRoot, 'starter-no-examples', 'css', {
+            cliPath: fixture.cliPath
+        });
+
+        assert.equal(existsSync(join(projectDir, 'package.json')), true, 'scaffolded package.json missing');
+        assert.equal(existsSync(join(projectDir, 'src', 'pages', 'index.zen')), true, 'template source missing');
     } finally {
         rmSync(tempRoot, { recursive: true, force: true });
+        rmSync(fixture.fixtureRoot, { recursive: true, force: true });
     }
 });
 
-for (const [eslint, prettier] of [
-    [true, true],
-    [true, false],
-    [false, true],
-    [false, false]
-]) {
-    test(`starter template applies optional tooling correctly (eslint=${eslint}, prettier=${prettier})`, () => {
+for (const template of Object.keys(TEMPLATE_MATRIX)) {
+    test(`${template} template scaffolds, installs, and builds clean`, async () => {
         assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
 
-        const tempRoot = mkdtempSync(join(tmpdir(), `create-zenith-tooling-${eslint}-${prettier}-`));
-        const projectDir = scaffoldProject(tempRoot, `starter-tooling-${eslint}-${prettier}`, false, {
-            eslint,
-            prettier
-        });
+        const tempRoot = mkdtempSync(join(tmpdir(), `create-zenith-${template}-`));
+        const projectDir = scaffoldProject(tempRoot, `${template}-smoke`, template);
 
         try {
-            assertToolingSelection(projectDir, { eslint, prettier });
+            assertPackageDependencies(projectDir, template);
+            assertSourceContracts(projectDir);
+            assertTemplateShape(projectDir, template);
+            installForBuild(projectDir, template);
+            patchRuntimeTemplateExport(projectDir);
+            run('npx', ['--no-install', 'zenith', 'build'], projectDir);
+            assertBuildArtifacts(projectDir, template);
+            await assertPreviewPayload(projectDir, template);
         } finally {
             rmSync(tempRoot, { recursive: true, force: true });
         }
     });
 }
 
-test('starter-tailwindcss template scaffolds, installs, and builds clean', async () => {
-    assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
+for (const template of Object.keys(TEMPLATE_MATRIX)) {
+    for (const [eslint, prettier] of [
+        [true, true],
+        [true, false],
+        [false, true],
+        [false, false]
+    ]) {
+        test(`${template} template applies optional tooling correctly (eslint=${eslint}, prettier=${prettier})`, () => {
+            assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
 
-    const tempRoot = mkdtempSync(join(tmpdir(), 'create-zenith-tailwind-'));
-    const projectDir = scaffoldProject(tempRoot, 'starter-tailwind-smoke', true);
+            const tempRoot = mkdtempSync(join(tmpdir(), `create-zenith-${template}-${eslint}-${prettier}-`));
+            const projectDir = scaffoldProject(tempRoot, `${template}-tooling-${eslint}-${prettier}`, template, {
+                eslint,
+                prettier
+            });
 
-    try {
-        assertPackageDependencies(projectDir);
-        assertSourceContracts(projectDir);
-        installForBuild(projectDir, true);
-        patchRuntimeTemplateExport(projectDir);
-        run('npx', ['--no-install', 'zenith', 'build'], projectDir);
-        assertBuildArtifacts(projectDir);
-        await assertPreviewPayload(projectDir);
-    } finally {
-        rmSync(tempRoot, { recursive: true, force: true });
+            try {
+                assertToolingSelection(projectDir, { eslint, prettier });
+                assertTemplateShape(projectDir, template);
+            } finally {
+                rmSync(tempRoot, { recursive: true, force: true });
+            }
+        });
     }
-});
+}
+
+for (const template of Object.keys(TEMPLATE_MATRIX)) {
+    test(`${template} template scaffolding is deterministic`, () => {
+        assert.equal(existsSync(CLI_PATH), true, 'dist/cli.js missing; run npm run build first');
+
+        const tempRoot = mkdtempSync(join(tmpdir(), `create-zenith-determinism-${template}-`));
+        const tempRootB = mkdtempSync(join(tmpdir(), `create-zenith-determinism-${template}-`));
+
+        try {
+            const projectA = scaffoldProject(tempRoot, `${template}-deterministic`, template, {
+                eslint: false,
+                prettier: false
+            });
+            const projectB = scaffoldProject(tempRootB, `${template}-deterministic`, template, {
+                eslint: false,
+                prettier: false
+            });
+
+            assert.equal(snapshotTree(projectA), snapshotTree(projectB));
+        } finally {
+            rmSync(tempRoot, { recursive: true, force: true });
+            rmSync(tempRootB, { recursive: true, force: true });
+        }
+    });
+}

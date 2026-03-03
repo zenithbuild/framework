@@ -36,7 +36,7 @@ test('scaffold output is deterministic in plain mode', () => {
         assert.equal(ANSI_REGEX.test(output), false)
         assert.match(output, /SCAFFOLD PLAN/)
         assert.match(output, /Project : gate5-demo-app/)
-        assert.match(output, /Template: starter-tailwindcss/)
+        assert.match(output, /Template: tailwind/)
         assert.match(output, /NEXT STEPS:/)
 
         assert.match(output, /^ZENITH - Modern Reactive Framework/m)

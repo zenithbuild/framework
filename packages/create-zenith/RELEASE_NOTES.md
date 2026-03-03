@@ -1,26 +1,27 @@
-# 🚀 create-zenith v1.3.19
+# 🚀 create-zenith v1.3.20
 
-## [1.3.19] - 2026-03-02
+## [1.3.20] - 2026-03-03
 
-### 🐛 Bug Fixes
+### ♻️ Refactors
 
-- ESLint and Prettier are now fully optional scaffold features: choosing `No` leaves zero scripts, dependencies, config files, ignore files, or template references for that tool in the generated project.
-- Base starter templates are now tool-agnostic, and optional tooling is layered in through explicit feature overlays at scaffold time.
+- Starter scaffolding now reads only from `templates/basic`, `templates/css`, and `templates/tailwind`.
+- The template tree is now the single source of truth for scaffolded apps; `examples/` is demo-only and no longer drives generation.
 
-### 📚 Documentation
+### 🧪 Verification
 
-- Documented the optional tooling contract in the package README and canonical install/create docs so users know exactly what gets generated when they opt in or out.
+- Added matrix coverage for all three templates plus ESLint/Prettier on/off combinations.
+- Verified template scaffolds remain deterministic and install/build clean from local packaged output.
 
 ## 📦 Installation
 
 ```bash
-bun add create-zenith@1.3.19
+bun add create-zenith@1.3.20
 ```
 
 *or with npm:*
 
 ```bash
-npm install create-zenith@1.3.19
+npm install create-zenith@1.3.20
 ```
 
 ---

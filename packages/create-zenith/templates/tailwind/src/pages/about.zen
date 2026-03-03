@@ -1,0 +1,20 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Tailwind Starter About"
+    };
+</script>
+
+<DefaultLayout>
+    <section class="mx-auto max-w-3xl space-y-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
+        <h1 class="text-3xl font-semibold text-slate-100">About This Tailwind Starter</h1>
+        <p class="text-slate-300">
+            Tailwind entry lives in <code>src/styles/globals.css</code>, and Zenith compiles it
+            internally during <code>zenith dev</code> and <code>zenith build</code>.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-sky-300">
+            <a href="/" class="underline-offset-4 hover:underline">Back to home</a>
+            <a href="/blog" class="underline-offset-4 hover:underline">Visit blog</a>
+            <a href="/docs" class="underline-offset-4 hover:underline">Visit docs</a>
+        </div>
+    </section>
+</DefaultLayout>

@@ -1,0 +1,26 @@
+<script setup="ts">
+import "../styles/global.css";
+</script>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zenith Starter</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+</head>
+<body>
+    <header class="site-header">
+        <a href="/" class="brand">Zenith Starter</a>
+        <nav class="site-nav">
+            <a href="/">Home</a>
+            <a href="/about">About</a>
+            <a href="/blog">Blog</a>
+            <a href="/docs">Docs</a>
+        </nav>
+    </header>
+    <main class="site-main">
+        <slot />
+    </main>
+</body>
+</html>

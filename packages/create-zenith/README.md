@@ -17,6 +17,7 @@ The official CLI for scaffolding new Zenith applications. Fast, animated, and de
 - **Interactive UX**: Built with `@clack/prompts` for intuitive arrow-key navigation and clear visual indicators.
 - **Reliable Fallbacks**: Automatically detects CI environments and non-TTY pipes to provide clean, static output.
 - **Smart Detection**: automatically detects your preferred package manager (Bun, pnpm, Yarn, or npm).
+- **Template Authority**: Scaffold generation now reads only from `templates/` (`basic`, `css`, `tailwind`), which is the single source of truth for starter projects.
 - **Tool-Agnostic Output**: ESLint, Prettier, and TypeScript path aliases are opt-in. If you answer `No`, the generated project contains no scripts, dependencies, config files, or ignore files for that tool.
 
 ## Quick Start
@@ -65,8 +66,14 @@ If you see version mismatches after install, delete `node_modules` and `package-
 
 - Generated apps now depend on `@zenithbuild/core@latest` so new installs track the current stable framework release.
 - Template downloads now resolve from `zenithbuild/framework`, which is the active monorepo source of truth.
+- Starter templates now live under `templates/`, and the scaffolder no longer depends on `examples/`.
 - ESLint and Prettier are now feature overlays, so opting out leaves no stray config or dependency references in the scaffolded app.
 - Verified scaffold → install → build coverage lives in `tests/template-regression.spec.mjs`.
+
+## Templates vs Examples
+
+- `templates/` is authoritative for scaffolding.
+- `examples/` is demo-only when present and is not part of the scaffold source of truth.
 
 ## Development
 

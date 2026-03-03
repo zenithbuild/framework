@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.20] - 2026-03-03
+
+### ♻️ Refactors
+
+- Migrated starter scaffolding to `templates/basic`, `templates/css`, and `templates/tailwind` so templates are the single source of truth and `examples/` is no longer used by the generator.
+- Kept ESLint and Prettier as feature overlays on top of the selected template, preserving zero-artifact opt-out behavior for both tools.
+
 ## [1.3.19] - 2026-03-02
 
 ### 🐛 Bug Fixes

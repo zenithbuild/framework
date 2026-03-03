@@ -1,20 +1,20 @@
 {
   "name": "create-zenith",
-  "version": "1.3.19",
+  "version": "1.3.20",
   "description": "Create a new Zenith application - the modern reactive web framework",
   "type": "module",
   "bin": {
     "create-zenith": "dist/cli.js"
   },
   "files": [
-    "dist/**"
+    "dist/**",
+    "templates/**"
   ],
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node --format esm && node -e \"const fs=require('fs');const c=fs.readFileSync('dist/index.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env node\\n'+c);fs.chmodSync('dist/cli.js','755')\"",
     "prepublishOnly": "npm run build",
     "create": "bun src/index.ts",
-    "example": "rm -rf examples/test-template && bun src/index.ts test-template && mv test-template examples/",
-    "test": "node --test tests/*.spec.mjs",
+    "test": "bun run build && node --test tests/*.spec.mjs",
     "release": "bun run scripts/release.ts",
     "release:dry": "bun run scripts/release.ts --dry-run",
     "release:patch": "bun run scripts/release.ts --bump=patch",

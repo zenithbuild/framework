@@ -16,19 +16,24 @@ import * as brand from './branding.js'
 import * as prompts from './prompts.js'
 import { getUiMode } from './ui/env.js'
 import { applyPackageFeatures, selectedTemplateFeaturePaths } from './template-features.js'
+import {
+    DEFAULT_TEMPLATE,
+    getTemplateDefinition,
+    resolveTemplateName,
+    templateSelectOptions,
+    type TemplateName
+} from './templates.js'
 
 export interface ProjectOptions {
     name: string
     eslint: boolean
     prettier: boolean
     pathAlias: boolean
-    tailwind: boolean
+    template: TemplateName
 }
 
 // GitHub repository info
 const GITHUB_REPO = 'zenithbuild/framework'
-const DEFAULT_TEMPLATE = 'examples/starter'
-const TAILWIND_TEMPLATE = 'examples/starter-tailwindcss'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -187,13 +192,29 @@ function readOptionOverride(name: string): boolean | undefined {
     return flagEnabled(value)
 }
 
+function readTemplateOverride(name: string): TemplateName | undefined {
+    const value = process.env[name]
+    if (value == null || value.trim() === '') {
+        return undefined
+    }
+
+    const templateName = resolveTemplateName(value)
+    if (!templateName) {
+        throw new Error(`Unsupported template "${value}". Use basic, css, or tailwind.`)
+    }
+
+    return templateName
+}
+
 /**
  * Gather all project options through interactive prompts
  */
-async function gatherOptions(providedName?: string, withTailwind?: boolean): Promise<ProjectOptions> {
+async function gatherOptions(providedName?: string, requestedTemplate?: TemplateName): Promise<ProjectOptions> {
     const eslintOverride = readOptionOverride('CREATE_ZENITH_ESLINT')
     const prettierOverride = readOptionOverride('CREATE_ZENITH_PRETTIER')
     const pathAliasOverride = readOptionOverride('CREATE_ZENITH_PATH_ALIAS')
+    const templateOverride = readTemplateOverride('CREATE_ZENITH_TEMPLATE')
+    const selectedTemplate = requestedTemplate || templateOverride || DEFAULT_TEMPLATE
 
     // Project name - REQUIRED
     let name = providedName
@@ -243,16 +264,19 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
             eslint: eslintOverride ?? true,
             prettier: prettierOverride ?? true,
             pathAlias: pathAliasOverride ?? true,
-            tailwind: withTailwind ?? false
+            template: selectedTemplate
         }
     }
 
     // Interactive prompts with visual indicators
-    const tailwindResult = (withTailwind !== undefined) ? withTailwind : await prompts.confirm({
-        message: 'Add Tailwind CSS for styling?',
-        initialValue: true
+    const templateResult = requestedTemplate ?? templateOverride ?? await prompts.select({
+        message: 'Choose a starter template',
+        options: templateSelectOptions(),
+        initialValue: DEFAULT_TEMPLATE
     })
-    if (prompts.isCancel(tailwindResult)) prompts.handleCancel()
+    if (requestedTemplate === undefined && templateOverride === undefined && prompts.isCancel(templateResult)) {
+        prompts.handleCancel()
+    }
     const eslintResult = eslintOverride ?? await prompts.confirm({
         message: 'Add ESLint for code linting?',
         initialValue: true
@@ -276,7 +300,7 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
         eslint: eslintResult as boolean,
         prettier: prettierResult as boolean,
         pathAlias: pathAliasResult as boolean,
-        tailwind: tailwindResult as boolean
+        template: templateResult as TemplateName
     }
 }
 
@@ -285,7 +309,7 @@ async function gatherOptions(providedName?: string, withTailwind?: boolean): Pro
  */
 async function createProject(options: ProjectOptions): Promise<void> {
     const targetDir = path.resolve(process.cwd(), options.name)
-    const templatePath = options.tailwind ? TAILWIND_TEMPLATE : DEFAULT_TEMPLATE
+    const templatePath = getTemplateDefinition(options.template).templatePath
     const templateFeaturePaths = selectedTemplateFeaturePaths(options)
 
     // Download template from GitHub
@@ -323,13 +347,13 @@ async function createProject(options: ProjectOptions): Promise<void> {
 /**
  * Main create command
  */
-async function create(appName?: string, withTailwind?: boolean): Promise<void> {
+async function create(appName?: string, requestedTemplate?: TemplateName): Promise<void> {
     // Show branded animated intro
     await prompts.intro()
 
     // Gather project options
-    const options = await gatherOptions(appName, withTailwind)
-    const templateLabel = options.tailwind ? 'starter-tailwindcss' : 'starter'
+    const options = await gatherOptions(appName, requestedTemplate)
+    const templateLabel = getTemplateDefinition(options.template).name
 
     brand.showScaffoldSummary(options.name, templateLabel)
 
@@ -392,7 +416,8 @@ if (args.includes('--help') || args.includes('-h')) {
     console.log('Options:')
     console.log('  -h, --help           Show this help message')
     console.log('  -v, --version        Show version number')
-    console.log('  --with-tailwind      Initialize with Tailwind CSS v4 template')
+    console.log('  --template <name>    Choose template: basic, css, or tailwind')
+    console.log('  --with-tailwind      Alias for --template tailwind')
     console.log('')
     console.log('Examples:')
     console.log('  npx create-zenith my-app')
@@ -408,14 +433,35 @@ if (args.includes('--version') || args.includes('-v')) {
     process.exit(0)
 }
 
-// Get project name from arguments (first non-flag argument)
-const projectName = args.find((arg: string) => !arg.startsWith('-'))
+let projectName: string | undefined
+let requestedTemplate: TemplateName | undefined
 
-// Check for Tailwind flag
-const withTailwind = args.includes('--with-tailwind') ? true : undefined
+for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--with-tailwind') {
+        requestedTemplate = 'tailwind'
+        continue
+    }
+
+    if (arg === '--template') {
+        const templateValue = args[index + 1]
+        const templateName = resolveTemplateName(templateValue)
+        if (!templateName) {
+            brand.error(`Unsupported template "${templateValue || ''}". Use basic, css, or tailwind.`)
+            process.exit(1)
+        }
+        requestedTemplate = templateName
+        index += 1
+        continue
+    }
+
+    if (!arg.startsWith('-') && !projectName) {
+        projectName = arg
+    }
+}
 
 // Run the create command
-create(projectName, withTailwind).catch((err: unknown) => {
+create(projectName, requestedTemplate).catch((err: unknown) => {
     const mode = getUiMode(process)
     if (mode.plain) {
         console.log('ERROR: SCAFFOLD_ERROR')

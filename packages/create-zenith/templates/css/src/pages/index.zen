@@ -1,0 +1,26 @@
+<script server lang="ts">
+    export const data = {
+        pageTitle: "Zenith Starter Home"
+    };
+</script>
+
+<script setup="ts">
+const count = signal(0);
+
+function increment() {
+    count.set(count.get() + 1);
+}
+</script>
+
+<DefaultLayout>
+    <section class="container">
+        <h1>Zenith Starter</h1>
+        <p>Build with compile-time first defaults.</p>
+        <div class="actions">
+            <button on:click={increment} class="button">Count: {count}</button>
+            <a href="/about" class="link">Visit about page</a>
+            <a href="/blog" class="link">Read blog page</a>
+            <a href="/docs" class="link">Open docs page</a>
+        </div>
+    </section>
+</DefaultLayout>
