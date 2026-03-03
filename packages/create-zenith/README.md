@@ -17,7 +17,7 @@ The official CLI for scaffolding new Zenith applications. Fast, animated, and de
 - **Interactive UX**: Built with `@clack/prompts` for intuitive arrow-key navigation and clear visual indicators.
 - **Reliable Fallbacks**: Automatically detects CI environments and non-TTY pipes to provide clean, static output.
 - **Smart Detection**: automatically detects your preferred package manager (Bun, pnpm, Yarn, or npm).
-- **Batteries Included**: Optional setup for ESLint, Prettier, and TypeScript path aliases.
+- **Tool-Agnostic Output**: ESLint, Prettier, and TypeScript path aliases are opt-in. If you answer `No`, the generated project contains no scripts, dependencies, config files, or ignore files for that tool.
 
 ## Quick Start
 
@@ -40,6 +40,21 @@ pnpm create zenith
 | `-h, --help` | Show usage information |
 | `-v, --version` | Show version number |
 
+## Optional Tooling Contract
+
+During scaffold, `create-zenith` asks whether to include:
+
+- ESLint
+- Prettier
+- TypeScript path aliases
+
+Tooling behavior is strict:
+
+- If you enable ESLint, the project gets `eslint.config.js`, lint scripts, and matching ESLint dependencies.
+- If you disable ESLint, the project contains zero ESLint references.
+- If you enable Prettier, the project gets `.prettierrc`, `.prettierignore`, a format script, and the Prettier dependency.
+- If you disable Prettier, the project contains zero Prettier references.
+
 ## Beta Version Pinning
 
 Zenith beta currently pins `@zenithbuild/core` to `0.5.0-beta.2.20` and leaf packages (compiler, cli, runtime, router, bundler) to `0.5.0-beta.2.20`. This is intentional — core contains the CLI entry point and may bump independently for bin/CLI fixes without touching the engine.
@@ -50,6 +65,7 @@ If you see version mismatches after install, delete `node_modules` and `package-
 
 - Generated apps now depend on `@zenithbuild/core@latest` so new installs track the current stable framework release.
 - Template downloads now resolve from `zenithbuild/framework`, which is the active monorepo source of truth.
+- ESLint and Prettier are now feature overlays, so opting out leaves no stray config or dependency references in the scaffolded app.
 - Verified scaffold → install → build coverage lives in `tests/template-regression.spec.mjs`.
 
 ## Development

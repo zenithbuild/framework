@@ -1,6 +1,6 @@
 {
   "name": "create-zenith",
-  "version": "1.3.18",
+  "version": "1.3.19",
   "description": "Create a new Zenith application - the modern reactive web framework",
   "type": "module",
   "bin": {

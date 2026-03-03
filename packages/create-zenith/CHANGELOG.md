@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.19] - 2026-03-02
+
+### 🐛 Bug Fixes
+
+- ESLint and Prettier are now fully optional scaffold features: choosing `No` leaves zero scripts, dependencies, config files, ignore files, or template references for that tool in the generated project.
+- Base starter templates are now tool-agnostic, and optional tooling is layered in through explicit feature overlays at scaffold time.
+
+### 📚 Documentation
+
+- Documented the optional tooling contract in the package README and canonical install/create docs so users know exactly what gets generated when they opt in or out.
+
 ## [1.3.18] - 2026-03-02
 
 ### 🐛 Bug Fixes

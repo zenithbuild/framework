@@ -1,9 +1,9 @@
 ---
 title: "Install and Compatibility"
-description: "Supported install flow and compatibility guarantees for Zenith beta trains."
+description: "Supported install flow and compatibility guarantees for Zenith stable and beta scaffolds."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-03-01"
+last_updated: "2026-03-02"
 tags: ["install", "compatibility", "release"]
 ---
 
@@ -16,10 +16,32 @@ Contract: a beta train is supported when clean-room scaffold, install, and `zeni
 ## Recommended Install
 
 ```bash
-npx create-zenith@beta my-app
+npm create zenith@latest
 cd my-app
 npm install
 npx zenith build
+```
+
+`create-zenith` is the canonical scaffold entry point for stable users. Beta installs remain available when explicitly requested.
+
+## Optional Tooling
+
+The scaffold prompts let you opt into:
+
+- ESLint
+- Prettier
+- TypeScript path aliases
+
+Contract:
+
+- Selecting `Yes` adds the tool's scripts, dependencies, and config files.
+- Selecting `No` adds nothing for that tool.
+- Generated projects must never contain scripts or config for tools the user declined.
+
+Beta example:
+
+```bash
+npx create-zenith@beta my-app
 ```
 
 ## Tailwind v4 Setup
@@ -65,5 +87,6 @@ This keeps Tailwind compilation internal to the Zenith dev loop and prevents any
 
 - `@zenithbuild/core` may bump independently for CLI-wrapper fixes.
 - Engine packages (compiler, cli, runtime, router, bundler) move together for engine changes.
+- `create-zenith` may publish patch releases independently when scaffold templates or CLI UX change.
 
 If internal versions skew, reinstall from a clean dependency state.
