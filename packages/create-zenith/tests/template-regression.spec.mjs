@@ -8,9 +8,6 @@ import { pathToFileURL } from 'node:url';
 
 const CLI_PATH = resolve(process.cwd(), 'dist', 'cli.js');
 const WORKSPACE_ROOT = resolve(process.cwd(), '..', '..');
-const CORE_VERSION = JSON.parse(
-    readFileSync(resolve(WORKSPACE_ROOT, 'packages', 'core', 'package.json'), 'utf8')
-).version;
 const LOCAL_ZENITH_PACKAGES = [
     resolve(WORKSPACE_ROOT, 'packages', 'core'),
     resolve(WORKSPACE_ROOT, 'packages', 'cli'),
@@ -95,8 +92,8 @@ function assertPackageDependencies(projectDir) {
     assert.deepEqual(zenithDeps, ['@zenithbuild/core'], 'Template must only directly depend on @zenithbuild/core');
     assert.equal(
         String(pkg.dependencies['@zenithbuild/core']),
-        CORE_VERSION,
-        'Core dependency must match the workspace core version exactly'
+        'latest',
+        'Core dependency must install the current stable @zenithbuild/core release'
     );
 }
 

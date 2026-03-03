@@ -4,8 +4,8 @@ The official CLI for scaffolding new Zenith applications. Fast, animated, and de
 
 ## Canonical Docs
 
-- Create contract: `../zenith-docs/documentation/contracts/create-contract.md`
-- Install and compatibility: `../zenith-docs/documentation/install-compatibility.md`
+- Create contract: `framework/docs`
+- Install and compatibility: `framework/docs`
 
 ## Overview
 
@@ -46,17 +46,20 @@ Zenith beta currently pins `@zenithbuild/core` to `0.5.0-beta.2.20` and leaf pac
 
 If you see version mismatches after install, delete `node_modules` and `package-lock.json`, then reinstall.
 
-## Latest Release (Beta 2.13)
+## Latest Release
 
-- **Fixed:** `zenith --help` now exits 0 reliably (bin wrapper early-exit before version-mismatch checks)
-- **Published:** Leaf packages at `0.5.0-beta.2.20`; `@zenithbuild/core` and `create-zenith` at `0.5.0-beta.2.20`
-- **Verified:** scaffold → install → `--version` → `--help` → build → all routes output static HTML (`/`, `/about`, `/blog`, `/docs`)
+- Generated apps now depend on `@zenithbuild/core@latest` so new installs track the current stable framework release.
+- Template downloads now resolve from `zenithbuild/framework`, which is the active monorepo source of truth.
+- Verified scaffold → install → build coverage lives in `tests/template-regression.spec.mjs`.
 
 ## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/zenithbuild/create-zenith.git
+# Clone the monorepo
+git clone https://github.com/zenithbuild/framework.git
+
+# Enter the package
+cd framework/packages/create-zenith
 
 # Install dependencies
 bun install

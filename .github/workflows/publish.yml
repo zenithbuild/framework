@@ -80,3 +80,5 @@ jobs:
       - run: bun run ci
 
       - run: ./scripts/publish-train.sh
+
+      - run: ./scripts/publish-scaffolder.sh

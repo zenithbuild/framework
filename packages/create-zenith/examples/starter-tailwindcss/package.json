@@ -12,7 +12,7 @@
         "format": "prettier --write ."
     },
     "dependencies": {
-        "@zenithbuild/core": "0.6.6"
+        "@zenithbuild/core": "latest"
     },
     "devDependencies": {
         "@tailwindcss/cli": "^4.1.18",

@@ -25,7 +25,7 @@ export interface ProjectOptions {
 }
 
 // GitHub repository info
-const GITHUB_REPO = 'zenithbuild/create-zenith'
+const GITHUB_REPO = 'zenithbuild/framework'
 const DEFAULT_TEMPLATE = 'examples/starter'
 const TAILWIND_TEMPLATE = 'examples/starter-tailwindcss'
 const __filename = fileURLToPath(import.meta.url)
@@ -118,13 +118,14 @@ async function downloadTemplate(targetDir: string, templatePath: string): Promis
             execSync(`git clone --depth 1 --filter=blob:none --sparse https://github.com/${GITHUB_REPO}.git "${tempDir}"`, {
                 stdio: 'pipe'
             })
-            execSync(`git sparse-checkout set ${templatePath}`, {
+            const repoTemplatePath = `packages/create-zenith/${templatePath}`
+            execSync(`git sparse-checkout set ${repoTemplatePath}`, {
                 cwd: tempDir,
                 stdio: 'pipe'
             })
 
             // Copy template contents to target
-            const templateSource = path.join(tempDir, templatePath)
+            const templateSource = path.join(tempDir, repoTemplatePath)
             fs.cpSync(templateSource, targetDir, { recursive: true })
         } else {
             // Fallback: download tarball via curl/fetch
@@ -138,14 +139,14 @@ async function downloadTemplate(targetDir: string, templatePath: string): Promis
             fs.mkdirSync(tempDir, { recursive: true })
             execSync(`tar -xzf "${tarballPath}" -C "${tempDir}"`, { stdio: 'pipe' })
 
-            // Find extracted directory (create-zenith-main)
-            const extractedDir = fs.readdirSync(tempDir).find(f => f.startsWith('create-zenith'))
+            // Find extracted directory (usually framework-main)
+            const extractedDir = fs.readdirSync(tempDir).find(f => f.startsWith('framework'))
             if (!extractedDir) {
                 throw new Error('Failed to extract template from GitHub')
             }
 
             // Copy template contents
-            const templateSource = path.join(tempDir, extractedDir, templatePath)
+            const templateSource = path.join(tempDir, extractedDir, 'packages/create-zenith', templatePath)
             fs.cpSync(templateSource, targetDir, { recursive: true })
 
             // Cleanup tarball

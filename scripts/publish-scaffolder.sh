@@ -20,16 +20,11 @@ if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
   TRAIN_VERSION="$(tr -d '[:space:]' < "$ROOT/TRAIN_VERSION")"
 fi
 
-FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-train}"
+FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-latest}"
 NPM_REGISTRY_URL="${PUBLISH_NPM_REGISTRY:-https://registry.npmjs.org/}"
 
 PACKAGES=(
-  "packages/compiler|@zenithbuild/compiler"
-  "packages/bundler|@zenithbuild/bundler"
-  "packages/runtime|@zenithbuild/runtime"
-  "packages/router|@zenithbuild/router"
-  "packages/core|@zenithbuild/core"
-  "packages/cli|@zenithbuild/cli"
+  "packages/create-zenith|create-zenith"
 )
 
 published=()
@@ -388,7 +383,7 @@ print_list() {
   done
 }
 
-echo "Publishing Zenith train in strict order"
+echo "Publishing create-zenith scaffolder"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "TRAIN_VERSION=${TRAIN_VERSION}"
 fi
@@ -470,7 +465,7 @@ for entry in "${PACKAGES[@]}"; do
 done
 
 echo
-echo "Publish train summary"
+echo "Publish scaffolder summary"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "Train version: ${TRAIN_VERSION}"
 fi

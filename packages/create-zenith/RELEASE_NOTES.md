@@ -1,23 +1,26 @@
-# 🚀 create-zenith v0.6.9
+# 🚀 create-zenith v1.3.18
 
-## [0.6.9] - 2026-01-26
+## [1.3.18] - 2026-03-02
 
-### 📝 Other Changes
+### 🐛 Bug Fixes
 
-- **** ()
+- Download starter templates from `zenithbuild/framework` instead of the archived standalone repository.
+- Generated starter apps now depend on `@zenithbuild/core@latest` so fresh installs pick up the current stable framework release.
 
+### 🔧 CI Configuration
 
+- Publish `create-zenith` through the dedicated scaffolder publish step instead of the train package loop.
 
 ## 📦 Installation
 
 ```bash
-bun add create-zenith@0.6.9
+bun add create-zenith@1.3.18
 ```
 
 *or with npm:*
 
 ```bash
-npm install create-zenith@0.6.9
+npm install create-zenith@1.3.18
 ```
 
 ---
