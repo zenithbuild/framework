@@ -22,6 +22,7 @@ fi
 
 FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-train}"
 NPM_REGISTRY_URL="${PUBLISH_NPM_REGISTRY:-https://registry.npmjs.org/}"
+NPM_BIN="${NPM_BIN:-npm}"
 
 PACKAGES=(
   "packages/bundler-darwin-arm64|@zenithbuild/bundler-darwin-arm64"
@@ -40,6 +41,7 @@ PUBLISH_PACKAGE_FILTER="${PUBLISH_PACKAGE_FILTER:-}"
 published=()
 skipped=()
 pending=()
+bootstrap_required=()
 
 package_selected_for_publish() {
   local package_dir="$1"
@@ -155,7 +157,7 @@ npm_view_json() {
   shift
   local output
 
-  if output="$(npm view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
+  if output="$("$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
     printf '%s' "$output"
     return 0
   fi
@@ -488,6 +490,13 @@ print_list() {
   done
 }
 
+format_inline_list() {
+  node -e '
+    const values = process.argv.slice(1).filter(Boolean);
+    process.stdout.write(values.join(", "));
+  ' "$@"
+}
+
 echo "Publishing Zenith train in strict order"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "TRAIN_VERSION=${TRAIN_VERSION}"
@@ -541,10 +550,14 @@ for entry in "${PACKAGES[@]}"; do
   fi
 
   if [[ "$DRY_RUN" -eq 0 ]] && ! package_has_any_published_version "$actual_name"; then
-    echo "  fail: ${actual_name} has not been published to npm before." >&2
-    echo "  Trusted publishing cannot bootstrap a brand-new npm package name." >&2
-    echo "  Publish ${actual_name} once manually (or with a temporary token), configure npm trusted publishing for that package, then rerun this train." >&2
-    exit 1
+    echo "  bootstrap required: package name not yet published on npm"
+    bootstrap_required+=("${actual_name}")
+    continue
+  fi
+
+  if [[ "$DRY_RUN" -eq 0 && ${#bootstrap_required[@]} -gt 0 ]]; then
+    echo "  deferred: waiting for bootstrap packages to be published first"
+    continue
   fi
 
   highest_version="$(highest_published_version "$actual_name")"
@@ -572,9 +585,9 @@ for entry in "${PACKAGES[@]}"; do
   (
     cd "${ROOT}/${package_dir}"
     if [[ -n "$publish_tag" ]]; then
-      npm publish --access public --tag "$publish_tag" --registry "$NPM_REGISTRY_URL"
+      "$NPM_BIN" publish --access public --tag "$publish_tag" --registry "$NPM_REGISTRY_URL"
     else
-      npm publish --access public --registry "$NPM_REGISTRY_URL"
+      "$NPM_BIN" publish --access public --registry "$NPM_REGISTRY_URL"
     fi
   )
   echo "  published"
@@ -584,6 +597,13 @@ for entry in "${PACKAGES[@]}"; do
     published+=("${actual_name}@${version}")
   fi
 done
+
+if [[ "$DRY_RUN" -eq 0 && ${#bootstrap_required[@]} -gt 0 ]]; then
+  echo >&2
+  echo "Bootstrap required: $(format_inline_list "${bootstrap_required[@]}")" >&2
+  echo "Publish once manually or with temporary token, then configure Trusted Publishers." >&2
+  exit 1
+fi
 
 echo
 echo "Publish train summary"
