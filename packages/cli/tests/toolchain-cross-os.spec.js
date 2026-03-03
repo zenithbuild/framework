@@ -62,7 +62,13 @@ function createIncompatibleCandidate(root, tool, label) {
     }
 
     const filePath = join(root, `${tool}-incompatible`);
-    writeFileSync(filePath, 'not a real binary\n', 'utf8');
+    writeFileSync(
+        filePath,
+        '#!/usr/bin/env sh\n' +
+        'echo "bad CPU type" >&2\n' +
+        'exit 1\n',
+        'utf8'
+    );
     chmodSync(filePath, 0o755);
     return makeBinaryCandidate(tool, label, filePath);
 }

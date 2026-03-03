@@ -55,7 +55,12 @@ function createFixture() {
             'release',
             'zenith-compiler'
         );
-        writeFileSync(fakeBinaryPath, 'not a real binary\n');
+        writeFileSync(
+            fakeBinaryPath,
+            '#!/usr/bin/env sh\n' +
+            'echo "bad CPU type" >&2\n' +
+            'exit 1\n'
+        );
         chmodSync(fakeBinaryPath, 0o755);
     }
 
