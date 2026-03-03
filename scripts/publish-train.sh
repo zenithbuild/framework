@@ -61,6 +61,7 @@ validate_publish_manifest() {
   node -e '
     const fs = require("node:fs");
     const manifestPath = process.argv[1];
+    const expectedRepositoryUrl = process.argv[2];
     const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     if (!Array.isArray(pkg.files) || pkg.files.length === 0) {
       console.error(`Missing non-empty files whitelist in ${manifestPath}`);
@@ -70,7 +71,24 @@ validate_publish_manifest() {
       console.error(`Refusing to publish private package manifest: ${manifestPath}`);
       process.exit(1);
     }
-  ' "$manifest"
+    const repository = pkg.repository;
+    const repositoryUrl =
+      repository && typeof repository === "object"
+        ? repository.url
+        : typeof repository === "string"
+          ? repository
+          : "";
+    if (typeof repositoryUrl !== "string" || repositoryUrl.trim() === "") {
+      console.error(`Missing repository.url in ${manifestPath}`);
+      process.exit(1);
+    }
+    if (repositoryUrl !== expectedRepositoryUrl) {
+      console.error(
+        `Invalid repository.url in ${manifestPath}: expected ${expectedRepositoryUrl}, found ${repositoryUrl}`
+      );
+      process.exit(1);
+    }
+  ' "$manifest" "https://github.com/zenithbuild/framework"
 }
 
 extract_npm_json() {
