@@ -1,9 +1,9 @@
 ---
 title: "Events"
 description: "Canonical universal event model, alias mapping, and handler validation rules for Zenith."
-version: "0.3"
+version: "0.4"
 status: "canonical"
-last_updated: "2026-02-27"
+last_updated: "2026-03-04"
 tags: ["syntax", "events", "dx"]
 nav:
   order: 10
@@ -44,6 +44,95 @@ Allowed:
 Forbidden at compile time:
 - String handlers
 - Direct call expressions (`on:click={doThing()}`)
+
+## Passing Event Handlers Through Components
+
+Function props are transported as real function references, not strings.
+All DOM event wiring still uses `on:*` in markup.
+
+Native DOM event binding:
+
+```zen
+<script lang="ts">
+function increment() {}
+</script>
+
+<button on:click={increment}>Increment</button>
+```
+
+Component callsite:
+
+```zen
+<script lang="ts">
+function increment() {}
+</script>
+
+<Button onClick={increment}></Button>
+```
+
+Component implementation:
+
+```zen
+<script lang="ts">
+interface Props {
+  onClick: () => void;
+}
+
+const incoming = props as Props;
+</script>
+
+<button on:click={incoming.onClick}>Increment</button>
+```
+
+This works for any event-like prop name as long as the component forwards it into canonical DOM event markup:
+- `onClick`
+- `onKeydown`
+- `onInput`
+- `onSubmit`
+- `onPress`
+
+Forwarding across multiple component hops is supported:
+
+```zen
+<script lang="ts">
+interface Props {
+  onClick: () => void;
+}
+
+const incoming = props as Props;
+</script>
+
+<EventSink onClick={incoming.onClick}></EventSink>
+```
+
+Inline function props are also supported when they still evaluate to a function reference:
+
+```zen
+<FormShell onSubmit={(event) => submit(event)}></FormShell>
+```
+
+Transport rule:
+- Any prop value that references parent scope symbols must compile through the same scoped symbol resolution used by normal expressions.
+- Raw unscoped identifiers must not survive into emitted props objects after renaming/scoping.
+
+Optional handlers need one extra rule.
+The runtime expects an actual function at the final `on:*` binding site.
+If a handler prop may be absent, guard it with a small wrapper:
+
+```zen
+<script lang="ts">
+interface Props {
+  onClick?: () => void;
+}
+
+const incoming = props as Props;
+</script>
+
+<button on:click={() => incoming.onClick?.()}>Maybe Increment</button>
+```
+
+Use the direct form when the handler is required.
+Use the guarded wrapper when the prop is optional.
 
 ## ZEN-RULE-210: Hover Aliases
 

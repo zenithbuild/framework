@@ -71,6 +71,7 @@ Use Tailwind tokens and `dark:` variants. Do not use raw CSS variables or hardco
 - Do not declare custom wrappers like `runtimeWindow` / `runtimeDocument`.
 - Use `zenResize(handler)` for window-resize-driven reactive updates.
 - Use `collectRefs(...refs)` for deterministic multi-node operations instead of selector scans.
+- Passing handler functions through component props is supported and must preserve scoped symbol identity; do not workaround with querySelector/addEventListener.
 - If canonical primitives are insufficient, do not invent APIs or workarounds; report the missing primitive explicitly.
 
 ## Forbidden Patterns
