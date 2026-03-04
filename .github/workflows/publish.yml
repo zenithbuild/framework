@@ -162,7 +162,7 @@ jobs:
             package_dir: packages/bundler-darwin-arm64
             rust_target: aarch64-apple-darwin
             platform_key: darwin-arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             package_kind: bundler
             package_dir: packages/bundler-darwin-x64
             rust_target: x86_64-apple-darwin
@@ -182,7 +182,7 @@ jobs:
             package_dir: packages/compiler-darwin-arm64
             rust_target: aarch64-apple-darwin
             platform_key: darwin-arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             package_kind: compiler
             package_dir: packages/compiler-darwin-x64
             rust_target: x86_64-apple-darwin
