@@ -159,7 +159,7 @@ jobs:
         include:
           - runner: macos-14
             package_dir: packages/bundler-darwin-arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             package_dir: packages/bundler-darwin-x64
           - runner: ubuntu-latest
             package_dir: packages/bundler-linux-x64
