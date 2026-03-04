@@ -17,6 +17,7 @@ bun run --cwd packages/router test
 bun run --cwd packages/create-zenith test
 bun run --cwd docs docs:gate
 node --test scripts/publish-train-bootstrap.spec.mjs
+node --test scripts/bootstrap-platform-package.spec.mjs
 
 cargo test --manifest-path packages/compiler/Cargo.toml
 cargo test --manifest-path packages/bundler/Cargo.toml

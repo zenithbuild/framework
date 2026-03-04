@@ -28,17 +28,31 @@ function parseArgs(argv) {
 }
 
 function runNpm(args, options = {}) {
-  const result = spawnSync(process.env.NPM_BIN || 'npm', args, {
+  const npmBin = process.env.NPM_BIN;
+
+  if (npmBin) {
+    return spawnSync(npmBin, args, {
+      encoding: 'utf8',
+      ...options
+    });
+  }
+
+  if (process.platform === 'win32') {
+    return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm.cmd', ...args], {
+      encoding: 'utf8',
+      ...options
+    });
+  }
+
+  return spawnSync('npm', args, {
     encoding: 'utf8',
     ...options
   });
-
-  return result;
 }
 
 function npmViewMissing(stderr, stdout) {
   const combined = `${stdout || ''}\n${stderr || ''}`;
-  return /E404|404 Not Found|404 No match found/.test(combined);
+  return /E404|code E404|404|Not Found/i.test(combined);
 }
 
 function ensureVersionMissing(packageName, version, registry) {
@@ -54,7 +68,8 @@ function ensureVersionMissing(packageName, version, registry) {
     return true;
   }
 
-  process.stderr.write(result.stderr || result.stdout || `npm view failed for ${packageName}@${version}\n`);
+  const detail = result.stderr || result.stdout || `npm view failed for ${packageName}@${version}\n`;
+  process.stderr.write(`Failed to check npm for ${packageName}@${version}:\n${detail}`);
   process.exit(result.status || 1);
 }
 
