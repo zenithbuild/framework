@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.12] - 2026-03-04
+
+### Changed
+
+- Fixed function-prop transport for component callsites so parent-scope symbols are emitted through scoped/renamed bindings (no raw unscoped identifiers in emitted props objects).
+- Added regression coverage for direct and multi-hop event-like handler props (`onClick`, `onKeydown`, `onInput`, `onSubmit`) plus non-function prop scoping transport.
+- Fixed component tag parsing for inline prop function expressions (for example `onSubmit={(event) => submit(event)}`) so component expansion and prop lowering remain stable.
+- Documented canonical handler-prop forwarding (`on:*` wiring in component markup) and tightened docs syntax gates to distinguish DOM `onClick=` misuse from valid component prop examples.
+
 ## [0.6.11] - 2026-03-04
 
 ### Changed

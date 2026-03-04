@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/compiler-linux-x64",
-  "version": "0.6.11",
+  "version": "0.6.12",
   "description": "Internal linux-x64 native binary for @zenithbuild/compiler",
   "license": "MIT",
   "os": [
