@@ -2034,6 +2034,91 @@ function rewritePropsExpression(expr, rewriteContext = null) {
 }
 
 /**
+ * Translate compiler `compiled_expr` output into module-scope JS for props
+ * preludes. Expression bindings use `signalMap.get(i)` at hydrate-time, but
+ * component props need direct access to the already-hoisted scoped symbols.
+ *
+ * @param {string | null | undefined} compiledExpr
+ * @param {{
+ *   signals?: Array<{ state_index?: number }>,
+ *   stateBindings?: Array<{ key?: string }>
+ * } | null | undefined} expressionRewrite
+ * @returns {string | null}
+ */
+function resolveCompiledPropsExpression(compiledExpr, expressionRewrite = null) {
+    const source = typeof compiledExpr === 'string' ? compiledExpr.trim() : '';
+    if (!source) {
+        return null;
+    }
+
+    const signals = Array.isArray(expressionRewrite?.signals) ? expressionRewrite.signals : [];
+    const stateBindings = Array.isArray(expressionRewrite?.stateBindings) ? expressionRewrite.stateBindings : [];
+
+    return source.replace(/signalMap\.get\((\d+)\)(?:\.get\(\))?/g, (full, rawIndex) => {
+        const signalIndex = Number.parseInt(rawIndex, 10);
+        if (!Number.isInteger(signalIndex)) {
+            return full;
+        }
+
+        const signal = signals[signalIndex];
+        const stateIndex = signal?.state_index;
+        const stateKey = Number.isInteger(stateIndex) ? stateBindings[stateIndex]?.key : null;
+        if (typeof stateKey !== 'string' || stateKey.length === 0) {
+            return full;
+        }
+
+        return full.endsWith('.get()') ? `${stateKey}.get()` : stateKey;
+    });
+}
+
+/**
+ * Resolve a raw component prop expression to the same scoped symbol/expression
+ * contract used by the compiler rename pass.
+ *
+ * @param {string} expr
+ * @param {{
+ *   expressionRewrite?: {
+ *     map?: Map<string, string>,
+ *     bindings?: Map<string, {
+ *       compiled_expr?: string | null
+ *     }>,
+ *     ambiguous?: Set<string>,
+ *     signals?: Array<{ state_index?: number }>,
+ *     stateBindings?: Array<{ key?: string }>
+ *   } | null,
+ *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ * } | null} rewriteContext
+ * @returns {string}
+ */
+function resolvePropsValueCode(expr, rewriteContext = null) {
+    const trimmed = String(expr || '').trim();
+    if (!trimmed) {
+        return trimmed;
+    }
+
+    const expressionRewrite = rewriteContext?.expressionRewrite;
+    const expressionAmbiguous = expressionRewrite?.ambiguous;
+    if (!(expressionAmbiguous instanceof Set && expressionAmbiguous.has(trimmed))) {
+        const binding = expressionRewrite?.bindings instanceof Map
+            ? expressionRewrite.bindings.get(trimmed)
+            : null;
+        const compiled = resolveCompiledPropsExpression(binding?.compiled_expr, expressionRewrite);
+        if (typeof compiled === 'string' && compiled.length > 0) {
+            return compiled;
+        }
+
+        const exact = expressionRewrite?.map instanceof Map
+            ? expressionRewrite.map.get(trimmed)
+            : null;
+        if (typeof exact === 'string' && exact.length > 0) {
+            return exact;
+        }
+    }
+
+    return rewritePropsExpression(trimmed, rewriteContext);
+}
+
+/**
  * @param {string} attrs
  * @param {{
  *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
@@ -2066,7 +2151,7 @@ function renderPropsLiteralFromAttrs(attrs, rewriteContext = null) {
             valueCode = JSON.stringify(singleQuoted);
         } else if (expressionValue !== undefined) {
             const trimmed = String(expressionValue).trim();
-            valueCode = trimmed.length > 0 ? rewritePropsExpression(trimmed, rewriteContext) : 'undefined';
+            valueCode = trimmed.length > 0 ? resolvePropsValueCode(trimmed, rewriteContext) : 'undefined';
         }
 
         entries.push(`${renderObjectKey(rawName)}: ${valueCode}`);
@@ -2336,6 +2421,7 @@ export async function build(options) {
         const sourceFile = join(pagesDir, entry.file);
         const rawSource = readFileSync(sourceFile, 'utf8');
         const componentOccurrences = collectExpandedComponentOccurrences(rawSource, registry, sourceFile);
+        const pageOwnerSource = extractServerScript(rawSource, sourceFile, compilerOpts).source;
 
         const baseName = sourceFile.slice(0, -extname(sourceFile).length);
         let adjacentGuard = null;
@@ -2411,7 +2497,29 @@ export async function build(options) {
         const pageAmbiguousExpressionMap = new Set();
         const knownRefKeys = new Set();
         const componentOccurrencePlans = [];
-        const pageScopeRewrite = buildScopedIdentifierRewrite(pageIr);
+        const pageOwnerIr = componentOccurrences.length > 0
+            ? runCompiler(
+                sourceFile,
+                pageOwnerSource,
+                compilerOpts,
+                {
+                    suppressWarnings: true,
+                    compilerToolchain: compilerBin
+                }
+            )
+            : null;
+        const pageOwnerExpressionRewrite = pageOwnerIr
+            ? buildComponentExpressionRewrite(
+                sourceFile,
+                pageOwnerSource,
+                pageOwnerIr,
+                compilerOpts,
+                compilerBin
+            )
+            : { map: new Map(), bindings: new Map(), signals: [], stateBindings: [], ambiguous: new Set(), sequence: [] };
+        const pageOwnerScopeRewrite = pageOwnerIr
+            ? buildScopedIdentifierRewrite(pageOwnerIr)
+            : { map: new Map(), ambiguous: new Set() };
         const pageSelfExpressionRewrite = buildComponentExpressionRewrite(
             sourceFile,
             compileSource,
@@ -2472,8 +2580,8 @@ export async function build(options) {
                 componentExpressionRewriteCache.set(compPath, expressionRewrite);
             }
 
-            let attrExpressionRewrite = pageSelfExpressionRewrite;
-            let attrScopeRewrite = pageScopeRewrite;
+            let attrExpressionRewrite = pageOwnerExpressionRewrite;
+            let attrScopeRewrite = pageOwnerScopeRewrite;
             const ownerPath = typeof occurrence.ownerPath === 'string' && occurrence.ownerPath.length > 0
                 ? occurrence.ownerPath
                 : sourceFile;

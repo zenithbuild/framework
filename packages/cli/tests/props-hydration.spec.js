@@ -229,6 +229,60 @@ describe('props hydration', () => {
         expect(pageJs).toMatch(/onPress:\s*___.*toggleMenu/);
     });
 
+    test('T7 — root page component props resolve scoped identifiers and compiled expressions', async () => {
+        project = await makePropsProject({
+            'components/SharedButton.zen': [
+                '<script lang="ts">',
+                'interface Props {',
+                '  onPress?: () => void;',
+                '  currentCount?: unknown;',
+                '  nextCount?: number;',
+                '  memberHandler?: () => void;',
+                '}',
+                'const incoming = props as Props;',
+                'const onPress = typeof incoming.onPress === "function" ? incoming.onPress : undefined;',
+                'const currentCount = incoming.currentCount;',
+                'const nextCount = typeof incoming.nextCount === "number" ? incoming.nextCount : -1;',
+                'const memberHandler = typeof incoming.memberHandler === "function" ? incoming.memberHandler : undefined;',
+                '</script>',
+                '<button data-next={nextCount} on:click={onPress}>{currentCount ? "ready" : "idle"}</button>'
+            ].join('\n'),
+            'pages/index.zen': [
+                '<script lang="ts">',
+                'const count = signal(0);',
+                'function increment() {',
+                '  count.set(count.get() + 1);',
+                '}',
+                'const handlers = { increment };',
+                '</script>',
+                '<main>',
+                '  <SharedButton',
+                '    onPress={increment}',
+                '    currentCount={count}',
+                '    nextCount={count + 1}',
+                '    memberHandler={handlers.increment}',
+                '  />',
+                '</main>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const indexHtml = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        const scriptMatch = indexHtml.match(/src="([^"]+\.js)"/);
+        expect(scriptMatch).toBeTruthy();
+        const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
+        const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
+
+        expect(pageJs).not.toContain('onPress: increment');
+        expect(pageJs).not.toContain('currentCount: count');
+        expect(pageJs).not.toContain('nextCount: count + 1');
+        expect(pageJs).not.toContain('memberHandler: handlers.increment');
+        expect(pageJs).toMatch(/onPress:\s*___.*increment/);
+        expect(pageJs).toMatch(/currentCount:\s*___.*count/);
+        expect(pageJs).toMatch(/nextCount:\s*___.*count\.get\(\)\s*\+\s*1/);
+        expect(pageJs).toMatch(/memberHandler:\s*___.*handlers\.___.*increment/);
+    });
+
     test('existing document-mode props test still works', async () => {
         // Ensure the documentMode gate removal didn't break layout props injection
         const root = join(tmpdir(), `zenith-docmode-${Date.now()}-${Math.random().toString(36).slice(2)}`);
