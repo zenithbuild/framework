@@ -23,8 +23,8 @@ export const PUBLIC_DOC_STATUS_VALUES = new Set([
 ]);
 
 export const FORBIDDEN_PATTERNS = [
-  { label: "string event attribute", regex: /onclick\s*=/i },
-  { label: "react click prop", regex: /onClick\s*=/ },
+  { label: "string event attribute", regex: /<[a-z][^>]*\bonclick\s*=/ },
+  { label: "react click prop", regex: /<[a-z][^>]*\bonClick\s*=/ },
   { label: "vue click attribute", regex: /@click\s*=/i },
   { label: "svelte each block", regex: /\{#each\b/ },
   { label: "svelte if block", regex: /\{#if\b/ },
