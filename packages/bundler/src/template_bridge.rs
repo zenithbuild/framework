@@ -80,8 +80,21 @@ fn resolve_render_script_path() -> Result<PathBuf, String> {
     let mut candidates = Vec::<PathBuf>::new();
 
     if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(release_dir) = exe_path.parent() {
-            if let Some(target_dir) = release_dir.parent() {
+        if let Some(bin_dir) = exe_path.parent() {
+            if let Some(package_root) = bin_dir.parent() {
+                candidates.push(package_root.join("scripts").join("render-assets.mjs"));
+
+                if let Some(scope_root) = package_root.parent() {
+                    candidates.push(
+                        scope_root
+                            .join("bundler")
+                            .join("scripts")
+                            .join("render-assets.mjs"),
+                    );
+                }
+            }
+
+            if let Some(target_dir) = bin_dir.parent() {
                 if let Some(repo_root) = target_dir.parent() {
                     candidates.push(repo_root.join("scripts").join("render-assets.mjs"));
                 }

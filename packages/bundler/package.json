@@ -20,7 +20,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
+    "dist/**",
+    "scripts/render-assets.mjs",
     "package.json",
     "README.md",
     "LICENSE"
