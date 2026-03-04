@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.10] - 2026-03-04
+
+### Changed
+
+- Fixed cross-OS fresh installs by moving `@zenithbuild/compiler` to platform-specific native packages, matching the bundler distribution model and keeping the meta package binary-free.
+- Updated CLI toolchain resolution to prefer installed compiler and bundler platform packages, while treating wrong-OS native binaries as fallthrough candidates instead of hard failures.
+- Fixed `zenith-bundler --version` to report the lockstep npm train version when builds inject `ZENITH_TRAIN_VERSION`, with the Cargo crate version kept as the deterministic fallback.
+- Expanded the cross-OS smoke and toolchain resolution tests so wrong-format native binaries and workspace fallback leaks fail CI before release.
+
 ## [0.6.9] - 2026-03-03
 
 ### Changed

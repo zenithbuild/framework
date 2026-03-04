@@ -22,7 +22,7 @@ function walk(dir, files = []) {
 }
 
 test('public API surface is frozen', () => {
-  assert.deepEqual(Object.keys(compiler), ['compile'])
+  assert.deepEqual(Object.keys(compiler).sort(), ['compile', 'resolveCompilerBin'])
 })
 
 test('bridge source has no forbidden primitives', () => {
@@ -43,7 +43,6 @@ test('bridge source has no forbidden primitives', () => {
 test('bridge source has no forbidden layer imports', () => {
   const source = fs.readFileSync(path.join(projectRoot, 'dist', 'index.js'), 'utf8')
   const forbidden = [
-    '@zenithbuild/',
     'bundler',
     'runtime',
     'router',
@@ -57,7 +56,10 @@ test('bridge source has no forbidden layer imports', () => {
 
 test('only dist/index.js is exported', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
-  assert.deepEqual(pkg.exports, { '.': './dist/index.js' })
+  assert.deepEqual(pkg.exports, {
+    '.': './dist/index.js',
+    './package.json': './package.json'
+  })
 
   const distDir = path.join(projectRoot, 'dist')
   const distFiles = walk(distDir)

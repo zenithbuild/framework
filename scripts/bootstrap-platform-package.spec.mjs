@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ROOT = process.cwd();
 const HELPER = path.join(ROOT, 'scripts/bootstrap-platform-package.mjs');
+const TRAIN_VERSION = readFileSync(path.join(ROOT, 'TRAIN_VERSION'), 'utf8').trim();
 
 function makeTempDir(prefix) {
   return mkdtempSync(path.join(tmpdir(), prefix));
@@ -21,7 +22,7 @@ function makeFakeNpm(tempDir, scenario) {
     'const command = args[0] || "";',
     'if (command === "view") {',
     '  if (scenario === "exists") {',
-    '    process.stdout.write(JSON.stringify("0.6.9"));',
+    `    process.stdout.write(JSON.stringify(${JSON.stringify(TRAIN_VERSION)}));`,
     '    process.exit(0);',
     '  }',
     '  if (scenario === "missing") {',
@@ -67,12 +68,12 @@ test('bootstrap helper treats npm 404 as publish-needed', () => {
       '--dry-run',
       'packages/bundler-linux-x64',
       '@zenithbuild/bundler-linux-x64',
-      '0.6.9',
+      TRAIN_VERSION,
       'https://registry.npmjs.org/'
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /dry-run: would publish @zenithbuild\/bundler-linux-x64@0\.6\.9/);
+    assert.match(result.stdout, new RegExp(`dry-run: would publish @zenithbuild/bundler-linux-x64@${TRAIN_VERSION.replaceAll('.', '\\.')}`));
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -88,12 +89,15 @@ test('bootstrap helper skips when version already exists', () => {
       '--dry-run',
       'packages/bundler-linux-x64',
       '@zenithbuild/bundler-linux-x64',
-      '0.6.9',
+      TRAIN_VERSION,
       'https://registry.npmjs.org/'
     );
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /skipped @zenithbuild\/bundler-linux-x64@0\.6\.9 \(already published\)/);
+    assert.match(
+      result.stdout,
+      new RegExp(`skipped @zenithbuild/bundler-linux-x64@${TRAIN_VERSION.replaceAll('.', '\\.')} \\(already published\\)`)
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -109,12 +113,15 @@ test('bootstrap helper fails on non-404 npm errors', () => {
       '--dry-run',
       'packages/bundler-linux-x64',
       '@zenithbuild/bundler-linux-x64',
-      '0.6.9',
+      TRAIN_VERSION,
       'https://registry.npmjs.org/'
     );
 
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /Failed to check npm for @zenithbuild\/bundler-linux-x64@0\.6\.9/);
+    assert.match(
+      result.stderr,
+      new RegExp(`Failed to check npm for @zenithbuild/bundler-linux-x64@${TRAIN_VERSION.replaceAll('.', '\\.')}`)
+    );
     assert.match(result.stderr, /E401/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

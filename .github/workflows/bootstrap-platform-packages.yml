@@ -8,9 +8,9 @@ on:
         required: false
         type: string
       packages:
-        description: Comma-separated platform package names to bootstrap.
+        description: Comma-separated platform package names to bootstrap (bundler-* and compiler-*).
         required: false
-        default: bundler-darwin-arm64,bundler-darwin-x64,bundler-linux-x64,bundler-win32-x64
+        default: bundler-darwin-arm64,bundler-darwin-x64,bundler-linux-x64,bundler-win32-x64,compiler-darwin-arm64,compiler-darwin-x64,compiler-linux-x64,compiler-win32-x64
         type: string
 
 permissions:
@@ -23,23 +23,51 @@ jobs:
       matrix:
         include:
           - runner: macos-14
+            package_kind: bundler
             package_name: bundler-darwin-arm64
             package_dir: packages/bundler-darwin-arm64
             rust_target: aarch64-apple-darwin
             platform_key: darwin-arm64
-          - runner: macos-15-intel
+          - runner: macos-13
+            package_kind: bundler
             package_name: bundler-darwin-x64
             package_dir: packages/bundler-darwin-x64
             rust_target: x86_64-apple-darwin
             platform_key: darwin-x64
           - runner: ubuntu-latest
+            package_kind: bundler
             package_name: bundler-linux-x64
             package_dir: packages/bundler-linux-x64
             rust_target: x86_64-unknown-linux-gnu
             platform_key: linux-x64
           - runner: windows-latest
+            package_kind: bundler
             package_name: bundler-win32-x64
             package_dir: packages/bundler-win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            platform_key: win32-x64
+          - runner: macos-14
+            package_kind: compiler
+            package_name: compiler-darwin-arm64
+            package_dir: packages/compiler-darwin-arm64
+            rust_target: aarch64-apple-darwin
+            platform_key: darwin-arm64
+          - runner: macos-13
+            package_kind: compiler
+            package_name: compiler-darwin-x64
+            package_dir: packages/compiler-darwin-x64
+            rust_target: x86_64-apple-darwin
+            platform_key: darwin-x64
+          - runner: ubuntu-latest
+            package_kind: compiler
+            package_name: compiler-linux-x64
+            package_dir: packages/compiler-linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            platform_key: linux-x64
+          - runner: windows-latest
+            package_kind: compiler
+            package_name: compiler-win32-x64
+            package_dir: packages/compiler-win32-x64
             rust_target: x86_64-pc-windows-msvc
             platform_key: win32-x64
     runs-on: ${{ matrix.runner }}
@@ -49,10 +77,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -96,22 +120,29 @@ jobs:
           fi
           printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
 
-      - name: Install workspace dependencies
-        if: steps.target.outputs.selected == 'true'
-        shell: bash
-        run: bun install
-
-      - name: Build bundler binary for target platform
+      - name: Build native binary for target platform package
         if: steps.target.outputs.selected == 'true'
         shell: bash
         env:
-          BUNDLER_PLATFORM_KEY: ${{ matrix.platform_key }}
-          BUNDLER_TARGET_TRIPLE: ${{ matrix.rust_target }}
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PLATFORM_KEY: ${{ matrix.platform_key }}
+          TARGET_TRIPLE: ${{ matrix.rust_target }}
+          ZENITH_TRAIN_VERSION: ${{ steps.target.outputs.train_version }}
         run: |
           set -euo pipefail
-          rustup target add "${BUNDLER_TARGET_TRIPLE}"
-          cargo build --release --target "${BUNDLER_TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
-          node scripts/stage-bundler-platform-package.mjs
+          rustup target add "${TARGET_TRIPLE}"
+
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
+            BUNDLER_PLATFORM_KEY="${PLATFORM_KEY}" \
+            BUNDLER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
+            node scripts/stage-bundler-platform-package.mjs
+          else
+            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
+            COMPILER_PLATFORM_KEY="${PLATFORM_KEY}" \
+            COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
+            node scripts/stage-compiler-platform-package.mjs
+          fi
 
       - name: Bootstrap platform package
         if: steps.target.outputs.selected == 'true'

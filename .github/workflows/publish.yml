@@ -150,7 +150,7 @@ jobs:
 
       - run: bun run ci
 
-  publish-bundler-platforms:
+  publish-platforms:
     needs: [detect, gate]
     if: needs.detect.outputs.publish_train == 'true'
     strategy:
@@ -158,13 +158,45 @@ jobs:
       matrix:
         include:
           - runner: macos-14
+            package_kind: bundler
             package_dir: packages/bundler-darwin-arm64
-          - runner: macos-15-intel
+            rust_target: aarch64-apple-darwin
+            platform_key: darwin-arm64
+          - runner: macos-13
+            package_kind: bundler
             package_dir: packages/bundler-darwin-x64
+            rust_target: x86_64-apple-darwin
+            platform_key: darwin-x64
           - runner: ubuntu-latest
+            package_kind: bundler
             package_dir: packages/bundler-linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            platform_key: linux-x64
           - runner: windows-latest
+            package_kind: bundler
             package_dir: packages/bundler-win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            platform_key: win32-x64
+          - runner: macos-14
+            package_kind: compiler
+            package_dir: packages/compiler-darwin-arm64
+            rust_target: aarch64-apple-darwin
+            platform_key: darwin-arm64
+          - runner: macos-13
+            package_kind: compiler
+            package_dir: packages/compiler-darwin-x64
+            rust_target: x86_64-apple-darwin
+            platform_key: darwin-x64
+          - runner: ubuntu-latest
+            package_kind: compiler
+            package_dir: packages/compiler-linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            platform_key: linux-x64
+          - runner: windows-latest
+            package_kind: compiler
+            package_dir: packages/compiler-win32-x64
+            rust_target: x86_64-pc-windows-msvc
+            platform_key: win32-x64
     runs-on: ${{ matrix.runner }}
     environment: npm-release
     steps:
@@ -176,12 +208,33 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build bundler binary for current platform package
+      - name: Resolve train version
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --manifest-path packages/bundler/Cargo.toml
-          node scripts/stage-bundler-platform-package.mjs
+          echo "ZENITH_TRAIN_VERSION=$(tr -d '[:space:]' < TRAIN_VERSION)" >> "$GITHUB_ENV"
+
+      - name: Build native binary for current platform package
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PLATFORM_KEY: ${{ matrix.platform_key }}
+          TARGET_TRIPLE: ${{ matrix.rust_target }}
+        run: |
+          set -euo pipefail
+          rustup target add "${TARGET_TRIPLE}"
+
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
+            BUNDLER_PLATFORM_KEY="${PLATFORM_KEY}" \
+            BUNDLER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
+            node scripts/stage-bundler-platform-package.mjs
+          else
+            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
+            COMPILER_PLATFORM_KEY="${PLATFORM_KEY}" \
+            COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
+            node scripts/stage-compiler-platform-package.mjs
+          fi
 
       - name: Publish platform package
         shell: bash
@@ -190,7 +243,7 @@ jobs:
         run: ./scripts/publish-train.sh
 
   publish-train:
-    needs: [detect, gate, publish-bundler-platforms]
+    needs: [detect, gate, publish-platforms]
     if: needs.detect.outputs.publish_train == 'true'
     runs-on: ubuntu-latest
     environment: npm-release
@@ -228,11 +281,13 @@ jobs:
 
       - run: bun install
 
-      - name: Build compiler and bundler meta package
+      - name: Build compiler and bundler meta packages
         shell: bash
         run: |
           set -euo pipefail
+          export ZENITH_TRAIN_VERSION="$(tr -d '[:space:]' < TRAIN_VERSION)"
           cargo build --release --manifest-path packages/compiler/Cargo.toml
+          bun run --cwd packages/compiler build
           bun run --cwd packages/bundler build
 
       - name: Publish train packages

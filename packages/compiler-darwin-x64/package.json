@@ -1,10 +1,10 @@
 {
-  "name": "@zenithbuild/bundler-win32-x64",
+  "name": "@zenithbuild/compiler-darwin-x64",
   "version": "0.6.10",
-  "description": "Internal win32-x64 native binary for @zenithbuild/bundler",
+  "description": "Internal darwin-x64 native binary for @zenithbuild/compiler",
   "license": "MIT",
   "os": [
-    "win32"
+    "darwin"
   ],
   "cpu": [
     "x64"
@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/zenithbuild/framework",
-    "directory": "packages/bundler-win32-x64"
+    "directory": "packages/compiler-darwin-x64"
   },
   "bugs": {
     "url": "https://github.com/zenithbuild/framework/issues"

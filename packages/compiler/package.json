@@ -1,18 +1,16 @@
 {
   "name": "@zenithbuild/compiler",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "COMPILER_JS_BRIDGE_CONTRACT.md",
-    "dist/**",
-    "target/release/zenith-compiler",
-    "LICENSE",
     "README.md",
+    "LICENSE",
     "package.json"
   ],
   "repository": {
@@ -26,7 +24,17 @@
   "homepage": "https://github.com/zenithbuild/framework#readme",
   "private": false,
   "scripts": {
-    "build": "cargo build --release",
+    "build": "rm -rf dist && bun build meta/index.ts --outdir dist --target node --format esm && node ../../scripts/stage-compiler-platform-package.mjs",
     "prepublishOnly": "npm run build"
+  },
+  "optionalDependencies": {
+    "@zenithbuild/compiler-darwin-arm64": "0.6.10",
+    "@zenithbuild/compiler-darwin-x64": "0.6.10",
+    "@zenithbuild/compiler-linux-x64": "0.6.10",
+    "@zenithbuild/compiler-win32-x64": "0.6.10"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "^5"
   }
 }

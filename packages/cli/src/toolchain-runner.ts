@@ -29,6 +29,8 @@ const INCOMPATIBLE_STDERR_PATTERNS = [
     /cannot execute binary file/i,
     /not a valid win32 application/i
 ];
+const INSTALL_COMPATIBILITY_DOC =
+    'https://github.com/zenithbuild/framework/blob/master/docs/documentation/install-compatibility.md';
 
 function currentPlatformLabel(): string {
     return `${process.platform}-${process.arch}`;
@@ -85,20 +87,23 @@ function missingToolchainError(toolchain: ToolchainState): Error {
     if (toolchain.tool === 'bundler') {
         return new Error(
             `[zenith] Bundler binary not installed for ${process.platform}/${process.arch}. ` +
-            'Reinstall @zenithbuild/bundler or ensure optional dependency installed.'
+            `Reinstall @zenithbuild/bundler and ensure the matching platform package is installed. ` +
+            `See ${INSTALL_COMPATIBILITY_DOC}.`
         );
     }
 
     return new Error(
         `[zenith] ${toolchain.tool} binary not installed for ${currentPlatformLabel()}; ` +
-        `reinstall or set ${toolEnvVar(toolchain.tool)}=...`
+        `reinstall, ensure the matching platform package is installed, or set ${toolEnvVar(toolchain.tool)}=... ` +
+        `See ${INSTALL_COMPATIBILITY_DOC}.`
     );
 }
 
 function incompatibleBinaryError(toolchain: ToolchainState): Error {
     return new Error(
         `[zenith] ${toolchain.tool} binary is incompatible for ${currentPlatformLabel()}; ` +
-        `reinstall or set ${toolEnvVar(toolchain.tool)}=...`
+        `reinstall, clear the wrong-platform package, or set ${toolEnvVar(toolchain.tool)}=... ` +
+        `See ${INSTALL_COMPATIBILITY_DOC}.`
     );
 }
 

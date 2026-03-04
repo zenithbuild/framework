@@ -3,7 +3,7 @@ title: "Install and Compatibility"
 description: "Supported install flow and compatibility guarantees for Zenith stable and beta scaffolds."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-03-02"
+last_updated: "2026-03-04"
 tags: ["install", "compatibility", "release"]
 ---
 
@@ -90,3 +90,33 @@ This keeps Tailwind compilation internal to the Zenith dev loop and prevents any
 - `create-zenith` may publish patch releases independently when scaffold templates or CLI UX change.
 
 If internal versions skew, reinstall from a clean dependency state.
+
+## Native Toolchain Packages
+
+`@zenithbuild/compiler` and `@zenithbuild/bundler` install native binaries through platform-specific optional dependencies.
+
+Supported platform package names:
+
+- `@zenithbuild/compiler-darwin-arm64`
+- `@zenithbuild/compiler-darwin-x64`
+- `@zenithbuild/compiler-linux-x64`
+- `@zenithbuild/compiler-win32-x64`
+- `@zenithbuild/bundler-darwin-arm64`
+- `@zenithbuild/bundler-darwin-x64`
+- `@zenithbuild/bundler-linux-x64`
+- `@zenithbuild/bundler-win32-x64`
+
+If a native binary is missing or the wrong OS package was installed:
+
+1. Delete `node_modules` and the lockfile if your package manager cached the wrong optional dependency.
+2. Reinstall from the project root.
+3. Re-run `npx zenith build`.
+
+## Toolchain Overrides
+
+For debugging or CI pinning, the CLI accepts direct binary overrides:
+
+- `ZENITH_COMPILER_BIN=/abs/path/to/zenith-compiler`
+- `ZENITH_BUNDLER_BIN=/abs/path/to/zenith-bundler`
+
+The CLI prefers those overrides first, then the matching platform package, then legacy binaries from older installs, then monorepo workspace fallbacks.

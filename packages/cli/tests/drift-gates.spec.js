@@ -12,18 +12,34 @@ const INTERNAL_PACKAGE_NAMES = [
     '@zenithbuild/core',
     '@zenithbuild/cli',
     '@zenithbuild/compiler',
+    '@zenithbuild/compiler-darwin-arm64',
+    '@zenithbuild/compiler-darwin-x64',
+    '@zenithbuild/compiler-linux-x64',
+    '@zenithbuild/compiler-win32-x64',
     '@zenithbuild/runtime',
     '@zenithbuild/router',
-    '@zenithbuild/bundler'
+    '@zenithbuild/bundler',
+    '@zenithbuild/bundler-darwin-arm64',
+    '@zenithbuild/bundler-darwin-x64',
+    '@zenithbuild/bundler-linux-x64',
+    '@zenithbuild/bundler-win32-x64'
 ];
 const INTERNAL_DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 const TRAIN_MANIFESTS = [
     'packages/core/package.json',
     'packages/cli/package.json',
     'packages/compiler/package.json',
+    'packages/compiler-darwin-arm64/package.json',
+    'packages/compiler-darwin-x64/package.json',
+    'packages/compiler-linux-x64/package.json',
+    'packages/compiler-win32-x64/package.json',
     'packages/runtime/package.json',
     'packages/router/package.json',
-    'packages/bundler/package.json'
+    'packages/bundler/package.json',
+    'packages/bundler-darwin-arm64/package.json',
+    'packages/bundler-darwin-x64/package.json',
+    'packages/bundler-linux-x64/package.json',
+    'packages/bundler-win32-x64/package.json'
 ];
 
 function collectFiles(dir, allowExt) {

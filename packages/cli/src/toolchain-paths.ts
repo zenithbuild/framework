@@ -18,13 +18,38 @@ export interface ToolchainCandidate {
     explicit?: boolean;
 }
 
+interface PlatformPackageDefinition {
+    packageName: string;
+    binaryName: string;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_ROOT = resolve(__dirname, '..');
 const localRequire = createRequire(import.meta.url);
 const IS_WINDOWS = process.platform === 'win32';
 const COMPILER_BRIDGE_RUNNER = resolve(__dirname, 'compiler-bridge-runner.js');
-const BUNDLER_PLATFORM_PACKAGES: Record<string, { packageName: string; binaryName: string }> = {
+
+const COMPILER_PLATFORM_PACKAGES: Record<string, PlatformPackageDefinition> = {
+    'darwin-arm64': {
+        packageName: '@zenithbuild/compiler-darwin-arm64',
+        binaryName: 'zenith-compiler'
+    },
+    'darwin-x64': {
+        packageName: '@zenithbuild/compiler-darwin-x64',
+        binaryName: 'zenith-compiler'
+    },
+    'linux-x64': {
+        packageName: '@zenithbuild/compiler-linux-x64',
+        binaryName: 'zenith-compiler'
+    },
+    'win32-x64': {
+        packageName: '@zenithbuild/compiler-win32-x64',
+        binaryName: 'zenith-compiler.exe'
+    }
+};
+
+const BUNDLER_PLATFORM_PACKAGES: Record<string, PlatformPackageDefinition> = {
     'darwin-arm64': {
         packageName: '@zenithbuild/bundler-darwin-arm64',
         binaryName: 'zenith-bundler'
@@ -112,8 +137,10 @@ function createCompilerBridgeCandidate(modulePath: string): ToolchainCandidate |
     };
 }
 
-function currentBundlerPlatformPackage(): { packageName: string; binaryName: string } | null {
-    return BUNDLER_PLATFORM_PACKAGES[`${process.platform}-${process.arch}`] || null;
+function currentPlatformPackage(
+    packages: Record<string, PlatformPackageDefinition>
+): PlatformPackageDefinition | null {
+    return packages[`${process.platform}-${process.arch}`] || null;
 }
 
 export function resolveBinary(candidates: Array<string | ToolchainCandidate>): string {
@@ -164,6 +191,46 @@ export function readCliPackageVersion(): string {
     }
 }
 
+function createInstalledPlatformPackageCandidate(
+    tool: ToolchainTool,
+    packages: Record<string, PlatformPackageDefinition>,
+    projectRoot: string | null
+): ToolchainCandidate | null {
+    const platformPackage = currentPlatformPackage(packages);
+    if (!platformPackage) {
+        return null;
+    }
+
+    const platformPackageRoot = resolvePackageRoot(platformPackage.packageName, projectRoot);
+    if (!platformPackageRoot) {
+        return null;
+    }
+
+    return createBinaryCandidate(
+        tool,
+        'installed platform package binary',
+        resolve(platformPackageRoot, 'bin', platformPackage.binaryName)
+    );
+}
+
+function createLegacyInstalledPackageCandidate(
+    tool: ToolchainTool,
+    packageName: string,
+    binaryName: string,
+    projectRoot: string | null
+): ToolchainCandidate | null {
+    const installedRoot = resolvePackageRoot(packageName, projectRoot);
+    if (!installedRoot) {
+        return null;
+    }
+
+    return createBinaryCandidate(
+        tool,
+        'legacy installed package binary',
+        resolve(installedRoot, 'target', 'release', binaryName)
+    );
+}
+
 function compilerWorkspaceBinaryCandidates(): ToolchainCandidate[] {
     return [
         createBinaryCandidate('compiler', 'workspace binary', resolve(CLI_ROOT, '../compiler/target/release/zenith-compiler')),
@@ -191,15 +258,24 @@ export function compilerCommandCandidates(
         });
     }
 
-    const installedRoot = resolvePackageRoot('@zenithbuild/compiler', projectRoot);
-    if (installedRoot) {
-        candidates.push(
-            createBinaryCandidate('compiler', 'installed package binary', resolve(installedRoot, 'target/release/zenith-compiler'))
-        );
+    const platformCandidate = createInstalledPlatformPackageCandidate('compiler', COMPILER_PLATFORM_PACKAGES, projectRoot);
+    if (platformCandidate) {
+        candidates.push(platformCandidate);
+    }
+
+    const legacyCandidate = createLegacyInstalledPackageCandidate(
+        'compiler',
+        '@zenithbuild/compiler',
+        IS_WINDOWS ? 'zenith-compiler.exe' : 'zenith-compiler',
+        projectRoot
+    );
+    if (legacyCandidate) {
+        candidates.push(legacyCandidate);
     }
 
     candidates.push(...compilerWorkspaceBinaryCandidates());
 
+    const installedRoot = resolvePackageRoot('@zenithbuild/compiler', projectRoot);
     if (installedRoot) {
         const bridgeCandidate = createCompilerBridgeCandidate(resolve(installedRoot, 'dist/index.js'));
         if (bridgeCandidate) {
@@ -233,25 +309,19 @@ export function bundlerCommandCandidates(
         });
     }
 
-    const platformPackage = currentBundlerPlatformPackage();
-    if (platformPackage) {
-        const platformPackageRoot = resolvePackageRoot(platformPackage.packageName, projectRoot);
-        if (platformPackageRoot) {
-            candidates.push(
-                createBinaryCandidate(
-                    'bundler',
-                    'installed platform package binary',
-                    resolve(platformPackageRoot, 'bin', platformPackage.binaryName)
-                )
-            );
-        }
+    const platformCandidate = createInstalledPlatformPackageCandidate('bundler', BUNDLER_PLATFORM_PACKAGES, projectRoot);
+    if (platformCandidate) {
+        candidates.push(platformCandidate);
     }
 
-    const installedRoot = resolvePackageRoot('@zenithbuild/bundler', projectRoot);
-    if (installedRoot) {
-        candidates.push(
-            createBinaryCandidate('bundler', 'installed package binary', resolve(installedRoot, 'target/release/zenith-bundler'))
-        );
+    const legacyCandidate = createLegacyInstalledPackageCandidate(
+        'bundler',
+        '@zenithbuild/bundler',
+        IS_WINDOWS ? 'zenith-bundler.exe' : 'zenith-bundler',
+        projectRoot
+    );
+    if (legacyCandidate) {
+        candidates.push(legacyCandidate);
     }
 
     candidates.push(...bundlerWorkspaceBinaryCandidates());

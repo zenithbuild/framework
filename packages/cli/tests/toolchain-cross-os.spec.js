@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { jest } from '@jest/globals';
-import { bundlerCommandCandidates, compilerCommandCandidates } from '../dist/toolchain-paths.js';
+import {
+    bundlerCommandCandidates,
+    compilerCommandCandidates,
+    resolveCompilerBin
+} from '../dist/toolchain-paths.js';
 import {
     createToolchainStateForTests,
     ensureToolchainCompatibility,
@@ -88,7 +92,60 @@ function createCompilerBridgeModule(root) {
     return modulePath;
 }
 
-function createCompilerProjectFixture({ includeInstalledBinary = true, includeBridge = true } = {}) {
+function currentPlatformPackage(tool) {
+    const key = `${process.platform}-${process.arch}`;
+    const compilerPackages = {
+        'darwin-arm64': {
+            packageName: '@zenithbuild/compiler-darwin-arm64',
+            packageDirName: 'compiler-darwin-arm64',
+            binaryName: 'zenith-compiler'
+        },
+        'darwin-x64': {
+            packageName: '@zenithbuild/compiler-darwin-x64',
+            packageDirName: 'compiler-darwin-x64',
+            binaryName: 'zenith-compiler'
+        },
+        'linux-x64': {
+            packageName: '@zenithbuild/compiler-linux-x64',
+            packageDirName: 'compiler-linux-x64',
+            binaryName: 'zenith-compiler'
+        },
+        'win32-x64': {
+            packageName: '@zenithbuild/compiler-win32-x64',
+            packageDirName: 'compiler-win32-x64',
+            binaryName: 'zenith-compiler.exe'
+        }
+    };
+    const bundlerPackages = {
+        'darwin-arm64': {
+            packageName: '@zenithbuild/bundler-darwin-arm64',
+            packageDirName: 'bundler-darwin-arm64',
+            binaryName: 'zenith-bundler'
+        },
+        'darwin-x64': {
+            packageName: '@zenithbuild/bundler-darwin-x64',
+            packageDirName: 'bundler-darwin-x64',
+            binaryName: 'zenith-bundler'
+        },
+        'linux-x64': {
+            packageName: '@zenithbuild/bundler-linux-x64',
+            packageDirName: 'bundler-linux-x64',
+            binaryName: 'zenith-bundler'
+        },
+        'win32-x64': {
+            packageName: '@zenithbuild/bundler-win32-x64',
+            packageDirName: 'bundler-win32-x64',
+            binaryName: 'zenith-bundler.exe'
+        }
+    };
+    return tool === 'compiler' ? compilerPackages[key] : bundlerPackages[key];
+}
+
+function createCompilerProjectFixture({
+    includePlatformPackage = true,
+    includeLegacyBinary = true,
+    includeBridge = true
+} = {}) {
     const root = createTempRoot('zenith-toolchain-project-');
     const compilerRoot = join(root, 'node_modules', '@zenithbuild', 'compiler');
     mkdirSync(join(root, 'node_modules', '@zenithbuild'), { recursive: true });
@@ -104,16 +161,36 @@ function createCompilerProjectFixture({ includeInstalledBinary = true, includeBr
         'utf8'
     );
 
-    if (includeInstalledBinary) {
+    if (includeLegacyBinary) {
         const targetDir = join(compilerRoot, 'target', 'release');
         mkdirSync(targetDir, { recursive: true });
-        createExecutableScript(targetDir, process.platform === 'win32' ? 'zenith-compiler.exe' : 'zenith-compiler', 'process.stdout.write("{}");');
+        createExecutableScript(
+            targetDir,
+            process.platform === 'win32' ? 'zenith-compiler.exe' : 'zenith-compiler',
+            'process.stdout.write("{}");'
+        );
     }
 
     if (includeBridge) {
         const distDir = join(compilerRoot, 'dist');
         mkdirSync(distDir, { recursive: true });
         writeFileSync(join(distDir, 'index.js'), 'export function compile() { return {}; }\n', 'utf8');
+    }
+
+    if (includePlatformPackage) {
+        const platformPackage = currentPlatformPackage('compiler');
+        const platformRoot = join(root, 'node_modules', '@zenithbuild', platformPackage.packageDirName);
+        mkdirSync(join(platformRoot, 'bin'), { recursive: true });
+        writeFileSync(
+            join(platformRoot, 'package.json'),
+            JSON.stringify({ name: platformPackage.packageName, version: '0.0.0-test', type: 'module' }, null, 2),
+            'utf8'
+        );
+        createExecutableScript(
+            join(platformRoot, 'bin'),
+            platformPackage.binaryName,
+            'process.stdout.write("{}");'
+        );
     }
 
     return root;
@@ -149,22 +226,17 @@ function createBundlerProjectFixture({
     }
 
     if (includePlatformPackage) {
-        const packageName = process.platform === 'darwin'
-            ? `bundler-darwin-${process.arch}`
-            : process.platform === 'linux'
-                ? `bundler-linux-${process.arch}`
-                : `bundler-win32-${process.arch}`;
-        const platformRoot = join(root, 'node_modules', '@zenithbuild', packageName);
-        const binaryName = process.platform === 'win32' ? 'zenith-bundler.exe' : 'zenith-bundler';
+        const platformPackage = currentPlatformPackage('bundler');
+        const platformRoot = join(root, 'node_modules', '@zenithbuild', platformPackage.packageDirName);
         mkdirSync(join(platformRoot, 'bin'), { recursive: true });
         writeFileSync(
             join(platformRoot, 'package.json'),
-            JSON.stringify({ name: `@zenithbuild/${packageName}`, version: '0.0.0-test', type: 'module' }, null, 2),
+            JSON.stringify({ name: platformPackage.packageName, version: '0.0.0-test', type: 'module' }, null, 2),
             'utf8'
         );
         createExecutableScript(
             join(platformRoot, 'bin'),
-            binaryName,
+            platformPackage.binaryName,
             'process.stdout.write("zenith-bundler 0.0.0-test\\n");'
         );
     }
@@ -178,7 +250,7 @@ describe('toolchain cross-OS fallback', () => {
         jest.restoreAllMocks();
     });
 
-    test('compiler candidate ordering keeps env override first and JS bridge last', () => {
+    test('compiler candidate ordering keeps env override first, platform before legacy, and JS bridge last', () => {
         const projectRoot = createCompilerProjectFixture();
         const envOverride = join(projectRoot, 'custom-compiler-bin');
         writeFileSync(envOverride, '', 'utf8');
@@ -189,25 +261,56 @@ describe('toolchain cross-OS fallback', () => {
             });
 
             expect(candidates[0].label).toBe('env override (ZENITH_COMPILER_BIN)');
-            expect(candidates[1].label).toBe('installed package binary');
+            expect(candidates[1].label).toBe('installed platform package binary');
+            expect(candidates[2].label).toBe('legacy installed package binary');
             expect(candidates[candidates.length - 1].label).toBe('JS bridge');
-            expect(candidates.slice(2, -1).every((candidate) => candidate.label === 'workspace binary')).toBe(true);
+            expect(candidates.slice(3, -1).every((candidate) => candidate.label === 'workspace binary')).toBe(true);
         } finally {
             rmSync(projectRoot, { recursive: true, force: true });
         }
     });
 
-    test('resolution order prefers env override, then installed, then workspace, then JS bridge', () => {
+    test('compiler resolves the platform package path even when the legacy binary is absent', () => {
+        const projectRoot = createCompilerProjectFixture({
+            includePlatformPackage: true,
+            includeLegacyBinary: false,
+            includeBridge: false
+        });
+        const platformPackage = currentPlatformPackage('compiler');
+
+        try {
+            expect(resolveCompilerBin(projectRoot)).toContain(
+                `/node_modules/@zenithbuild/${platformPackage.packageDirName}/bin/${platformPackage.binaryName}`
+            );
+        } finally {
+            rmSync(projectRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('compiler env override wins over platform and legacy installs', () => {
+        const projectRoot = createCompilerProjectFixture();
+        const envOverride = createExecutableScript(projectRoot, 'env-compiler.js', 'process.stdout.write("{}");');
+
+        try {
+            expect(resolveCompilerBin(projectRoot, { ZENITH_COMPILER_BIN: envOverride })).toBe(envOverride);
+        } finally {
+            rmSync(projectRoot, { recursive: true, force: true });
+        }
+    });
+
+    test('resolution order prefers env override, then platform, then legacy, then workspace, then JS bridge', () => {
         const root = createTempRoot('zenith-toolchain-order-');
         const envPath = createExecutableScript(root, 'env-compiler.js', 'process.stdout.write("{}");');
-        const installedPath = createExecutableScript(root, 'installed-compiler.js', 'process.stdout.write("{}");');
+        const platformPath = createExecutableScript(root, 'platform-compiler.js', 'process.stdout.write("{}");');
+        const legacyPath = createExecutableScript(root, 'legacy-compiler.js', 'process.stdout.write("{}");');
         const workspacePath = createExecutableScript(root, 'workspace-compiler.js', 'process.stdout.write("{}");');
         const bridgePath = createCompilerBridgeModule(root);
 
         try {
             const candidates = [
                 makeBinaryCandidate('compiler', 'env override (ZENITH_COMPILER_BIN)', envPath, process.execPath, [envPath]),
-                makeBinaryCandidate('compiler', 'installed package binary', installedPath, process.execPath, [installedPath]),
+                makeBinaryCandidate('compiler', 'installed platform package binary', platformPath, process.execPath, [platformPath]),
+                makeBinaryCandidate('compiler', 'legacy installed package binary', legacyPath, process.execPath, [legacyPath]),
                 makeBinaryCandidate('compiler', 'workspace binary', workspacePath, process.execPath, [workspacePath]),
                 makeBridgeCandidate(bridgePath)
             ];
@@ -215,20 +318,45 @@ describe('toolchain cross-OS fallback', () => {
             expect(getActiveToolchainCandidate(createToolchainStateForTests('compiler', candidates)).label)
                 .toBe('env override (ZENITH_COMPILER_BIN)');
             expect(getActiveToolchainCandidate(createToolchainStateForTests('compiler', candidates.slice(1))).label)
-                .toBe('installed package binary');
+                .toBe('installed platform package binary');
             expect(getActiveToolchainCandidate(createToolchainStateForTests('compiler', candidates.slice(2))).label)
-                .toBe('workspace binary');
+                .toBe('legacy installed package binary');
             expect(getActiveToolchainCandidate(createToolchainStateForTests('compiler', candidates.slice(3))).label)
+                .toBe('workspace binary');
+            expect(getActiveToolchainCandidate(createToolchainStateForTests('compiler', candidates.slice(4))).label)
                 .toBe('JS bridge');
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
     });
 
-    test('compiler falls back to JS bridge when the binary is incompatible', () => {
+    test('compiler falls back to the legacy binary when the platform package is incompatible', () => {
         const root = createTempRoot('zenith-toolchain-fallback-');
         const sourceFile = join(root, 'page.zen');
-        const incompatible = createIncompatibleCandidate(root, 'compiler', 'installed package binary');
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const legacyPath = createExecutableScript(root, 'legacy-compiler.js', 'process.stdout.write("{}");');
+
+        writeFileSync(sourceFile, '<div />\n', 'utf8');
+
+        try {
+            const toolchain = createToolchainStateForTests('compiler', [
+                createIncompatibleCandidate(root, 'compiler', 'installed platform package binary'),
+                makeBinaryCandidate('compiler', 'legacy installed package binary', legacyPath, process.execPath, [legacyPath])
+            ]);
+            const { candidate } = runToolchainSync(toolchain, [sourceFile], { encoding: 'utf8' });
+
+            expect(candidate.label).toBe('legacy installed package binary');
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[zenith] compiler binary incompatible for this platform; falling back to legacy installed package binary'
+            );
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('compiler falls back to JS bridge when no compatible native binary exists', () => {
+        const root = createTempRoot('zenith-toolchain-bridge-');
+        const sourceFile = join(root, 'page.zen');
         const bridgeModule = createCompilerBridgeModule(root);
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -236,7 +364,8 @@ describe('toolchain cross-OS fallback', () => {
 
         try {
             const toolchain = createToolchainStateForTests('compiler', [
-                incompatible,
+                createIncompatibleCandidate(root, 'compiler', 'installed platform package binary'),
+                createIncompatibleCandidate(root, 'compiler', 'legacy installed package binary'),
                 makeBridgeCandidate(bridgeModule)
             ]);
             const { result, candidate } = runToolchainSync(toolchain, [sourceFile], { encoding: 'utf8' });
@@ -255,9 +384,9 @@ describe('toolchain cross-OS fallback', () => {
         }
     });
 
-    test('bundler preflight falls back to env override when the installed binary is incompatible', () => {
+    test('bundler preflight falls back to env override when the installed platform binary is incompatible', () => {
         const root = createTempRoot('zenith-bundler-fallback-');
-        const incompatible = createIncompatibleCandidate(root, 'bundler', 'installed package binary');
+        const incompatible = createIncompatibleCandidate(root, 'bundler', 'installed platform package binary');
         const overridePath = createExecutableScript(root, 'bundler-override.js', 'process.stdout.write("zenith-bundler 0.0.0-test\\n");');
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -285,7 +414,7 @@ describe('toolchain cross-OS fallback', () => {
             const candidates = bundlerCommandCandidates(projectRoot, {});
 
             expect(candidates[0].label).toBe('installed platform package binary');
-            expect(candidates[1].label).toBe('installed package binary');
+            expect(candidates[1].label).toBe('legacy installed package binary');
             expect(candidates.slice(2).every((candidate) => candidate.label === 'workspace binary')).toBe(true);
         } finally {
             rmSync(projectRoot, { recursive: true, force: true });
@@ -305,7 +434,9 @@ describe('toolchain cross-OS fallback', () => {
             const toolchain = createToolchainStateForTests('bundler', candidates);
 
             expect(() => ensureToolchainCompatibility(toolchain)).toThrow(
-                `[zenith] Bundler binary not installed for ${process.platform}/${process.arch}. Reinstall @zenithbuild/bundler or ensure optional dependency installed.`
+                `[zenith] Bundler binary not installed for ${process.platform}/${process.arch}. ` +
+                'Reinstall @zenithbuild/bundler and ensure the matching platform package is installed. ' +
+                'See https://github.com/zenithbuild/framework/blob/master/docs/documentation/install-compatibility.md.'
             );
         } finally {
             rmSync(projectRoot, { recursive: true, force: true });
@@ -319,11 +450,13 @@ describe('toolchain cross-OS fallback', () => {
 
         try {
             const toolchain = createToolchainStateForTests('compiler', [
-                createIncompatibleCandidate(root, 'compiler', 'installed package binary')
+                createIncompatibleCandidate(root, 'compiler', 'installed platform package binary')
             ]);
 
             expect(() => runToolchainSync(toolchain, [sourceFile], { encoding: 'utf8' })).toThrow(
-                `[zenith] compiler binary is incompatible for ${process.platform}-${process.arch}; reinstall or set ZENITH_COMPILER_BIN=...`
+                `[zenith] compiler binary is incompatible for ${process.platform}-${process.arch}; ` +
+                'reinstall, clear the wrong-platform package, or set ZENITH_COMPILER_BIN=... ' +
+                'See https://github.com/zenithbuild/framework/blob/master/docs/documentation/install-compatibility.md.'
             );
         } finally {
             rmSync(root, { recursive: true, force: true });

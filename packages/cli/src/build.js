@@ -20,7 +20,7 @@ import { generateManifest } from './manifest.js';
 import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMode } from './resolve-components.js';
 import { collectExpandedComponentOccurrences } from './component-occurrences.js';
 import { applyOccurrenceRewritePlans, cloneComponentIrForInstance } from './component-instance-ir.js';
-import { resolveBundlerBin, resolveCompilerBin } from './toolchain-paths.js';
+import { resolveBundlerBin } from './toolchain-paths.js';
 import {
     createBundlerToolchain,
     createCompilerToolchain,
@@ -117,7 +117,7 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOption
             : null);
     const compilerBin = !compilerToolchain && typeof compilerRunOptions.compilerBin === 'string'
         ? compilerRunOptions.compilerBin
-        : resolveCompilerBin();
+        : null;
     const args = stdinSource !== undefined
         ? ['--stdin', filePath]
         : [filePath];
