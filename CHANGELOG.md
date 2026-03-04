@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.11] - 2026-03-04
+
+### Changed
+
+- Fixed the `@zenithbuild/bundler` publish contract so the npm tarball ships `scripts/render-assets.mjs`, and the native bundler now resolves that bridge from installed `node_modules` layouts instead of only repo checkouts.
+- Added a bundler `npm pack --dry-run` regression gate so CI fails if runtime bridge scripts or `dist/**` drop out of the published tarball again.
+- Documented the post-publish dist-tag promotion sequence for `latest` so public installs stay on a coherent train while `train` remains available as the safety channel.
+
 ## [0.6.10] - 2026-03-04
 
 ### Changed

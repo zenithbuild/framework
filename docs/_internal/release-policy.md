@@ -1,36 +1,27 @@
 # Release Policy
 
-This document records the stable dist-tag policy for the core Zenith framework packages.
+After a stable train publish succeeds, keep `latest` coherent. `train` can remain as the safety channel, but public installs should not mix train versions across `core`, `cli`, and the internal toolchain packages.
 
-Core packages are TS-authored and JS-shipped: the source of truth is TypeScript, while published consumers continue to receive JS from `dist/` plus declaration files.
+## Minimum promotion
 
-## Dist tags
+Run:
 
-- `latest` is the stable default for `@zenithbuild/core` and `@zenithbuild/cli`.
-- `train` exists only as a staging channel when we need one.
-- `beta` remains the prerelease channel.
+```sh
+npm dist-tag add @zenithbuild/core@0.6.11 latest
+npm dist-tag add @zenithbuild/cli@0.6.11 latest
+```
 
-## Promotion sequence
+## Recommended full alignment
 
-After a stable train publish completes:
+Run:
 
-1. Promote `@zenithbuild/core@TRAIN_VERSION` to `latest`.
-2. Promote `@zenithbuild/cli@TRAIN_VERSION` to `latest`.
-3. Promote the rest of `@zenithbuild/*` packages to `latest` only after cross-OS native binary packaging is fixed.
+```sh
+npm dist-tag add @zenithbuild/core@0.6.11 latest
+npm dist-tag add @zenithbuild/cli@0.6.11 latest
+npm dist-tag add @zenithbuild/runtime@0.6.11 latest
+npm dist-tag add @zenithbuild/router@0.6.11 latest
+npm dist-tag add @zenithbuild/bundler@0.6.11 latest
+npm dist-tag add @zenithbuild/compiler@0.6.11 latest
+```
 
-## Package roles
-
-- `@zenithbuild/core` remains the anchor package.
-- Internal packages are not a user-facing install surface even if they eventually align on `latest`.
-
-## Current blocker
-
-Full-package `latest` promotion is not unconditional yet. Native compiler and bundler distribution still needs platform-correct packaging before the ecosystem can assume every install path is cross-OS safe without fallback.
-
-## Platform package bootstrap
-
-Platform binary packages require a one-time bootstrap publish before npm Trusted Publishing can take over for that package name.
-
-- Use the `Bootstrap Platform Packages` workflow with the `NPM_BOOTSTRAP_TOKEN` secret for first publish only.
-- Bootstrap is limited to platform packages such as `@zenithbuild/bundler-<platform>`.
-- After the first publish succeeds, configure npm Trusted Publishing for each new package name and return to the normal OIDC-only publish flow.
+Promoting the full train avoids mixed installs where `@latest` still resolves an older compiler or bundler than the `core`/`cli` pair.
