@@ -1,0 +1,23 @@
+<script lang="ts">
+interface Props {
+    scope?: string;
+    onClick?: () => void;
+    onKeydown?: (event: KeyboardEvent) => void;
+    onInput?: (event: Event) => void;
+    onSubmit?: (event: Event) => void;
+    currentCount?: unknown;
+    nextCount?: unknown;
+}
+
+const incoming = props as Props;
+</script>
+
+<EventSink
+    scope={incoming.scope}
+    onClick={incoming.onClick}
+    onKeydown={incoming.onKeydown}
+    onInput={incoming.onInput}
+    onSubmit={incoming.onSubmit}
+    currentCount={incoming.currentCount}
+    nextCount={incoming.nextCount}
+></EventSink>

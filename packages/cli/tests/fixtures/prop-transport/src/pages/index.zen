@@ -1,0 +1,58 @@
+<script lang="ts">
+const count = signal(0);
+const keydownLog = signal("idle");
+const inputLog = signal("idle");
+const submitLog = signal("idle");
+const submitCount = signal(0);
+
+function increment() {
+    count.set(count.get() + 1);
+}
+
+const handlers = {
+    onKeydown(event) {
+        const target = event.currentTarget;
+        const scope = target instanceof HTMLElement ? target.dataset.scope ?? "unknown" : "unknown";
+        keydownLog.set(`${scope}:${event.key}`);
+    },
+    onInput(event) {
+        const target = event.currentTarget;
+        const scope = target instanceof HTMLInputElement ? target.dataset.scope ?? "unknown" : "unknown";
+        const value = target instanceof HTMLInputElement ? target.value : "";
+        inputLog.set(`${scope}:${value}`);
+    },
+    onSubmit(event) {
+        event.preventDefault();
+        const target = event.currentTarget;
+        const scope = target instanceof HTMLFormElement ? target.dataset.scope ?? "unknown" : "unknown";
+        const next = submitCount.get() + 1;
+        submitCount.set(next);
+        submitLog.set(`${scope}:${next}`);
+    }
+};
+</script>
+
+<main>
+    <EventSink
+        scope="direct"
+        onClick={increment}
+        onKeydown={handlers.onKeydown}
+        onInput={handlers.onInput}
+        onSubmit={(event) => handlers.onSubmit(event)}
+        currentCount={count}
+        nextCount={count + 1}
+    ></EventSink>
+    <ParentForward
+        scope="forwarded"
+        onClick={increment}
+        onKeydown={handlers.onKeydown}
+        onInput={handlers.onInput}
+        onSubmit={(event) => handlers.onSubmit(event)}
+        currentCount={count}
+        nextCount={count + 1}
+    ></ParentForward>
+    <p data-testid="click-count">{count}</p>
+    <p data-testid="last-keydown">{keydownLog}</p>
+    <p data-testid="last-input">{inputLog}</p>
+    <p data-testid="last-submit">{submitLog}</p>
+</main>

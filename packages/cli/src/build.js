@@ -19,6 +19,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { generateManifest } from './manifest.js';
 import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMode } from './resolve-components.js';
 import { collectExpandedComponentOccurrences } from './component-occurrences.js';
+import { findNextKnownComponentTag } from './component-tag-parser.js';
 import { applyOccurrenceRewritePlans, cloneComponentIrForInstance } from './component-instance-ir.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
 import {
@@ -1222,8 +1223,6 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
     };
 }
 
-const OPEN_COMPONENT_TAG_RE = /<([A-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\s*(\/?)>/g;
-
 /**
  * Collect original attribute strings for component usages in a page source.
  *
@@ -1234,18 +1233,19 @@ const OPEN_COMPONENT_TAG_RE = /<([A-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\s*(\/?)>/g;
  */
 function collectComponentUsageAttrs(source, registry, ownerPath = null) {
     const out = new Map();
-    OPEN_COMPONENT_TAG_RE.lastIndex = 0;
-    let match;
-    while ((match = OPEN_COMPONENT_TAG_RE.exec(source)) !== null) {
-        const name = match[1];
-        if (!registry.has(name)) {
-            continue;
+    let cursor = 0;
+    while (cursor < source.length) {
+        const tag = findNextKnownComponentTag(source, registry, cursor);
+        if (!tag) {
+            break;
         }
-        const attrs = String(match[2] || '').trim();
+        const name = tag.name;
+        const attrs = String(tag.attrs || '').trim();
         if (!out.has(name)) {
             out.set(name, []);
         }
         out.get(name).push({ attrs, ownerPath });
+        cursor = tag.end;
     }
     return out;
 }

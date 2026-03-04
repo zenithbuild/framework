@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { findMatchingComponentClose, findNextKnownComponentTag } from './component-tag-parser.js';
 import { extractTemplate, isDocumentMode } from './resolve-components.js';
-
-const OPEN_COMPONENT_TAG_RE = /<([A-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\s*(\/?)>/g;
 
 export function collectExpandedComponentOccurrences(source, registry, sourceFile) {
     /** @type {Array<{ name: string, attrs: string, ownerPath: string, componentPath: string }>} */
@@ -14,7 +13,7 @@ function walkSource(source, registry, sourceFile, chain, occurrences) {
     let cursor = 0;
 
     while (cursor < source.length) {
-        const tag = findNextKnownTag(source, registry, cursor);
+        const tag = findNextKnownComponentTag(source, registry, cursor);
         if (!tag) {
             return;
         }
@@ -22,7 +21,7 @@ function walkSource(source, registry, sourceFile, chain, occurrences) {
         let children = '';
         let replaceEnd = tag.end;
         if (!tag.selfClosing) {
-            const close = findMatchingClose(source, tag.name, tag.end);
+            const close = findMatchingComponentClose(source, tag.name, tag.end);
             if (!close) {
                 throw new Error(`Unclosed component tag <${tag.name}> in ${sourceFile} at offset ${tag.start}`);
             }
@@ -77,69 +76,6 @@ function materializeTemplate(componentSource, name, children, componentPath) {
     }
 
     return template;
-}
-
-function findNextKnownTag(source, registry, startIndex) {
-    OPEN_COMPONENT_TAG_RE.lastIndex = startIndex;
-    let match;
-    while ((match = OPEN_COMPONENT_TAG_RE.exec(source)) !== null) {
-        const name = match[1];
-        if (!registry.has(name)) {
-            continue;
-        }
-        if (isInsideExpressionScope(source, match.index)) {
-            continue;
-        }
-        return {
-            name,
-            attrs: String(match[2] || ''),
-            start: match.index,
-            end: OPEN_COMPONENT_TAG_RE.lastIndex,
-            selfClosing: match[3] === '/'
-        };
-    }
-    return null;
-}
-
-function isInsideExpressionScope(source, index) {
-    let depth = 0;
-    for (let i = 0; i < index; i++) {
-        if (source[i] === '{') {
-            depth += 1;
-        } else if (source[i] === '}') {
-            depth = Math.max(0, depth - 1);
-        }
-    }
-    return depth > 0;
-}
-
-function findMatchingClose(source, tagName, startAfterOpen) {
-    let depth = 1;
-    const escapedName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const tagRe = new RegExp(`<(/?)${escapedName}(?:\\s[^<>]*?)?\\s*(/?)>`, 'g');
-    tagRe.lastIndex = startAfterOpen;
-
-    let match;
-    while ((match = tagRe.exec(source)) !== null) {
-        const isClose = match[1] === '/';
-        const isSelfClose = match[2] === '/';
-        if (isSelfClose && !isClose) {
-            continue;
-        }
-        if (isClose) {
-            depth -= 1;
-            if (depth === 0) {
-                return {
-                    contentEnd: match.index,
-                    tagEnd: match.index + match[0].length
-                };
-            }
-        } else {
-            depth += 1;
-        }
-    }
-
-    return null;
 }
 
 function countSlots(template) {

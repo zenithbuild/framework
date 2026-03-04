@@ -11,6 +11,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
+import { findMatchingComponentClose, findNextKnownComponentTag } from './component-tag-parser.js';
 
 // ---------------------------------------------------------------------------
 // Registry: Map<PascalCaseName, absolutePath>
@@ -145,8 +146,6 @@ export function isDocumentMode(template) {
 // Component expansion
 // ---------------------------------------------------------------------------
 
-const OPEN_COMPONENT_TAG_RE = /<([A-Z][a-zA-Z0-9]*)(\s[^<>]*?)?\s*(\/?)>/g;
-
 /**
  * Recursively expand PascalCase component tags in `source`.
  *
@@ -186,7 +185,7 @@ function expandSource(source, registry, sourceFile, chain, usedComponents) {
 
     while (iterations < MAX_ITERATIONS) {
         iterations += 1;
-        const tag = findNextKnownTag(output, registry, 0);
+        const tag = findNextKnownComponentTag(output, registry, 0);
         if (!tag) {
             return output;
         }
@@ -195,7 +194,7 @@ function expandSource(source, registry, sourceFile, chain, usedComponents) {
         let replaceEnd = tag.end;
 
         if (!tag.selfClosing) {
-            const close = findMatchingClose(output, tag.name, tag.end);
+            const close = findMatchingComponentClose(output, tag.name, tag.end);
             if (!close) {
                 throw new Error(
                     `Unclosed component tag <${tag.name}> in ${sourceFile} at offset ${tag.start}`
@@ -226,183 +225,6 @@ function expandSource(source, registry, sourceFile, chain, usedComponents) {
     throw new Error(
         `Component expansion exceeded ${MAX_ITERATIONS} replacements in ${sourceFile}.`
     );
-}
-
-/**
- * Find the next component opening tag that exists in the registry.
- *
- * @param {string} source
- * @param {Map<string, string>} registry
- * @param {number} startIndex
- * @returns {{ name: string, start: number, end: number, selfClosing: boolean } | null}
- */
-function findNextKnownTag(source, registry, startIndex) {
-    OPEN_COMPONENT_TAG_RE.lastIndex = startIndex;
-
-    let match;
-    while ((match = OPEN_COMPONENT_TAG_RE.exec(source)) !== null) {
-        const name = match[1];
-        if (!registry.has(name)) {
-            continue;
-        }
-        if (isInsideExpressionScope(source, match.index)) {
-            continue;
-        }
-        return {
-            name,
-            start: match.index,
-            end: OPEN_COMPONENT_TAG_RE.lastIndex,
-            selfClosing: match[3] === '/',
-        };
-    }
-
-    return null;
-}
-
-/**
- * Detect whether `index` is inside a `{ ... }` expression scope.
- *
- * This prevents component macro expansion inside embedded markup expressions,
- * which must remain expression-local so the compiler can lower them safely.
- *
- * @param {string} source
- * @param {number} index
- * @returns {boolean}
- */
-function isInsideExpressionScope(source, index) {
-    let depth = 0;
-    let mode = 'code';
-    let escaped = false;
-    const lower = source.toLowerCase();
-
-    for (let i = 0; i < index; i++) {
-        if (mode === 'code') {
-            if (lower.startsWith('<script', i)) {
-                const close = lower.indexOf('</script>', i + 7);
-                if (close < 0 || close >= index) {
-                    return false;
-                }
-                i = close + '</script>'.length - 1;
-                continue;
-            }
-            if (lower.startsWith('<style', i)) {
-                const close = lower.indexOf('</style>', i + 6);
-                if (close < 0 || close >= index) {
-                    return false;
-                }
-                i = close + '</style>'.length - 1;
-                continue;
-            }
-        }
-
-        const ch = source[i];
-        const next = i + 1 < index ? source[i + 1] : '';
-
-        if (mode === 'line-comment') {
-            if (ch === '\n') {
-                mode = 'code';
-            }
-            continue;
-        }
-        if (mode === 'block-comment') {
-            if (ch === '*' && next === '/') {
-                mode = 'code';
-                i += 1;
-            }
-            continue;
-        }
-        if (mode === 'single-quote' || mode === 'double-quote' || mode === 'template') {
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (ch === '\\') {
-                escaped = true;
-                continue;
-            }
-            if (
-                (mode === 'single-quote' && ch === "'") ||
-                (mode === 'double-quote' && ch === '"') ||
-                (mode === 'template' && ch === '`')
-            ) {
-                mode = 'code';
-            }
-            continue;
-        }
-
-        if (ch === '/' && next === '/') {
-            mode = 'line-comment';
-            i += 1;
-            continue;
-        }
-        if (ch === '/' && next === '*') {
-            mode = 'block-comment';
-            i += 1;
-            continue;
-        }
-        if (ch === "'") {
-            mode = 'single-quote';
-            continue;
-        }
-        if (ch === '"') {
-            mode = 'double-quote';
-            continue;
-        }
-        if (ch === '`') {
-            mode = 'template';
-            continue;
-        }
-        if (ch === '{') {
-            depth += 1;
-            continue;
-        }
-        if (ch === '}') {
-            depth = Math.max(0, depth - 1);
-        }
-    }
-
-    return depth > 0;
-}
-
-/**
- * Find the matching </Name> for an opening tag, accounting for nested
- * tags with the same name.
- *
- * @param {string} source — full source
- * @param {string} tagName — tag name to match
- * @param {number} startAfterOpen — position after the opening tag's `>`
- * @returns {{ contentEnd: number, tagEnd: number } | null}
- */
-function findMatchingClose(source, tagName, startAfterOpen) {
-    let depth = 1;
-    const escapedName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const tagRe = new RegExp(`<(/?)${escapedName}(?:\\s[^<>]*?)?\\s*(/?)>`, 'g');
-    tagRe.lastIndex = startAfterOpen;
-
-    let match;
-    while ((match = tagRe.exec(source)) !== null) {
-        const isClose = match[1] === '/';
-        const isSelfClose = match[2] === '/';
-
-        if (isSelfClose && !isClose) {
-            // Self-closing <Name />, doesn't affect depth.
-            continue;
-        }
-
-        if (isClose) {
-            depth--;
-            if (depth === 0) {
-                return {
-                    contentEnd: match.index,
-                    tagEnd: match.index + match[0].length,
-                };
-            }
-        } else {
-            depth++;
-        }
-    }
-
-    return null;
 }
 
 /**

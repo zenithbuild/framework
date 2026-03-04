@@ -1,0 +1,33 @@
+<script lang="ts">
+interface Props {
+    scope?: string;
+    onClick?: () => void;
+    onKeydown?: (event: KeyboardEvent) => void;
+    onInput?: (event: Event) => void;
+    onSubmit?: (event: Event) => void;
+    currentCount?: unknown;
+    nextCount?: unknown;
+}
+
+const incoming = props as Props;
+const scope = typeof incoming.scope === "string" ? incoming.scope : "sink";
+const buttonId = `${scope}-btn`;
+const inputId = `${scope}-inp`;
+const formId = `${scope}-form`;
+const currentId = `${scope}-current`;
+const nextId = `${scope}-next`;
+const currentCount = incoming.currentCount;
+const nextCount = incoming.nextCount;
+</script>
+
+<section data-scope={scope}>
+    <button data-testid={buttonId} data-scope={scope} on:click={incoming.onClick} on:keydown={incoming.onKeydown}>
+        click
+    </button>
+    <input data-testid={inputId} data-scope={scope} on:input={incoming.onInput} />
+    <form data-testid={formId} data-scope={scope} on:submit={incoming.onSubmit}>
+        <button type="submit">submit</button>
+    </form>
+    <output data-testid={currentId}>{currentCount}</output>
+    <output data-testid={nextId}>{nextCount}</output>
+</section>
