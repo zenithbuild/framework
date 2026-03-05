@@ -4,6 +4,11 @@ After a stable train publish succeeds, keep `latest` coherent. `train` can remai
 
 ## Pipeline policy
 
+- Automatic release flow on `master` push:
+  - `CI` must pass first.
+  - `Platform Bootstrap` stage runs next for train publishes.
+  - npm publish jobs run next in the `npm-release` environment (maintainer approval required).
+  - GitHub releases run only after publish succeeds and only when package/train versions changed.
 - Normal publish is OIDC-only via `.github/workflows/publish.yml` in the `npm-release` environment.
 - The standard path does not use token-based npm auth (`NPM_TOKEN` / `NODE_AUTH_TOKEN`).
 - `.github/workflows/bootstrap-platform-packages.yml` is manual-only (`workflow_dispatch`) and reserved for bootstrapping brand-new package names.
