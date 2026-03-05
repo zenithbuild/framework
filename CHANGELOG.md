@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - No unreleased entries yet.
 
+## [0.6.13] - 2026-03-05
+
+### Changed
+
+- Fixed vendor bundling classification so `@/` path-alias imports are treated as project modules instead of external npm packages, preventing initial build failures caused by `.zen` modules being pulled into vendor entrypoints.
+- Added bundler regression coverage to lock the `@/` alias behavior in vendor external detection.
+- Added missing runtime dependencies (`gsap`, `tailwind-merge`) to the site package so fresh installs do not fail on unresolved UI imports.
+
 ## [0.6.12] - 2026-03-04
 
 ### Changed
