@@ -110,7 +110,19 @@ fn main() -> Result<()> {
                 "component_instance": entry.component_instance,
                 "component_binding": entry.component_binding,
                 "literal": entry.literal,
-                "compiled_expr": entry.compiled_expr
+                "compiled_expr": entry.compiled_expr,
+                "source": entry.source.as_ref().map(|source| serde_json::json!({
+                    "file": source.file,
+                    "start": {
+                        "line": source.start.line,
+                        "column": source.start.column
+                    },
+                    "end": {
+                        "line": source.end.line,
+                        "column": source.end.column
+                    },
+                    "snippet": source.snippet
+                }))
             })
         })
         .collect::<Vec<_>>();
@@ -122,7 +134,19 @@ fn main() -> Result<()> {
                 "index": entry.index,
                 "kind": entry.kind,
                 "selector": entry.selector,
-                "attr": entry.attr
+                "attr": entry.attr,
+                "source": entry.source.as_ref().map(|source| serde_json::json!({
+                    "file": source.file,
+                    "start": {
+                        "line": source.start.line,
+                        "column": source.start.column
+                    },
+                    "end": {
+                        "line": source.end.line,
+                        "column": source.end.column
+                    },
+                    "snippet": source.snippet
+                }))
             })
         })
         .collect::<Vec<_>>();
@@ -133,7 +157,19 @@ fn main() -> Result<()> {
             serde_json::json!({
                 "index": entry.index,
                 "event": entry.event,
-                "selector": entry.selector
+                "selector": entry.selector,
+                "source": entry.source.as_ref().map(|source| serde_json::json!({
+                    "file": source.file,
+                    "start": {
+                        "line": source.start.line,
+                        "column": source.start.column
+                    },
+                    "end": {
+                        "line": source.end.line,
+                        "column": source.end.column
+                    },
+                    "snippet": source.snippet
+                }))
             })
         })
         .collect::<Vec<_>>();
@@ -144,7 +180,19 @@ fn main() -> Result<()> {
             serde_json::json!({
                 "index": entry.index,
                 "identifier": entry.identifier,
-                "selector": entry.selector
+                "selector": entry.selector,
+                "source": entry.source.as_ref().map(|source| serde_json::json!({
+                    "file": source.file,
+                    "start": {
+                        "line": source.start.line,
+                        "column": source.start.column
+                    },
+                    "end": {
+                        "line": source.end.line,
+                        "column": source.end.column
+                    },
+                    "snippet": source.snippet
+                }))
             })
         })
         .collect::<Vec<_>>();

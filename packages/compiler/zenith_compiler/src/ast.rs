@@ -6,7 +6,10 @@
 pub enum Node {
     Element(ElementNode),
     Text(String),
-    Expression(String),
+    Expression {
+        value: String,
+        span: SourceSpan,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -22,6 +25,12 @@ pub struct SourceLocation {
     pub column: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SourceSpan {
+    pub start: SourceLocation,
+    pub end: SourceLocation,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ElementNode {
     pub tag: String,
@@ -33,11 +42,18 @@ pub struct ElementNode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
     Static { name: String, value: String },
-    Expression { name: String, value: String },
+    Expression {
+        name: String,
+        value: String,
+        span: SourceSpan,
+    },
     Event {
         name: String,
         handler: String,
-        location: SourceLocation,
+        span: SourceSpan,
     },
-    Ref { identifier: String },
+    Ref {
+        identifier: String,
+        span: SourceSpan,
+    },
 }

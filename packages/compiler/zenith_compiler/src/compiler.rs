@@ -7,6 +7,7 @@ use crate::script::{
 use crate::transform::{
     transform, EventBinding, MarkerBinding, MarkerKind, RefBinding, TransformWarning,
 };
+use crate::ast::SourceSpan;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const IR_VERSION: u32 = 1;
@@ -56,6 +57,20 @@ pub struct SignalPayload {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SourcePositionPayload {
+    pub line: usize,
+    pub column: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SourceSpanPayload {
+    pub file: String,
+    pub start: SourcePositionPayload,
+    pub end: SourcePositionPayload,
+    pub snippet: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ExpressionBindingPayload {
     pub marker_index: usize,
     pub signal_index: Option<usize>,
@@ -67,6 +82,7 @@ pub struct ExpressionBindingPayload {
     /// Precompiled expression for compound expressions that reference signals.
     /// Replaces signal identifiers with `signalMap.get(id).get()` for runtime evaluation without eval.
     pub compiled_expr: Option<String>,
+    pub source: Option<SourceSpanPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -75,6 +91,7 @@ pub struct MarkerPayload {
     pub kind: String,
     pub selector: String,
     pub attr: Option<String>,
+    pub source: Option<SourceSpanPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -82,6 +99,7 @@ pub struct EventPayload {
     pub index: usize,
     pub event: String,
     pub selector: String,
+    pub source: Option<SourceSpanPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -89,6 +107,7 @@ pub struct RefBindingPayload {
     pub index: usize,
     pub identifier: String,
     pub selector: String,
+    pub source: Option<SourceSpanPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -217,7 +236,17 @@ pub fn compile_structured_with_source_options_and_warnings(
         ) = compile_internal_result(input, source_path, options)?;
         let html = crate::codegen::generate_html(&ast);
         let signals = map_signals(&hoisted);
-        let expression_bindings = map_expression_bindings(&expressions, &hoisted, &signals);
+        let marker_bindings = map_markers(markers, source_path);
+        let marker_sources = marker_bindings
+            .iter()
+            .map(|marker| (marker.index, marker.source.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let expression_bindings = map_expression_bindings(
+            &expressions,
+            &hoisted,
+            &signals,
+            &marker_sources,
+        );
 
         let output = CompilerOutput {
             ir_version: IR_VERSION,
@@ -235,9 +264,9 @@ pub fn compile_structured_with_source_options_and_warnings(
             component_instances: map_component_instances(component_instances),
             signals,
             expression_bindings,
-            marker_bindings: map_markers(markers),
-            event_bindings: map_events(events),
-            ref_bindings: map_ref_bindings(ref_bindings),
+            marker_bindings,
+            event_bindings: map_events(events, source_path),
+            ref_bindings: map_ref_bindings(ref_bindings, source_path),
             style_blocks: Vec::new(),
         };
 
@@ -464,6 +493,7 @@ fn map_expression_bindings(
     expressions: &[String],
     hoisted: &HoistedOutput,
     signals: &[SignalPayload],
+    marker_sources: &BTreeMap<usize, Option<SourceSpanPayload>>,
 ) -> Vec<ExpressionBindingPayload> {
     let signal_index_by_state = signals
         .iter()
@@ -491,6 +521,7 @@ fn map_expression_bindings(
                     component_binding: None,
                     literal: None,
                     compiled_expr: None,
+                    source: marker_sources.get(&index).cloned().unwrap_or(None),
                 };
             }
 
@@ -504,6 +535,7 @@ fn map_expression_bindings(
                     component_binding: Some(binding),
                     literal: None,
                     compiled_expr: None,
+                    source: marker_sources.get(&index).cloned().unwrap_or(None),
                 };
             }
 
@@ -517,6 +549,7 @@ fn map_expression_bindings(
                     component_binding: None,
                     literal: Some(expr.clone()),
                     compiled_expr: None,
+                    source: marker_sources.get(&index).cloned().unwrap_or(None),
                 };
             }
 
@@ -543,6 +576,7 @@ fn map_expression_bindings(
                     &hoisted.state_bindings,
                     &signal_index_by_state,
                 )),
+                source: marker_sources.get(&index).cloned().unwrap_or(None),
             }
         })
         .collect()
@@ -722,7 +756,7 @@ fn parse_component_binding(expr: &str) -> Option<(String, String)> {
     Some((instance.to_string(), binding.to_string()))
 }
 
-fn map_markers(markers: Vec<MarkerBinding>) -> Vec<MarkerPayload> {
+fn map_markers(markers: Vec<MarkerBinding>, source_path: &str) -> Vec<MarkerPayload> {
     markers
         .into_iter()
         .map(|marker| MarkerPayload {
@@ -735,30 +769,48 @@ fn map_markers(markers: Vec<MarkerBinding>) -> Vec<MarkerPayload> {
             .to_string(),
             selector: marker.selector,
             attr: marker.attr,
+            source: map_source_span(source_path, marker.source),
         })
         .collect()
 }
 
-fn map_events(events: Vec<EventBinding>) -> Vec<EventPayload> {
+fn map_events(events: Vec<EventBinding>, source_path: &str) -> Vec<EventPayload> {
     events
         .into_iter()
         .map(|event| EventPayload {
             index: event.index,
             event: event.event,
             selector: event.selector,
+            source: map_source_span(source_path, event.source),
         })
         .collect()
 }
 
-fn map_ref_bindings(bindings: Vec<RefBinding>) -> Vec<RefBindingPayload> {
+fn map_ref_bindings(bindings: Vec<RefBinding>, source_path: &str) -> Vec<RefBindingPayload> {
     bindings
         .into_iter()
         .map(|binding| RefBindingPayload {
             index: binding.index,
             identifier: binding.identifier,
             selector: binding.selector,
+            source: map_source_span(source_path, binding.source),
         })
         .collect()
+}
+
+fn map_source_span(source_path: &str, source: Option<SourceSpan>) -> Option<SourceSpanPayload> {
+    source.map(|span| SourceSpanPayload {
+        file: source_path.to_string(),
+        start: SourcePositionPayload {
+            line: span.start.line,
+            column: span.start.column,
+        },
+        end: SourcePositionPayload {
+            line: span.end.line,
+            column: span.end.column,
+        },
+        snippet: None,
+    })
 }
 
 fn map_warnings(warnings: Vec<TransformWarning>) -> Vec<CompileWarning> {

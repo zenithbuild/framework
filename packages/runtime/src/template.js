@@ -122,6 +122,8 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   }
 
   let cssSwapEpoch = 0;
+  const CSS_UPDATE_DOCS = '/docs/documentation/contracts/hmr-v1-contract.md#css-updates';
+  const BUILD_ERROR_DOCS = '/docs/documentation/contracts/runtime-contract.md#diagnostics';
 
   function withCacheBuster(nextHref) {
     const separator = nextHref.includes('?') ? '&' : '?';
@@ -162,7 +164,7 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
 
   function scheduleCssRetry(previousHref, attempt) {
     if (attempt >= 3) {
-      window.location.reload();
+      reportBuildFailure('CSS update failed (404): server build not ready', CSS_UPDATE_DOCS);
       return;
     }
     const delayMs = (attempt + 1) * 100;
@@ -229,6 +231,19 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   shell.style.fontSize = '12px';
   shell.style.pointerEvents = 'none';
 
+  const buildFailure = document.createElement('div');
+  buildFailure.setAttribute('data-zenith-dev-build-error', 'true');
+  buildFailure.style.display = 'none';
+  buildFailure.style.marginBottom = '8px';
+  buildFailure.style.padding = '8px 10px';
+  buildFailure.style.maxWidth = '420px';
+  buildFailure.style.pointerEvents = 'auto';
+  buildFailure.style.border = '1px solid rgba(255,106,106,0.8)';
+  buildFailure.style.borderRadius = '8px';
+  buildFailure.style.background = 'rgba(90, 16, 16, 0.92)';
+  buildFailure.style.color = '#ffe8e8';
+  buildFailure.style.whiteSpace = 'pre-wrap';
+
   const pill = document.createElement('button');
   pill.type = 'button';
   pill.textContent = 'Zenith Dev';
@@ -252,6 +267,29 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   panel.style.borderRadius = '10px';
   panel.style.padding = '10px';
   panel.style.boxShadow = '0 14px 30px rgba(0,0,0,0.35)';
+  let lastBuildFailureSignature = '';
+
+  function reportBuildFailure(message, docsLink) {
+    const normalizedMessage = typeof message === 'string' && message.trim().length > 0
+      ? message.trim()
+      : 'Build failed - fix errors to continue.';
+    const signature = normalizedMessage + '|' + String(docsLink || '');
+    if (signature !== lastBuildFailureSignature) {
+      appendLog('[build_failed] ' + normalizedMessage);
+      lastBuildFailureSignature = signature;
+    }
+    const docsText = typeof docsLink === 'string' && docsLink.length > 0
+      ? '\\nDocs: ' + docsLink
+      : '';
+    buildFailure.textContent = 'Build failed - fix errors to continue\\n' + normalizedMessage + docsText;
+    buildFailure.style.display = 'block';
+  }
+
+  function clearBuildFailure() {
+    lastBuildFailureSignature = '';
+    buildFailure.style.display = 'none';
+    buildFailure.textContent = '';
+  }
 
   const status = document.createElement('div');
   status.textContent = 'status: connecting';
@@ -301,7 +339,7 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   logs.textContent = '[zenith-dev] waiting for server events...';
 
   panel.append(status, info, controls, logs);
-  shell.append(pill, panel);
+  shell.append(buildFailure, pill, panel);
 
   function setOpen(open) {
     state.overlay.open = open === true;
@@ -322,6 +360,9 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
     const serverUrl = typeof payload.serverUrl === 'string' ? payload.serverUrl : window.location.origin;
     const buildId = Number.isInteger(payload.buildId) ? payload.buildId : 'n/a';
     const buildStatus = typeof payload.status === 'string' ? payload.status : 'unknown';
+    const errorMessage = payload && payload.error && typeof payload.error.message === 'string'
+      ? payload.error.message
+      : (typeof payload.message === 'string' ? payload.message : '');
     info.textContent =
       'server: ' + serverUrl + '\\n' +
       'route: ' + route + '\\n' +
@@ -330,6 +371,11 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
       'hash: ' + hash + '\\n' +
       'duration: ' + duration + '\\n' +
       'changed: ' + changed;
+    if (buildStatus === 'error') {
+      reportBuildFailure(errorMessage || 'Dev build is in an error state.', BUILD_ERROR_DOCS);
+    } else if (buildStatus === 'ok' || buildStatus === 'building') {
+      clearBuildFailure();
+    }
   }
 
   function allLogsEnabled() {
@@ -397,12 +443,14 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   source.addEventListener('build_start', function (event) {
     const payload = parseEventData(event.data);
     status.textContent = 'status: rebuilding';
+    clearBuildFailure();
     appendLog('[build_start] ' + (Array.isArray(payload.changedFiles) ? payload.changedFiles.join(', ') : ''));
     emitDebug('build_start', payload);
   });
   source.addEventListener('build_complete', function (event) {
     const payload = parseEventData(event.data);
     status.textContent = 'status: ready';
+    clearBuildFailure();
     updateInfo(payload);
     appendLog('[build_complete] ' + (Number.isFinite(payload.durationMs) ? payload.durationMs + 'ms' : 'done'));
     emitDebug('build_complete', payload);
@@ -410,6 +458,8 @@ const RUNTIME_DEV_CLIENT_SOURCE = `(() => {
   source.addEventListener('build_error', function (event) {
     const payload = parseEventData(event.data);
     status.textContent = 'status: error';
+    reportBuildFailure(payload.message || 'Build failed', BUILD_ERROR_DOCS);
+    updateInfo(payload);
     appendLog('[build_error] ' + (payload.message || 'Unknown error'));
     emitDebug('build_error', payload);
   });

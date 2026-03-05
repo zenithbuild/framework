@@ -60,7 +60,7 @@ fn generate_node(node: &Node) -> String {
             }
         }
         Node::Text(text) => text.clone(),
-        Node::Expression(_) => {
+        Node::Expression { .. } => {
             panic!("Codegen encountered Expression node! Transform step failed.")
         }
     }

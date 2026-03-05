@@ -1,4 +1,4 @@
-use crate::ast::{Attribute, ElementNode, Node, SourceLocation};
+use crate::ast::{Attribute, ElementNode, Node, SourceLocation, SourceSpan};
 use crate::event_contract;
 use crate::lexer::{Lexer, Token};
 
@@ -48,8 +48,16 @@ impl<'a> Parser<'a> {
         SourceLocation { line, column }
     }
 
-    fn current_token_location(&self) -> SourceLocation {
-        self.location_for_offset(self.current_token_start)
+    fn span_for_offsets(&self, start_offset: usize, end_offset_exclusive: usize) -> SourceSpan {
+        let end_offset = if end_offset_exclusive > start_offset {
+            end_offset_exclusive.saturating_sub(1)
+        } else {
+            start_offset
+        };
+        SourceSpan {
+            start: self.location_for_offset(start_offset),
+            end: self.location_for_offset(end_offset),
+        }
     }
 
     fn expect(&mut self, token: Token) {
@@ -117,12 +125,17 @@ impl<'a> Parser<'a> {
             Token::LBrace,
             "parse_expression called without LBrace"
         );
+        let start_offset = self.current_token_start;
         let raw = self.lexer.lex_expression_content();
+        let end_offset_exclusive = self.lexer.current_offset();
         // lex_expression_content consumed everything up to and including the closing '}'.
         // Re-sync current_token from the lexer.
         self.sync_current_token();
         let content = self.contract_gate_expression(&raw);
-        Node::Expression(content)
+        Node::Expression {
+            value: content,
+            span: self.span_for_offsets(start_offset, end_offset_exclusive),
+        }
     }
 
     /// Contract gate: reject embedded markup tags inside expressions unless
@@ -187,7 +200,7 @@ impl<'a> Parser<'a> {
             match &self.current_token {
                 Token::Identifier(name) => {
                     let name = name.clone();
-                    let attr_name_location = self.current_token_location();
+                    let attr_name_offset = self.current_token_start;
                     self.advance();
 
                     if self.current_token == Token::Eq {
@@ -210,8 +223,12 @@ impl<'a> Parser<'a> {
                                 ),
                             };
                             self.advance();
+                            let end_offset_exclusive = self.lexer.current_offset();
                             self.expect(Token::RBrace);
-                            attributes.push(Attribute::Ref { identifier });
+                            attributes.push(Attribute::Ref {
+                                identifier,
+                                span: self.span_for_offsets(attr_name_offset, end_offset_exclusive),
+                            });
                         } else if self.current_token == Token::LBrace {
                             // Expression or Event — use raw balanced capture.
                             // The lexer produced LBrace as current_token and is
@@ -219,12 +236,15 @@ impl<'a> Parser<'a> {
                             // lex_expression_content() directly (do NOT advance
                             // first, as that would consume the first content token).
                             let value = self.lexer.lex_expression_content();
+                            let end_offset_exclusive = self.lexer.current_offset();
                             self.sync_current_token();
                             let value = self.contract_gate_expression(&value);
+                            let span = self.span_for_offsets(attr_name_offset, end_offset_exclusive);
 
                             if name.starts_with("on:") {
                                 let handler = value.trim().to_string();
                                 if event_contract::is_direct_call_expression(&handler) {
+                                    let attr_name_location = self.location_for_offset(attr_name_offset);
                                     panic!(
                                         "Event handlers must not be direct call expressions.\n\
                                          Found: on:{}={{ {} }} at line {}, column {}.\n\
@@ -238,13 +258,14 @@ impl<'a> Parser<'a> {
                                 attributes.push(Attribute::Event {
                                     name: name[3..].to_string(),
                                     handler,
-                                    location: attr_name_location,
+                                    span,
                                 });
                             } else {
-                                attributes.push(Attribute::Expression { name, value });
+                                attributes.push(Attribute::Expression { name, value, span });
                             }
                         } else if let Token::StringLiteral(value) = &self.current_token {
                             if name.starts_with("on:") {
+                                let attr_name_location = self.location_for_offset(attr_name_offset);
                                 panic!(
                                     "Event attributes do not accept string handlers.\n\
                                      Found: {}=\"{}\" at line {}, column {}.\n\

@@ -2,6 +2,9 @@ const OVERLAY_ID = '__zenith_runtime_error_overlay';
 const MAX_MESSAGE_LENGTH = 120;
 const MAX_HINT_LENGTH = 140;
 const MAX_PATH_LENGTH = 120;
+const MAX_DOCS_LINK_LENGTH = 180;
+const MAX_SNIPPET_LENGTH = 220;
+const MAX_STACK_LENGTH = 420;
 
 const VALID_PHASES = new Set(['hydrate', 'bind', 'render', 'event']);
 const VALID_CODES = new Set([
@@ -10,8 +13,21 @@ const VALID_CODES = new Set([
     'MARKER_MISSING',
     'FRAGMENT_MOUNT_FAILED',
     'BINDING_APPLY_FAILED',
-    'EVENT_HANDLER_FAILED'
+    'EVENT_HANDLER_FAILED',
+    'COMPONENT_BOOTSTRAP_FAILED',
+    'UNSAFE_MEMBER_ACCESS'
 ]);
+
+const DOCS_LINK_BY_CODE = Object.freeze({
+    UNRESOLVED_EXPRESSION: '/docs/documentation/reference/reactive-binding-model.md#expression-resolution',
+    NON_RENDERABLE_VALUE: '/docs/documentation/reference/reactive-binding-model.md#renderable-values',
+    MARKER_MISSING: '/docs/documentation/reference/markers.md',
+    FRAGMENT_MOUNT_FAILED: '/docs/documentation/contracts/runtime-contract.md#fragment-contract',
+    BINDING_APPLY_FAILED: '/docs/documentation/contracts/runtime-contract.md#binding-application',
+    EVENT_HANDLER_FAILED: '/docs/documentation/contracts/runtime-contract.md#event-bindings',
+    COMPONENT_BOOTSTRAP_FAILED: '/docs/documentation/contracts/runtime-contract.md#component-bootstrap',
+    UNSAFE_MEMBER_ACCESS: '/docs/documentation/reference/reactive-binding-model.md#expression-resolution'
+});
 
 function _truncate(input, maxLength) {
     const text = String(input ?? '');
@@ -50,6 +66,50 @@ function _sanitizePath(value) {
     const compact = _sanitizeAbsolutePaths(value).replace(/\s+/g, ' ').trim();
     if (!compact) return undefined;
     return _truncate(compact, MAX_PATH_LENGTH);
+}
+
+function _sanitizeDocsLink(value) {
+    if (value === null || value === undefined || value === false) {
+        return undefined;
+    }
+    const compact = String(value).replace(/\s+/g, ' ').trim();
+    if (!compact) return undefined;
+    return _truncate(compact, MAX_DOCS_LINK_LENGTH);
+}
+
+function _sanitizeSourceLocation(value) {
+    if (!value || typeof value !== 'object') return undefined;
+    const line = Number(value.line);
+    const column = Number(value.column);
+    if (!Number.isInteger(line) || !Number.isInteger(column)) {
+        return undefined;
+    }
+    if (line < 1 || column < 1) {
+        return undefined;
+    }
+    return { line, column };
+}
+
+function _sanitizeSource(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return undefined;
+    }
+    const fileRaw = value.file;
+    const file = typeof fileRaw === 'string' ? _truncate(fileRaw.trim(), 240) : '';
+    if (!file) {
+        return undefined;
+    }
+    const start = _sanitizeSourceLocation(value.start);
+    const end = _sanitizeSourceLocation(value.end);
+    const snippet = typeof value.snippet === 'string'
+        ? _truncate(value.snippet.replace(/\s+/g, ' ').trim(), MAX_SNIPPET_LENGTH)
+        : undefined;
+    return {
+        file,
+        ...(start ? { start } : null),
+        ...(end ? { end } : null),
+        ...(snippet ? { snippet } : null)
+    };
 }
 
 function _normalizeMarker(marker) {
@@ -178,8 +238,23 @@ function _renderOverlay(payload) {
     if (payload.path) {
         textLines.push(`path: ${payload.path}`);
     }
+    if (payload.source && payload.source.file) {
+        const line = payload.source.start?.line;
+        const column = payload.source.start?.column;
+        if (Number.isInteger(line) && Number.isInteger(column)) {
+            textLines.push(`source: ${payload.source.file}:${line}:${column}`);
+        } else {
+            textLines.push(`source: ${payload.source.file}`);
+        }
+        if (payload.source.snippet) {
+            textLines.push(`snippet: ${payload.source.snippet}`);
+        }
+    }
     if (payload.hint) {
         textLines.push(`hint: ${payload.hint}`);
+    }
+    if (payload.docsLink) {
+        textLines.push(`docs: ${payload.docsLink}`);
     }
 
     const jsonText = _safeJson(payload);
@@ -217,7 +292,9 @@ function _mapLegacyError(error, fallback) {
         message: _sanitizeMessage(fallback.message || safeMessage),
         marker: _normalizeMarker(fallback.marker),
         path: _sanitizePath(fallback.path),
-        hint: _sanitizeHint(fallback.hint)
+        hint: _sanitizeHint(fallback.hint),
+        source: _sanitizeSource(fallback.source),
+        docsLink: _sanitizeDocsLink(fallback.docsLink)
     };
 
     if (/failed to resolve expression literal/i.test(rawMessage)) {
@@ -245,6 +322,10 @@ function _mapLegacyError(error, fallback) {
         details.hint = details.hint || 'Confirm SSR markers and client selector tables match.';
     }
 
+    if (!details.docsLink) {
+        details.docsLink = DOCS_LINK_BY_CODE[details.code];
+    }
+
     return details;
 }
 
@@ -261,12 +342,14 @@ export function createZenithRuntimeError(details, cause) {
     const phase = VALID_PHASES.has(details?.phase) ? details.phase : 'hydrate';
     const code = VALID_CODES.has(details?.code) ? details.code : 'BINDING_APPLY_FAILED';
     const message = _sanitizeMessage(details?.message || 'Runtime failure');
+    const docsLink = _sanitizeDocsLink(details?.docsLink || DOCS_LINK_BY_CODE[code]);
 
     const payload = {
         kind: 'ZENITH_RUNTIME_ERROR',
         phase,
         code,
-        message
+        message,
+        ...(docsLink ? { docsLink } : null)
     };
 
     const marker = _normalizeMarker(details?.marker);
@@ -277,6 +360,14 @@ export function createZenithRuntimeError(details, cause) {
 
     const hint = _sanitizeHint(details?.hint);
     if (hint) payload.hint = hint;
+
+    const source = _sanitizeSource(details?.source);
+    if (source) payload.source = source;
+
+    const stack = _sanitizeHint(details?.stack);
+    if (stack) {
+        payload.stack = _truncate(stack, MAX_STACK_LENGTH);
+    }
 
     const error = new Error(`[Zenith Runtime] ${code}: ${message}`);
     error.name = 'ZenithRuntimeError';
@@ -316,13 +407,19 @@ export function rethrowZenithRuntimeError(error, fallback = {}) {
         const marker = !payload.marker ? _normalizeMarker(fallback.marker) : payload.marker;
         const path = !payload.path ? _sanitizePath(fallback.path) : payload.path;
         const hint = !payload.hint ? _sanitizeHint(fallback.hint) : payload.hint;
+        const source = !payload.source ? _sanitizeSource(fallback.source) : payload.source;
+        const docsLink = !payload.docsLink
+            ? _sanitizeDocsLink(fallback.docsLink || DOCS_LINK_BY_CODE[payload.code])
+            : payload.docsLink;
 
-        if (marker || path || hint) {
+        if (marker || path || hint || source || docsLink) {
             updatedPayload = {
                 ...payload,
                 ...(marker ? { marker } : null),
                 ...(path ? { path } : null),
-                ...(hint ? { hint } : null)
+                ...(hint ? { hint } : null),
+                ...(source ? { source } : null),
+                ...(docsLink ? { docsLink } : null)
             };
             error.zenithRuntimeError = updatedPayload;
             error.toJSON = () => updatedPayload;

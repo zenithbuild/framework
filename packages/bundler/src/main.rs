@@ -217,6 +217,25 @@ struct CompilerExpressionBinding {
     literal: Option<String>,
     #[serde(default)]
     compiled_expr: Option<String>,
+    #[serde(default)]
+    source: Option<CompilerSourceSpan>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerSourcePosition {
+    line: usize,
+    column: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompilerSourceSpan {
+    file: String,
+    start: CompilerSourcePosition,
+    end: CompilerSourcePosition,
+    #[serde(default)]
+    snippet: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -268,6 +287,9 @@ struct MarkerBinding {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     attr: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<CompilerSourceSpan>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,6 +297,9 @@ struct EventBinding {
     index: usize,
     event: String,
     selector: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<CompilerSourceSpan>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -282,6 +307,8 @@ struct CompilerRefBinding {
     index: usize,
     identifier: String,
     selector: String,
+    #[serde(default)]
+    source: Option<CompilerSourceSpan>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -289,6 +316,8 @@ struct RuntimeRefBinding {
     index: usize,
     state_index: usize,
     selector: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<CompilerSourceSpan>,
 }
 
 fn main() {
@@ -1843,6 +1872,7 @@ fn derive_binding_tables(
                         kind: MarkerKind::Text,
                         selector: format!(r#"[data-zx-e~="{index}"]"#),
                         attr: None,
+                        source: None,
                     },
                 )?;
             }
@@ -1863,12 +1893,14 @@ fn derive_binding_tables(
                     kind: MarkerKind::Event,
                     selector: selector.clone(),
                     attr: None,
+                    source: None,
                 },
             )?;
             event_bindings.push(EventBinding {
                 index,
                 event: event_name.to_string(),
                 selector,
+                source: None,
             });
             continue;
         }
@@ -1881,6 +1913,7 @@ fn derive_binding_tables(
                 kind: MarkerKind::Attr,
                 selector: format!(r#"[data-zx-{attr_name}="{index}"]"#),
                 attr: Some(attr_name.to_string()),
+                source: None,
             },
         )?;
     }
@@ -2969,6 +3002,7 @@ fn generate_entry_js(
                 component_binding: None,
                 literal: Some(value.clone()),
                 compiled_expr: None,
+                source: None,
             })
             .collect()
     } else {
@@ -3156,6 +3190,7 @@ fn map_runtime_ref_bindings(ir: &CompilerIr) -> Result<Vec<RuntimeRefBinding>, S
             index: binding.index,
             state_index,
             selector: binding.selector.clone(),
+            source: binding.source.clone(),
         });
     }
     Ok(out)
@@ -3235,7 +3270,8 @@ fn build_expression_fns_and_bindings(
                 "state_index": b.state_index,
                 "component_instance": b.component_instance,
                 "component_binding": b.component_binding,
-                "literal": b.literal
+                "literal": b.literal,
+                "source": b.source
             });
             if let Some(&fi) = fn_index_by_binding.get(&i) {
                 obj["fn_index"] = serde_json::json!(fi);
@@ -3248,7 +3284,10 @@ fn build_expression_fns_and_bindings(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_expression_fns_and_bindings, CompilerExpressionBinding};
+    use super::{
+        build_expression_fns_and_bindings, CompilerExpressionBinding, CompilerSourcePosition,
+        CompilerSourceSpan,
+    };
 
     #[test]
     fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
@@ -3262,6 +3301,12 @@ mod tests {
                 component_binding: None,
                 literal: Some("count ? \"on\" : \"off\"".to_string()),
                 compiled_expr: Some("signalMap.get(0).get() ? \"on\" : \"off\"".to_string()),
+                source: Some(CompilerSourceSpan {
+                    file: "src/pages/index.zen".to_string(),
+                    start: CompilerSourcePosition { line: 12, column: 5 },
+                    end: CompilerSourcePosition { line: 12, column: 30 },
+                    snippet: Some("count ? \"on\" : \"off\"".to_string()),
+                }),
             },
             CompilerExpressionBinding {
                 marker_index: 1,
@@ -3272,6 +3317,7 @@ mod tests {
                 component_binding: None,
                 literal: Some("props.href".to_string()),
                 compiled_expr: None,
+                source: None,
             },
         ];
 
@@ -3280,6 +3326,10 @@ mod tests {
         assert!(js.contains("const signalMap = __ctx.signalMap;"));
         assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
         assert_eq!(runtime_bindings[0]["signal_indices"], serde_json::json!([0, 2]));
+        assert_eq!(
+            runtime_bindings[0]["source"]["file"],
+            serde_json::json!("src/pages/index.zen")
+        );
         assert!(runtime_bindings[1].get("fn_index").is_none());
     }
 }

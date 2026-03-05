@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use regex::Regex;
 
-use crate::ast::{Attribute, ElementNode, Node};
+use crate::ast::{Attribute, ElementNode, Node, SourceSpan};
 use crate::event_contract;
 use crate::script::{
     ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript, SCRIPT_ID_ATTR,
@@ -22,6 +22,7 @@ pub struct MarkerBinding {
     pub kind: MarkerKind,
     pub selector: String,
     pub attr: Option<String>,
+    pub source: Option<SourceSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +30,7 @@ pub struct EventBinding {
     pub index: usize,
     pub event: String,
     pub selector: String,
+    pub source: Option<SourceSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +38,7 @@ pub struct RefBinding {
     pub index: usize,
     pub identifier: String,
     pub selector: String,
+    pub source: Option<SourceSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,8 +163,11 @@ impl Transformer {
     fn transform_node(&mut self, node: Node) -> Node {
         match node {
             Node::Element(elem) => self.transform_element(elem),
-            Node::Expression(expr) => {
-                Node::Expression(self.rewrite_expression(&expr, RewriteContext::Text))
+            Node::Expression { value, span } => {
+                Node::Expression {
+                    value: self.rewrite_expression(&value, RewriteContext::Text),
+                    span,
+                }
             }
             Node::Text(text) => Node::Text(text),
         }
@@ -219,7 +225,7 @@ impl Transformer {
                 Attribute::Event {
                     name,
                     handler,
-                    location,
+                    span,
                 } => {
                     let normalized = event_contract::normalize_event_name(&name);
                     let canonical = event_contract::canonicalize_event_name(&normalized);
@@ -235,8 +241,8 @@ impl Transformer {
                         self.warnings.push(TransformWarning {
                             code: "ZEN-EVT-UNKNOWN".to_string(),
                             message,
-                            line: location.line,
-                            column: location.column,
+                            line: span.start.line,
+                            column: span.start.column,
                         });
                     }
                     let rewritten = self.rewrite_expression(&handler, RewriteContext::Event);
@@ -247,18 +253,20 @@ impl Transformer {
                         kind: MarkerKind::Event,
                         selector: selector.clone(),
                         attr: None,
+                        source: Some(span.clone()),
                     });
                     self.events.push(EventBinding {
                         index: idx,
                         event: canonical.clone(),
                         selector,
+                        source: Some(span),
                     });
                     new_attributes.push(Attribute::Static {
                         name: format!("data-zx-on-{}", canonical),
                         value: idx.to_string(),
                     });
                 }
-                Attribute::Expression { name, value } => {
+                Attribute::Expression { name, value, span } => {
                     let rewritten = self.rewrite_expression(&value, RewriteContext::Attribute);
                     let idx = self.add_expression(rewritten);
                     self.insert_marker(MarkerBinding {
@@ -266,6 +274,7 @@ impl Transformer {
                         kind: MarkerKind::Attr,
                         selector: format!(r#"[data-zx-{}="{}"]"#, name, idx),
                         attr: Some(name.clone()),
+                        source: Some(span),
                     });
                     new_attributes.push(Attribute::Static {
                         name: format!("data-zx-{}", name),
@@ -275,7 +284,7 @@ impl Transformer {
                 Attribute::Static { .. } => {
                     new_attributes.push(attr);
                 }
-                Attribute::Ref { identifier } => {
+                Attribute::Ref { identifier, span } => {
                     let ref_index = self.ref_counter;
                     self.ref_counter += 1;
                     let selector = format!(r#"[data-zx-r="{}"]"#, ref_index);
@@ -283,6 +292,7 @@ impl Transformer {
                         index: ref_index,
                         identifier,
                         selector,
+                        source: Some(span),
                     });
                     new_attributes.push(Attribute::Static {
                         name: "data-zx-r".to_string(),
@@ -325,14 +335,15 @@ impl Transformer {
                 Node::Element(child_elem) if self.script_placeholder_id(&child_elem).is_some() => {
                     continue;
                 }
-                Node::Expression(expr) => {
-                    let rewritten = self.rewrite_expression(&expr, RewriteContext::Text);
+                Node::Expression { value, span } => {
+                    let rewritten = self.rewrite_expression(&value, RewriteContext::Text);
                     let idx = self.add_expression(rewritten);
                     self.insert_marker(MarkerBinding {
                         index: idx,
                         kind: MarkerKind::Text,
                         selector: format!(r#"[data-zx-e~="{}"]"#, idx),
                         attr: None,
+                        source: Some(span),
                     });
                     expression_indices.push(idx);
                 }

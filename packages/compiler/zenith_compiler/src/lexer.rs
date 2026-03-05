@@ -72,6 +72,10 @@ impl<'a> Lexer<'a> {
         self.token_end
     }
 
+    pub fn current_offset(&self) -> usize {
+        self.pos
+    }
+
     pub fn offset_to_line_col(&self, offset: usize) -> (usize, usize) {
         let mut line = 1usize;
         let mut column = 1usize;

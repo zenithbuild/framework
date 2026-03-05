@@ -32,6 +32,13 @@ const BOOLEAN_ATTRIBUTES = new Set([
 
 const STRICT_MEMBER_CHAIN_LITERAL_RE = /^(?:true|false|null|undefined|[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*)$/;
 const UNSAFE_MEMBER_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+const DOCS_LINKS = Object.freeze({
+    eventBinding: '/docs/documentation/contracts/runtime-contract.md#event-bindings',
+    expressionScope: '/docs/documentation/reference/reactive-binding-model.md#expression-resolution',
+    markerTable: '/docs/documentation/reference/markers.md',
+    componentBootstrap: '/docs/documentation/contracts/runtime-contract.md#component-bootstrap',
+    refs: '/docs/documentation/reference/reactive-binding-model.md#refs-and-mount'
+});
 
 /**
  * Hydrate a pre-rendered DOM tree using explicit payload tables.
@@ -39,14 +46,14 @@ const UNSAFE_MEMBER_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
  * @param {{
  *   ir_version: number,
  *   root: Document | Element,
- *   expressions: Array<{ marker_index: number, signal_index?: number|null, state_index?: number|null, component_instance?: string|null, component_binding?: string|null, literal?: string|null }>,
- *   markers: Array<{ index: number, kind: 'text' | 'attr' | 'event', selector: string, attr?: string }>,
- *   events: Array<{ index: number, event: string, selector: string }>,
- *   refs?: Array<{ index: number, state_index: number, selector: string }>,
+ *   expressions: Array<{ marker_index: number, signal_index?: number|null, state_index?: number|null, component_instance?: string|null, component_binding?: string|null, literal?: string|null, source?: { file: string, start?: { line: number, column: number }, end?: { line: number, column: number }, snippet?: string } }>,
+ *   markers: Array<{ index: number, kind: 'text' | 'attr' | 'event', selector: string, attr?: string, source?: { file: string, start?: { line: number, column: number }, end?: { line: number, column: number }, snippet?: string } }>,
+ *   events: Array<{ index: number, event: string, selector: string, source?: { file: string, start?: { line: number, column: number }, end?: { line: number, column: number }, snippet?: string } }>,
+ *   refs?: Array<{ index: number, state_index: number, selector: string, source?: { file: string, start?: { line: number, column: number }, end?: { line: number, column: number }, snippet?: string } }>,
  *   state_values: Array<*>,
  *   state_keys?: Array<string>,
  *   signals: Array<{ id: number, kind: 'signal', state_index: number }>,
- *   components?: Array<{ instance: string, selector: string, create: Function }>
+ *   components?: Array<{ instance: string, selector: string, create: Function, source?: { file: string, start?: { line: number, column: number }, end?: { line: number, column: number }, snippet?: string } }>
  * }} payload
  * @returns {() => void}
  */
@@ -91,7 +98,13 @@ export function hydrate(payload) {
         for (let i = 0; i < refs.length; i++) {
             const refBinding = refs[i];
             const targetRef = stateValues[refBinding.state_index];
-            const nodes = _resolveNodes(root, refBinding.selector, refBinding.index, 'ref');
+            const nodes = _resolveNodes(
+                root,
+                refBinding.selector,
+                refBinding.index,
+                'ref',
+                refBinding.source
+            );
             targetRef.current = nodes[0] || null;
             hydratedRefs.push(targetRef);
         }
@@ -110,38 +123,54 @@ export function hydrate(payload) {
                 component: component.instance,
                 route
             }));
-            const hosts = _resolveNodes(root, component.selector, i, 'component');
+            const hosts = _resolveNodes(root, component.selector, i, 'component', component.source);
             for (let j = 0; j < hosts.length; j++) {
-                const componentScope = createSideEffectScope(`${component.instance}:${j}`);
-                const runtimeApi = {
-                    signal,
-                    state,
-                    zeneffect(effect, dependenciesOrOptions) {
-                        return zeneffect(effect, dependenciesOrOptions, componentScope);
-                    },
-                    zenEffect(effect, options) {
-                        return zenEffect(effect, options, componentScope);
-                    },
-                    zenMount(callback) {
-                        return zenMount(callback, componentScope);
+                try {
+                    const componentScope = createSideEffectScope(`${component.instance}:${j}`);
+                    const runtimeApi = {
+                        signal,
+                        state,
+                        zeneffect(effect, dependenciesOrOptions) {
+                            return zeneffect(effect, dependenciesOrOptions, componentScope);
+                        },
+                        zenEffect(effect, options) {
+                            return zenEffect(effect, options, componentScope);
+                        },
+                        zenMount(callback) {
+                            return zenMount(callback, componentScope);
+                        }
+                    };
+                    const instance = component.create(hosts[j], resolvedProps, runtimeApi);
+                    if (!instance || typeof instance !== 'object') {
+                        throw new Error(`[Zenith Runtime] component factory for ${component.instance} must return an object`);
                     }
-                };
-                const instance = component.create(hosts[j], resolvedProps, runtimeApi);
-                if (!instance || typeof instance !== 'object') {
-                    throw new Error(`[Zenith Runtime] component factory for ${component.instance} must return an object`);
-                }
-                if (typeof instance.mount === 'function') {
-                    instance.mount();
-                }
-                activateSideEffectScope(componentScope);
-                _registerDisposer(() => {
-                    disposeSideEffectScope(componentScope);
-                    if (typeof instance.destroy === 'function') {
-                        instance.destroy();
+                    if (typeof instance.mount === 'function') {
+                        instance.mount();
                     }
-                });
-                if (instance.bindings && typeof instance.bindings === 'object') {
-                    componentBindings[component.instance] = instance.bindings;
+                    activateSideEffectScope(componentScope);
+                    _registerDisposer(() => {
+                        disposeSideEffectScope(componentScope);
+                        if (typeof instance.destroy === 'function') {
+                            instance.destroy();
+                        }
+                    });
+                    if (instance.bindings && typeof instance.bindings === 'object') {
+                        componentBindings[component.instance] = instance.bindings;
+                    }
+                } catch (error) {
+                    try {
+                        rethrowZenithRuntimeError(error, {
+                            phase: 'hydrate',
+                            code: 'COMPONENT_BOOTSTRAP_FAILED',
+                            message: `Component bootstrap failed for "${component.instance}"`,
+                            path: `component[${component.instance}]`,
+                            hint: 'Fix the failing component and refresh; other components continue mounting.',
+                            docsLink: DOCS_LINKS.componentBootstrap,
+                            source: component.source
+                        });
+                    } catch {
+                        // Fault containment: continue mounting remaining components.
+                    }
                 }
             }
         }
@@ -170,7 +199,7 @@ export function hydrate(payload) {
                 continue;
             }
 
-            const nodes = _resolveNodes(root, marker.selector, marker.index, marker.kind);
+            const nodes = _resolveNodes(root, marker.selector, marker.index, marker.kind, marker.source);
             markerNodesByIndex.set(marker.index, nodes);
             const value = _evaluateExpression(
                 expressions[marker.index],
@@ -182,7 +211,9 @@ export function hydrate(payload) {
                 ssrData,
                 marker.kind,
                 props,
-                exprFns
+                exprFns,
+                marker,
+                null
             );
             _applyMarkerValue(nodes, marker, value);
         }
@@ -198,7 +229,7 @@ export function hydrate(payload) {
             if (!marker || marker.kind === 'event') {
                 return;
             }
-            const nodes = markerNodesByIndex.get(index) || _resolveNodes(root, marker.selector, marker.index, marker.kind);
+            const nodes = markerNodesByIndex.get(index) || _resolveNodes(root, marker.selector, marker.index, marker.kind, marker.source);
             markerNodesByIndex.set(index, nodes);
             const value = _evaluateExpression(
                 expressions[index],
@@ -210,7 +241,9 @@ export function hydrate(payload) {
                 ssrData,
                 marker.kind,
                 props,
-                exprFns
+                exprFns,
+                marker,
+                null
             );
             _applyMarkerValue(nodes, marker, value);
         }
@@ -292,9 +325,17 @@ export function hydrate(payload) {
             }
             eventIndices.add(eventBinding.index);
 
-            const nodes = _resolveNodes(root, eventBinding.selector, eventBinding.index, 'event');
+            const marker = markerByIndex.get(eventBinding.index) || null;
+            const nodes = _resolveNodes(
+                root,
+                eventBinding.selector,
+                eventBinding.index,
+                'event',
+                eventBinding.source || marker?.source
+            );
+            const expressionBinding = expressions[eventBinding.index];
             const handler = _evaluateExpression(
-                expressions[eventBinding.index],
+                expressionBinding,
                 stateValues,
                 stateKeys,
                 signalMap,
@@ -303,16 +344,21 @@ export function hydrate(payload) {
                 ssrData,
                 'event',
                 props || {},
-                exprFns
+                exprFns,
+                marker,
+                eventBinding
             );
             if (typeof handler !== 'function') {
+                const passedExpression = _describeBindingExpression(expressionBinding);
                 throwZenithRuntimeError({
                     phase: 'bind',
                     code: 'BINDING_APPLY_FAILED',
-                    message: `Event binding at index ${eventBinding.index} did not resolve to a function`,
+                    message: `Event binding at index ${eventBinding.index} expected a function reference. You passed: ${passedExpression}`,
                     marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
                     path: `event[${eventBinding.index}].${eventBinding.event}`,
-                    hint: 'Bind events to function references (on:click={handler}).'
+                    hint: 'Use on:*={handler} or ensure the forwarded prop is a function.',
+                    docsLink: DOCS_LINKS.eventBinding,
+                    source: _resolveBindingSource(expressionBinding, marker, eventBinding)
                 });
             }
 
@@ -328,7 +374,9 @@ export function hydrate(payload) {
                             message: `Event handler failed for "${eventBinding.event}"`,
                             marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
                             path: `event[${eventBinding.index}].${eventBinding.event}`,
-                            hint: 'Inspect the handler body and referenced state.'
+                            hint: 'Inspect the handler body and referenced state.',
+                            docsLink: DOCS_LINKS.eventBinding,
+                            source: _resolveBindingSource(expressionBinding, marker, eventBinding)
                         });
                     }
                 };
@@ -398,7 +446,8 @@ export function hydrate(payload) {
         rethrowZenithRuntimeError(error, {
             phase: 'hydrate',
             code: 'BINDING_APPLY_FAILED',
-            hint: 'Inspect marker tables, expression bindings, and the runtime overlay diagnostics.'
+            hint: 'Inspect marker tables, expression bindings, and the runtime overlay diagnostics.',
+            docsLink: DOCS_LINKS.markerTable
         });
     }
 }
@@ -490,6 +539,7 @@ function _validatePayload(payload) {
                 throw new Error(`[Zenith Runtime] expression at position ${i} has invalid fn_index`);
             }
         }
+        _assertValidSourceSpan(expression.source, `expression[${i}]`);
         if (expression.signal_indices !== undefined) {
             if (!Array.isArray(expression.signal_indices)) {
                 throw new Error(`[Zenith Runtime] expression at position ${i} must provide signal_indices[]`);
@@ -524,6 +574,7 @@ function _validatePayload(payload) {
         if (marker.kind === 'attr' && (typeof marker.attr !== 'string' || marker.attr.length === 0)) {
             throw new Error(`[Zenith Runtime] attr marker at position ${i} requires attr name`);
         }
+        _assertValidSourceSpan(marker.source, `marker[${i}]`);
     }
 
     for (let i = 0; i < events.length; i++) {
@@ -540,6 +591,7 @@ function _validatePayload(payload) {
         if (typeof eventBinding.selector !== 'string' || eventBinding.selector.length === 0) {
             throw new Error(`[Zenith Runtime] event binding at position ${i} requires selector`);
         }
+        _assertValidSourceSpan(eventBinding.source, `event[${i}]`);
     }
 
     for (let i = 0; i < refs.length; i++) {
@@ -562,6 +614,7 @@ function _validatePayload(payload) {
         if (typeof refBinding.selector !== 'string' || refBinding.selector.length === 0) {
             throw new Error(`[Zenith Runtime] ref binding at position ${i} requires selector`);
         }
+        _assertValidSourceSpan(refBinding.source, `ref[${i}]`);
         const candidate = stateValues[refBinding.state_index];
         if (!candidate || typeof candidate !== 'object' || !Object.prototype.hasOwnProperty.call(candidate, 'current')) {
             throw new Error(
@@ -603,6 +656,7 @@ function _validatePayload(payload) {
         if (typeof component.create !== 'function') {
             throw new Error(`[Zenith Runtime] component at position ${i} requires create() function`);
         }
+        _assertValidSourceSpan(component.source, `component[${i}]`);
     }
 
     if (payload.params !== undefined) {
@@ -671,6 +725,37 @@ function _validatePayload(payload) {
     return Object.freeze(validatedPayload);
 }
 
+function _assertValidSourceSpan(source, contextLabel) {
+    if (source === undefined || source === null) {
+        return;
+    }
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+        throw new Error(`[Zenith Runtime] ${contextLabel}.source must be an object`);
+    }
+    if (typeof source.file !== 'string' || source.file.length === 0) {
+        throw new Error(`[Zenith Runtime] ${contextLabel}.source.file must be a non-empty string`);
+    }
+    const points = ['start', 'end'];
+    for (let i = 0; i < points.length; i++) {
+        const point = source[points[i]];
+        if (point === undefined || point === null) {
+            continue;
+        }
+        if (!point || typeof point !== 'object' || Array.isArray(point)) {
+            throw new Error(`[Zenith Runtime] ${contextLabel}.source.${points[i]} must be an object`);
+        }
+        if (!Number.isInteger(point.line) || point.line < 1) {
+            throw new Error(`[Zenith Runtime] ${contextLabel}.source.${points[i]}.line must be >= 1`);
+        }
+        if (!Number.isInteger(point.column) || point.column < 1) {
+            throw new Error(`[Zenith Runtime] ${contextLabel}.source.${points[i]}.column must be >= 1`);
+        }
+    }
+    if (source.snippet !== undefined && source.snippet !== null && typeof source.snippet !== 'string') {
+        throw new Error(`[Zenith Runtime] ${contextLabel}.source.snippet must be a string when provided`);
+    }
+}
+
 function _resolveComponentProps(propTable, signalMap, context = {}) {
     if (!Array.isArray(propTable)) {
         throw new Error('[Zenith Runtime] component props must be an array');
@@ -714,16 +799,21 @@ function _resolveComponentProps(propTable, signalMap, context = {}) {
     return resolved;
 }
 
-function _resolveNodes(root, selector, index, kind) {
+function _resolveNodes(root, selector, index, kind, source = undefined) {
     const nodes = root.querySelectorAll(selector);
     if (!nodes || nodes.length === 0) {
+        const isRef = kind === 'ref';
         throwZenithRuntimeError({
             phase: 'bind',
             code: 'MARKER_MISSING',
             message: `Unresolved ${kind} marker index ${index}`,
             marker: { type: kind, id: index },
             path: `selector:${selector}`,
-            hint: 'Confirm SSR marker attributes and runtime selector tables match.'
+            hint: isRef
+                ? 'Use ref + zenMount and ensure the ref is bound in markup before mount.'
+                : 'Confirm SSR marker attributes and runtime selector tables match.',
+            docsLink: isRef ? DOCS_LINKS.refs : DOCS_LINKS.markerTable,
+            source
         });
     }
     return nodes;
@@ -742,7 +832,20 @@ function _resolveExpressionSignalIndices(binding) {
     return [];
 }
 
-function _evaluateExpression(binding, stateValues, stateKeys, signalMap, componentBindings, params, ssrData, mode, props, exprFns) {
+function _evaluateExpression(
+    binding,
+    stateValues,
+    stateKeys,
+    signalMap,
+    componentBindings,
+    params,
+    ssrData,
+    mode,
+    props,
+    exprFns,
+    markerBinding = null,
+    eventBinding = null
+) {
     if (binding.fn_index != null && binding.fn_index !== undefined) {
         const fns = Array.isArray(exprFns) ? exprFns : [];
         const fn = fns[binding.fn_index];
@@ -818,7 +921,8 @@ function _evaluateExpression(binding, stateValues, stateKeys, signalMap, compone
                 ssrData,
                 mode,
                 props,
-                binding.marker_index
+                binding.marker_index,
+                _resolveBindingSource(binding, markerBinding, eventBinding)
             );
             if (strictMemberValue !== UNRESOLVED_LITERAL) {
                 return strictMemberValue;
@@ -838,16 +942,23 @@ function _evaluateExpression(binding, stateValues, stateKeys, signalMap, compone
                 return primitiveValue;
             }
             if (_isLikelyExpressionLiteral(trimmedLiteral)) {
+                const missingIdentifier = _extractMissingIdentifier(trimmedLiteral);
                 throwZenithRuntimeError({
                     phase: 'bind',
                     code: 'UNRESOLVED_EXPRESSION',
-                    message: `Failed to resolve expression literal: ${_truncateLiteralForError(trimmedLiteral)}`,
+                    message: missingIdentifier
+                        ? `Unresolved expression identifier "${missingIdentifier}" in ${_truncateLiteralForError(trimmedLiteral)}`
+                        : `Failed to resolve expression literal: ${_truncateLiteralForError(trimmedLiteral)}`,
                     marker: {
                         type: _markerTypeForError(mode),
                         id: binding.marker_index
                     },
                     path: `expression[${binding.marker_index}]`,
-                    hint: 'Ensure the expression references declared state keys or params/data bindings.'
+                    hint: missingIdentifier
+                        ? `Declare "${missingIdentifier}" in scope or pass it via props.`
+                        : 'Declare the missing identifier in scope or pass it via props.',
+                    docsLink: DOCS_LINKS.expressionScope,
+                    source: _resolveBindingSource(binding, markerBinding, eventBinding)
                 });
             }
         }
@@ -857,7 +968,7 @@ function _evaluateExpression(binding, stateValues, stateKeys, signalMap, compone
     return '';
 }
 
-function _throwUnresolvedMemberChainError(literal, markerIndex, mode, pathSuffix, hint) {
+function _throwUnresolvedMemberChainError(literal, markerIndex, mode, pathSuffix, hint, source) {
     throwZenithRuntimeError({
         phase: 'bind',
         code: 'UNRESOLVED_EXPRESSION',
@@ -867,7 +978,9 @@ function _throwUnresolvedMemberChainError(literal, markerIndex, mode, pathSuffix
             id: markerIndex
         },
         path: `marker[${markerIndex}].${pathSuffix}`,
-        hint
+        hint,
+        docsLink: DOCS_LINKS.expressionScope,
+        source
     });
 }
 
@@ -880,7 +993,8 @@ function _resolveStrictMemberChainLiteral(
     mode,
 
     props,
-    markerIndex
+    markerIndex,
+    source
 ) {
     if (typeof literal !== 'string' || !STRICT_MEMBER_CHAIN_LITERAL_RE.test(literal)) {
         return UNRESOLVED_LITERAL;
@@ -901,7 +1015,8 @@ function _resolveStrictMemberChainLiteral(
             markerIndex,
             mode,
             `expression.${baseIdentifier}`,
-            `Base identifier "${baseIdentifier}" is not bound. Check props/data/params and declared state keys.`
+            `Base identifier "${baseIdentifier}" is not bound. Check props/data/params and declared state keys.`,
+            source
         );
     }
 
@@ -916,7 +1031,9 @@ function _resolveStrictMemberChainLiteral(
                 code: 'UNSAFE_MEMBER_ACCESS',
                 message: `Blocked unsafe member access: ${segment} in path "${literal}"`,
                 path: `marker[${markerIndex}].expression.${literal}`,
-                hint: 'Property access to __proto__, prototype, and constructor is forbidden.'
+                hint: 'Property access to __proto__, prototype, and constructor is forbidden.',
+                docsLink: DOCS_LINKS.expressionScope,
+                source
             });
         }
 
@@ -926,7 +1043,8 @@ function _resolveStrictMemberChainLiteral(
                 markerIndex,
                 mode,
                 `expression.${traversedPath}.${segment}`,
-                `Cannot read "${segment}" from ${traversedPath} because it is null or undefined.`
+                `Cannot read "${segment}" from ${traversedPath} because it is null or undefined.`,
+                source
             );
         }
 
@@ -937,7 +1055,8 @@ function _resolveStrictMemberChainLiteral(
                 markerIndex,
                 mode,
                 `expression.${traversedPath}.${segment}`,
-                `Cannot read "${segment}" from ${traversedPath} because it resolved to a ${cursorType}.`
+                `Cannot read "${segment}" from ${traversedPath} because it resolved to a ${cursorType}.`,
+                source
             );
         }
 
@@ -947,7 +1066,8 @@ function _resolveStrictMemberChainLiteral(
                 markerIndex,
                 mode,
                 `expression.${traversedPath}.${segment}`,
-                `Missing member "${segment}" on ${traversedPath}. Check your bindings.`
+                `Missing member "${segment}" on ${traversedPath}. Check your bindings.`,
+                source
             );
         }
 
@@ -1089,6 +1209,55 @@ function _isLikelyExpressionLiteral(literal) {
         return true;
     }
     return /=>|[()[\]{}<>=?:.+\-*/%|&!]/.test(trimmed);
+}
+
+function _extractMissingIdentifier(literal) {
+    if (typeof literal !== 'string') {
+        return null;
+    }
+    const match = literal.trim().match(/^([A-Za-z_$][A-Za-z0-9_$]*)/);
+    if (!match) {
+        return null;
+    }
+    const candidate = match[1];
+    if (candidate === 'true' || candidate === 'false' || candidate === 'null' || candidate === 'undefined') {
+        return null;
+    }
+    return candidate;
+}
+
+function _resolveBindingSource(binding, markerBinding, eventBinding) {
+    const candidates = [
+        binding?.source,
+        eventBinding?.source,
+        markerBinding?.source
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        if (candidate && typeof candidate === 'object' && typeof candidate.file === 'string') {
+            return candidate;
+        }
+    }
+    return undefined;
+}
+
+function _describeBindingExpression(binding) {
+    if (!binding || typeof binding !== 'object') {
+        return '<unknown>';
+    }
+    if (typeof binding.literal === 'string' && binding.literal.trim().length > 0) {
+        return _truncateLiteralForError(binding.literal.trim());
+    }
+    if (Number.isInteger(binding.state_index)) {
+        return `state[${binding.state_index}]`;
+    }
+    if (Number.isInteger(binding.signal_index)) {
+        return `signal[${binding.signal_index}]`;
+    }
+    if (typeof binding.component_instance === 'string' && typeof binding.component_binding === 'string') {
+        return `${binding.component_instance}.${binding.component_binding}`;
+    }
+    return '<unknown expression>';
 }
 
 function _markerTypeForError(kind) {
@@ -1563,7 +1732,9 @@ function _applyMarkerValue(nodes, marker, value) {
                 path: marker.kind === 'attr'
                     ? `${markerPath}.attr.${marker.attr}`
                     : `${markerPath}.${marker.kind}`,
-                hint: 'Check the binding value type and marker mapping.'
+                hint: 'Check the binding value type and marker mapping.',
+                docsLink: DOCS_LINKS.markerTable,
+                source: marker.source
             });
         }
     }
@@ -1619,7 +1790,8 @@ function _mountStructuralFragment(container, value, rootPath = 'renderable') {
             code: 'FRAGMENT_MOUNT_FAILED',
             message: 'Fragment mount failed',
             path: rootPath,
-            hint: 'Verify fragment values and nested renderable arrays.'
+            hint: 'Verify fragment values and nested renderable arrays.',
+            docsLink: DOCS_LINKS.markerTable
         });
     }
     container.__z_unmounts = newUnmounts;
@@ -1633,7 +1805,8 @@ function _coerceText(value, path = 'renderable') {
             code: 'NON_RENDERABLE_VALUE',
             message: `Zenith Render Error: non-renderable function at ${path}. Use map() to render fields.`,
             path,
-            hint: 'Convert functions into explicit event handlers or renderable text.'
+            hint: 'Convert functions into explicit event handlers or renderable text.',
+            docsLink: DOCS_LINKS.expressionScope
         });
     }
     if (value && typeof value === 'object') {
@@ -1642,7 +1815,8 @@ function _coerceText(value, path = 'renderable') {
             code: 'NON_RENDERABLE_VALUE',
             message: `Zenith Render Error: non-renderable object at ${path}. Use map() to render fields.`,
             path,
-            hint: 'Use map() to render object fields into nodes.'
+            hint: 'Use map() to render object fields into nodes.',
+            docsLink: DOCS_LINKS.expressionScope
         });
     }
     return String(value);

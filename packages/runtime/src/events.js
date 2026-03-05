@@ -32,10 +32,11 @@ export function bindEvent(element, eventName, exprFn) {
         throwZenithRuntimeError({
             phase: 'bind',
             code: 'BINDING_APPLY_FAILED',
-            message: `Event binding did not resolve to a function for "${eventName}"`,
+            message: `Event binding expected a function reference for "${eventName}"`,
             marker: { type: `data-zx-on-${eventName}`, id: '<unknown>' },
             path: `event:${eventName}`,
-            hint: 'Bind events to function references.'
+            hint: 'Use on:*={handler} and ensure forwarded props are function-valued.',
+            docsLink: '/docs/documentation/contracts/runtime-contract.md#event-bindings'
         });
     }
 
@@ -49,7 +50,8 @@ export function bindEvent(element, eventName, exprFn) {
                 message: `Event handler failed for "${eventName}"`,
                 marker: { type: `data-zx-on-${eventName}`, id: '<unknown>' },
                 path: `event:${eventName}:${resolved.name || '<anonymous>'}`,
-                hint: 'Inspect handler logic and referenced state.'
+                hint: 'Inspect handler logic and referenced state.',
+                docsLink: '/docs/documentation/contracts/runtime-contract.md#event-bindings'
             });
         }
     };
