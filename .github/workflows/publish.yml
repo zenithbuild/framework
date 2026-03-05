@@ -206,6 +206,15 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Assert OIDC-only publish auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Token-based npm auth is disabled in Publish (npm). Use npm Trusted Publishing (OIDC)." >&2
+            exit 1
+          fi
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Resolve train version
@@ -257,6 +266,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Assert OIDC-only publish auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Token-based npm auth is disabled in Publish (npm). Use npm Trusted Publishing (OIDC)." >&2
+            exit 1
+          fi
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -311,6 +329,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Assert OIDC-only publish auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Token-based npm auth is disabled in Publish (npm). Use npm Trusted Publishing (OIDC)." >&2
+            exit 1
+          fi
 
       - name: Cache Bun install cache
         uses: actions/cache@v4
