@@ -18,4 +18,6 @@ bun run --cwd packages/compiler build
 bun run --cwd packages/bundler build
 
 bun run --cwd docs docs:gate
-bun run --cwd apps/smoke-test build
+ZENITH_COMPILER_BIN="$ROOT/packages/compiler/target/release/zenith-compiler" \
+ZENITH_BUNDLER_BIN="$ROOT/packages/bundler/target/release/zenith-bundler" \
+  bun run --cwd apps/smoke-test build
