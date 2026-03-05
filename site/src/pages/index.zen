@@ -5,6 +5,7 @@
 </script>
 
 <script setup="ts">
+import Hero from "@/components/ui/Hero.zen"
 const count = signal(0);
 
 function increment() {
@@ -13,6 +14,7 @@ function increment() {
 </script>
 
 <DefaultLayout>
+    <Hero />
     <section class="mx-auto max-w-3xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
         <h1 class="text-4xl font-bold tracking-tight text-slate-100">Zenith + Tailwind Starter</h1>
         <p class="text-slate-300">Compile-time first templates with an opt-in Tailwind build step.</p>

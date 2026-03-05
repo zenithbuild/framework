@@ -217,6 +217,7 @@ pub async fn bundle_vendor(
 fn is_external(spec: &str) -> bool {
     !spec.starts_with('.')
         && !spec.starts_with('/')
+        && !spec.starts_with("@/")
         && !spec.starts_with(VIRTUAL_PREFIX)
         && !spec.contains("zenith:")
 }
@@ -355,5 +356,12 @@ mod tests {
         assert!(specs.contains(&"./styles/output.css".to_string()));
         assert!(specs.contains(&"date-fns".to_string()));
         assert!(specs.contains(&"three".to_string()));
+    }
+
+    #[test]
+    fn is_external_skips_zenith_alias_paths() {
+        assert!(!is_external("@/components/ui/Hero.zen"));
+        assert!(is_external("@scope/pkg"));
+        assert!(is_external("gsap"));
     }
 }
