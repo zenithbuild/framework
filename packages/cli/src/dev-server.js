@@ -135,6 +135,121 @@ export async function createDevServer(options) {
         });
     }
 
+    function _classifyNotFound(pathname) {
+        const lower = String(pathname || '').toLowerCase();
+        if (lower.startsWith('/__zenith_dev/')) return 'dev_internal';
+        if (lower.startsWith('/__zenith/')) return 'zenith_internal';
+        if (
+            lower.startsWith('/_assets/')
+            || lower.startsWith('/assets/')
+            || lower.endsWith('.css')
+            || lower.endsWith('.js')
+            || lower.endsWith('.map')
+            || lower.endsWith('.json')
+        ) {
+            return 'asset';
+        }
+        return 'page';
+    }
+
+    function _routeFileHint(pathname) {
+        const normalized = String(pathname || '/').replace(/\/+$/, '');
+        if (normalized === '' || normalized === '/') {
+            return 'src/pages/index.zen';
+        }
+        return `src/pages${normalized}.zen`;
+    }
+
+    function _infer404Cause(category) {
+        if (category === 'dev_internal' || category === 'zenith_internal') {
+            if (buildStatus === 'error') {
+                return 'initial build failed';
+            }
+            return 'unknown Zenith dev endpoint';
+        }
+        if (category === 'asset') {
+            if (buildStatus === 'error') {
+                return 'initial build failed';
+            }
+            return 'asset not emitted by latest build';
+        }
+        return null;
+    }
+
+    function _looksLikeJsonRequest(req, pathname) {
+        const accept = String(req.headers.accept || '').toLowerCase();
+        const secFetchDest = String(req.headers['sec-fetch-dest'] || '').toLowerCase();
+        if (accept.includes('application/json') || accept.includes('application/problem+json')) {
+            return true;
+        }
+        if (pathname.endsWith('.json')) {
+            return true;
+        }
+        return secFetchDest === 'empty';
+    }
+
+    function _buildNotFoundPayload(pathname, category, cause) {
+        const payload = {
+            kind: 'zenith_dev_not_found',
+            category,
+            requestedPath: pathname,
+            buildId,
+            buildStatus,
+            cause: cause || ''
+        };
+
+        if (category === 'asset') {
+            payload.hint = buildStatus === 'error'
+                ? 'Dev server is running but initial build failed; fix compile errors and refresh.'
+                : 'Check emitted assets in dist and verify the requested path.';
+            if (pathname.endsWith('.css')) {
+                payload.expectedCssHref = currentCssHref || null;
+                payload.hint = buildStatus === 'error'
+                    ? `Dev server is running but initial build failed; expected CSS at ${currentCssHref || '<none>'}.`
+                    : `Requested CSS is missing; expected current href ${currentCssHref || '<none>'}.`;
+            }
+            return payload;
+        }
+
+        if (category === 'dev_internal' || category === 'zenith_internal') {
+            payload.hint = buildStatus === 'error'
+                ? 'Dev server is running but initial build failed; restart after fixing compile errors.'
+                : 'Check Zenith dev endpoint path and dev client version.';
+            payload.docsLink = '/docs/documentation/contracts/hmr-v1-contract.md';
+            return payload;
+        }
+
+        const routeFile = _routeFileHint(pathname);
+        payload.routeFile = routeFile;
+        payload.cause = `no route file found at ${routeFile}`;
+        payload.hint = `Create ${routeFile} or verify router manifest output.`;
+        return payload;
+    }
+
+    function _renderNotFoundHtml(payload) {
+        const escaped = (value) => String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;');
+        const details = [
+            `Requested: ${payload.requestedPath}`,
+            `Category: ${payload.category}`,
+            `Build: ${payload.buildStatus} (id=${payload.buildId})`,
+            `Cause: ${payload.cause}`,
+            payload.expectedCssHref ? `Expected CSS href: ${payload.expectedCssHref}` : '',
+            `Hint: ${payload.hint || 'Inspect dev server output.'}`,
+            payload.docsLink ? `Docs: ${payload.docsLink}` : ''
+        ].filter(Boolean).join('\n');
+        return [
+            '<!DOCTYPE html>',
+            '<html><head><meta charset="utf-8"><title>Zenith Dev 404</title></head>',
+            '<body style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 20px; background: #101216; color: #e6edf3;">',
+            '<h1 style="margin-top:0;">Zenith Dev 404</h1>',
+            `<pre style="white-space: pre-wrap; line-height: 1.5;">${escaped(details)}</pre>`,
+            '</body></html>'
+        ].join('');
+    }
+
     function _pickCssAsset(assets) {
         if (!Array.isArray(assets) || assets.length === 0) {
             return '';
@@ -330,6 +445,21 @@ export async function createDevServer(options) {
         }
 
         if (pathname === '/__zenith_dev/styles.css') {
+            if (buildStatus === 'error') {
+                const reason = typeof buildError?.message === 'string' && buildError.message.length > 0
+                    ? buildError.message
+                    : 'initial build failed';
+                const summary = reason.length > 280 ? `${reason.slice(0, 277)}...` : reason;
+                res.writeHead(503, {
+                    'Content-Type': 'text/css; charset=utf-8',
+                    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    'X-Zenith-Dev-Error': 'build-failed'
+                });
+                res.end(`/* zenith-dev: css unavailable because build failed */\n/* cause: ${summary} */\n/* expected href: ${currentCssHref || '<none>'} */`);
+                return;
+            }
             if (typeof currentCssContent === 'string' && currentCssContent.length > 0) {
                 res.writeHead(200, {
                     'Content-Type': 'text/css; charset=utf-8',
@@ -545,14 +675,40 @@ export async function createDevServer(options) {
             }
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
-        } catch {
+        } catch (error) {
+            const category = _classifyNotFound(pathname);
+            const cause = _infer404Cause(category);
+            const payload = _buildNotFoundPayload(pathname, category, cause);
+            if (buildStatus === 'error' && typeof buildError?.message === 'string') {
+                payload.buildError = buildError.message.length > 600
+                    ? `${buildError.message.slice(0, 597)}...`
+                    : buildError.message;
+            }
+            const displayCategory = category === 'page' ? 'page' : 'asset';
+            logger.warn(
+                `404 ${displayCategory}: ${pathname} (buildId=${buildId}) -> cause: ${payload.cause || cause || 'not found'}`
+            );
             _trace404(req, url, {
                 reason: 'not_found',
+                category,
+                cause: payload.cause || cause || 'not_found',
                 staticRoot: staticRootFor404,
-                resolvedPath: resolvedPathFor404
+                resolvedPath: resolvedPathFor404,
+                error: error instanceof Error ? error.message : String(error || '')
             });
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('404 Not Found');
+            if (_looksLikeJsonRequest(req, pathname)) {
+                res.writeHead(404, {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-store'
+                });
+                res.end(JSON.stringify(payload));
+                return;
+            }
+            res.writeHead(404, {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'no-store'
+            });
+            res.end(_renderNotFoundHtml(payload));
         }
     });
 
