@@ -66,13 +66,14 @@ async function createTailwindDevProject(initialClass = 'text-red-500') {
     return { root, pagesDir, outDir, pageFile };
 }
 
-function httpGet(url) {
+function httpGet(url, headers = undefined) {
     return new Promise((resolve, reject) => {
-        http.get(url, (res) => {
+        const req = http.get(url, { headers }, (res) => {
             let data = '';
             res.on('data', (chunk) => data += chunk);
             res.on('end', () => resolve({ status: res.statusCode, body: data, headers: res.headers }));
-        }).on('error', reject);
+        });
+        req.on('error', reject);
     });
 }
 
@@ -234,6 +235,69 @@ describe('Dev Server', () => {
         expect(css.status).toBe(200);
         expect(String(css.headers['content-type'] || '')).toContain('text/css');
         expect(css.body.length).toBeGreaterThan(0);
+    });
+
+    test('returns classified diagnostics for unknown /__zenith_dev endpoints', async () => {
+        project = await createTestProject(['index.zen']);
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port: 0
+        });
+
+        const htmlRes = await httpGet(`${localOrigin(dev.port)}/__zenith_dev/not-real`);
+        expect(htmlRes.status).toBe(404);
+        expect(String(htmlRes.headers['content-type'] || '')).toContain('text/html');
+        expect(htmlRes.body).toContain('Zenith Dev 404');
+        expect(htmlRes.body).toContain('Category: dev_internal');
+
+        const jsonRes = await httpGet(
+            `${localOrigin(dev.port)}/__zenith_dev/not-real`,
+            { accept: 'application/json' }
+        );
+        expect(jsonRes.status).toBe(404);
+        expect(String(jsonRes.headers['content-type'] || '')).toContain('application/json');
+        const payload = JSON.parse(jsonRes.body);
+        expect(payload.kind).toBe('zenith_dev_not_found');
+        expect(payload.category).toBe('dev_internal');
+    });
+
+    test('css endpoint returns clear build-failed response when initial build fails', async () => {
+        const root = join(tmpdir(), `zenith-dev-css-error-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const pagesDir = join(root, 'pages');
+        const outDir = join(root, 'dist');
+        await mkdir(pagesDir, { recursive: true });
+        await writeFile(join(pagesDir, 'index.zen'), '<main>{</main>');
+        project = { root, pagesDir, outDir };
+
+        dev = await createDevServer({
+            pagesDir,
+            outDir,
+            port: 0
+        });
+
+        const state = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
+        expect(state.status).toBe('error');
+
+        const css = await httpGet(`${localOrigin(dev.port)}/__zenith_dev/styles.css`);
+        expect(css.status).toBe(503);
+        expect(String(css.headers['x-zenith-dev-error'] || '')).toBe('build-failed');
+        expect(css.body).toContain('css unavailable because build failed');
+    });
+
+    test('route 404 response includes route file guidance', async () => {
+        project = await createTestProject(['index.zen']);
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port: 0
+        });
+
+        const res = await httpGet(`${localOrigin(dev.port)}/docs`);
+        expect(res.status).toBe(404);
+        expect(res.body).toContain('src/pages/docs.zen');
     });
 
     test('rebuilds when non-page source files change', async () => {

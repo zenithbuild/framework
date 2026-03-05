@@ -20,5 +20,14 @@ describe('runtime dev client css contract', () => {
         expect(source).toContain('swapStylesheet(href, attempt + 1);');
         expect(source).toContain("if (statePayload && typeof statePayload.cssHref === 'string' && statePayload.cssHref.length > 0)");
         expect(source).toContain('swapStylesheet(statePayload.cssHref);');
+        expect(source).toContain("reportBuildFailure('CSS update failed (404): server build not ready'");
+    });
+
+    test('surfaces persistent build-failed banner when dev state reports error', () => {
+        const source = runtimeDevClientSource();
+
+        expect(source).toContain("buildFailure.setAttribute('data-zenith-dev-build-error', 'true')");
+        expect(source).toContain("buildFailure.textContent = 'Build failed - fix errors to continue");
+        expect(source).toContain("if (buildStatus === 'error') {");
     });
 });

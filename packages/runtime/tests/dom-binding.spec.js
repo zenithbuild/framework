@@ -443,7 +443,11 @@ describe('hydrate() marker contract', () => {
         expect(payload.phase).toBe('bind');
         expect(payload.code).toBe('UNRESOLVED_EXPRESSION');
         expect(payload.marker).toEqual({ type: 'data-zx-e', id: 0 });
-        expect(payload.message).toContain('Failed to resolve expression literal');
+        expect(
+            payload.message.includes('Failed to resolve expression literal')
+            || payload.message.includes('Unresolved expression identifier')
+        ).toBe(true);
+        expect(payload.message).toContain('contributors');
     });
 
     test('throws structured runtime error for non-renderable object expressions', () => {

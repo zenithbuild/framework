@@ -50,7 +50,7 @@ describe('hydrate() event contract', () => {
             events: [{ index: 0, event: 'click', selector: '[data-zx-on-click="0"]' }],
             state_values: [42],
             signals: []
-        })).toThrow('did not resolve to a function');
+        })).toThrow('expected a function reference');
     });
 
     test('surfaces structured EVENT_HANDLER_FAILED when handler throws', () => {

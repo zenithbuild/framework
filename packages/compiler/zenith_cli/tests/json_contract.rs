@@ -92,3 +92,35 @@ fn compiler_cli_emits_empty_ref_bindings_when_no_refs_exist() {
     assert_eq!(json["warnings"], serde_json::json!([]));
     assert_eq!(json["ref_bindings"], serde_json::json!([]));
 }
+
+#[test]
+fn compiler_cli_emits_source_spans_for_marker_and_event_bindings() {
+    let json = compile_fixture(
+        r#"<script lang="ts">
+state count = signal(0);
+function increment() { count.set(count.get() + 1); }
+</script>
+<button on:click={increment}>{count.get()}</button>"#,
+        "source-spans.zen",
+    );
+
+    let markers = json["marker_bindings"].as_array().expect("marker_bindings array");
+    assert!(!markers.is_empty(), "expected marker bindings");
+    let marker_source = &markers[0]["source"];
+    assert_eq!(marker_source["file"].as_str().unwrap().ends_with("source-spans.zen"), true);
+    assert!(marker_source["start"]["line"].as_u64().unwrap() >= 1);
+    assert!(marker_source["start"]["column"].as_u64().unwrap() >= 1);
+
+    let events = json["event_bindings"].as_array().expect("event_bindings array");
+    assert_eq!(events.len(), 1);
+    let event_source = &events[0]["source"];
+    assert_eq!(event_source["file"].as_str().unwrap().ends_with("source-spans.zen"), true);
+    assert!(event_source["start"]["line"].as_u64().unwrap() >= 1);
+    assert!(event_source["end"]["column"].as_u64().unwrap() >= 1);
+
+    let exprs = json["expression_bindings"]
+        .as_array()
+        .expect("expression_bindings array");
+    assert!(!exprs.is_empty(), "expected expression bindings");
+    assert!(exprs.iter().all(|entry| entry["source"]["file"].is_string()));
+}

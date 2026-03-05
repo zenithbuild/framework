@@ -108,6 +108,45 @@ describe('hydrate integration contract', () => {
         expect(container.querySelector('span').textContent).toBe('3');
     });
 
+    test('contains component bootstrap failure and continues mounting healthy components', () => {
+        container.innerHTML = [
+            '<Broken data-zx-c="c0"></Broken>',
+            '<Healthy data-zx-c="c1"><span data-zx-e="0"></span></Healthy>'
+        ].join('');
+
+        expect(() => hydrate({
+            ir_version: 1,
+            root: container,
+            expressions: [{ marker_index: 0, component_instance: 'c1', component_binding: 'label' }],
+            markers: [{ index: 0, kind: 'text', selector: '[data-zx-e~="0"]' }],
+            events: [],
+            state_values: [],
+            signals: [],
+            components: [
+                {
+                    instance: 'c0',
+                    selector: '[data-zx-c~="c0"]',
+                    props: [],
+                    create: () => {
+                        throw new Error('boom from c0');
+                    }
+                },
+                {
+                    instance: 'c1',
+                    selector: '[data-zx-c~="c1"]',
+                    props: [],
+                    create: () => ({
+                        mount() { },
+                        destroy() { },
+                        bindings: Object.freeze({ label: 'healthy' })
+                    })
+                }
+            ]
+        })).not.toThrow();
+
+        expect(container.querySelector('span').textContent).toBe('healthy');
+    });
+
     test('re-renders compiled fn_index expressions when subscribed signals change', () => {
         container.innerHTML = '<p data-zx-e="0"></p>';
         const isOpen = runtimeApi.signal(false);
