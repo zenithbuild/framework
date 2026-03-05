@@ -334,9 +334,33 @@ jobs:
           PUBLISH_PACKAGE_FILTER: ${{ matrix.package_dir }}
         run: ./scripts/publish-train.sh
 
-  publish-train:
+  platform_stage:
+    name: Platform Stage Complete
     needs: [detect, gate, publish-platforms]
-    if: needs.detect.outputs.publish_train == 'true'
+    if: always() && needs.detect.result == 'success' && needs.gate.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate platform stage status
+        shell: bash
+        env:
+          PUBLISH_TRAIN: ${{ needs.detect.outputs.publish_train }}
+          PLATFORM_RESULT: ${{ needs['publish-platforms'].result }}
+        run: |
+          set -euo pipefail
+          if [[ "${PUBLISH_TRAIN}" == "true" ]]; then
+            if [[ "${PLATFORM_RESULT}" != "success" ]]; then
+              echo "Platform Bootstrap must succeed before publish jobs can run." >&2
+              exit 1
+            fi
+            echo "Platform Bootstrap completed successfully."
+            exit 0
+          fi
+
+          echo "Platform Bootstrap skipped (no train publish requested)."
+
+  publish-train:
+    needs: [detect, platform_stage]
+    if: needs.detect.outputs.publish_train == 'true' && needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
@@ -398,8 +422,8 @@ jobs:
         run: ./scripts/publish-train.sh
 
   publish-scaffolder:
-    needs: [detect, gate]
-    if: needs.detect.outputs.publish_scaffolder == 'true'
+    needs: [detect, platform_stage]
+    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
