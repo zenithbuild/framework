@@ -1,0 +1,15 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+
+const mountRef = ref<HTMLDivElement>();
+state mountStatus = "pending";
+
+zenMount(() => {
+    mountStatus = mountRef.current ? "ready" : "missing";
+});
+</script>
+
+<SectionShell bg="card" dense={true}>
+    <div ref={mountRef} data-testid="mount-ref">mount target</div>
+    <p data-testid="mount-status">{mountStatus}</p>
+</SectionShell>

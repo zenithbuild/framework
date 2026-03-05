@@ -1,0 +1,48 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+</script>
+
+<SectionShell bg="muted">
+  <div class="flex flex-col gap-4 mb-12">
+    <span class="font-mono text-xs tracking-widest uppercase text-muted-foreground">Mental Model</span>
+    <h2 class="font-[var(--zen-font-heading)] text-3xl md:text-4xl font-semibold tracking-tight">
+      Reactivity belongs to scope.
+    </h2>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Code Snippet -->
+    <div class="bg-card border border-border rounded-xl p-6 overflow-x-auto">
+      <pre class="font-mono text-xs md:text-sm leading-6 text-card-foreground whitespace-pre">// counter.zen
+state count = 0
+
+function increment() &#123;
+  count = count + 1
+&#125;
+
+// Reactivity scoped to this file.
+// Slots see parent scope, not ours.</pre>
+    </div>
+
+    <!-- Principles -->
+    <div class="flex flex-col gap-6">
+      <h3 class="font-semibold text-lg text-foreground">What stays true</h3>
+      <div class="flex flex-col gap-5">
+        <div class="flex flex-col gap-1">
+          <span class="font-semibold text-sm text-foreground">Slots preserve parent scope</span>
+          <p class="text-muted-foreground text-sm leading-relaxed">Content passed into a component retains the reactive bindings of the parent. No re-binding, no proxy layers.</p>
+        </div>
+        <div class="border-t border-border"></div>
+        <div class="flex flex-col gap-1">
+          <span class="font-semibold text-sm text-foreground">Components are structural</span>
+          <p class="text-muted-foreground text-sm leading-relaxed">A component is a layout boundary — not a reactive boundary. State does not leak across component edges.</p>
+        </div>
+        <div class="border-t border-border"></div>
+        <div class="flex flex-col gap-1">
+          <span class="font-semibold text-sm text-foreground">No reactive boundaries created by components</span>
+          <p class="text-muted-foreground text-sm leading-relaxed">Unlike frameworks that create subscription zones per component, Zenith scopes reactivity to the file where it is declared.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</SectionShell>

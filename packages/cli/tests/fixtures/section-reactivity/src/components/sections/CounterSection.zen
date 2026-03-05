@@ -1,0 +1,15 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+
+state count = 0;
+function increment() {
+    count = count + 1;
+}
+</script>
+
+<SectionShell bg="muted">
+    <div class="flex items-center gap-3">
+        <button type="button" data-testid="counter-btn" on:click={increment}>increment</button>
+        <p data-testid="counter-text">{count}</p>
+    </div>
+</SectionShell>

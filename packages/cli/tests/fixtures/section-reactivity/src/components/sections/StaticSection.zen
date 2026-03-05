@@ -1,0 +1,7 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+</script>
+
+<SectionShell>
+    <p data-testid="static-text">static section</p>
+</SectionShell>

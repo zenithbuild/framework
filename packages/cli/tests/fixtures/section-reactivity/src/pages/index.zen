@@ -1,0 +1,11 @@
+<script setup="ts">
+import CounterSection from "../components/sections/CounterSection.zen";
+import MountSection from "../components/sections/MountSection.zen";
+import StaticSection from "../components/sections/StaticSection.zen";
+</script>
+
+<main>
+    <CounterSection />
+    <MountSection />
+    <StaticSection />
+</main>

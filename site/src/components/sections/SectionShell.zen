@@ -1,0 +1,23 @@
+<script lang="ts">
+export interface Props {
+  bg?: "default" | "card" | "muted";
+  dense?: boolean;
+  class?: string;
+}
+
+const incoming = props as Props;
+const resolvedBg = incoming.bg === "card"
+  ? "bg-card text-card-foreground"
+  : incoming.bg === "muted"
+    ? "bg-muted text-foreground"
+    : "bg-background text-foreground";
+const resolvedDensity = incoming.dense ? "py-16 md:py-20" : "py-24 md:py-32";
+const resolvedClass = typeof incoming.class === "string" ? incoming.class : "";
+const sectionClass = `w-full ${resolvedBg} ${resolvedDensity} ${resolvedClass}`.trim();
+</script>
+
+<section class={sectionClass}>
+  <div class="max-w-6xl mx-auto px-6 md:px-12">
+    <slot />
+  </div>
+</section>
