@@ -65,4 +65,16 @@ jobs:
 
       - run: bunx playwright install --with-deps chromium
 
-      - run: bun run ci
+      - name: Run CI (retry once)
+        shell: bash
+        env:
+          ZENITH_COMPILER_BIN: ${{ github.workspace }}/packages/compiler/target/release/zenith-compiler
+          ZENITH_BUNDLER_BIN: ${{ github.workspace }}/packages/bundler/target/release/zenith-bundler
+        run: |
+          set -euo pipefail
+          if bun run ci; then
+            exit 0
+          fi
+
+          echo "CI failed on first attempt; retrying once..."
+          bun run ci

@@ -221,7 +221,9 @@ function runSmoke(projectRoot) {
         env: {
             ...process.env,
             CI: '1',
-            ZENITH_NO_UI: '1'
+            ZENITH_NO_UI: '1',
+            ZENITH_COMPILER_BIN: '',
+            ZENITH_BUNDLER_BIN: ''
         },
         encoding: 'utf8'
     });

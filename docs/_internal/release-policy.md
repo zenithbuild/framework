@@ -7,6 +7,7 @@ After a stable train publish succeeds, keep `latest` coherent. `train` can remai
 - Normal publish is OIDC-only via `.github/workflows/publish.yml` in the `npm-release` environment.
 - The standard path does not use token-based npm auth (`NPM_TOKEN` / `NODE_AUTH_TOKEN`).
 - `.github/workflows/bootstrap-platform-packages.yml` is manual-only (`workflow_dispatch`) and reserved for bootstrapping brand-new package names.
+- Train publish runs a bootstrap preflight; missing platform package names fail early with instructions to run the manual bootstrap workflow.
 - The CI gate retries once (`bun run ci`), then publish proceeds only if the retry succeeds.
 - Release creation is downstream of successful publish; if publish fails, release does not run.
 

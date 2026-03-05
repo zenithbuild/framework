@@ -107,6 +107,37 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify platform package names are bootstrapped
+        if: needs.detect.outputs.publish_train == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry="https://registry.npmjs.org/"
+          packages=(
+            "@zenithbuild/bundler-darwin-arm64"
+            "@zenithbuild/bundler-darwin-x64"
+            "@zenithbuild/bundler-linux-x64"
+            "@zenithbuild/bundler-win32-x64"
+            "@zenithbuild/compiler-darwin-arm64"
+            "@zenithbuild/compiler-darwin-x64"
+            "@zenithbuild/compiler-linux-x64"
+            "@zenithbuild/compiler-win32-x64"
+          )
+
+          missing=()
+          for package in "${packages[@]}"; do
+            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
+              missing+=("${package}")
+            fi
+          done
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            joined="$(IFS=, ; echo "${missing[*]}")"
+            echo "Platform package names are not bootstrapped on npm: ${joined}" >&2
+            echo "Run the manual Bootstrap Platform Packages workflow once for missing names using NPM_BOOTSTRAP_TOKEN, then re-run publish." >&2
+            exit 1
+          fi
+
       - name: Resolve Playwright version
         id: playwright-version
         run: |
@@ -150,6 +181,9 @@ jobs:
 
       - name: Run CI gate (retry once)
         shell: bash
+        env:
+          ZENITH_COMPILER_BIN: ${{ github.workspace }}/packages/compiler/target/release/zenith-compiler
+          ZENITH_BUNDLER_BIN: ${{ github.workspace }}/packages/bundler/target/release/zenith-bundler
         run: |
           set -euo pipefail
           if bun run ci; then
