@@ -2,6 +2,14 @@
 
 After a stable train publish succeeds, keep `latest` coherent. `train` can remain as the safety channel, but public installs should not mix train versions across `core`, `cli`, and the internal toolchain packages.
 
+## Pipeline policy
+
+- Normal publish is OIDC-only via `.github/workflows/publish.yml` in the `npm-release` environment.
+- The standard path does not use token-based npm auth (`NPM_TOKEN` / `NODE_AUTH_TOKEN`).
+- `.github/workflows/bootstrap-platform-packages.yml` is manual-only (`workflow_dispatch`) and reserved for bootstrapping brand-new package names.
+- The CI gate retries once (`bun run ci`), then publish proceeds only if the retry succeeds.
+- Release creation is downstream of successful publish; if publish fails, release does not run.
+
 ## Minimum promotion
 
 Run:
