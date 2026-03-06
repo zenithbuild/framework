@@ -1,0 +1,48 @@
+{
+  "name": "@zenithbuild/language-server",
+  "version": "0.6.13",
+  "description": "Canonical Language Server Protocol implementation for Zenith",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "main": "./dist/server.mjs",
+  "bin": {
+    "zenith-language-server": "bin/zenith-language-server.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/language-server"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && mkdir -p dist && bun x esbuild src/server.ts --bundle --outfile=dist/server.mjs --format=esm --platform=node --external:@zenithbuild/compiler --external:vscode-languageserver --external:vscode-languageserver/node --external:vscode-languageserver-textdocument",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@zenithbuild/compiler": "0.6.13",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest",
+    "esbuild": "^0.25.11",
+    "typescript": "^5.7.3"
+  }
+}
