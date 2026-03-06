@@ -22,9 +22,14 @@ function createFakeNpm(dir) {
     'const command = args[0] || "";',
     'const target = args[1] || "";',
     'const field = args[2] || "";',
+    'const npmTag = process.env.npm_config_tag || process.env.NPM_CONFIG_TAG || "";',
     `const packageName = ${JSON.stringify(PACKAGE_NAME)};`,
     `const currentVersion = ${JSON.stringify(TRAIN_VERSION)};`,
     'if (command === "view") {',
+    '  if (target === packageName && field === "version" && npmTag && npmTag !== "latest") {',
+    '    process.stderr.write("npm error code E404\\nnpm error 404 No match found for version train\\n");',
+    '    process.exit(1);',
+    '  }',
     '  if (target === `${packageName}@${currentVersion}` && field === "dist-tags") {',
     '    process.stderr.write("npm error code E404\\nnpm error 404 Not Found - GET https://registry.npmjs.org/pkg - Not found\\n");',
     '    process.exit(1);',
@@ -67,6 +72,7 @@ test('publish-train publishes an existing package when npm view version returns 
       env: {
         ...process.env,
         NPM_BIN: fakeNpm,
+        NPM_CONFIG_TAG: 'train',
         PUBLISH_PACKAGE_FILTER: PACKAGE_DIR
       },
       encoding: 'utf8'

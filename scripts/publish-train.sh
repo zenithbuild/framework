@@ -163,7 +163,7 @@ npm_view_json() {
   shift
   local output
 
-  if output="$("$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
+  if output="$(npm_config_tag=latest "$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
     printf '%s' "$output"
     return 0
   fi
