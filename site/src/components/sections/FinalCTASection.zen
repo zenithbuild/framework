@@ -1,0 +1,36 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import Button from "../ui/Button.zen";
+</script>
+
+<SectionShell tone="base" height="screen">
+  <div class="flex flex-col flex-1">
+
+    <!-- top zone: empty spacer — closing plate uses pure whitespace at top -->
+    <div class="shrink-0"></div>
+
+    <!-- middle zone: centered closing statement -->
+    <div class="flex-1 flex flex-col items-start justify-center gap-8">
+      <Heading size="section">BUILD DIFFERENT.</Heading>
+      <p class="text-muted-foreground text-sm md:max-w-md">
+        Zenith compiles your intent into the smallest possible output.
+        No virtual DOM. No runtime framework. Just your application.
+      </p>
+    </div>
+
+    <!-- bottom zone: closing CTAs matching Hero language -->
+    <div class="shrink-0 flex flex-col gap-6 pt-8 border-t border-border">
+      <div class="flex gap-4">
+        <Button variant="primary" href="/docs">Start building</Button>
+        <Button variant="ghost" href="https://github.com/nicholasgriffintn/zenithbuild">GitHub</Button>
+      </div>
+      <div class="flex gap-8 text-xs text-muted-foreground font-mono">
+        <span>MIT Licensed</span>
+        <span>v0.6.x</span>
+        <span>@zenithbuild</span>
+      </div>
+    </div>
+
+  </div>
+</SectionShell>

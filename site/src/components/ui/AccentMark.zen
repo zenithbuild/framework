@@ -1,0 +1,26 @@
+<script lang="ts">
+interface Props {
+  color?: "purple" | "blue" | "magenta" | "gold" | "red";
+  variant?: "dot" | "rule" | "badge";
+}
+
+const { color = "purple", variant = "dot" } = $props<Props>();
+
+const colorMap: Record<string, string> = {
+  purple: "bg-brand-purple",
+  blue: "bg-brand-blue",
+  magenta: "bg-brand-magenta",
+  gold: "bg-brand-gold",
+  red: "bg-brand-red",
+};
+
+const bgClass = colorMap[color] ?? colorMap.purple;
+
+const variantClass = variant === "rule"
+  ? `inline-block w-8 h-0.5 ${bgClass}`
+  : variant === "badge"
+    ? `inline-block px-2 py-0.5 rounded text-xs font-mono text-primary-foreground ${bgClass}`
+    : `inline-block w-2 h-2 rounded-full ${bgClass}`;
+</script>
+
+<span class={variantClass}><slot /></span>

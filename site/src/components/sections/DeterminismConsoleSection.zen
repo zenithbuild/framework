@@ -1,0 +1,67 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import AccentMark from "../ui/AccentMark.zen";
+</script>
+
+<SectionShell tone="blue" height="screen">
+  <div class="flex flex-col flex-1">
+
+    <!-- top zone: label left, stat tags right -->
+    <div class="shrink-0 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div>
+        <div class="flex items-center gap-2">
+          <AccentMark color="blue" variant="dot" />
+          <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Determinism</span>
+        </div>
+        <div class="mt-4">
+          <Heading size="section">SAME INPUT, SAME OUTPUT.</Heading>
+        </div>
+      </div>
+      <div class="flex gap-4 md:pb-2">
+        <span class="font-mono text-xs text-muted-foreground border border-border rounded-full px-3 py-1">no side effects</span>
+        <span class="font-mono text-xs text-muted-foreground border border-border rounded-full px-3 py-1">reproducible builds</span>
+      </div>
+    </div>
+
+    <!-- middle zone: asymmetric 40/60 split -->
+    <div class="flex-1 flex flex-col md:flex-row gap-8 py-12">
+      <!-- left: contracts list -->
+      <div class="md:w-2/5 flex flex-col justify-center gap-6">
+        <div class="border-l-2 border-brand-blue pl-4">
+          <span class="font-mono text-sm text-foreground">Deterministic builds</span>
+          <p class="text-xs text-muted-foreground mt-1">Given the same source tree, Zenith produces byte-identical output every time.</p>
+        </div>
+        <div class="border-l-2 border-brand-blue pl-4">
+          <span class="font-mono text-sm text-foreground">No hidden state</span>
+          <p class="text-xs text-muted-foreground mt-1">Compilation depends only on source files and explicit config — never ambient globals.</p>
+        </div>
+        <div class="border-l-2 border-brand-blue pl-4">
+          <span class="font-mono text-sm text-foreground">Marker-based hydration</span>
+          <p class="text-xs text-muted-foreground mt-1">Runtime finds exactly the nodes the compiler marked — no DOM diffing, no surprises.</p>
+        </div>
+      </div>
+
+      <!-- right: console mock -->
+      <div class="md:w-3/5 flex items-center">
+        <div class="w-full bg-card border border-border rounded-lg p-6 font-mono text-xs">
+          <div class="flex items-center gap-2 pb-3 border-b border-border mb-4">
+            <span class="w-2.5 h-2.5 rounded-full bg-destructive"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-accent"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-brand-blue"></span>
+            <span class="text-muted-foreground ml-2">build output</span>
+          </div>
+          <div class="space-y-1.5 text-muted-foreground">
+            <div><span class="text-brand-blue">✓</span> src/pages/index.zen → 2.1kb</div>
+            <div><span class="text-brand-blue">✓</span> src/pages/docs.zen → 3.4kb</div>
+            <div><span class="text-brand-blue">✓</span> src/pages/blog.zen → 1.8kb</div>
+            <div class="pt-2 border-t border-border text-foreground">
+              <span class="text-brand-blue">done</span> · 3 pages · 7.3kb total · deterministic ✓
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</SectionShell>

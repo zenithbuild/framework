@@ -1,0 +1,80 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import AccentMark from "../ui/AccentMark.zen";
+import { gsap } from "gsap";
+
+const r0 = ref<HTMLDivElement>(); const r1 = ref<HTMLDivElement>();
+const r2 = ref<HTMLDivElement>(); const r3 = ref<HTMLDivElement>();
+const r4 = ref<HTMLDivElement>(); const r5 = ref<HTMLDivElement>();
+const rowRefs = [r0, r1, r2, r3, r4, r5];
+
+zenMount((ctx) => {
+  const rows = collectRefs(...rowRefs);
+  if (!rows.length) return;
+
+  gsap.set(rows, { y: 16, opacity: 0 });
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          gsap.to(rows, { y: 0, opacity: 1, duration: 0.6, stagger: 0.07, ease: "power3.out" });
+          observer.disconnect();
+        }
+      });
+    },
+    { threshold: 0.2 }
+  );
+  if (rows[0]) observer.observe(rows[0]);
+  ctx.cleanup(() => observer.disconnect());
+});
+</script>
+
+<SectionShell tone="purple" height="screen">
+  <div class="flex flex-col flex-1">
+
+    <div class="shrink-0 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div>
+        <div class="flex items-center gap-2">
+          <AccentMark color="magenta" variant="dot" />
+          <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Contracts</span>
+        </div>
+        <div class="mt-4">
+          <Heading size="section">CONTRACTS, NOT CONVENTIONS.</Heading>
+        </div>
+      </div>
+      <p class="text-muted-foreground text-sm md:text-right md:max-w-xs md:pb-2">
+        Every API boundary is a typed contract.<br/>Break the contract, break at compile time.
+      </p>
+    </div>
+
+    <div class="flex-1 flex flex-col justify-center py-12 gap-0">
+      <div ref={r0} class="flex items-baseline justify-between border-t border-border py-4">
+        <span class="font-mono text-sm text-foreground">guard(ctx)</span>
+        <span class="text-xs text-muted-foreground">Route protection — runs before render</span>
+      </div>
+      <div ref={r1} class="flex items-baseline justify-between border-t border-border py-4">
+        <span class="font-mono text-sm text-foreground">load(ctx)</span>
+        <span class="text-xs text-muted-foreground">Data fetching — server-only, typed payload</span>
+      </div>
+      <div ref={r2} class="flex items-baseline justify-between border-t border-border py-4">
+        <span class="font-mono text-sm text-foreground">on:event={handler}</span>
+        <span class="text-xs text-muted-foreground">Event binding — compiler-checked names</span>
+      </div>
+      <div ref={r3} class="flex items-baseline justify-between border-t border-border py-4">
+        <span class="font-mono text-sm text-foreground">ref&lt;T&gt;()</span>
+        <span class="text-xs text-muted-foreground">DOM access — scoped, never global queries</span>
+      </div>
+      <div ref={r4} class="flex items-baseline justify-between border-t border-border py-4">
+        <span class="font-mono text-sm text-foreground">signal()</span>
+        <span class="text-xs text-muted-foreground">Reactivity — explicit get/set, stable identity</span>
+      </div>
+      <div ref={r5} class="flex items-baseline justify-between border-t border-border border-b py-4">
+        <span class="font-mono text-sm text-foreground">state</span>
+        <span class="text-xs text-muted-foreground">Reactive binding — auto DOM updates</span>
+      </div>
+    </div>
+
+  </div>
+</SectionShell>

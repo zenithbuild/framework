@@ -1,0 +1,60 @@
+<script lang="ts">
+export interface Props {
+  size?: "hero" | "section" | "base";
+  elementRef?: any;
+  class?: string;
+}
+
+const forwardedRef = (props as Props).elementRef;
+const localRef = ref<HTMLSpanElement>();
+const textRef = forwardedRef ? forwardedRef : localRef;
+
+zenMount((ctx) => {
+  let charRatio = 0;
+  const titleEl = textRef.current;
+  if (!titleEl) return;
+
+  const sizeAttr = titleEl.getAttribute("data-size") || "hero";
+  const fillRatioMap: Record<string, number> = {
+    hero: 0.96,
+    section: 0.80,
+    base: 0.60,
+  };
+  const fillRatio = fillRatioMap[sizeAttr] || 0.96;
+
+  function fitTitle() {
+    const win = zenWindow();
+    if (!win || !titleEl) return;
+
+    if (charRatio === 0) {
+      const origPos = titleEl.style.position;
+      const origVis = titleEl.style.visibility;
+      const origW = titleEl.style.width;
+      titleEl.style.position = "absolute";
+      titleEl.style.visibility = "hidden";
+      titleEl.style.width = "auto";
+      titleEl.style.fontSize = "100px";
+      void titleEl.offsetWidth;
+      const textWidth = titleEl.scrollWidth || 1;
+      charRatio = textWidth / 100;
+      titleEl.style.position = origPos;
+      titleEl.style.visibility = origVis;
+      titleEl.style.width = origW;
+    }
+
+    const targetWidth = win.innerWidth * fillRatio;
+    const newSize = Math.floor(targetWidth / charRatio);
+    titleEl.style.fontSize = `${newSize}px`;
+  }
+
+  fitTitle();
+  const offResize = zenResize(fitTitle);
+  ctx.cleanup(offResize);
+});
+</script>
+
+<div class="w-full text-center font-[var(--zen-font-heading)] font-semibold tracking-tighter text-foreground uppercase m-0 leading-[0.85] flex flex-col mix-blend-normal overflow-visible [perspective:2000px]">
+  <span ref={textRef} data-size="hero" class="w-full text-center whitespace-nowrap inline-block [transform-style:preserve-3d] [transform:rotateX(12deg)]">
+    <slot />
+  </span>
+</div>

@@ -1,0 +1,42 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import AccentMark from "../ui/AccentMark.zen";
+</script>
+
+<SectionShell tone="base" height="screen">
+  <div class="flex flex-col flex-1">
+
+    <!-- top zone: micro label -->
+    <div class="shrink-0">
+      <div class="flex items-center gap-2">
+        <AccentMark color="red" variant="dot" />
+        <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Runtime</span>
+      </div>
+      <div class="mt-4">
+        <Heading size="section">RUNTIME AS THIN AS AIR.</Heading>
+      </div>
+    </div>
+
+    <!-- middle zone: statement stack -->
+    <div class="flex-1 flex flex-col justify-center py-12 gap-0">
+      <div class="group flex items-baseline justify-between border-t border-border py-5">
+        <span class="text-sm text-foreground font-medium">Marker-based hydration</span>
+        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Compiler-placed markers guide runtime binding — no virtual DOM.</span>
+      </div>
+      <div class="group flex items-baseline justify-between border-t border-border py-5">
+        <span class="text-sm text-foreground font-medium">Signal reactivity</span>
+        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Fine-grained updates via signal() — no full component re-render.</span>
+      </div>
+      <div class="group flex items-baseline justify-between border-t border-border py-5">
+        <span class="text-sm text-foreground font-medium">Scoped DOM access</span>
+        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">ref&lt;T&gt;() scopes all DOM reads — no global queries allowed.</span>
+      </div>
+      <div class="group flex items-baseline justify-between border-t border-border border-b py-5">
+        <span class="text-sm text-foreground font-medium">Zero dead code</span>
+        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Tree-shaking removes unused bindings at build time.</span>
+      </div>
+    </div>
+
+  </div>
+</SectionShell>

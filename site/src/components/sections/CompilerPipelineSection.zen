@@ -1,0 +1,72 @@
+<script lang="ts">
+import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import AccentMark from "../ui/AccentMark.zen";
+</script>
+
+<SectionShell tone="base" height="screen">
+  <div class="flex flex-col flex-1">
+
+    <!-- top zone: micro label -->
+    <div class="shrink-0">
+      <div class="flex items-center gap-2">
+        <AccentMark color="purple" variant="dot" />
+        <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Compiler</span>
+      </div>
+      <div class="mt-4">
+        <Heading size="section">ZERO RUNTIME COST.</Heading>
+      </div>
+    </div>
+
+    <!-- middle zone: pipeline strip -->
+    <div class="flex-1 flex items-center py-12">
+      <div class="w-full grid grid-cols-1 md:grid-cols-4 gap-px">
+        <div class="group border border-border p-6 flex flex-col gap-3">
+          <span class="font-mono text-xs text-muted-foreground">01</span>
+          <span class="font-mono text-sm text-foreground">Parse</span>
+          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            .zen source → AST via Babel parser integration.
+          </p>
+        </div>
+        <div class="group border border-border p-6 flex flex-col gap-3">
+          <span class="font-mono text-xs text-muted-foreground">02</span>
+          <span class="font-mono text-sm text-foreground">Transform</span>
+          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            AST → IR with event bindings, reactivity markers.
+          </p>
+        </div>
+        <div class="group border border-border p-6 flex flex-col gap-3">
+          <span class="font-mono text-xs text-muted-foreground">03</span>
+          <span class="font-mono text-sm text-foreground">Emit</span>
+          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            IR → optimized HTML + minimal JS hydration markers.
+          </p>
+        </div>
+        <div class="group border border-border p-6 flex flex-col gap-3">
+          <span class="font-mono text-xs text-muted-foreground">04</span>
+          <span class="font-mono text-sm text-foreground">Bundle</span>
+          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            Tree-shaken vendor splits, CSS extraction, zero dead code.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- bottom zone: stats -->
+    <div class="shrink-0 flex flex-wrap gap-x-12 gap-y-4 pt-8 md:pt-12 border-t border-border">
+      <div class="flex flex-col gap-1">
+        <span class="font-mono text-xs text-foreground">0kb</span>
+        <span class="text-xs text-muted-foreground">Runtime overhead.</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <span class="font-mono text-xs text-foreground">100%</span>
+        <span class="text-xs text-muted-foreground">Compile-time resolved.</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <span class="font-mono text-xs text-foreground">Babel</span>
+        <span class="text-xs text-muted-foreground">Parser integration.</span>
+      </div>
+    </div>
+
+  </div>
+</SectionShell>

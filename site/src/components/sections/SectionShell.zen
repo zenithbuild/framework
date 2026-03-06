@@ -1,23 +1,41 @@
 <script lang="ts">
 export interface Props {
-  bg?: "default" | "card" | "muted";
-  dense?: boolean;
+  tone?: "base" | "purple" | "blue" | "magenta" | "gold" | "red";
+  borderTone?: "purple" | "blue" | "magenta" | "gold" | "red";
+  height?: "auto" | "screen";
+  runway?: "short" | "long";
   class?: string;
 }
 
 const incoming = props as Props;
-const resolvedBg = incoming.bg === "card"
-  ? "bg-card text-card-foreground"
-  : incoming.bg === "muted"
-    ? "bg-muted text-foreground"
-    : "bg-background text-foreground";
-const resolvedDensity = incoming.dense ? "py-16 md:py-20" : "py-24 md:py-32";
-const resolvedClass = typeof incoming.class === "string" ? incoming.class : "";
-const sectionClass = `w-full ${resolvedBg} ${resolvedDensity} ${resolvedClass}`.trim();
+
+const toneMap: Record<string, string> = {
+  base: "bg-background text-foreground",
+  purple: "bg-surface-purple text-foreground",
+  blue: "bg-surface-blue text-foreground",
+  magenta: "bg-surface-magenta text-foreground",
+  gold: "bg-surface-gold text-foreground",
+  red: "bg-surface-red text-foreground",
+};
+
+const borderClassMap: Record<string, string> = {
+  purple: "border-surface-border-purple",
+  blue: "border-surface-border-blue",
+  magenta: "border-surface-border-magenta",
+  gold: "border-surface-border-gold",
+  red: "border-surface-border-red",
+};
+
+const bg = toneMap[incoming.tone ?? "base"] ?? toneMap.base;
+const border = incoming.borderTone ? `border-t ${borderClassMap[incoming.borderTone] ?? ""}` : "";
+const h = incoming.height === "screen" ? "min-h-screen" : "";
+const pad = incoming.runway === "long" ? "py-32 md:py-40" : "py-24 md:py-32";
+const cls = typeof incoming.class === "string" ? incoming.class : "";
+const sectionClass = `w-full ${bg} ${border} ${h} ${pad} ${cls}`.trim();
 </script>
 
 <section class={sectionClass}>
-  <div class="max-w-6xl mx-auto px-6 md:px-12">
+  <div class="px-6 md:px-12 flex flex-col h-full">
     <slot />
   </div>
 </section>
