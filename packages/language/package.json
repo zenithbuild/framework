@@ -1,0 +1,147 @@
+{
+  "name": "@zenithbuild/language",
+  "displayName": "Zenith Language Support",
+  "description": "Canonical Zenith syntax highlighting, snippets, and VS Code integration",
+  "version": "0.6.13",
+  "publisher": "ZenithBuild",
+  "license": "MIT",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/language"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./out/extension.cjs",
+  "activationEvents": [
+    "onLanguage:zenith",
+    "onCommand:zenith.restartServer"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "zenith",
+    "language",
+    "lsp",
+    "syntax",
+    "tooling"
+  ],
+  "files": [
+    "out",
+    "snippets",
+    "syntaxes",
+    "language-configuration.json",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun run build:server && rm -rf out && mkdir -p out && bun x esbuild src/extension.ts --bundle --outfile=out/extension.cjs --external:vscode --external:vscode-languageclient/node --format=cjs --platform=node && cp ../language-server/dist/server.mjs out/server.mjs",
+    "build:server": "bun run --cwd ../language-server build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.spec.mjs",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.11",
+    "typescript": "^5.7.3",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.2.0"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "zenith",
+        "aliases": [
+          "Zenith",
+          "zenith"
+        ],
+        "extensions": [
+          ".zen",
+          ".zen.html",
+          ".zenx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zenith",
+        "scopeName": "text.html.zenith",
+        "path": "./syntaxes/zenith.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.ts": "typescript",
+          "source.css": "css"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "zenith",
+        "path": "./snippets/zenith.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "zenith.restartServer",
+        "title": "Zenith: Restart Server",
+        "category": "Zenith"
+      }
+    ],
+    "configurationDefaults": {
+      "[zenith]": {
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggest.insertMode": "replace",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.quickSuggestions": {
+          "other": true,
+          "comments": false,
+          "strings": true
+        },
+        "editor.autoClosingBrackets": "always"
+      },
+      "emmet.includeLanguages": {
+        "zenith": "html"
+      },
+      "emmet.syntaxProfiles": {
+        "zenith": "html"
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Zenith",
+      "properties": {
+        "zenith.strictDomLints": {
+          "type": "boolean",
+          "default": false,
+          "description": "Report ZEN-DOM-* warnings as errors when true."
+        },
+        "zenith.enableFrameworkSnippets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reserved compatibility flag. Zenith ships only canonical Zenith snippets."
+        },
+        "zenith.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute or workspace-relative path to a custom Zenith language server entry file."
+        }
+      }
+    }
+  }
+}

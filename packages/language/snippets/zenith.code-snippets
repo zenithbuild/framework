@@ -1,0 +1,78 @@
+{
+  "state-toggle": {
+    "prefix": "state-toggle",
+    "body": [
+      "state ${1:open} = false",
+      "function toggle${1/(.*)/${1:/capitalize}/}() { ${1:open} = !${1:open} }",
+      "$0"
+    ],
+    "description": "State variable with toggle function"
+  },
+  "signal-counter": {
+    "prefix": "signal-counter",
+    "body": [
+      "const ${1:count} = signal(${2:0})",
+      "${1:count}.set(${1:count}.get() + 1)",
+      "$0"
+    ],
+    "description": "Signal with explicit get/set"
+  },
+  "ref-dom": {
+    "prefix": "ref-dom",
+    "body": [
+      "const ${1:node} = ref<${2:HTMLElement}>()",
+      "$0"
+    ],
+    "description": "Ref for a DOM node"
+  },
+  "zenmount-cleanup": {
+    "prefix": "zenmount-cleanup",
+    "body": [
+      "zenMount((ctx) => {",
+      "\t$0",
+      "\tctx.cleanup(${1:dispose})",
+      "})"
+    ],
+    "description": "zenMount with registered cleanup"
+  },
+  "zeneffect-basic": {
+    "prefix": "zeneffect-basic",
+    "body": [
+      "zenEffect(() => {",
+      "\t$0",
+      "})"
+    ],
+    "description": "Basic zenEffect pattern"
+  },
+  "zenon-keydown-escape": {
+    "prefix": "zenon-keydown-escape",
+    "body": [
+      "const doc = zenDocument()",
+      "if (!doc) return",
+      "const offKey = zenOn(doc, 'keydown', (event) => {",
+      "\tif (event.key === 'Escape') ${1:closeMenu}()",
+      "})",
+      "ctx.cleanup(offKey)",
+      "$0"
+    ],
+    "description": "Escape key listener via zenOn"
+  },
+  "zenresize-viewport": {
+    "prefix": "zenresize-viewport",
+    "body": [
+      "const offResize = zenResize(({ w, h }) => {",
+      "\t$0",
+      "})",
+      "ctx.cleanup(offResize)"
+    ],
+    "description": "Viewport resize handling via zenResize"
+  },
+  "collectrefs": {
+    "prefix": "collectrefs",
+    "body": [
+      "const nodes = collectRefs(${1:firstRef}, ${2:secondRef}, ${3:thirdRef})",
+      "$0"
+    ],
+    "description": "Collect multiple refs deterministically"
+  }
+}
