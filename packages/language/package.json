@@ -2,7 +2,7 @@
   "name": "@zenithbuild/language",
   "displayName": "Zenith Language Support",
   "description": "Canonical Zenith syntax highlighting, snippets, and VS Code integration",
-  "version": "0.6.16",
+  "version": "0.6.17",
   "publisher": "ZenithBuild",
   "license": "MIT",
   "private": false,
