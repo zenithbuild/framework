@@ -203,7 +203,10 @@ package_has_any_published_version() {
   local status
 
   if output="$(npm_view_json "${package_name} package" "${package_name}" version)"; then
-    extract_npm_json "${package_name} package" "$output" >/dev/null
+    if [[ -z "${output//[[:space:]]/}" ]]; then
+      echo "Empty npm view payload for ${package_name} package" >&2
+      exit 1
+    fi
     return 0
   else
     status=$?
