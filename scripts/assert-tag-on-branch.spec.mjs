@@ -111,12 +111,12 @@ test('fails when required GitHub environment variables are missing', () => {
   const repo = setupRepo();
 
   try {
+    const env = { ...process.env, GITHUB_REF_NAME: 'v0.6.13' };
+    delete env.GITHUB_SHA;
+
     const result = spawnSync(process.execPath, [SCRIPT, 'train'], {
       cwd: repo.workDir,
-      env: {
-        ...process.env,
-        GITHUB_REF_NAME: 'v0.6.13',
-      },
+      env,
       encoding: 'utf8',
     });
 
