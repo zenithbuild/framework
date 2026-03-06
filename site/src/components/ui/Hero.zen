@@ -1,9 +1,17 @@
 <script lang="ts">
 import ZenithLogo from "./ZenithLogo.zen";
 import Button from "./Button.zen";
+import Tag from "./Tag.zen";
+import Heading from "./Heading.zen";
 import { gsap } from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
+
+export interface Props {
+  version?: string;
+}
+
+const versionLabel = "v" + ((props as Props).version || "0.0.0");
 
 const refTitle = ref<HTMLSpanElement>();
 const refDesc = ref<HTMLParagraphElement>();
@@ -26,23 +34,7 @@ zenMount((ctx) => {
   const metasCol2 = refMetasCol2.current;
   const watermarkWrapper = refWatermarkWrapper.current;
 
-  function fitTitle() {
-    const win = zenWindow();
-    const titleEl = refTitle.current;
-    if (!win || !titleEl) return;
-    
-    titleEl.style.fontSize = "100px";
-    void titleEl.offsetWidth;
-    const textWidth = titleEl.scrollWidth || 1;
-    // Stretch completely perfectly edge to edge without any padding subtracted
-    const targetWidth = win.innerWidth;
-    const newSize = Math.floor(100 * (targetWidth / textWidth));
-    titleEl.style.fontSize = `${newSize}px`;
-  }
-  
-  fitTitle();
-  const offResize = zenResize(fitTitle);
-  ctx.cleanup(offResize);
+
 
   if (!title && !desc && !version && !btnInit && !btnSource && !metasCol1 && !metasCol2 && !watermarkWrapper) return;
 
@@ -83,8 +75,9 @@ zenMount((ctx) => {
 
   if (title) {
     const titleSplit = new SplitText(title, { 
-      type: "chars",
-      charsClass: "text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-zenith-cyan)] via-[var(--color-zenith-purple)] to-[var(--color-zenith-magenta)] pb-4 inline-block "
+      type: "chars, words",
+      mask: "chars",
+      lineClass: 'lines++',
     });
     // Applying the 3D perspective inside the chars wrapper by avoiding CSS conflicts
     gsap.set(titleSplit.chars, { yPercent: 120, opacity: 0, rotationX: -80, transformOrigin: "0% 50% -50" });
@@ -106,10 +99,8 @@ zenMount((ctx) => {
   }
 
   if (version) {
-    const versionMasks = new SplitText(version, { type: "lines", linesClass: "overflow-hidden inline-block align-bottom" });
-    const versionLines = new SplitText(versionMasks.lines, { type: "lines" });
-    gsap.set(versionLines.lines, { yPercent: 120 });
-    tl.to(versionLines.lines, { yPercent: 0, duration: 0.85, ease: "power3.out" }, textStartTime + 0.1);
+    gsap.set(version, { y: 20, opacity: 0 });
+    tl.to(version, { y: 0, opacity: 1, duration: 0.85, ease: "power3.out" }, textStartTime + 0.3);
   }
 
   const buttons = collectRefs(refBtnInit, refBtnSource);
@@ -132,12 +123,12 @@ zenMount((ctx) => {
 });
 </script>
 
-<section class="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-transparent z-10 px-6 md:px-12 pt-24 md:pt-32 pb-12">
+<section class="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-transparent z-10 pt-24 md:pt-32 pb-12">
   
   <!-- Massive Nebula Background & Watermarks -->
   <div class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
     <!-- Giant Logo Watermark -->
-    <div ref={refWatermarkWrapper} class="absolute text-zinc-950 dark:text-zinc-50 w-[150vw] sm:w-[100vw] lg:w-[80vw] max-w-[1200px] aspect-square flex items-center justify-center transform -rotate-12 opacity-0">
+    <div ref={refWatermarkWrapper} class="absolute text-foreground w-[150vw] sm:w-[100vw] lg:w-[80vw] max-w-[1200px] aspect-square flex items-center justify-center transform -rotate-12 opacity-0">
       <ZenithLogo />
     </div>
 
@@ -145,54 +136,54 @@ zenMount((ctx) => {
     <div class="absolute w-[90vw] h-[90vw] max-h-[900px] bg-[var(--color-zenith-purple)]/20 dark:bg-[var(--color-zenith-purple)]/30 blur-[150px] md:blur-[220px] rounded-full bottom-[-10%] right-[-10%] opacity-40 dark:opacity-30"></div>
   </div>
 
-  <div class="relative z-10 flex flex-col h-full flex-grow w-full mx-auto" style="max-width: 100%;">
+  <div class="relative z-10 flex flex-col h-full flex-grow w-full mx-auto">
     
     <!-- Top Row -->
     <div class="flex justify-between items-start w-full px-6 md:px-12 max-w-[1600px] mx-auto">
       <div class="inline-flex items-center gap-3">
-        <div class="h-6 w-6 text-zinc-950 dark:text-zinc-50 drop-shadow-sm">
+        <div class="h-6 w-6 text-foreground drop-shadow-sm">
           <ZenithLogo />
         </div>
-        <span ref={refVersion} class="text-[10px] md:text-xs font-mono font-medium uppercase tracking-[0.2em] text-zinc-950 dark:text-zinc-50 mt-1">ZENITH BUILD · v0.6.0</span>
       </div>
       
-      <p ref={refDesc} class="text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-zinc-500 max-w-[200px] text-right leading-loose">
+      <p ref={refDesc} class="text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-muted-foreground max-w-[200px] text-right leading-loose">
         ENGINEERED FOR<br/>DETERMINISM.
       </p>
     </div>
 
     <!-- Middle Giant Typography -->
-    <div class="flex flex-col justify-center flex-grow w-full py-16 md:py-24 overflow-visible">
-      <h1 class="w-full text-center font-[var(--zen-font-heading)] font-semibold tracking-tighter text-zinc-950 dark:text-zinc-50 uppercase m-0 leading-[0.85] flex flex-col mix-blend-normal [perspective:1000px]">
-        <span ref={refTitle} class="transform -translate-x-[0.02em] w-full text-center whitespace-nowrap inline-block [transform-style:preserve-3d] [transform:rotateX(15deg)]">ZENITH BUILD</span>
-      </h1>
+    <div class="flex flex-col items-center justify-center flex-grow w-full py-8 md:py-16 overflow-visible gap-6">
+      <h1><Heading size="hero" elementRef={refTitle}>ZENITH BUILD</Heading></h1>
+      <div ref={refVersion} class="flex justify-center">
+        <Tag variant="muted">{versionLabel}</Tag>
+      </div>
     </div>
 
     <!-- Bottom Row (Action & Metas) -->
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12 w-full border-t border-zinc-200 dark:border-zinc-800/60 pt-8 md:pt-12 px-6 md:px-12 max-w-[1600px] mx-auto">
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12 w-full border-t border-border pt-8 md:pt-12 px-6 md:px-12 max-w-[1600px] mx-auto">
       <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
         <div ref={refBtnInit} class="w-full md:w-auto">
-          <Button href="/docs" variant="primary" class="w-full md:w-auto rounded-none px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+          <Button href="/docs" variant="primary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
             Initialize
           </Button>
         </div>
         <div ref={refBtnSource} class="w-full md:w-auto">
-          <Button href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" variant="secondary" class="w-full md:w-auto rounded-none px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+          <Button href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" variant="secondary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
             Source
           </Button>
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-12 md:gap-24 text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-zinc-500">
+      <div class="flex flex-wrap gap-12 md:gap-24 text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-muted-foreground">
         <div ref={refMetasCol1} class="flex flex-col gap-3 md:gap-4">
-          <span class="text-zinc-950 dark:text-zinc-50 font-semibold mb-1 opacity-70">Architecture</span>
-          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Reactivity</span>
-          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Zero-JS</span>
+          <span class="text-foreground font-semibold mb-1 opacity-70">Architecture</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">Reactivity</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">Zero-JS</span>
         </div>
         <div ref={refMetasCol2} class="flex flex-col gap-3 md:gap-4">
-          <span class="text-zinc-950 dark:text-zinc-50 font-semibold mb-1 opacity-70">Ecosystem</span>
-          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Compiler</span>
-          <span class="hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors cursor-pointer">Subagents</span>
+          <span class="text-foreground font-semibold mb-1 opacity-70">Ecosystem</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">Compiler</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">Subagents</span>
         </div>
       </div>
     </div>

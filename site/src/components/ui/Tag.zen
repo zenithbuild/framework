@@ -10,10 +10,10 @@ const className = typeof incoming.class === "string" ? incoming.class : "";
 const baseClasses = "inline-flex items-center justify-center rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em]";
 const variantClasses =
   variant === "solid"
-    ? "border-transparent bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
+    ? "border-transparent bg-foreground text-background"
     : variant === "muted"
-    ? "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400"
-    : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300";
+    ? "border-border bg-muted text-muted-foreground"
+    : "border-border text-muted-foreground";
 </script>
 
 <span class={(baseClasses + " " + variantClasses + " " + className).trim()}>

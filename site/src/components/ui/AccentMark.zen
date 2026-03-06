@@ -4,7 +4,9 @@ interface Props {
   variant?: "dot" | "rule" | "badge";
 }
 
-const { color = "purple", variant = "dot" } = $props<Props>();
+const incoming = props as Props;
+const color = incoming.color ?? "purple";
+const variant = incoming.variant ?? "dot";
 
 const colorMap: Record<string, string> = {
   purple: "bg-brand-purple",

@@ -1,20 +1,46 @@
 <script server lang="ts">
-interface PageProps{ 
+import fs from "fs";
+import path from "path";
+
+let coreVersion = "0.0.0";
+try {
+    const pkgPath = path.resolve("node_modules/@zenithbuild/core/package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+    coreVersion = pkg.version;
+} catch {}
+
+interface PageProps {
     title: string;
     description: string;
-
+    coreVersion: string;
 }
-    export const data: PageProps = {
-        title: "Home",
-        description: "",
-    };
+
+export const data: PageProps = {
+    title: "Home",
+    description: "ZenithBuild framework homepage and ecosystem overview.",
+    coreVersion,
+};
 </script>
 
 <script setup="ts">
-import DefaultLayout from "@/layouts/DefaultLayout.zen"
-import Hero from "@/components/ui/Hero.zen"
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import Hero from "@/components/ui/Hero.zen";
+import ContractSection from "@/components/sections/ContractSection.zen";
+import CompilerPipelineSection from "@/components/sections/CompilerPipelineSection.zen";
+import DeterminismConsoleSection from "@/components/sections/DeterminismConsoleSection.zen";
+import ReactivityModelSection from "@/components/sections/ReactivityModelSection.zen";
+import RuntimePrinciplesSection from "@/components/sections/RuntimePrinciplesSection.zen";
+import EcosystemOrbitSection from "@/components/sections/EcosystemOrbitSection.zen";
+import GettingStartedSection from "@/components/sections/GettingStartedSection.zen";
 </script>
 
-<DefaultLayout title={data.title}>
-    <Hero />
+<DefaultLayout title={data.title} description={data.description}>
+    <Hero version={data.coreVersion} />
+    <ContractSection />
+    <CompilerPipelineSection />
+    <DeterminismConsoleSection />
+    <ReactivityModelSection />
+    <RuntimePrinciplesSection />
+    <EcosystemOrbitSection />
+    <GettingStartedSection />
 </DefaultLayout>

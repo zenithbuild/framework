@@ -1,20 +1,30 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
+import Heading from "../ui/Heading.zen";
+import AccentMark from "../ui/AccentMark.zen";
 </script>
 
-<SectionShell bg="muted">
-  <div class="flex flex-col gap-4 mb-12">
-    <span class="font-mono text-xs tracking-widest uppercase text-muted-foreground">Mental Model</span>
-    <h2 class="font-[var(--zen-font-heading)] text-3xl md:text-4xl font-semibold tracking-tight">
-      Reactivity belongs to scope.
-    </h2>
-  </div>
+<SectionShell tone="gold" height="screen">
+  <div class="flex flex-col flex-1">
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-    <!-- Code Snippet -->
-    <div class="bg-card border border-border rounded-xl p-6 overflow-x-auto">
-      <pre class="font-mono text-xs md:text-sm leading-6 text-card-foreground whitespace-pre">// counter.zen
-state count = 0
+    <!-- top zone: micro label -->
+    <div class="shrink-0 flex items-center gap-2">
+      <AccentMark color="gold" variant="dot" />
+      <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Mental Model</span>
+    </div>
+
+    <!-- middle zone: heading + code block -->
+    <div class="flex-1 flex flex-col justify-center py-12">
+      <div class="mb-10">
+        <Heading size="section">REACTIVITY BELONGS TO SCOPE.</Heading>
+      </div>
+
+      <!-- Dominant motif: full-width code block -->
+      <div class="bg-card border border-border border-t-2 border-t-brand-gold rounded-lg overflow-x-auto">
+        <div class="flex items-center gap-2 px-5 py-3 border-b border-border">
+          <span class="text-xs font-mono text-muted-foreground tracking-widest">counter.zen</span>
+        </div>
+        <pre class="font-mono text-sm leading-8 text-card-foreground px-6 py-6 whitespace-pre">state count = 0
 
 function increment() &#123;
   count = count + 1
@@ -22,27 +32,24 @@ function increment() &#123;
 
 // Reactivity scoped to this file.
 // Slots see parent scope, not ours.</pre>
-    </div>
-
-    <!-- Principles -->
-    <div class="flex flex-col gap-6">
-      <h3 class="font-semibold text-lg text-foreground">What stays true</h3>
-      <div class="flex flex-col gap-5">
-        <div class="flex flex-col gap-1">
-          <span class="font-semibold text-sm text-foreground">Slots preserve parent scope</span>
-          <p class="text-muted-foreground text-sm leading-relaxed">Content passed into a component retains the reactive bindings of the parent. No re-binding, no proxy layers.</p>
-        </div>
-        <div class="border-t border-border"></div>
-        <div class="flex flex-col gap-1">
-          <span class="font-semibold text-sm text-foreground">Components are structural</span>
-          <p class="text-muted-foreground text-sm leading-relaxed">A component is a layout boundary — not a reactive boundary. State does not leak across component edges.</p>
-        </div>
-        <div class="border-t border-border"></div>
-        <div class="flex flex-col gap-1">
-          <span class="font-semibold text-sm text-foreground">No reactive boundaries created by components</span>
-          <p class="text-muted-foreground text-sm leading-relaxed">Unlike frameworks that create subscription zones per component, Zenith scopes reactivity to the file where it is declared.</p>
-        </div>
       </div>
     </div>
+
+    <!-- bottom zone: principles tucked right -->
+    <div class="shrink-0 flex flex-col md:flex-row md:justify-end gap-8 pt-8 md:pt-12 border-t border-border">
+      <div class="flex flex-col gap-2 md:text-right">
+        <span class="text-xs font-mono text-foreground tracking-wide">Slots preserve parent scope</span>
+        <span class="text-xs text-muted-foreground">No re-binding. No proxy layers.</span>
+      </div>
+      <div class="flex flex-col gap-2 md:text-right">
+        <span class="text-xs font-mono text-foreground tracking-wide">Components are structural</span>
+        <span class="text-xs text-muted-foreground">Layout boundary, not reactive.</span>
+      </div>
+      <div class="flex flex-col gap-2 md:text-right">
+        <span class="text-xs font-mono text-foreground tracking-wide">State scoped to the file</span>
+        <span class="text-xs text-muted-foreground">No subscription zones per component.</span>
+      </div>
+    </div>
+
   </div>
 </SectionShell>

@@ -4,24 +4,27 @@ import Navigation from "@/components/ui/Navigation.zen";
 import Footer from "@/components/globals/footer/Footer.zen";
 
 interface Props {
-  title?: string;
+    title?: string;
+    description?: string;
 }
-const { title = "Home" } = $props<Props>();
+
+const { title = "Home", description = "" } = $props<Props>();
 </script>
 
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title} | ZenithBuild</title>
+    <title>ZenithBuild | {title}</title>
+    <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Rajdhani:wght@500;600;700&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet" />
 </head>
-<body class="min-h-screen bg-background text-foreground">
+<body class="min-h-screen overflow-x-hidden bg-background text-foreground">
     <Navigation />
-    <main class="relative z-10 bg-background">
+    <main class="relative z-10 w-full overflow-x-hidden bg-background">
         <slot />
     </main>
     <Footer />

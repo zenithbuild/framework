@@ -365,19 +365,19 @@ zeneffect([isOpen], () => {
   <div
     ref={backdrop}
     data-testid="nav-backdrop"
-    class="absolute inset-0 bg-zinc-950/40 backdrop-blur-sm opacity-0 pointer-events-none"
+    class="absolute inset-0 bg-foreground/40 backdrop-blur-sm opacity-0 pointer-events-none"
     on:click={toggleMenu}
   ></div>
 
   <div
     ref={shell}
     data-testid="nav-shell"
-    class="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto bg-white/95 dark:bg-zinc-900/95 border border-zinc-200 dark:border-zinc-800 shadow-2xl backdrop-blur-3xl overflow-hidden"
+    class="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto bg-background/95 border border-border shadow-2xl backdrop-blur-3xl overflow-hidden"
     style="top: 24px; width: 50%; height: 64px; border-radius: 32px;"
   >
     <div ref={header} class="absolute top-0 left-0 flex h-16 w-full items-center justify-between px-6 z-20">
       <a href="/" class="flex flex-shrink-0 items-center drop-shadow-sm transition-transform hover:scale-105" aria-label="Home">
-        <div class="h-7 w-7 text-zinc-950 dark:text-white">
+        <div class="h-7 w-7 text-foreground">
           <ZenithLogo />
         </div>
       </a>
@@ -390,12 +390,12 @@ zeneffect([isOpen], () => {
           ariaLabel="Toggle menu"
           ariaControls="site-menu-panel"
           onPress={toggleMenu}
-          class="min-w-[88px] border-transparent bg-zinc-100/50 px-4 py-2 text-zinc-900 hover:bg-zinc-200/70 dark:bg-zinc-800/50 dark:text-zinc-100 dark:hover:bg-zinc-700/70 disabled:opacity-70"
+          class="min-w-[88px] border-transparent bg-muted/50 px-4 py-2 text-foreground hover:bg-secondary disabled:opacity-70"
         >
           <span
             ref={toggleLabel}
             data-testid="nav-toggle-label"
-            class="relative z-10 block overflow-hidden font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-100"
+            class="relative z-10 block overflow-hidden font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-foreground"
           >menu</span>
         </Button>
 
@@ -406,21 +406,21 @@ zeneffect([isOpen], () => {
     <div id="site-menu-panel" ref={content} class="absolute inset-0 pt-32 px-8 md:px-16 flex flex-col pointer-events-none" style="display: none;">
       <div ref={linksContainer} class="flex-1 flex flex-col justify-center" style="pointer-events: none;">
         <nav class="flex flex-col space-y-4 md:space-y-6">
-          <a ref={linkHome} href="/" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-zinc-900 dark:text-zinc-50">Home<span class="text-[#5A1DA8] dark:text-[#FDC458]">.</span></a>
-          <a ref={linkDocs} href="/docs" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-zinc-900 dark:text-zinc-50">Docs<span class="text-[#5A1DA8] dark:text-[#FDC458]">.</span></a>
-          <a ref={linkBlog} href="/blog" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-zinc-900 dark:text-zinc-50">Blog<span class="text-[#5A1DA8] dark:text-[#FDC458]">.</span></a>
-          <a ref={linkGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-zinc-900 dark:text-zinc-50">GitHub<span class="text-[#5A1DA8] dark:text-[#FDC458]">.</span></a>
+          <a ref={linkHome} href="/" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Home<span class="text-primary">.</span></a>
+          <a ref={linkDocs} href="/docs" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Docs<span class="text-primary">.</span></a>
+          <a ref={linkBlog} href="/blog" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Blog<span class="text-primary">.</span></a>
+          <a ref={linkGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">GitHub<span class="text-primary">.</span></a>
         </nav>
       </div>
 
       <div class="pb-10 md:pb-16 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
         <div class="flex flex-wrap gap-x-8 gap-y-4">
-          <a ref={footerTwitter} href="https://twitter.com/zenithbuild" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-zinc-500">Twitter</a>
-          <a ref={footerGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-zinc-500">GitHub</a>
-          <a ref={footerContract} href="/docs/zenith-contract" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-zinc-500">Contract</a>
+          <a ref={footerTwitter} href="https://twitter.com/zenithbuild" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">Twitter</a>
+          <a ref={footerGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">GitHub</a>
+          <a ref={footerContract} href="/docs/zenith-contract" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">Contract</a>
         </div>
 
-        <div ref={footerYear} class="text-[10px] md:text-xs font-mono text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.15em]">
+        <div ref={footerYear} class="text-[10px] md:text-xs font-mono text-muted-foreground uppercase tracking-[0.15em]">
           Zenith Framework © {new Date().getFullYear()}
         </div>
       </div>

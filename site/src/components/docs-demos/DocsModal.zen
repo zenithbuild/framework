@@ -31,16 +31,16 @@ zeneffect([open], () => {
 
 <section class="p-6 font-sans">
   <h1 class="text-2xl font-semibold">Modal Demo</h1>
-  <p class="mt-2 text-sm text-zinc-600">Visibility is controlled by explicit state transitions.</p>
+  <p class="mt-2 text-sm text-muted-foreground">Visibility is controlled by explicit state transitions.</p>
 
-  <button class="mt-4 rounded-md bg-indigo-600 px-4 py-2 text-white" on:click={showModal}>Open modal</button>
+  <button class="mt-4 rounded-md bg-primary px-4 py-2 text-primary-foreground" on:click={showModal}>Open modal</button>
 
   <div ref={modalOverlayRef} data-demo-modal-overlay-runtime class="hidden">
-    <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+    <div class="w-full max-w-md rounded-lg bg-popover p-5 shadow-xl">
       <h2 class="text-xl font-semibold">Deterministic Modal</h2>
-      <p class="mt-2 text-sm text-zinc-600">No framework magic. No runtime parser.</p>
+      <p class="mt-2 text-sm text-muted-foreground">No framework magic. No runtime parser.</p>
       <div class="mt-4 flex justify-end">
-        <button class="rounded-md border border-zinc-300 px-4 py-2" on:click={hideModal}>Close</button>
+        <button class="rounded-md border border-border px-4 py-2" on:click={hideModal}>Close</button>
       </div>
     </div>
   </div>

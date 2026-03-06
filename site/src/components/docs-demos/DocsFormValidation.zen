@@ -31,7 +31,7 @@ function syncValidation() {
     emailErrorRef.current.className = touched.get() && !emailOk ? "text-red-600" : "hidden";
   }
   if (statusRef.current) {
-    statusRef.current.className = ready ? "text-emerald-700" : "text-zinc-500";
+    statusRef.current.className = ready ? "text-emerald-700" : "text-muted-foreground";
     statusRef.current.textContent = ready ? "Ready to submit" : "Waiting for valid input";
   }
 }
@@ -64,24 +64,24 @@ zeneffect([name, email, touched], () => {
 
 <section class="p-6 font-sans">
   <h1 class="text-2xl font-semibold">Form Validation Demo</h1>
-  <p class="mt-2 text-sm text-zinc-600">Validation derives from explicit state and memoized expressions.</p>
+  <p class="mt-2 text-sm text-muted-foreground">Validation derives from explicit state and memoized expressions.</p>
 
   <div class="mt-5 grid gap-4">
     <label class="grid gap-1 text-sm">
       <span>Name</span>
-      <input class="rounded-md border border-zinc-300 px-3 py-2" on:input={onNameInput} />
+      <input class="rounded-md border border-input px-3 py-2" on:input={onNameInput} />
       <span ref={nameErrorRef} data-demo-form-name-error-runtime class="hidden">Name must be at least 2 characters.</span>
     </label>
 
     <label class="grid gap-1 text-sm">
       <span>Email</span>
-      <input class="rounded-md border border-zinc-300 px-3 py-2" on:input={onEmailInput} />
+      <input class="rounded-md border border-input px-3 py-2" on:input={onEmailInput} />
       <span ref={emailErrorRef} data-demo-form-email-error-runtime class="hidden">Email must include @.</span>
     </label>
 
     <div class="flex items-center gap-3">
-      <button class="rounded-md bg-zinc-900 px-4 py-2 text-white" on:click={onValidate}>Validate</button>
-      <span ref={statusRef} data-demo-form-status-runtime class="text-zinc-500">Waiting for valid input</span>
+      <button class="rounded-md bg-foreground px-4 py-2 text-background" on:click={onValidate}>Validate</button>
+      <span ref={statusRef} data-demo-form-status-runtime class="text-muted-foreground">Waiting for valid input</span>
     </div>
   </div>
 </section>

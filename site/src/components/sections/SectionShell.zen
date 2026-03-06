@@ -1,16 +1,20 @@
 <script lang="ts">
 export interface Props {
-  tone?: "base" | "purple" | "blue" | "magenta" | "gold" | "red";
-  borderTone?: "purple" | "blue" | "magenta" | "gold" | "red";
-  height?: "auto" | "screen";
-  runway?: "short" | "long";
+  tone?: "base" | "card" | "muted" | "purple" | "blue" | "magenta" | "gold" | "red";
+  borderTone?: "base" | "card" | "muted" | "purple" | "blue" | "magenta" | "gold" | "red" | "none";
+  surface?: "default" | "card" | "muted";
+  height?: "screen" | "auto";
+  runway?: "normal" | "long";
+  dense?: boolean;
   class?: string;
 }
 
 const incoming = props as Props;
 
 const toneMap: Record<string, string> = {
-  base: "bg-background text-foreground",
+  base: "bg-surface-0 text-foreground",
+  card: "bg-surface-1 text-card-foreground",
+  muted: "bg-surface-2 text-foreground",
   purple: "bg-surface-purple text-foreground",
   blue: "bg-surface-blue text-foreground",
   magenta: "bg-surface-magenta text-foreground",
@@ -19,23 +23,38 @@ const toneMap: Record<string, string> = {
 };
 
 const borderClassMap: Record<string, string> = {
-  purple: "border-surface-border-purple",
-  blue: "border-surface-border-blue",
-  magenta: "border-surface-border-magenta",
-  gold: "border-surface-border-gold",
-  red: "border-surface-border-red",
+  base: "border-t border-border",
+  card: "border-t border-border",
+  muted: "border-t border-border",
+  purple: "border-t border-surface-border-purple",
+  blue: "border-t border-surface-border-blue",
+  magenta: "border-t border-surface-border-magenta",
+  gold: "border-t border-surface-border-gold",
+  red: "border-t border-surface-border-red",
+  none: "",
 };
 
-const bg = toneMap[incoming.tone ?? "base"] ?? toneMap.base;
-const border = incoming.borderTone ? `border-t ${borderClassMap[incoming.borderTone] ?? ""}` : "";
-const h = incoming.height === "screen" ? "min-h-screen" : "";
-const pad = incoming.runway === "long" ? "py-32 md:py-40" : "py-24 md:py-32";
-const cls = typeof incoming.class === "string" ? incoming.class : "";
-const sectionClass = `w-full ${bg} ${border} ${h} ${pad} ${cls}`.trim();
+const resolvedTone = incoming.tone
+  ? (toneMap[incoming.tone] || toneMap.base)
+  : incoming.surface === "card"
+    ? toneMap.card
+    : incoming.surface === "muted"
+      ? toneMap.muted
+      : toneMap.base;
+
+const resolvedBorder = borderClassMap[incoming.borderTone || "none"] || "";
+const resolvedHeight = incoming.height === "auto" ? "" : "min-h-screen";
+const resolvedDensity = incoming.dense
+  ? "py-16 md:py-20"
+  : incoming.runway === "long"
+    ? "pt-24 md:pt-32 pb-28 md:pb-40"
+    : "pt-24 md:pt-32 pb-20 md:pb-28";
+const resolvedClass = typeof incoming.class === "string" ? incoming.class : "";
+const sectionClass = `w-full flex flex-col ${resolvedTone} ${resolvedBorder} ${resolvedHeight} ${resolvedDensity} ${resolvedClass}`.trim();
 </script>
 
 <section class={sectionClass}>
-  <div class="px-6 md:px-12 flex flex-col h-full">
+  <div class="px-6 md:px-12 flex flex-col flex-1">
     <slot />
   </div>
 </section>

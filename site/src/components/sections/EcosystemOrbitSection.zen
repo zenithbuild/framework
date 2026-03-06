@@ -12,6 +12,12 @@ interface OrbNode {
   r: number; accent: string;
 }
 
+interface NodeDetail {
+  title: string;
+  desc: string;
+  tag: string;
+}
+
 const CX = 250;
 const CY = 250;
 
@@ -25,6 +31,26 @@ const nodes: OrbNode[] = [
   { id: "cli",      label: "cli",        desc: "Build orchestration",  x: 112, y: 178, z: 76,  r: 12, accent: "brand-blue" },
   { id: "lang",     label: "lang-tools", desc: "Editor intelligence",  x: 188, y: 105, z: -78, r: 9,  accent: "brand-magenta" },
 ];
+
+const fallbackDesc: NodeDetail = {
+  title: "NETWORK",
+  desc: "Interact with an orb to view details.",
+  tag: "SELECT",
+};
+
+const nodeDetails: Record<string, NodeDetail> = {
+  core: { title: "CORE", desc: "Shared types, IR contracts, and compiler-facing primitives.", tag: "CENTER" },
+  router: { title: "ROUTER", desc: "SSR route contracts and navigation boundaries.", tag: "ROUTE" },
+  runtime: { title: "RUNTIME", desc: "Marker hydration with the smallest possible browser surface.", tag: "HYDRATE" },
+  compiler: { title: "COMPILER", desc: "AST to IR to HTML with compile-time diagnostics.", tag: "COMPILE" },
+  bundler: { title: "BUNDLER", desc: "Deterministic packaging and tree-shaken output.", tag: "PACKAGE" },
+  cli: { title: "CLI", desc: "Build orchestration and train-facing developer workflows.", tag: "COMMAND" },
+  lang: { title: "LANG-TOOLS", desc: "Editor grammar, hovers, completions, and diagnostics.", tag: "EDITOR" },
+};
+
+state detailTitle = fallbackDesc.title;
+state detailDesc = fallbackDesc.desc;
+state detailTag = fallbackDesc.tag;
 
 interface Edge { from: string; to: string; }
 
@@ -92,6 +118,12 @@ const descRefs = [lRef0, lRef1, lRef2, lRef3, lRef4, lRef5, lRef6];
 function handleHoverIn(idx: number) {
   const node = nodes[idx];
   const desc = descRefs[idx]?.current;
+  const detail = nodeDetails[node.id] || fallbackDesc;
+
+  detailTitle = detail.title;
+  detailDesc = detail.desc;
+  detailTag = detail.tag;
+
   if (desc) gsap.to(desc, { opacity: 1, duration: 0.2 });
 
   edges.forEach((e, i) => {
@@ -105,6 +137,11 @@ function handleHoverIn(idx: number) {
 
 function handleHoverOut(idx: number) {
   const desc = descRefs[idx]?.current;
+
+  detailTitle = fallbackDesc.title;
+  detailDesc = fallbackDesc.desc;
+  detailTag = fallbackDesc.tag;
+
   if (desc) gsap.to(desc, { opacity: 0, duration: 0.2 });
 
   edges.forEach((e, i) => {
@@ -194,6 +231,16 @@ zenMount((ctx) => {
     created.forEach(el => el.remove());
   });
 });
+
+const p0 = orbEdgePath(edges[0]);
+const p1 = orbEdgePath(edges[1]);
+const p2 = orbEdgePath(edges[2]);
+const p3 = orbEdgePath(edges[3]);
+const p4 = orbEdgePath(edges[4]);
+const p5 = orbEdgePath(edges[5]);
+const p6 = orbEdgePath(edges[6]);
+const p7 = orbEdgePath(edges[7]);
+const p8 = orbEdgePath(edges[8]);
 </script>
 
 <SectionShell tone="magenta" height="screen" runway="long">
@@ -232,11 +279,11 @@ zenMount((ctx) => {
           <path d="M 250,88 A 42,162 0 0,0 250,412" transform="rotate(120,250,250)" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
 
           <!-- ═══ BACK EDGES ═══ -->
-          <path ref={eRef2} d={orbEdgePath(edges[2])} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
-          <path ref={eRef3} d={orbEdgePath(edges[3])} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
-          <path ref={eRef5} d={orbEdgePath(edges[5])} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
-          <path ref={eRef6} d={orbEdgePath(edges[6])} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
-          <path ref={eRef7} d={orbEdgePath(edges[7])} class="fill-none stroke-orb-link-back" stroke-opacity="0.22" stroke-width="1.5" />
+          <path ref={eRef2} d={p2} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
+          <path ref={eRef3} d={p3} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
+          <path ref={eRef5} d={p5} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
+          <path ref={eRef6} d={p6} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
+          <path ref={eRef7} d={p7} class="fill-none stroke-orb-link-back" stroke-opacity="0.22" stroke-width="1.5" />
 
           <!-- ═══ BACK NODES (smaller, dimmer) ═══ -->
           <g on:hoverin={() => handleHoverIn(3)} on:hoverout={() => handleHoverOut(3)} class="cursor-pointer">
@@ -269,11 +316,11 @@ zenMount((ctx) => {
           <path d="M 250,88 A 42,162 0 0,1 250,412" transform="rotate(60,250,250)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
           <path d="M 250,88 A 42,162 0 0,1 250,412" transform="rotate(120,250,250)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
 
-          <!-- ═══ FRONT EDGES ═══ -->
-          <path ref={eRef0} d={orbEdgePath(edges[0])} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef1} d={orbEdgePath(edges[1])} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef4} d={orbEdgePath(edges[4])} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef8} d={orbEdgePath(edges[8])} class="fill-none stroke-orb-link-front" stroke-opacity="0.35" stroke-width="1.5" />
+           {/* Front links */}
+          <path ref={eRef0} d={p0} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
+          <path ref={eRef1} d={p1} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
+          <path ref={eRef4} d={p4} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
+          <path ref={eRef8} d={p8} class="fill-none stroke-orb-link-front" stroke-opacity="0.35" stroke-width="1.5" />
 
           <!-- ═══ FRONT NODES (bigger, brighter) ═══ -->
           <g on:hoverin={() => handleHoverIn(0)} on:hoverout={() => handleHoverOut(0)} class="cursor-pointer">
@@ -307,6 +354,15 @@ zenMount((ctx) => {
 
         </svg>
       </div>
+    </div>
+
+    <!-- detail panel -->
+    <div class="shrink-0 h-28 flex flex-col justify-end border-t border-orb-ring-back/30 pt-4 mb-4">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="font-mono text-xs tracking-widest uppercase text-muted-foreground">{detailTag}</span>
+        <h2 class="font-display text-2xl font-semibold tracking-tighter uppercase">{detailTitle}</h2>
+      </div>
+      <p class="text-muted-foreground text-sm max-w-lg leading-relaxed">{detailDesc}</p>
     </div>
 
     <!-- bottom zone: package descriptors -->
