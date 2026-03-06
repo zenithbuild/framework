@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- No unreleased entries yet.
+- Editor tooling: zenith-language + language-server now ship with canonical TS tokenization, compiler diagnostics, hovers, and completions.
 
 ## [0.6.13] - 2026-03-05
 

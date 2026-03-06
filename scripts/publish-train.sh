@@ -39,6 +39,8 @@ PACKAGES=(
   "packages/router|@zenithbuild/router"
   "packages/core|@zenithbuild/core"
   "packages/cli|@zenithbuild/cli"
+  "packages/language-server|@zenithbuild/language-server"
+  "packages/language|@zenithbuild/language"
 )
 PUBLISH_PACKAGE_FILTER="${PUBLISH_PACKAGE_FILTER:-}"
 

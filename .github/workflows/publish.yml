@@ -418,7 +418,7 @@ jobs:
       - name: Publish train packages
         shell: bash
         env:
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli
+          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/language-server,packages/language
         run: ./scripts/publish-train.sh
 
   publish-scaffolder:
