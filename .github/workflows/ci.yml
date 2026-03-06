@@ -6,6 +6,11 @@ on:
       - train
       - master
       - beta
+  push:
+    branches:
+      - beta
+      - train
+      - master
 
 jobs:
   ci:
