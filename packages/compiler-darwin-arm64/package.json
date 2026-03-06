@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/compiler-darwin-arm64",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "description": "Internal darwin-arm64 native binary for @zenithbuild/compiler",
   "license": "MIT",
   "os": [
