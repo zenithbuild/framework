@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Editor tooling: zenith-language + language-server now ship with canonical TS tokenization, compiler diagnostics, hovers, and completions.
+- Documented the `beta` / `train` / `master` release model, added tag-to-branch publish guards, and moved framework publishes to the tag-driven `CI -> npm publish -> GitHub Release` workflow with OIDC-only normal publishing.
+- Imported `@zenithbuild/language` and `@zenithbuild/language-server` into the monorepo, aligned `.zen` editor tooling to the canonical Zenith grammar/LSP surface, and added CI coverage for grammar embedding, hover docs, completions, and ZEN-DOM diagnostics.
 
 ## [0.6.13] - 2026-03-05
 

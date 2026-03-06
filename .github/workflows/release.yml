@@ -1,0 +1,121 @@
+name: Release (GitHub)
+
+on:
+  workflow_run:
+    workflows:
+      - Publish (npm)
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release-train:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download publish metadata
+        id: metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          artifacts_json="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts")"
+
+          download_url="$(printf '%s' "${artifacts_json}" | node -e '
+            let data = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", (chunk) => { data += chunk; });
+            process.stdin.on("end", () => {
+              const payload = JSON.parse(data);
+              const artifact = (payload.artifacts || []).find((item) => item.name === "framework-release-metadata");
+              if (artifact && typeof artifact.archive_download_url === "string") {
+                process.stdout.write(artifact.archive_download_url);
+              }
+            });
+          ')"
+
+          if [[ -z "${download_url}" ]]; then
+            echo "No framework-release-metadata artifact found for publish run ${RUN_ID}." >&2
+            exit 1
+          fi
+
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${download_url}" \
+            -o framework-release-metadata.zip
+
+          unzip -p framework-release-metadata.zip framework-release.json > framework-release.json
+
+          version="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.version || "");')"
+          tag="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.tag || "");')"
+          sha="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.sha || "");')"
+
+          if [[ -z "${version}" || -z "${tag}" || -z "${sha}" ]]; then
+            echo "framework-release.json is missing version, tag, or sha." >&2
+            exit 1
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ steps.metadata.outputs.tag }}
+
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes_path="${RUNNER_TEMP}/release-notes.md"
+
+          awk -v version="$VERSION" '
+            BEGIN { capture = 0 }
+            $0 ~ "^## \\[" version "\\]" { capture = 1 }
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
+            capture { print }
+          ' CHANGELOG.md > "$notes_path"
+
+          if [[ -s "$notes_path" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release from CHANGELOG.md
+        if: steps.changelog.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.metadata.outputs.tag }}
+          tag_name: ${{ steps.metadata.outputs.tag }}
+          target_commitish: ${{ steps.metadata.outputs.sha }}
+          body_path: ${{ steps.changelog.outputs.notes_path }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with generated notes fallback
+        if: steps.changelog.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.metadata.outputs.tag }}
+          tag_name: ${{ steps.metadata.outputs.tag }}
+          target_commitish: ${{ steps.metadata.outputs.sha }}
+          body: |
+            No matching section was found in `CHANGELOG.md` for `${{ steps.metadata.outputs.tag }}`.
+            Maintainers should add a matching train section before the next release.
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

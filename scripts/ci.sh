@@ -20,6 +20,7 @@ bun run --cwd packages/create-zenith test
 bun run --cwd packages/language-server test
 bun run --cwd packages/language test
 bun run --cwd docs docs:gate
+node --test scripts/assert-tag-on-branch.spec.mjs
 node --test scripts/publish-train-bootstrap.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
 

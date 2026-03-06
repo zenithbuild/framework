@@ -10,138 +10,23 @@
 name: Publish (npm)
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - master
+    tags:
+      - "v*"
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      publish_train: ${{ steps.detect.outputs.publish_train }}
-      publish_scaffolder: ${{ steps.detect.outputs.publish_scaffolder }}
-      train_version: ${{ steps.detect.outputs.train_version }}
-      train_tag: ${{ steps.detect.outputs.train_tag }}
-      scaffolder_version: ${{ steps.detect.outputs.scaffolder_version }}
-      scaffolder_tag: ${{ steps.detect.outputs.scaffolder_tag }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect publish targets
-        id: detect
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          scaffolder_manifest="packages/create-zenith/package.json"
-          train_version_file="TRAIN_VERSION"
-
-          read_package_version_at_revision() {
-            local revision="$1"
-            local manifest="$2"
-            if [[ -z "$revision" ]]; then
-              return 1
-            fi
-            if ! git cat-file -e "${revision}:${manifest}" 2>/dev/null; then
-              return 1
-            fi
-            git show "${revision}:${manifest}" | node -e '
-              let data = "";
-              process.stdin.setEncoding("utf8");
-              process.stdin.on("data", (chunk) => { data += chunk; });
-              process.stdin.on("end", () => {
-                const pkg = JSON.parse(data);
-                process.stdout.write(typeof pkg.version === "string" ? pkg.version : "");
-              });
-            '
-          }
-
-          read_plain_file_at_revision() {
-            local revision="$1"
-            local file_path="$2"
-            if [[ -z "$revision" ]]; then
-              return 1
-            fi
-            if ! git cat-file -e "${revision}:${file_path}" 2>/dev/null; then
-              return 1
-            fi
-            git show "${revision}:${file_path}" | tr -d '[:space:]'
-          }
-
-          publish_train=false
-          publish_scaffolder=false
-          train_version=""
-          train_tag=""
-          scaffolder_version=""
-          scaffolder_tag=""
-
-          case "$EVENT_NAME" in
-            workflow_dispatch)
-              publish_train=true
-              publish_scaffolder=true
-              train_version="$(tr -d '[:space:]' < "${train_version_file}")"
-              scaffolder_version="$(node -p "require('./${scaffolder_manifest}').version")"
-              ;;
-            push)
-              if [[ "$REF_NAME" == "master" ]]; then
-                previous_train_version="$(read_plain_file_at_revision "$BEFORE_SHA" "$train_version_file" || true)"
-                current_train_version="$(read_plain_file_at_revision "$CURRENT_SHA" "$train_version_file" || true)"
-                if [[ -n "$current_train_version" && "$current_train_version" != "$previous_train_version" ]]; then
-                  publish_train=true
-                  train_version="$current_train_version"
-                fi
-
-                previous_scaffolder_version="$(read_package_version_at_revision "$BEFORE_SHA" "$scaffolder_manifest" || true)"
-                current_scaffolder_version="$(read_package_version_at_revision "$CURRENT_SHA" "$scaffolder_manifest" || true)"
-                if [[ -n "$current_scaffolder_version" && "$current_scaffolder_version" != "$previous_scaffolder_version" ]]; then
-                  publish_scaffolder=true
-                  scaffolder_version="$current_scaffolder_version"
-                fi
-              fi
-              ;;
-          esac
-
-          if [[ -z "$train_version" && -f "$train_version_file" ]]; then
-            train_version="$(tr -d '[:space:]' < "${train_version_file}")"
-          fi
-          if [[ -z "$scaffolder_version" && -f "$scaffolder_manifest" ]]; then
-            scaffolder_version="$(node -p "require('./${scaffolder_manifest}').version")"
-          fi
-          if [[ -n "$train_version" ]]; then
-            train_tag="v${train_version}"
-          fi
-          if [[ -n "$scaffolder_version" ]]; then
-            scaffolder_tag="create-zenith-v${scaffolder_version}"
-          fi
-
-          echo "publish_train=${publish_train}" >> "$GITHUB_OUTPUT"
-          echo "publish_scaffolder=${publish_scaffolder}" >> "$GITHUB_OUTPUT"
-          echo "train_version=${train_version}" >> "$GITHUB_OUTPUT"
-          echo "train_tag=${train_tag}" >> "$GITHUB_OUTPUT"
-          echo "scaffolder_version=${scaffolder_version}" >> "$GITHUB_OUTPUT"
-          echo "scaffolder_tag=${scaffolder_tag}" >> "$GITHUB_OUTPUT"
-
-  gate:
-    needs: detect
-    if: needs.detect.outputs.publish_train == 'true' || needs.detect.outputs.publish_scaffolder == 'true'
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: 20
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -149,39 +34,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Verify platform package names are bootstrapped
-        if: needs.detect.outputs.publish_train == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          registry="https://registry.npmjs.org/"
-          packages=(
-            "@zenithbuild/bundler-darwin-arm64"
-            "@zenithbuild/bundler-darwin-x64"
-            "@zenithbuild/bundler-linux-x64"
-            "@zenithbuild/bundler-win32-x64"
-            "@zenithbuild/compiler-darwin-arm64"
-            "@zenithbuild/compiler-darwin-x64"
-            "@zenithbuild/compiler-linux-x64"
-            "@zenithbuild/compiler-win32-x64"
-          )
-
-          missing=()
-          for package in "${packages[@]}"; do
-            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
-              missing+=("${package}")
-            fi
-          done
-
-          if [[ "${#missing[@]}" -gt 0 ]]; then
-            joined="$(IFS=, ; echo "${missing[*]}")"
-            echo "Platform package names are not bootstrapped on npm: ${joined}" >&2
-            echo "Run the manual Bootstrap Platform Packages workflow once for missing names using NPM_BOOTSTRAP_TOKEN, then re-run publish." >&2
-            exit 1
-          fi
-
       - name: Resolve Playwright version
-        id: playwright-version
+        id: playwright_version
         run: |
           version="$(node -p "const pkg = require('./apps/smoke-test/package.json'); pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright ?? pkg.devDependencies?.['@playwright/test'] ?? pkg.dependencies?.['@playwright/test'] ?? ''")"
           if [[ -z "$version" ]]; then
@@ -213,7 +67,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
@@ -221,7 +75,7 @@ jobs:
 
       - run: bunx playwright install --with-deps chromium
 
-      - name: Run CI gate (retry once)
+      - name: Run CI (retry once)
         shell: bash
         run: |
           set -euo pipefail
@@ -229,13 +83,86 @@ jobs:
             exit 0
           fi
 
-          echo "CI gate failed on first attempt; retrying once..."
+          echo "CI failed on first attempt; retrying once..."
           bun run ci
 
-  publish-platforms:
+  preflight:
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      train_version: ${{ steps.train_version.outputs.train_version }}
+      train_tag: ${{ steps.train_version.outputs.train_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Assert tag matches TRAIN_VERSION
+        id: train_version
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          train_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
+          tag_version="${TAG_NAME#v}"
+
+          if [[ "$TAG_NAME" != v* ]]; then
+            echo "Expected a v-prefixed release tag, found ${TAG_NAME}." >&2
+            exit 1
+          fi
+
+          if [[ "$train_version" != "$tag_version" ]]; then
+            echo "TRAIN_VERSION=${train_version} but tag=${TAG_NAME}; bump TRAIN_VERSION first or retag correctly." >&2
+            exit 1
+          fi
+
+          echo "train_version=${train_version}" >> "$GITHUB_OUTPUT"
+          echo "train_tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Assert tag is on train
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/assert-tag-on-branch.mjs train
+
+      - name: Verify platform package names are bootstrapped
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry="https://registry.npmjs.org/"
+          packages=(
+            "@zenithbuild/bundler-darwin-arm64"
+            "@zenithbuild/bundler-darwin-x64"
+            "@zenithbuild/bundler-linux-x64"
+            "@zenithbuild/bundler-win32-x64"
+            "@zenithbuild/compiler-darwin-arm64"
+            "@zenithbuild/compiler-darwin-x64"
+            "@zenithbuild/compiler-linux-x64"
+            "@zenithbuild/compiler-win32-x64"
+          )
+
+          missing=()
+          for package in "${packages[@]}"; do
+            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
+              missing+=("${package}")
+            fi
+          done
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            joined="$(IFS=, ; echo "${missing[*]}")"
+            echo "Platform package names are not bootstrapped on npm: ${joined}" >&2
+            echo "Run the manual Bootstrap Platform Packages workflow once for missing names using NPM_BOOTSTRAP_TOKEN, then re-run publish." >&2
+            exit 1
+          fi
+
+  publish_platforms:
     name: Platform Bootstrap
-    needs: [detect, gate]
-    if: needs.detect.outputs.publish_train == 'true'
+    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -331,36 +258,34 @@ jobs:
       - name: Publish platform package
         shell: bash
         env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NPM_CONFIG_TAG: train
+          PUBLISH_FALLBACK_TAG: train
           PUBLISH_PACKAGE_FILTER: ${{ matrix.package_dir }}
         run: ./scripts/publish-train.sh
 
   platform_stage:
     name: Platform Stage Complete
-    needs: [detect, gate, publish-platforms]
-    if: always() && needs.detect.result == 'success' && needs.gate.result == 'success'
+    needs: [preflight, publish_platforms]
+    if: always() && needs.preflight.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Validate platform stage status
         shell: bash
         env:
-          PUBLISH_TRAIN: ${{ needs.detect.outputs.publish_train }}
-          PLATFORM_RESULT: ${{ needs['publish-platforms'].result }}
+          PLATFORM_RESULT: ${{ needs.publish_platforms.result }}
         run: |
           set -euo pipefail
-          if [[ "${PUBLISH_TRAIN}" == "true" ]]; then
-            if [[ "${PLATFORM_RESULT}" != "success" ]]; then
-              echo "Platform Bootstrap must succeed before publish jobs can run." >&2
-              exit 1
-            fi
-            echo "Platform Bootstrap completed successfully."
-            exit 0
+          if [[ "${PLATFORM_RESULT}" != "success" ]]; then
+            echo "Platform Bootstrap must succeed before publish jobs can run." >&2
+            exit 1
           fi
 
-          echo "Platform Bootstrap skipped (no train publish requested)."
+          echo "Platform Bootstrap completed successfully."
 
-  publish-train:
-    needs: [detect, platform_stage]
-    if: needs.detect.outputs.publish_train == 'true' && needs.platform_stage.result == 'success'
+  publish_train:
+    needs: [preflight, platform_stage]
+    if: needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
@@ -418,220 +343,35 @@ jobs:
       - name: Publish train packages
         shell: bash
         env:
+          NPM_CONFIG_PROVENANCE: "true"
+          NPM_CONFIG_TAG: train
+          PUBLISH_FALLBACK_TAG: train
           PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/language-server,packages/language
         run: ./scripts/publish-train.sh
 
-  publish-scaffolder:
-    needs: [detect, platform_stage]
-    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.platform_stage.result == 'success'
+  release_metadata:
+    needs: [preflight, publish_train]
+    if: needs.publish_train.result == 'success'
     runs-on: ubuntu-latest
-    environment: npm-release
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Assert OIDC-only publish auth
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
-            echo "Token-based npm auth is disabled in Publish (npm). Use npm Trusted Publishing (OIDC)." >&2
-            exit 1
-          fi
-
-      - name: Cache Bun install cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - run: bun install
-
-      - run: ./scripts/publish-scaffolder.sh
-
-  release-train:
-    needs: [detect, publish-train]
-    if: needs.detect.outputs.publish_train == 'true' && github.event_name == 'push' && github.ref_name == 'master'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Resolve train release coordinates
-        id: release
+      - name: Write release metadata artifact
         shell: bash
         env:
-          TRAIN_VERSION: ${{ needs.detect.outputs.train_version }}
-          TRAIN_TAG: ${{ needs.detect.outputs.train_tag }}
+          TRAIN_VERSION: ${{ needs.preflight.outputs.train_version }}
+          TRAIN_TAG: ${{ needs.preflight.outputs.train_tag }}
+          TRAIN_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ -z "${TRAIN_VERSION}" || -z "${TRAIN_TAG}" ]]; then
-            echo "Missing train release coordinates from detect job outputs." >&2
-            exit 1
-          fi
-          echo "version=${TRAIN_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TRAIN_TAG}" >> "$GITHUB_OUTPUT"
+          cat > framework-release.json <<JSON
+          {
+            "version": "${TRAIN_VERSION}",
+            "tag": "${TRAIN_TAG}",
+            "sha": "${TRAIN_SHA}"
+          }
+          JSON
 
-      - name: Create train release tag
-        shell: bash
-        env:
-          TAG_NAME: ${{ steps.release.outputs.tag }}
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" "$GITHUB_SHA" -m "v${VERSION}"
-          git push origin "$TAG_NAME"
-
-      - name: Extract release notes from CHANGELOG.md
-        id: changelog
-        shell: bash
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          notes_path="${RUNNER_TEMP}/release-notes.md"
-
-          awk -v version="$VERSION" '
-            BEGIN { capture = 0 }
-            $0 ~ "^## \\[" version "\\]" { capture = 1 }
-            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
-            capture { print }
-          ' CHANGELOG.md > "$notes_path"
-
-          if [ -s "$notes_path" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create GitHub Release from CHANGELOG.md
-        if: steps.changelog.outputs.found == 'true'
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.release.outputs.tag }}
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          body_path: ${{ steps.changelog.outputs.notes_path }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release with generated notes fallback
-        if: steps.changelog.outputs.found != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ steps.release.outputs.tag }}
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          body: |
-            No matching section was found in `CHANGELOG.md` for `${{ steps.release.outputs.tag }}`.
-            Maintainers should add a matching train section before the next release.
-          generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  release-create-zenith:
-    needs: [detect, publish-scaffolder]
-    if: needs.detect.outputs.publish_scaffolder == 'true' && github.event_name == 'push' && github.ref_name == 'master'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Resolve create-zenith release coordinates
-        id: release
-        shell: bash
-        env:
-          VERSION: ${{ needs.detect.outputs.scaffolder_version }}
-          TAG: ${{ needs.detect.outputs.scaffolder_tag }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${VERSION}" || -z "${TAG}" ]]; then
-            echo "Missing create-zenith release coordinates from detect job outputs." >&2
-            exit 1
-          fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Extract release notes from packages/create-zenith/CHANGELOG.md
-        id: changelog
-        shell: bash
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          notes_path="${RUNNER_TEMP}/create-zenith-release-notes.md"
-
-          awk -v version="$VERSION" '
-            BEGIN { capture = 0 }
-            $0 ~ "^## \\[" version "\\]" { capture = 1 }
-            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
-            capture { print }
-          ' packages/create-zenith/CHANGELOG.md > "$notes_path"
-
-          if [ -s "$notes_path" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create create-zenith release tag
-        shell: bash
-        env:
-          TAG_NAME: ${{ steps.release.outputs.tag }}
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" "$GITHUB_SHA" -m "create-zenith v${VERSION}"
-          git push origin "$TAG_NAME"
-
-      - name: Create GitHub Release from package changelog
-        if: steps.changelog.outputs.found == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ steps.release.outputs.tag }}
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          body_path: ${{ steps.changelog.outputs.notes_path }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release with generated notes fallback
-        if: steps.changelog.outputs.found != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ steps.release.outputs.tag }}
-          tag_name: ${{ steps.release.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          body: |
-            No matching section was found in `packages/create-zenith/CHANGELOG.md` for `${{ steps.release.outputs.version }}`.
-            Maintainers should add a matching package changelog section before the next create-zenith release.
-          generate_release_notes: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: framework-release-metadata
+          path: framework-release.json
+          if-no-files-found: error

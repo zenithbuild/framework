@@ -1,0 +1,259 @@
+name: Publish (create-zenith)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      publish_scaffolder: ${{ steps.detect.outputs.publish_scaffolder }}
+      scaffolder_version: ${{ steps.detect.outputs.scaffolder_version }}
+      scaffolder_tag: ${{ steps.detect.outputs.scaffolder_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect publish target
+        id: detect
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          manifest="packages/create-zenith/package.json"
+          publish_scaffolder=false
+          scaffolder_version=""
+          scaffolder_tag=""
+
+          read_package_version_at_revision() {
+            local revision="$1"
+            if [[ -z "$revision" ]]; then
+              return 1
+            fi
+            if ! git cat-file -e "${revision}:${manifest}" 2>/dev/null; then
+              return 1
+            fi
+            git show "${revision}:${manifest}" | node -e '
+              let data = "";
+              process.stdin.setEncoding("utf8");
+              process.stdin.on("data", (chunk) => { data += chunk; });
+              process.stdin.on("end", () => {
+                const pkg = JSON.parse(data);
+                process.stdout.write(typeof pkg.version === "string" ? pkg.version : "");
+              });
+            '
+          }
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            publish_scaffolder=true
+            scaffolder_version="$(node -p "require('./${manifest}').version")"
+          else
+            previous_version="$(read_package_version_at_revision "$BEFORE_SHA" || true)"
+            current_version="$(read_package_version_at_revision "$CURRENT_SHA" || true)"
+            if [[ -n "$current_version" && "$current_version" != "$previous_version" ]]; then
+              publish_scaffolder=true
+              scaffolder_version="$current_version"
+            fi
+          fi
+
+          if [[ -n "$scaffolder_version" ]]; then
+            scaffolder_tag="create-zenith-v${scaffolder_version}"
+          fi
+
+          echo "publish_scaffolder=${publish_scaffolder}" >> "$GITHUB_OUTPUT"
+          echo "scaffolder_version=${scaffolder_version}" >> "$GITHUB_OUTPUT"
+          echo "scaffolder_tag=${scaffolder_tag}" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: detect
+    if: needs.detect.outputs.publish_scaffolder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve Playwright version
+        id: playwright_version
+        run: |
+          version="$(node -p "const pkg = require('./apps/smoke-test/package.json'); pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright ?? pkg.devDependencies?.['@playwright/test'] ?? pkg.dependencies?.['@playwright/test'] ?? ''")"
+          if [[ -z "$version" ]]; then
+            echo "Unable to determine Playwright version from apps/smoke-test/package.json" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/**/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - run: bun install
+
+      - run: bunx playwright install --with-deps chromium
+
+      - name: Run CI (retry once)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if bun run ci; then
+            exit 0
+          fi
+
+          echo "CI failed on first attempt; retrying once..."
+          bun run ci
+
+  publish_scaffolder:
+    needs: [detect, ci]
+    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.ci.result == 'success'
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Assert OIDC-only publish auth
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${NPM_TOKEN:-}" || -n "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Token-based npm auth is disabled in Publish (create-zenith). Use npm Trusted Publishing (OIDC)." >&2
+            exit 1
+          fi
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - run: bun install
+
+      - name: Publish create-zenith
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+        run: ./scripts/publish-scaffolder.sh
+
+  release_create_zenith:
+    needs: [detect, publish_scaffolder]
+    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.publish_scaffolder.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes from packages/create-zenith/CHANGELOG.md
+        id: changelog
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          notes_path="${RUNNER_TEMP}/create-zenith-release-notes.md"
+
+          awk -v version="$VERSION" '
+            BEGIN { capture = 0 }
+            $0 ~ "^## \\[" version "\\]" { capture = 1 }
+            capture && $0 ~ "^## \\[" && $0 !~ "^## \\[" version "\\]" { exit }
+            capture { print }
+          ' packages/create-zenith/CHANGELOG.md > "$notes_path"
+
+          if [[ -s "$notes_path" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "notes_path=$notes_path" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create create-zenith release tag
+        shell: bash
+        env:
+          TAG_NAME: ${{ needs.detect.outputs.scaffolder_tag }}
+          VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" "$GITHUB_SHA" -m "create-zenith v${VERSION}"
+          git push origin "$TAG_NAME"
+
+      - name: Create GitHub Release from package changelog
+        if: steps.changelog.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.detect.outputs.scaffolder_tag }}
+          tag_name: ${{ needs.detect.outputs.scaffolder_tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: ${{ steps.changelog.outputs.notes_path }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with generated notes fallback
+        if: steps.changelog.outputs.found != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.detect.outputs.scaffolder_tag }}
+          tag_name: ${{ needs.detect.outputs.scaffolder_tag }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            No matching section was found in `packages/create-zenith/CHANGELOG.md` for `${{ needs.detect.outputs.scaffolder_version }}`.
+            Maintainers should add a matching package changelog section before the next create-zenith release.
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

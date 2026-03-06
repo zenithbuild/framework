@@ -1,33 +1,64 @@
 # Release Policy
 
-After a stable train publish succeeds, keep `latest` coherent. `train` can remain as the safety channel, but public installs should not mix train versions across `core`, `cli`, and the internal toolchain packages.
+Zenith uses a three-branch release train with shared package versions across `beta`, `train`, and `master`. Channel selection happens through npm dist-tags, not semver suffixes.
 
-## Pipeline policy
+## Branches
 
-- Automatic release flow on `master` push:
-  - `CI` must pass first.
-  - `Platform Bootstrap` stage runs next for train publishes.
-  - npm publish jobs run next in the `npm-release` environment (maintainer approval required).
-  - GitHub releases run only after publish succeeds and only when package/train versions changed.
-- Normal publish is OIDC-only via `.github/workflows/publish.yml` in the `npm-release` environment.
-- The standard path does not use token-based npm auth (`NPM_TOKEN` / `NODE_AUTH_TOKEN`).
-- `.github/workflows/bootstrap-platform-packages.yml` is manual-only (`workflow_dispatch`) and reserved for bootstrapping brand-new package names.
-- Train publish runs a bootstrap preflight; missing platform package names fail early with instructions to run the manual bootstrap workflow.
-- The CI gate retries once (`bun run ci`), then publish proceeds only if the retry succeeds.
-- Release creation is downstream of successful publish; if publish fails, release does not run.
+- `beta`: internal-only integration branch for maintainers. Optional `beta` publishes are internal-only.
+- `train`: public contribution and integration branch. All contributor PRs land here first.
+- `master`: stable branch. Only maintainers merge `train` into `master` after rigorous testing.
 
-## Minimum promotion
+## Allowed Merges
 
-Run:
+- External contributors: `feature/* -> train` by pull request.
+- Maintainers: `beta -> train` by pull request.
+- Maintainers: `train -> master` by pull request.
+- Direct pushes to `beta`, `train`, and `master` are disallowed by policy and should be blocked with GitHub branch protection.
+
+## Release Notes Contract
+
+- Every pull request into `train` must add at least one bullet to [CHANGELOG.md](../../CHANGELOG.md) under `## [Unreleased]`.
+- `Unreleased` is the source of truth for the next train cut.
+- Stable releases must have a matching version section in `CHANGELOG.md` before GitHub Release creation runs.
+
+## Release Cut
+
+1. Stabilize `train` and move `CHANGELOG.md` `Unreleased` entries into a new version section matching `TRAIN_VERSION`.
+2. Create and push tag `v<TRAIN_VERSION>` from a commit contained in `train`.
+3. GitHub Actions runs `CI`, then npm publish, then GitHub Release.
+4. The tag-driven publish workflow publishes the framework packages to npm dist-tag `train`.
+5. After publish succeeds and validation passes, open a maintainer PR from `train` to `master`.
+6. After the `train -> master` merge is validated, promote the already-published version from dist-tag `train` to dist-tag `latest`.
+
+## Dist-Tag Mapping
+
+- `v*` tag pushed from `train`: publish framework packages on dist-tag `train`.
+- `master`: never publishes a separate semver line; it promotes the same package version to dist-tag `latest` after the merge.
+- `beta`: optional internal-only publishes use dist-tag `beta`.
+
+## Pipeline Policy
+
+- Normal framework publishing is OIDC-only via [publish.yml](../../.github/workflows/publish.yml) in the `npm-release` environment.
+- The standard publish path must not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or token-written `.npmrc` auth.
+- Tag publishing is guarded twice before npm publish begins:
+  - the pushed tag must match `TRAIN_VERSION` after removing the leading `v`
+  - the tagged commit must be contained in `origin/train`
+- The CI gate retries once (`bun run ci`) to reduce flaky failures. Publish never retries automatically.
+- GitHub Release creation runs only after publish succeeds.
+- `.github/workflows/bootstrap-platform-packages.yml` remains manual-only for bootstrapping brand-new package names.
+
+## Latest Promotion
+
+Promote `latest` only after the `train -> master` merge has been validated.
+
+Minimum promotion:
 
 ```sh
 npm dist-tag add @zenithbuild/core@0.6.13 latest
 npm dist-tag add @zenithbuild/cli@0.6.13 latest
 ```
 
-## Recommended full alignment
-
-Run:
+Recommended full alignment:
 
 ```sh
 npm dist-tag add @zenithbuild/core@0.6.13 latest
@@ -38,4 +69,4 @@ npm dist-tag add @zenithbuild/bundler@0.6.13 latest
 npm dist-tag add @zenithbuild/compiler@0.6.13 latest
 ```
 
-Promoting the full train avoids mixed installs where `@latest` still resolves an older compiler or bundler than the `core`/`cli` pair.
+npm Trusted Publishing currently covers `npm publish`, not `npm dist-tag add`, so `promote-latest.yml` is an approval-gated stub and the actual promotion step remains a manual authenticated maintainer action.

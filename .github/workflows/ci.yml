@@ -1,12 +1,11 @@
 name: ci
 
 on:
-  push:
-    branches:
-      - "**"
-    tags-ignore:
-      - "v*"
   pull_request:
+    branches:
+      - train
+      - master
+      - beta
 
 jobs:
   ci:
@@ -25,7 +24,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Resolve Playwright version
-        id: playwright-version
+        id: playwright_version
         run: |
           version="$(node -p "const pkg = require('./apps/smoke-test/package.json'); pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright ?? pkg.devDependencies?.['@playwright/test'] ?? pkg.dependencies?.['@playwright/test'] ?? ''")"
           if [[ -z "$version" ]]; then
@@ -57,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 

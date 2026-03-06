@@ -1,0 +1,33 @@
+name: Promote latest dist-tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Framework version to promote to latest (for example 0.6.13)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  promote-latest:
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - name: Explain npm dist-tag auth limitation
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          echo "npm Trusted Publishing currently supports OIDC for npm publish only." >&2
+          echo "npm dist-tag add still requires traditional npm authentication, so this workflow is an approval-gated stub." >&2
+          echo "Requested version: ${VERSION}" >&2
+          echo >&2
+          echo "Run these commands manually with authenticated npm credentials after the train -> master merge is validated:" >&2
+          echo "  npm dist-tag add @zenithbuild/core@${VERSION} latest" >&2
+          echo "  npm dist-tag add @zenithbuild/cli@${VERSION} latest" >&2
+          exit 1
