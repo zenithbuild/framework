@@ -9,12 +9,16 @@ bash ./scripts/build.sh
 bun run --cwd packages/runtime typecheck
 bun run --cwd packages/router typecheck
 bun run --cwd packages/cli typecheck
+bun run --cwd packages/language-server typecheck
+bun run --cwd packages/language typecheck
 
 bun run --cwd packages/cli test
 bun run --cwd packages/core test
 bun run --cwd packages/runtime test
 bun run --cwd packages/router test
 bun run --cwd packages/create-zenith test
+bun run --cwd packages/language-server test
+bun run --cwd packages/language test
 bun run --cwd docs docs:gate
 node --test scripts/publish-train-bootstrap.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs

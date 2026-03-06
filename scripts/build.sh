@@ -12,6 +12,8 @@ bun run --cwd packages/runtime build
 bun run --cwd packages/router build
 bun run --cwd packages/cli build
 bun run --cwd packages/create-zenith build
+bun run --cwd packages/language-server build
+bun run --cwd packages/language build
 
 cargo build --release --manifest-path packages/compiler/Cargo.toml
 bun run --cwd packages/compiler build
