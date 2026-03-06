@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler-linux-x64",
-  "version": "0.6.14",
+  "version": "0.6.15",
   "description": "Internal linux-x64 native binary for @zenithbuild/bundler",
   "license": "MIT",
   "os": [

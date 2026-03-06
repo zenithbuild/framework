@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/core",
-  "version": "0.6.14",
+  "version": "0.6.15",
   "description": "Deterministic utility substrate for the Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -43,11 +43,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@zenithbuild/cli": "0.6.14",
-    "@zenithbuild/compiler": "0.6.14",
-    "@zenithbuild/runtime": "0.6.14",
-    "@zenithbuild/router": "0.6.14",
-    "@zenithbuild/bundler": "0.6.14"
+    "@zenithbuild/cli": "0.6.15",
+    "@zenithbuild/compiler": "0.6.15",
+    "@zenithbuild/runtime": "0.6.15",
+    "@zenithbuild/router": "0.6.15",
+    "@zenithbuild/bundler": "0.6.15"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",

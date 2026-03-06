@@ -10,7 +10,7 @@
         "test": "bun test"
     },
     "dependencies": {
-        "@zenithbuild/core": "^0.6.14",
+        "@zenithbuild/core": "^0.6.15",
         "gsap": "^3.14.2",
         "tailwind-merge": "^3.5.0"
     },
