@@ -57,12 +57,12 @@ async function startLanguageClient(context) {
   const serverOptions = {
     run: {
       command: process.execPath,
-      args: [serverPath],
+      args: [serverPath, "--stdio"],
       options: { env: process.env }
     },
     debug: {
       command: process.execPath,
-      args: ["--inspect=6010", serverPath],
+      args: ["--inspect=6010", serverPath, "--stdio"],
       options: { env: process.env }
     }
   };

@@ -1,4 +1,4 @@
-import { MarkupKind, type Hover, type Position } from 'vscode-languageserver/node';
+import { MarkupKind, type Hover, type Position } from 'vscode-languageserver/node.js';
 import { getDocUrl, getSymbolDoc } from './docs.js';
 import { getWord, getWordRange } from './text.js';
 

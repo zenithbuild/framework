@@ -43,6 +43,24 @@ fn compile_fixture(source: &str, file_name: &str) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).expect("parse compiler json")
 }
 
+fn compile_fixture_allow_failure(source: &str, file_name: &str) -> (bool, serde_json::Value) {
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "zenith-compiler-json-contract-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&tmp_dir).expect("create temp dir");
+    let file_path = tmp_dir.join(file_name);
+    fs::write(&file_path, source).expect("write source");
+
+    let output = Command::new(compiler_bin())
+        .arg(&file_path)
+        .output()
+        .expect("run compiler");
+
+    let json = serde_json::from_slice(&output.stdout).expect("parse compiler json");
+    (output.status.success(), json)
+}
+
 #[test]
 fn compiler_cli_emits_schema_version_warnings_and_compiled_expr() {
     let json = compile_fixture(
@@ -54,6 +72,7 @@ state isOpen = false;
     );
     assert_eq!(json["schemaVersion"], 1);
     assert_eq!(json["warnings"], serde_json::json!([]));
+    assert_eq!(json["diagnostics"], serde_json::json!([]));
 
     let bindings = json["expression_bindings"]
         .as_array()
@@ -77,11 +96,12 @@ const shell = ref<HTMLDivElement>();
 
     assert_eq!(json["schemaVersion"], 1);
     assert_eq!(json["warnings"], serde_json::json!([]));
+    assert_eq!(json["diagnostics"], serde_json::json!([]));
 
     let refs = json["ref_bindings"].as_array().expect("ref_bindings array");
     assert!(!refs.is_empty(), "expected non-empty ref_bindings: {json}");
     assert_eq!(refs[0]["identifier"], "shell");
-    assert_eq!(refs[0]["selector"], r#"[data-zx-r="0"]"#);
+    assert_eq!(refs[0]["selector"], r#"[data-zx-ref="0"]"#);
 }
 
 #[test]
@@ -90,6 +110,7 @@ fn compiler_cli_emits_empty_ref_bindings_when_no_refs_exist() {
 
     assert_eq!(json["schemaVersion"], 1);
     assert_eq!(json["warnings"], serde_json::json!([]));
+    assert_eq!(json["diagnostics"], serde_json::json!([]));
     assert_eq!(json["ref_bindings"], serde_json::json!([]));
 }
 
@@ -104,17 +125,33 @@ function increment() { count.set(count.get() + 1); }
         "source-spans.zen",
     );
 
-    let markers = json["marker_bindings"].as_array().expect("marker_bindings array");
+    let markers = json["marker_bindings"]
+        .as_array()
+        .expect("marker_bindings array");
     assert!(!markers.is_empty(), "expected marker bindings");
     let marker_source = &markers[0]["source"];
-    assert_eq!(marker_source["file"].as_str().unwrap().ends_with("source-spans.zen"), true);
+    assert_eq!(
+        marker_source["file"]
+            .as_str()
+            .unwrap()
+            .ends_with("source-spans.zen"),
+        true
+    );
     assert!(marker_source["start"]["line"].as_u64().unwrap() >= 1);
     assert!(marker_source["start"]["column"].as_u64().unwrap() >= 1);
 
-    let events = json["event_bindings"].as_array().expect("event_bindings array");
+    let events = json["event_bindings"]
+        .as_array()
+        .expect("event_bindings array");
     assert_eq!(events.len(), 1);
     let event_source = &events[0]["source"];
-    assert_eq!(event_source["file"].as_str().unwrap().ends_with("source-spans.zen"), true);
+    assert_eq!(
+        event_source["file"]
+            .as_str()
+            .unwrap()
+            .ends_with("source-spans.zen"),
+        true
+    );
     assert!(event_source["start"]["line"].as_u64().unwrap() >= 1);
     assert!(event_source["end"]["column"].as_u64().unwrap() >= 1);
 
@@ -122,5 +159,68 @@ function increment() { count.set(count.get() + 1); }
         .as_array()
         .expect("expression_bindings array");
     assert!(!exprs.is_empty(), "expected expression bindings");
-    assert!(exprs.iter().all(|entry| entry["source"]["file"].is_string()));
+    assert!(exprs
+        .iter()
+        .all(|entry| entry["source"]["file"].is_string()));
+}
+
+#[test]
+fn compiler_cli_emits_structured_script_boundary_diagnostics() {
+    let (success, json) = compile_fixture_allow_failure(
+        "<script>const x = 1</script><main>{x}</main>",
+        "script-boundary.zen",
+    );
+
+    assert!(!success, "script-boundary input should fail");
+    assert_eq!(json["schemaVersion"], 1);
+    assert_eq!(json["warnings"], serde_json::json!([]));
+    let diagnostics = json["diagnostics"].as_array().expect("diagnostics array");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], "ZEN-SCRIPT-MISSING-TS");
+    assert_eq!(diagnostics[0]["severity"], "error");
+    assert_eq!(diagnostics[0]["source"], "compiler");
+    assert_eq!(
+        diagnostics[0]["docsPath"],
+        "docs/documentation/contracts/script-boundary.md"
+    );
+    assert!(diagnostics[0]["suggestion"]
+        .as_str()
+        .unwrap()
+        .contains("script lang=\"ts\""));
+}
+
+#[test]
+fn compiler_cli_emits_structured_invalid_event_diagnostics() {
+    let (success, json) =
+        compile_fixture_allow_failure(r#"<button on:click={doThing()}></button>"#, "bad-event.zen");
+
+    assert!(!success, "invalid event handler should fail");
+    let diagnostics = json["diagnostics"].as_array().expect("diagnostics array");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], "ZEN-EVT-DIRECT-CALL");
+    assert_eq!(diagnostics[0]["severity"], "error");
+    assert_eq!(diagnostics[0]["source"], "compiler");
+    assert_eq!(
+        diagnostics[0]["docsPath"],
+        "docs/documentation/syntax/events.md"
+    );
+}
+
+#[test]
+fn compiler_cli_emits_warning_diagnostics_with_suggestions() {
+    let json = compile_fixture(
+        r#"<button on:clcik={handleClick}></button>"#,
+        "unknown-event.zen",
+    );
+
+    let diagnostics = json["diagnostics"].as_array().expect("diagnostics array");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], "ZEN-EVT-UNKNOWN");
+    assert_eq!(diagnostics[0]["severity"], "warning");
+    assert_eq!(diagnostics[0]["source"], "compiler");
+    assert!(diagnostics[0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Did you mean 'click'"));
+    assert_eq!(diagnostics[0]["suggestion"], "Use on:click={handler}.");
 }
