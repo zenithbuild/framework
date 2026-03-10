@@ -33,6 +33,7 @@ import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
 const require = createRequire(import.meta.url);
 let cachedTypeScript = undefined;
+const COMPILER_SPAWN_MAX_BUFFER = 32 * 1024 * 1024;
 
 /**
  * @returns {import('typescript') | null}
@@ -128,7 +129,10 @@ function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRunOption
     if (compilerOpts?.strictDomLints) {
         args.push('--strict-dom-lints');
     }
-    const opts = { encoding: 'utf8' };
+    const opts = {
+        encoding: 'utf8',
+        maxBuffer: COMPILER_SPAWN_MAX_BUFFER
+    };
     if (stdinSource !== undefined) {
         opts.input = stdinSource;
     }
@@ -2030,7 +2034,14 @@ function rewritePropsExpression(expr, rewriteContext = null) {
         return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
     }
 
-    return `${rewrittenRoot}${rootMatch[2]}`;
+    if (rootMatch[2].trim().length === 0) {
+        return rewrittenRoot;
+    }
+
+    const rewrittenExpr = rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
+    return typeof rewrittenExpr === 'string' && rewrittenExpr.length > 0
+        ? rewrittenExpr
+        : `${rewrittenRoot}${rootMatch[2]}`;
 }
 
 /**

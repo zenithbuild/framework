@@ -287,7 +287,7 @@ impl Transformer {
                 Attribute::Ref { identifier, span } => {
                     let ref_index = self.ref_counter;
                     self.ref_counter += 1;
-                    let selector = format!(r#"[data-zx-r="{}"]"#, ref_index);
+                    let selector = format!(r#"[data-zx-ref="{}"]"#, ref_index);
                     self.ref_bindings.push(RefBinding {
                         index: ref_index,
                         identifier,
@@ -295,7 +295,7 @@ impl Transformer {
                         source: Some(span),
                     });
                     new_attributes.push(Attribute::Static {
-                        name: "data-zx-r".to_string(),
+                        name: "data-zx-ref".to_string(),
                         value: ref_index.to_string(),
                     });
                 }

@@ -24,6 +24,7 @@ const ALIAS_CONFLICT = Symbol('alias_conflict');
 const ACTIVE_MARKER_CLASS = 'z-active';
 const UNRESOLVED_LITERAL = Symbol('unresolved_literal');
 const LEGACY_MARKUP_HELPER = 'html';
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
 const BOOLEAN_ATTRIBUTES = new Set([
     'disabled', 'checked', 'selected', 'readonly', 'multiple',
@@ -1890,7 +1891,12 @@ function _applyAttribute(node, attrName, value) {
     }
 
     if (attrName === 'class' || attrName === 'className') {
-        node.className = value === null || value === undefined || value === false ? '' : String(value);
+        const classValue = value === null || value === undefined || value === false ? '' : String(value);
+        if (node && node.namespaceURI === SVG_NAMESPACE && typeof node.setAttribute === 'function') {
+            node.setAttribute('class', classValue);
+            return;
+        }
+        node.className = classValue;
         return;
     }
 

@@ -81,7 +81,7 @@ const shell = ref<HTMLDivElement>();
     let refs = json["ref_bindings"].as_array().expect("ref_bindings array");
     assert!(!refs.is_empty(), "expected non-empty ref_bindings: {json}");
     assert_eq!(refs[0]["identifier"], "shell");
-    assert_eq!(refs[0]["selector"], r#"[data-zx-r="0"]"#);
+    assert_eq!(refs[0]["selector"], r#"[data-zx-ref="0"]"#);
 }
 
 #[test]
