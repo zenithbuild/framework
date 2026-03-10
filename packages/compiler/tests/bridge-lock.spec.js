@@ -86,6 +86,8 @@ test('compiler JSON contract: schemaVersion and warnings array exist', () => {
   assert.equal(result.schemaVersion, 1, 'schemaVersion must be 1')
   assert.ok('warnings' in result, 'JSON must include warnings key')
   assert.ok(Array.isArray(result.warnings), 'warnings must be an array')
+  assert.ok('diagnostics' in result, 'JSON must include diagnostics key')
+  assert.ok(Array.isArray(result.diagnostics), 'diagnostics must be an array')
 
   for (const w of result.warnings) {
     assert.ok('code' in w, `warning must have code: ${JSON.stringify(w)}`)
@@ -107,4 +109,23 @@ test('compiler JSON contract: warnings shape when warnings exist', () => {
   assert.ok(typeof w.message === 'string')
   assert.ok(w.range.start.line >= 1 && w.range.start.column >= 1)
   assert.ok(w.range.end.line >= 1 && w.range.end.column >= 1)
+
+  const diagnostic = result.diagnostics[0]
+  assert.equal(diagnostic.code, 'ZEN-DOM-QUERY')
+  assert.equal(diagnostic.source, 'compiler')
+  assert.equal(diagnostic.severity, 'warning')
+  assert.ok(typeof diagnostic.docsPath === 'string')
+})
+
+test('compiler bridge returns structured diagnostics for hard failures', () => {
+  const result = compiler.compile('<script>const x = 1</script><main>{x}</main>', '/tmp/invalid-script.zen')
+
+  assert.equal(result.schemaVersion, 1)
+  assert.deepEqual(result.warnings, [])
+  assert.ok(Array.isArray(result.diagnostics))
+  assert.equal(result.diagnostics.length, 1)
+  assert.equal(result.diagnostics[0].code, 'ZEN-SCRIPT-MISSING-TS')
+  assert.equal(result.diagnostics[0].severity, 'error')
+  assert.equal(result.diagnostics[0].source, 'compiler')
+  assert.ok(typeof result.diagnostics[0].suggestion === 'string')
 })

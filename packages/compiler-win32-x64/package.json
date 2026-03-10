@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/compiler-win32-x64",
-  "version": "0.6.18",
+  "version": "0.6.19",
   "description": "Internal win32-x64 native binary for @zenithbuild/compiler",
   "license": "MIT",
   "os": [

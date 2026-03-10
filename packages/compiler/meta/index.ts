@@ -128,9 +128,21 @@ export function compile(
     if (result.error) {
         throw new Error(result.error.message);
     }
-    if (result.status !== 0) {
-        throw new Error(result.stderr || 'Compiler execution failed');
+
+    const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+    if (stdout) {
+        try {
+            return JSON.parse(stdout);
+        } catch (error) {
+            if (result.status === 0) {
+                throw error;
+            }
+        }
     }
 
-    return JSON.parse(result.stdout);
+    if (result.status !== 0) {
+        throw new Error(result.stderr || result.stdout || 'Compiler execution failed');
+    }
+
+    return {};
 }
