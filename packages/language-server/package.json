@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/language-server",
-  "version": "0.6.19",
+  "version": "0.6.17",
   "description": "Canonical Language Server Protocol implementation for Zenith",
   "license": "MIT",
   "private": false,
@@ -35,7 +35,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.6.19",
+    "@zenithbuild/compiler": "0.6.17",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.11"
   },
