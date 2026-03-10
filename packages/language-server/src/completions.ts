@@ -1,28 +1,47 @@
 import {
   CompletionItemKind,
   InsertTextFormat,
+  MarkupKind,
   type CompletionItem,
   type Position
-} from 'vscode-languageserver/node';
-import { canonicalEventAttributes, canonicalScriptSymbols } from './docs.js';
+} from 'vscode-languageserver/node.js';
+import { canonicalEventAttributes, canonicalScriptSymbols, getDocUrl, getSymbolDoc } from './docs.js';
 import { getCompletionContext, getCompletionPrefix } from './text.js';
 
 const blockedFrameworkTokens = ['react', 'vue', 'svelte', 'rfce'];
 
 function createScriptCompletion(label: string): CompletionItem {
+  const docs = getSymbolDoc(label);
   return {
     label,
     kind: CompletionItemKind.Function,
-    detail: 'Zenith canonical primitive',
+    detail: docs?.summary ?? 'Zenith canonical primitive',
+    ...(docs
+      ? {
+          documentation: {
+            kind: MarkupKind.Markdown,
+            value: `Docs: [${docs.docPath}](${getDocUrl(docs.docPath)})`
+          }
+        }
+      : {}),
     insertText: label
   };
 }
 
 function createEventCompletion(label: string): CompletionItem {
+  const docs = getSymbolDoc(label);
   return {
     label,
     kind: CompletionItemKind.Property,
-    detail: 'Canonical Zenith DOM event binding',
+    detail: docs?.summary ?? 'Canonical Zenith DOM event binding',
+    ...(docs
+      ? {
+          documentation: {
+            kind: MarkupKind.Markdown,
+            value: `Docs: [${docs.docPath}](${getDocUrl(docs.docPath)})`
+          }
+        }
+      : {}),
     insertTextFormat: InsertTextFormat.Snippet,
     insertText: `${label}={$1:handler}`
   };
@@ -63,7 +82,6 @@ export function filterFrameworkNoise(items: CompletionItem[], typedPrefix: strin
   return items.filter((item) => {
     const haystack = [
       item.label,
-      item.detail ?? '',
       typeof item.insertText === 'string' ? item.insertText : ''
     ].join(' ').toLowerCase();
     return blockedFrameworkTokens.every((token) => !haystack.includes(token));

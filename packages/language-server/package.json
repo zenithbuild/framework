@@ -29,7 +29,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && mkdir -p dist && bun x esbuild src/server.ts --bundle --outfile=dist/server.mjs --format=esm --platform=node --external:@zenithbuild/compiler --external:vscode-languageserver --external:vscode-languageserver/node --external:vscode-languageserver-textdocument",
+    "build": "rm -rf dist && mkdir -p dist && bun x esbuild src/server.ts --bundle --outfile=dist/server.mjs --format=esm --platform=node --external:@zenithbuild/compiler --external:vscode-languageserver --external:vscode-languageserver/node.js --external:vscode-languageserver-textdocument",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",
     "prepublishOnly": "bun run build"

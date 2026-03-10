@@ -76,6 +76,17 @@ test('package contributes a single canonical Zenith language id', async () => {
   assert.equal(/vue|svelte/i.test(serialized), false);
 });
 
+test('extension package ships the bundled server runtime dependencies and stdio launch path', async () => {
+  const pkg = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
+  const extensionSource = await fs.readFile(path.join(packageRoot, 'src', 'extension.ts'), 'utf8');
+
+  assert.equal(pkg.dependencies['@zenithbuild/compiler'], '0.6.17');
+  assert.ok(pkg.dependencies['vscode-languageserver']);
+  assert.ok(pkg.dependencies['vscode-languageserver-textdocument']);
+  assert.match(extensionSource, /args:\s*\[serverPath,\s*'--stdio'\]/);
+  assert.match(extensionSource, /args:\s*\['--inspect=6010',\s*serverPath,\s*'--stdio'\]/);
+});
+
 test('embedded TS scopes cover arrows inside on:* handlers', async () => {
   const registry = await loadRegistry();
   const grammar = await registry.loadGrammar('text.html.zenith');
