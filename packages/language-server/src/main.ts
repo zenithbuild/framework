@@ -5,9 +5,10 @@ import {
   TextDocumentSyncKind,
   type InitializeParams,
   type InitializeResult
-} from 'vscode-languageserver/node';
+} from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { TextDocuments } from 'vscode-languageserver';
+import { getCodeActions } from './code-actions.js';
 import { getCompletionItems } from './completions.js';
 import { collectDiagnosticsFromSource, resolveDocumentPath } from './diagnostics.js';
 import { getHover } from './hover.js';
@@ -54,7 +55,8 @@ export function startLanguageServer(): void {
         completionProvider: {
           triggerCharacters: [':', '<', '{']
         },
-        hoverProvider: true
+        hoverProvider: true,
+        codeActionProvider: true
       }
     };
   });
@@ -88,6 +90,15 @@ export function startLanguageServer(): void {
     }
 
     return getHover(document.getText(), params.position);
+  });
+
+  connection.onCodeAction((params) => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return [];
+    }
+
+    return getCodeActions(document.getText(), params.textDocument.uri, params.context.diagnostics);
   });
 
   documents.onDidOpen((event) => {

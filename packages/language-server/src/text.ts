@@ -1,4 +1,4 @@
-import type { Position, Range } from 'vscode-languageserver/node';
+import type { Position, Range } from 'vscode-languageserver/node.js';
 
 export type CompletionContext = 'script' | 'expression' | 'attribute' | 'markup';
 

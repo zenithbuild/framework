@@ -1,4 +1,4 @@
-import type { Connection } from 'vscode-languageserver/node';
+import type { Connection } from 'vscode-languageserver/node.js';
 
 export interface ZenithSettings {
   readonly strictDomLints: boolean;

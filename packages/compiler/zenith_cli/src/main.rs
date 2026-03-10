@@ -3,7 +3,8 @@ use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 use zenith_compiler::compiler::{
-    compile_structured_with_source_options_and_warnings, CompileOptions, CompilerOutput,
+    compile_structured_with_source_options_and_report, CompileDiagnosticSeverity, CompileOptions,
+    CompilerOutput,
 };
 use zenith_compiler::deterministic::sha256_hex;
 
@@ -52,24 +53,30 @@ fn main() -> Result<()> {
         (text, input_path.to_string_lossy().into_owned())
     };
 
-    let (output, warnings) = compile_structured_with_source_options_and_warnings(
+    let report = compile_structured_with_source_options_and_report(
         &content,
         &original_path,
         CompileOptions {
             embedded_markup_expressions: cli.embedded_markup_expressions,
             strict_dom_lints: cli.strict_dom_lints,
         },
-    )
-    .map_err(anyhow::Error::msg)?;
-    for warning in &warnings {
+    );
+    for warning in &report.warnings {
         eprintln!(
             "{}:{}:{}: warning[{}] {}",
             original_path, warning.line, warning.column, warning.code, warning.message
         );
     }
-    if cli.strict_dom_lints && warnings.iter().any(|w| w.code.starts_with("ZEN-DOM-")) {
-        std::process::exit(1);
+    if report.output.is_none() {
+        for diagnostic in report
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == CompileDiagnosticSeverity::Error)
+        {
+            eprintln!("{}", diagnostic.message);
+        }
     }
+    let output = report.output.clone().unwrap_or_default();
     let hoisted_state = output
         .hoisted
         .state
@@ -211,7 +218,8 @@ fn main() -> Result<()> {
     }
     let graph_hash = compute_graph_hash(&output);
 
-    let warnings_json: Vec<serde_json::Value> = warnings
+    let warnings_json: Vec<serde_json::Value> = report
+        .warnings
         .iter()
         .map(|w| {
             serde_json::json!({
@@ -225,6 +233,8 @@ fn main() -> Result<()> {
             })
         })
         .collect();
+    let diagnostics_json = serde_json::to_value(&report.diagnostics)
+        .context("Failed to serialize structured diagnostics")?;
 
     let json = serde_json::json!({
         "schemaVersion": 1,
@@ -252,13 +262,24 @@ fn main() -> Result<()> {
         "marker_bindings": marker_bindings,
         "event_bindings": event_bindings,
         "ref_bindings": ref_bindings,
-        "warnings": warnings_json
+        "warnings": warnings_json,
+        "diagnostics": diagnostics_json
     });
 
     println!(
         "{}",
         serde_json::to_string(&json).context("Failed to serialize compiler output to JSON")?
     );
+
+    if report.output.is_none()
+        || (cli.strict_dom_lints
+            && report
+                .warnings
+                .iter()
+                .any(|warning| warning.code.starts_with("ZEN-DOM-")))
+    {
+        std::process::exit(1);
+    }
 
     Ok(())
 }

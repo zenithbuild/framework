@@ -163,7 +163,7 @@ npm_view_json() {
   shift
   local output
 
-  if output="$(npm_config_tag=latest "$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
+  if output="$(env -u NPM_CONFIG_TAG -u npm_config_tag "$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
     printf '%s' "$output"
     return 0
   fi
@@ -183,9 +183,12 @@ package_exists_on_npm() {
   local output
   local status
 
-  if output="$(npm_view_json "${package_name}@${version} dist-tags" "${package_name}@${version}" dist-tags)"; then
-    extract_npm_json "${package_name}@${version} dist-tags" "$output" >/dev/null
-    return
+  if output="$(npm_view_json "${package_name}@${version} version" "${package_name}@${version}" version)"; then
+    if [[ -z "${output//[[:space:]]/}" ]]; then
+      echo "Empty npm view payload for ${package_name}@${version} version" >&2
+      exit 1
+    fi
+    return 0
   else
     status=$?
   fi

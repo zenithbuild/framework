@@ -4,18 +4,175 @@ import {
   DidChangeConfigurationNotification,
   ProposedFeatures,
   TextDocumentSyncKind
-} from "vscode-languageserver/node";
+} from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { TextDocuments } from "vscode-languageserver";
+
+// src/code-actions.ts
+import {
+  CodeActionKind
+} from "vscode-languageserver/node.js";
+var DOM_QUERY_SUPPRESS = "// zen-allow:dom-query explain interop reason";
+var DOM_LISTENER_TODO = "// TODO(zenith): replace addEventListener with zenOn(target, eventName, handler)";
+var DOM_LISTENER_CLEANUP = "// TODO(zenith): register the disposer with ctx.cleanup(...) inside zenMount";
+var DOM_WRAPPER_TODO = "// TODO(zenith): replace this guard with zenWindow() / zenDocument()";
+function getCodeActions(text, uri, diagnostics) {
+  const actions = [];
+  for (const diagnostic of diagnostics) {
+    const code = typeof diagnostic.code === "string" ? diagnostic.code : "";
+    if (!code) {
+      continue;
+    }
+    if (code === "ZEN-DOM-QUERY") {
+      const action = createDomQuerySuppressAction(text, uri, diagnostic);
+      if (action) {
+        actions.push(action);
+      }
+      continue;
+    }
+    if (code === "ZEN-DOM-LISTENER") {
+      const action = createCommentInsertionAction(
+        text,
+        uri,
+        diagnostic,
+        [DOM_LISTENER_TODO, DOM_LISTENER_CLEANUP],
+        "Zenith: Add zenOn migration note"
+      );
+      if (action) {
+        actions.push(action);
+      }
+      continue;
+    }
+    if (code === "ZEN-DOM-WRAPPER") {
+      const replacementAction = createGlobalThisReplacementAction(text, uri, diagnostic);
+      if (replacementAction) {
+        actions.push(replacementAction);
+      }
+      const noteAction = createCommentInsertionAction(
+        text,
+        uri,
+        diagnostic,
+        [DOM_WRAPPER_TODO],
+        "Zenith: Add zenWindow/zenDocument migration note"
+      );
+      if (noteAction) {
+        actions.push(noteAction);
+      }
+    }
+  }
+  return actions;
+}
+function createDomQuerySuppressAction(text, uri, diagnostic) {
+  const lineIndex = diagnostic.range.start.line;
+  if (lineIndex > 0) {
+    const previousLine = getLine(text, lineIndex - 1);
+    if (previousLine?.includes("zen-allow:dom-query")) {
+      return null;
+    }
+  }
+  return createCommentInsertionAction(
+    text,
+    uri,
+    diagnostic,
+    [DOM_QUERY_SUPPRESS],
+    "Zenith: Suppress DOM query with zen-allow comment"
+  );
+}
+function createGlobalThisReplacementAction(text, uri, diagnostic) {
+  const lineIndex = diagnostic.range.start.line;
+  const line = getLine(text, lineIndex);
+  if (!line) {
+    return null;
+  }
+  if (line.includes("globalThis.window")) {
+    return createReplacementAction(
+      uri,
+      diagnostic,
+      {
+        start: { line: lineIndex, character: line.indexOf("globalThis.window") },
+        end: { line: lineIndex, character: line.indexOf("globalThis.window") + "globalThis.window".length }
+      },
+      "zenWindow()",
+      "Zenith: Replace globalThis.window with zenWindow()"
+    );
+  }
+  if (line.includes("globalThis.document")) {
+    return createReplacementAction(
+      uri,
+      diagnostic,
+      {
+        start: { line: lineIndex, character: line.indexOf("globalThis.document") },
+        end: { line: lineIndex, character: line.indexOf("globalThis.document") + "globalThis.document".length }
+      },
+      "zenDocument()",
+      "Zenith: Replace globalThis.document with zenDocument()"
+    );
+  }
+  return null;
+}
+function createCommentInsertionAction(text, uri, diagnostic, commentLines, title) {
+  const lineIndex = diagnostic.range.start.line;
+  const line = getLine(text, lineIndex);
+  if (line === void 0) {
+    return null;
+  }
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  const previousLine = lineIndex > 0 ? getLine(text, lineIndex - 1) : void 0;
+  if (previousLine && commentLines.every((commentLine) => previousLine.includes(commentLine.trim()))) {
+    return null;
+  }
+  const newText = commentLines.map((commentLine) => `${indent}${commentLine}`).join("\n") + "\n";
+  return createReplacementAction(
+    uri,
+    diagnostic,
+    {
+      start: { line: lineIndex, character: 0 },
+      end: { line: lineIndex, character: 0 }
+    },
+    newText,
+    title
+  );
+}
+function createReplacementAction(uri, diagnostic, range, newText, title) {
+  const edits = [{ range, newText }];
+  const documentEdit = {
+    textDocument: {
+      uri,
+      version: null
+    },
+    edits
+  };
+  return {
+    title,
+    kind: CodeActionKind.QuickFix,
+    diagnostics: [diagnostic],
+    edit: {
+      documentChanges: [documentEdit]
+    }
+  };
+}
+function getLine(text, lineIndex) {
+  const lines = text.split("\n");
+  return lines[lineIndex];
+}
 
 // src/completions.ts
 import {
   CompletionItemKind,
-  InsertTextFormat
-} from "vscode-languageserver/node";
+  InsertTextFormat,
+  MarkupKind
+} from "vscode-languageserver/node.js";
 
 // src/docs.ts
 var DOCS_BASE_URL = "https://github.com/zenithbuild/framework/blob/master/";
+function createEventDoc(label, summary, example) {
+  return {
+    label,
+    summary,
+    example,
+    docPath: "docs/documentation/syntax/events.md"
+  };
+}
 var SYMBOL_DOCS = {
   zenEffect: {
     label: "zenEffect",
@@ -76,7 +233,128 @@ var SYMBOL_DOCS = {
     summary: "Deterministic multi-node collection helper that replaces selector scans.",
     example: "const nodes = collectRefs(linkRefA, linkRefB, linkRefC)",
     docPath: "docs/documentation/reactivity/dom-and-environment.md"
-  }
+  },
+  "on:esc": {
+    ...createEventDoc(
+      "on:esc",
+      "Escape-filtered keydown alias that routes through Zenith\u2019s document-level esc dispatch.",
+      "<button on:esc={closeMenu}>Close</button>"
+    )
+  },
+  "on:hoverin": {
+    ...createEventDoc(
+      "on:hoverin",
+      "Hover sugar alias for pointerenter when hover logic needs real event wiring.",
+      "<div on:hoverin={handleEnter}></div>"
+    )
+  },
+  "on:hoverout": {
+    ...createEventDoc(
+      "on:hoverout",
+      "Hover sugar alias for pointerleave when hover logic needs real event wiring.",
+      "<div on:hoverout={handleLeave}></div>"
+    )
+  },
+  "on:click": createEventDoc(
+    "on:click",
+    "Canonical mouse click binding in Zenith\u2019s universal on:* event model.",
+    "<button on:click={handleClick}>Press</button>"
+  ),
+  "on:doubleclick": createEventDoc(
+    "on:doubleclick",
+    "Canonical alias that normalizes doubleclick bindings to the emitted dblclick event.",
+    "<button on:doubleclick={handleDoubleClick}>Press</button>"
+  ),
+  "on:dblclick": createEventDoc(
+    "on:dblclick",
+    "Canonical double-click binding using the normalized dblclick event name.",
+    "<button on:dblclick={handleDoubleClick}>Press</button>"
+  ),
+  "on:keydown": createEventDoc(
+    "on:keydown",
+    "Canonical keyboard keydown binding in Zenith\u2019s universal on:* event model.",
+    "<div on:keydown={handleKeydown}></div>"
+  ),
+  "on:keyup": createEventDoc(
+    "on:keyup",
+    "Canonical keyboard keyup binding in Zenith\u2019s universal on:* event model.",
+    "<div on:keyup={handleKeyup}></div>"
+  ),
+  "on:submit": createEventDoc(
+    "on:submit",
+    "Canonical form submit binding in Zenith\u2019s universal on:* event model.",
+    "<form on:submit={handleSubmit}></form>"
+  ),
+  "on:input": createEventDoc(
+    "on:input",
+    "Canonical input binding for immediate form-value updates.",
+    "<input on:input={handleInput} />"
+  ),
+  "on:change": createEventDoc(
+    "on:change",
+    "Canonical change binding for committed form-value updates.",
+    "<input on:change={handleChange} />"
+  ),
+  "on:focus": createEventDoc(
+    "on:focus",
+    "Canonical focus binding for element focus transitions.",
+    "<input on:focus={handleFocus} />"
+  ),
+  "on:blur": createEventDoc(
+    "on:blur",
+    "Canonical blur binding for element focus exit transitions.",
+    "<input on:blur={handleBlur} />"
+  ),
+  "on:pointerdown": createEventDoc(
+    "on:pointerdown",
+    "Canonical pointerdown binding from the recommended pointer event set.",
+    "<div on:pointerdown={handlePointerDown}></div>"
+  ),
+  "on:pointerup": createEventDoc(
+    "on:pointerup",
+    "Canonical pointerup binding from the recommended pointer event set.",
+    "<div on:pointerup={handlePointerUp}></div>"
+  ),
+  "on:pointermove": createEventDoc(
+    "on:pointermove",
+    "Canonical pointermove binding from the recommended pointer event set.",
+    "<svg on:pointermove={handlePointerMove}></svg>"
+  ),
+  "on:pointerenter": createEventDoc(
+    "on:pointerenter",
+    "Direct pointerenter binding remains fully supported alongside on:hoverin.",
+    "<div on:pointerenter={handleEnter}></div>"
+  ),
+  "on:pointerleave": createEventDoc(
+    "on:pointerleave",
+    "Direct pointerleave binding remains fully supported alongside on:hoverout.",
+    "<div on:pointerleave={handleLeave}></div>"
+  ),
+  "on:dragstart": createEventDoc(
+    "on:dragstart",
+    "Canonical dragstart binding from Zenith\u2019s recommended drag event set.",
+    '<div draggable="true" on:dragstart={handleDragStart}></div>'
+  ),
+  "on:dragover": createEventDoc(
+    "on:dragover",
+    "Canonical dragover binding from Zenith\u2019s recommended drag event set.",
+    "<div on:dragover={handleDragOver}></div>"
+  ),
+  "on:drop": createEventDoc(
+    "on:drop",
+    "Canonical drop binding from Zenith\u2019s recommended drag event set.",
+    "<div on:drop={handleDrop}></div>"
+  ),
+  "on:scroll": createEventDoc(
+    "on:scroll",
+    "Canonical scroll binding from Zenith\u2019s recommended event set.",
+    "<div on:scroll={handleScroll}></div>"
+  ),
+  "on:contextmenu": createEventDoc(
+    "on:contextmenu",
+    "Canonical contextmenu binding from Zenith\u2019s recommended mouse event set.",
+    "<div on:contextmenu={handleContextMenu}></div>"
+  )
 };
 var canonicalScriptSymbols = [
   "zenMount",
@@ -92,6 +370,7 @@ var canonicalScriptSymbols = [
 ];
 var canonicalEventAttributes = [
   "on:click",
+  "on:doubleclick",
   "on:dblclick",
   "on:keydown",
   "on:keyup",
@@ -264,18 +543,32 @@ function positionAt(text, offset) {
 // src/completions.ts
 var blockedFrameworkTokens = ["react", "vue", "svelte", "rfce"];
 function createScriptCompletion(label) {
+  const docs = getSymbolDoc(label);
   return {
     label,
     kind: CompletionItemKind.Function,
-    detail: "Zenith canonical primitive",
+    detail: docs?.summary ?? "Zenith canonical primitive",
+    ...docs ? {
+      documentation: {
+        kind: MarkupKind.Markdown,
+        value: `Docs: [${docs.docPath}](${getDocUrl(docs.docPath)})`
+      }
+    } : {},
     insertText: label
   };
 }
 function createEventCompletion(label) {
+  const docs = getSymbolDoc(label);
   return {
     label,
     kind: CompletionItemKind.Property,
-    detail: "Canonical Zenith DOM event binding",
+    detail: docs?.summary ?? "Canonical Zenith DOM event binding",
+    ...docs ? {
+      documentation: {
+        kind: MarkupKind.Markdown,
+        value: `Docs: [${docs.docPath}](${getDocUrl(docs.docPath)})`
+      }
+    } : {},
     insertTextFormat: InsertTextFormat.Snippet,
     insertText: `${label}={$1:handler}`
   };
@@ -309,7 +602,6 @@ function filterFrameworkNoise(items, typedPrefix) {
   return items.filter((item) => {
     const haystack = [
       item.label,
-      item.detail ?? "",
       typeof item.insertText === "string" ? item.insertText : ""
     ].join(" ").toLowerCase();
     return blockedFrameworkTokens.every((token) => !haystack.includes(token));
@@ -319,24 +611,44 @@ function filterFrameworkNoise(items, typedPrefix) {
 // src/diagnostics.ts
 import { fileURLToPath } from "node:url";
 import { compile } from "@zenithbuild/compiler";
-import { DiagnosticSeverity } from "vscode-languageserver/node";
+import {
+  DiagnosticSeverity,
+  DiagnosticTag
+} from "vscode-languageserver/node.js";
 async function collectDiagnosticsFromSource(source, filePath, strictDomLints) {
   try {
     const result = compile({ source, filePath });
     if (result.schemaVersion !== 1) {
       return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
     }
-    const warnings = Array.isArray(result.warnings) ? result.warnings : [];
-    return warnings.map((warning) => ({
-      source: "zenith",
-      code: warning.code,
-      message: warning.message,
-      severity: resolveSeverity(warning, strictDomLints),
-      range: toRange(warning.range)
-    }));
+    return mapCompilerEnvelopeToDiagnostics(result, strictDomLints);
   } catch (error) {
     return [compilerContractDiagnostic(String(error))];
   }
+}
+function mapCompilerEnvelopeToDiagnostics(result, strictDomLints) {
+  const diagnostics = Array.isArray(result.diagnostics) ? result.diagnostics : [];
+  if (diagnostics.length > 0) {
+    return diagnostics.map((diagnostic) => {
+      const tags = mapTags(diagnostic.tags);
+      return {
+        source: diagnostic.source ?? "zenith",
+        code: diagnostic.code,
+        message: diagnostic.message,
+        severity: resolveSeverity(diagnostic, strictDomLints),
+        range: toRange(diagnostic.range),
+        ...tags ? { tags } : {}
+      };
+    });
+  }
+  const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+  return warnings.map((warning) => ({
+    source: "zenith",
+    code: warning.code,
+    message: warning.message,
+    severity: resolveSeverity(warning, strictDomLints),
+    range: toRange(warning.range)
+  }));
 }
 function resolveDocumentPath(uri) {
   if (uri.startsWith("file://")) {
@@ -344,20 +656,34 @@ function resolveDocumentPath(uri) {
   }
   return uri.replace(/^[a-z]+:\/\//i, "/virtual/");
 }
-function resolveSeverity(warning, strictDomLints) {
-  if (strictDomLints && warning.code.startsWith("ZEN-DOM-")) {
+function resolveSeverity(diagnostic, strictDomLints) {
+  if (strictDomLints && diagnostic.code.startsWith("ZEN-DOM-")) {
     return DiagnosticSeverity.Error;
   }
-  if (warning.severity === "error") {
+  if (diagnostic.severity === "error") {
     return DiagnosticSeverity.Error;
   }
-  if (warning.severity === "hint") {
+  if (diagnostic.severity === "hint") {
     return DiagnosticSeverity.Hint;
   }
-  if (warning.severity === "info") {
+  if (diagnostic.severity === "information") {
     return DiagnosticSeverity.Information;
   }
   return DiagnosticSeverity.Warning;
+}
+function mapTags(tags) {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    return void 0;
+  }
+  return tags.flatMap((tag) => {
+    if (tag === "deprecated") {
+      return [DiagnosticTag.Deprecated];
+    }
+    if (tag === "unnecessary") {
+      return [DiagnosticTag.Unnecessary];
+    }
+    return [];
+  });
 }
 function toRange(range) {
   if (!range) {
@@ -391,7 +717,7 @@ function compilerContractDiagnostic(message) {
 }
 
 // src/hover.ts
-import { MarkupKind } from "vscode-languageserver/node";
+import { MarkupKind as MarkupKind2 } from "vscode-languageserver/node.js";
 function getHover(text, position) {
   const symbol = getWord(text, position);
   const docs = getSymbolDoc(symbol);
@@ -414,7 +740,7 @@ function getHover(text, position) {
   return {
     range,
     contents: {
-      kind: MarkupKind.Markdown,
+      kind: MarkupKind2.Markdown,
       value: markdown
     }
   };
@@ -546,7 +872,8 @@ function startLanguageServer() {
         completionProvider: {
           triggerCharacters: [":", "<", "{"]
         },
-        hoverProvider: true
+        hoverProvider: true,
+        codeActionProvider: true
       }
     };
   });
@@ -574,6 +901,13 @@ function startLanguageServer() {
       return null;
     }
     return getHover(document.getText(), params.position);
+  });
+  connection.onCodeAction((params) => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return [];
+    }
+    return getCodeActions(document.getText(), params.textDocument.uri, params.context.diagnostics);
   });
   documents.onDidOpen((event) => {
     void scheduler.flush(event.document.uri);

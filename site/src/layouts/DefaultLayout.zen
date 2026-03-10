@@ -8,7 +8,9 @@ interface Props {
     description?: string;
 }
 
-const { title = "Home", description = "" } = $props<Props>();
+const incoming = props as Props;
+const title = incoming.title ?? "Home";
+const description = incoming.description ?? "";
 </script>
 
 <html lang="en">
