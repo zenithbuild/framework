@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Fixed slot-scoped owner attribution so slotted refs/state/signals keep parent scope through component occurrence collection and emitted child props.
+- Separated compiler ref markers from dynamic attr markers (`data-zx-ref` vs `data-zx-*`) to prevent same-node marker collisions during hydration.
+- Fixed runtime SVG `class` bindings to apply through SVG-safe attribute writes while preserving existing HTML `class` behavior.
+- Fixed CLI post-compiler expression rewriting so mixed reactive/local-const component expressions stay fully rewritten in final built binding functions.
+- Added focused regression coverage for slot-scope ownership, marker namespace separation, SVG class binding, component-expression rewriting, and final props-prelude ref emission.
+
 ## [0.6.17] - 2026-03-06
 
 ### Changed
