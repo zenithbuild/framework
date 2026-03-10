@@ -20,6 +20,7 @@ Zenith uses a three-branch release train with shared package versions across `be
 - Every pull request into `train` must add at least one bullet to [CHANGELOG.md](../../CHANGELOG.md) under `## [Unreleased]`.
 - `Unreleased` is the source of truth for the next train cut.
 - Stable releases must have a matching version section in `CHANGELOG.md` before GitHub Release creation runs.
+- Stable releases must also add or update the matching docs-side markdown entry under [docs/changelog](../changelog/) before the release is considered done.
 
 ## Release Cut
 
