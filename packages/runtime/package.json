@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/runtime",
-  "version": "0.6.18",
+  "version": "0.6.17",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
