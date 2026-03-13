@@ -299,6 +299,38 @@ describe('build orchestration', () => {
         );
     });
 
+    test('rejects duplicate inline and adjacent load definitions', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const load = async (ctx) => ({ ok: true });',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n'),
+            'index.load.ts': 'export const load = async (ctx) => ({ ok: true });'
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'load is defined both inline and in an adjacent module'
+        );
+    });
+
+    test('rejects adjacent load combined with inline data export', async () => {
+        project = await makeProject({
+            'index.zen': [
+                '<script server lang="ts">',
+                'export const data = { ok: true };',
+                '</script>',
+                '<main>bad</main>'
+            ].join('\n'),
+            'index.load.ts': 'export const load = async (ctx) => ({ ok: true });'
+        });
+
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir })).rejects.toThrow(
+            'adjacent load module cannot be combined with inline data/legacy payload exports'
+        );
+    });
+
     test('rejects embedded markup expressions when config gate is disabled', async () => {
         project = await makeProject({
             'index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'

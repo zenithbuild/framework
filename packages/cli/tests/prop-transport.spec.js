@@ -1,6 +1,6 @@
 import { build } from '../dist/build.js';
 import { jest } from '@jest/globals';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { SourceTextModule, createContext } from 'node:vm';
 import { tmpdir } from 'node:os';
@@ -24,6 +24,21 @@ async function createFixtureProject(fixtureName) {
         pagesDir: join(root, 'src', 'pages'),
         outDir: join(root, 'dist')
     };
+}
+
+async function createInlineProject(files) {
+    const root = await mkdtemp(join(tmpdir(), 'zenith-inline-'));
+    const pagesDir = join(root, 'src', 'pages');
+    const outDir = join(root, 'dist');
+    await mkdir(pagesDir, { recursive: true });
+
+    for (const [file, source] of Object.entries(files)) {
+        const fullPath = join(root, file);
+        await mkdir(dirname(fullPath), { recursive: true });
+        await writeFile(fullPath, source, 'utf8');
+    }
+
+    return { root, pagesDir, outDir };
 }
 
 function stripDoctype(html) {
@@ -225,5 +240,25 @@ describe('function prop transport', () => {
         expect(textOf(root, 'last-submit')).toBe('forwarded:2');
 
         dom.window.close();
+    });
+
+    test('built page modules refresh runtime SSR data and route HTML on each mount', async () => {
+        project = await createInlineProject({
+            'src/pages/index.zen': [
+                '<script server lang="ts">',
+                'export const data = { value: "build" };',
+                '</script>',
+                '<main><p data-testid="value">{ssr_data.value}</p></main>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const { pageJs } = await readBuiltPage(project.outDir);
+
+        expect(pageJs).toContain('let __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);');
+        expect(pageJs).toContain('function __zenith_refresh_runtime_data() {');
+        expect(pageJs).toContain('__zenith_refresh_runtime_data();');
+        expect(pageJs).toContain('function __zenith_read_route_html(staticValue) {');
+        expect(pageJs).toContain('const routeHtml = __zenith_read_route_html(__zenith_html);');
     });
 });

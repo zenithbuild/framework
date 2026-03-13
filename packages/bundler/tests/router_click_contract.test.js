@@ -9,6 +9,8 @@ const TEST_DIR = join(CWD, 'tests/tmp_router_click_contract');
 
 function resolveCliBin() {
     const candidates = [
+        join(CWD, 'target/debug/zenith-bundler'),
+        join(CWD, 'target/release/zenith-bundler'),
         join(CWD, '../zenith-bundler/target/debug/zenith-bundler'),
         join(CWD, '../zenith-bundler/target/release/zenith-bundler')
     ];
@@ -60,7 +62,7 @@ function baseIr(html, nodeId, graphHash) {
     };
 }
 
-test('router click contract uses single-click push+navigate flow', async () => {
+test('router click contract fetches fresh HTML and commits history only after successful soft navigation', async () => {
     cleanup();
 
     const payload = [
@@ -95,43 +97,76 @@ test('router click contract uses single-click push+navigate flow', async () => {
     assert.ok(existsSync(routerAsset), 'router bundle should be emitted');
     const routerSource = readFileSync(routerAsset, 'utf8');
 
-    const clickStart = routerSource.indexOf("document.addEventListener('click'");
+    const clickStart = routerSource.indexOf('document.addEventListener("click"');
     assert.ok(clickStart >= 0, 'router must attach delegated click handler');
     const preventDefaultIdx = routerSource.indexOf('event.preventDefault();', clickStart);
-    const targetIdx = routerSource.indexOf("closest('a[data-zen-link]')", clickStart);
-    const assignIdx = routerSource.indexOf('window.location.assign(url.href)', clickStart);
+    const targetIdx = routerSource.indexOf('closest("a[data-zen-link]")', clickStart);
+    const fetchIdx = routerSource.indexOf('fetch(targetUrl.href');
+    const performNavigationIdx = routerSource.indexOf('performNavigation(targetUrl, "push", null)', clickStart);
+    const assignIdx = routerSource.indexOf('window.location.assign(targetUrl.href)');
+    const locationReplaceIdx = routerSource.indexOf('window.location.replace(targetUrl.href);');
     const pushStateIdx = routerSource.indexOf('pushState(');
     const replaceStateIdx = routerSource.indexOf('replaceState(');
+    const beforeLeaveIdx = routerSource.indexOf('await emitNavigationEvent(context, "navigation:before-leave"');
+    const beforeSwapIdx = routerSource.indexOf('await emitNavigationEvent(context, "navigation:before-swap"');
+    const beforeEnterIdx = routerSource.indexOf('await emitNavigationEvent(context, "navigation:before-enter"');
     assert.ok(preventDefaultIdx >= 0, 'click flow must call preventDefault');
     assert.ok(targetIdx >= 0, 'click flow must target a[data-zen-link]');
-    assert.ok(assignIdx >= 0, 'click flow must call window.location.assign(url.href)');
-    assert.strictEqual(pushStateIdx, -1, 'router runtime must not call pushState');
-    assert.strictEqual(replaceStateIdx, -1, 'router runtime must not call replaceState');
+    assert.ok(fetchIdx >= 0, 'click flow must fetch fresh HTML before commit');
+    assert.ok(assignIdx >= 0, 'click flow must call window.location.assign(targetUrl.href)');
+    assert.ok(locationReplaceIdx >= 0, 'router runtime must call window.location.replace for popstate recovery');
+    assert.ok(pushStateIdx >= 0, 'router runtime must call pushState');
+    assert.ok(replaceStateIdx >= 0, 'router runtime must call replaceState');
+    assert.ok(beforeLeaveIdx >= 0, 'router runtime must expose navigation:before-leave');
+    assert.ok(beforeSwapIdx >= 0, 'router runtime must expose navigation:before-swap');
+    assert.ok(beforeEnterIdx >= 0, 'router runtime must expose navigation:before-enter');
     assert.ok(
-        preventDefaultIdx < assignIdx,
-        'preventDefault must execute before assign'
+        preventDefaultIdx < performNavigationIdx,
+        'preventDefault must execute before the click flow delegates into performNavigation'
     );
 
-    const navigateStart = routerSource.indexOf('async function navigate(pathname');
-    const mountIdx = routerSource.indexOf('await mountRoute(next.route, next.params, token);', navigateStart);
-    const scrollIdx = routerSource.indexOf('window.scrollTo(0, 0);', navigateStart);
-    assert.ok(navigateStart >= 0, 'router must define navigate(pathname');
-    assert.ok(mountIdx >= 0, 'navigate must mount route');
-    assert.ok(scrollIdx >= 0, 'navigate must reset scroll after successful route mount');
-    assert.ok(mountIdx < scrollIdx, 'navigate must reset scroll after mountRoute');
+    const performNavigationStart = routerSource.indexOf('async function performNavigation(targetUrl, historyMode, popstateState)');
+    const requestIdx = routerSource.indexOf('dispatchRouteEvent("navigation:request", buildNavigationPayload(context));', performNavigationStart);
+    const dataReadyIdx = routerSource.indexOf('emitNavigationEvent(context, "navigation:data-ready"', performNavigationStart);
+    const mountIdx = routerSource.indexOf('const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);', performNavigationStart);
+    const contentSwappedIdx = routerSource.indexOf('emitNavigationEvent(context, "navigation:content-swapped"', performNavigationStart);
+    const scrollIdx = routerSource.indexOf('dispatchScrollEvent("apply"', performNavigationStart);
+    const enterCompleteIdx = routerSource.indexOf('emitNavigationEvent(context, "navigation:enter-complete"', performNavigationStart);
+    assert.ok(performNavigationStart >= 0, 'router must define performNavigation(targetUrl, historyMode, popstateState)');
+    assert.ok(requestIdx >= 0, 'performNavigation must emit navigation:request');
+    assert.ok(dataReadyIdx >= 0, 'performNavigation must emit navigation:data-ready');
+    assert.ok(mountIdx >= 0, 'performNavigation must mount the route');
+    assert.ok(contentSwappedIdx >= 0, 'performNavigation must emit navigation:content-swapped');
+    assert.ok(enterCompleteIdx >= 0, 'performNavigation must emit navigation:enter-complete');
+    assert.ok(scrollIdx >= 0, 'performNavigation must coordinate scroll after route mount');
+    assert.ok(
+        requestIdx < dataReadyIdx &&
+        dataReadyIdx < beforeLeaveIdx &&
+        beforeLeaveIdx < beforeSwapIdx &&
+        beforeSwapIdx < mountIdx &&
+        mountIdx < contentSwappedIdx &&
+        contentSwappedIdx < scrollIdx &&
+        scrollIdx < beforeEnterIdx &&
+        beforeEnterIdx < enterCompleteIdx,
+        'performNavigation must keep lifecycle ordering deterministic'
+    );
 
     assert.ok(
-        routerSource.includes("history.scrollRestoration = 'manual';"),
+        routerSource.includes('history.scrollRestoration = "manual";'),
         'router must disable browser scroll restoration for deterministic SPA navigation'
     );
-
     assert.ok(
-        routerSource.includes('navigate(window.location.pathname, null)'),
-        'router must perform initial route mount on first load'
+        routerSource.includes('const __ZENITH_SCROLL_EVENT_NAME = "zx-router-scroll";'),
+        'router must publish the internal scroll coordination event'
     );
     assert.ok(
-        routerSource.includes('window.location.assign(url.href);'),
-        'click navigation failures must hard-navigate as fallback'
+        routerSource.includes('encodeURIComponent(toNavigationPath(targetUrl))'),
+        'route-check requests must include pathname plus query string'
+    );
+
+    assert.ok(
+        routerSource.includes('mountInitialRoute().catch(function(error) {'),
+        'router must perform initial route mount on first load'
     );
 });
 

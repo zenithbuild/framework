@@ -4,6 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
 
@@ -14,6 +15,7 @@ use zenith_compiler::script::ExtractedStyleBlock;
 
 mod template_bridge;
 mod vendor;
+mod page_runtime;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -518,11 +520,16 @@ fn run() -> Result<(), String> {
     let css_rel = format!("assets/styles.{}.css", css_hash);
     let css_path = out_dir_tmp.join(&css_rel);
     write_file(&css_path, &final_css_content)?;
+    let mut expected_asset_contents = BTreeMap::<String, String>::new();
+    expected_asset_contents.insert(css_rel.clone(), final_css_content.clone());
 
     // 4. Generate Runtime & Assets
     let runtime_rel = ensure_runtime_asset(&out_dir_tmp, &template_assets.runtime_source)?;
     let runtime_import_spec = runtime_import_specifier(&runtime_rel)?;
+    expected_asset_contents.insert(runtime_rel.clone(), template_assets.runtime_source.clone());
+    let core_js = generate_core_module_js(&runtime_import_spec);
     let (core_rel, core_hash) = ensure_core_asset(&out_dir_tmp, &runtime_rel)?;
+    expected_asset_contents.insert(core_rel.clone(), core_js);
     let core_import_spec = format!("/{}", core_rel);
 
     // Collect all component scripts from inputs
@@ -599,6 +606,7 @@ fn run() -> Result<(), String> {
 
         let js_path = out_dir_tmp.join(&js_rel);
         write_file(&js_path, &js)?;
+        expected_asset_contents.insert(js_rel.clone(), js.clone());
 
         manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
         if input.ir.server_script.is_some() && !input.ir.prerender {
@@ -685,9 +693,29 @@ fn run() -> Result<(), String> {
         let r_rel = format!("assets/router.{}.js", router_hash);
         router_rel_path = Some(format!("/{}", r_rel));
         write_file(&out_dir_tmp.join(&r_rel), &router_source)?;
+        expected_asset_contents.insert(r_rel, router_source);
     }
 
-    verify_emitted_js_imports(&out_dir_tmp)?;
+    if let Some(meta) = &vendor_result {
+        let vendor_path = out_dir_tmp.join("assets").join(&meta.filename);
+        expected_asset_contents.insert(format!("assets/{}", meta.filename), meta.content.clone());
+        if !vendor_path.exists() {
+            write_file(&vendor_path, &meta.content)?;
+        }
+    }
+
+    for (rel, content) in &expected_asset_contents {
+        let path = out_dir_tmp.join(rel);
+        if !path.exists() {
+            write_file(&path, content)?;
+        }
+    }
+
+    let known_emitted_assets = expected_asset_contents
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    verify_emitted_js_imports(&out_dir_tmp, &known_emitted_assets)?;
 
     // Final Manifest with Router
     let final_manifest = Manifest {
@@ -800,13 +828,35 @@ fn run() -> Result<(), String> {
     }
 
     // 8. Atomic Swap
-    // dist_tmp -> dist
-    if out_dir.exists() {
-        fs::remove_dir_all(&out_dir)
-            .map_err(|e| format!("failed to remove existing out_dir: {e}"))?;
+    // Move the current dist aside first so the live output is not blocked on a
+    // recursive delete. This keeps the serving gap to a narrow rename handoff.
+    let legacy_out_dir_prev = out_dir.with_extension("prev");
+    if legacy_out_dir_prev.exists() {
+        let _ = fs::remove_dir_all(&legacy_out_dir_prev);
     }
-    fs::rename(&out_dir_tmp, &out_dir)
-        .map_err(|e| format!("failed to rename temp dir to output dir: {e}"))?;
+    let backup_token = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let out_dir_prev =
+        out_dir.with_extension(format!("prev.{}.{}", process::id(), backup_token));
+    if out_dir.exists() {
+        fs::rename(&out_dir, &out_dir_prev)
+            .map_err(|e| format!("failed to move existing out_dir to backup '{}': {e}", out_dir_prev.display()))?;
+    }
+    if let Err(error) = fs::rename(&out_dir_tmp, &out_dir) {
+        if out_dir_prev.exists() && !out_dir.exists() {
+            let _ = fs::rename(&out_dir_prev, &out_dir);
+        }
+        return Err(format!(
+            "failed to rename temp dir '{}' to output dir '{}': {error}",
+            out_dir_tmp.display(),
+            out_dir.display()
+        ));
+    }
+    if out_dir_prev.exists() {
+        let _ = fs::remove_dir_all(&out_dir_prev);
+    }
 
     Ok(())
 }
@@ -1428,7 +1478,10 @@ fn has_runtime_zen_reference(js: &str) -> bool {
     specifier_re.is_match(js)
 }
 
-fn verify_emitted_js_imports(out_dir: &PathBuf) -> Result<(), String> {
+fn verify_emitted_js_imports(
+    out_dir: &PathBuf,
+    known_emitted_assets: &BTreeSet<String>,
+) -> Result<(), String> {
     let assets_dir = out_dir.join("assets");
     if !assets_dir.exists() {
         return Ok(());
@@ -1477,7 +1530,11 @@ fn verify_emitted_js_imports(out_dir: &PathBuf) -> Result<(), String> {
                         )
                     })?
             } else if spec.starts_with('/') {
-                out_dir.join(spec.trim_start_matches('/'))
+                let normalized = spec.trim_start_matches('/').replace('\\', "/");
+                if known_emitted_assets.contains(&normalized) {
+                    continue;
+                }
+                out_dir.join(normalized)
             } else {
                 return Err(format!(
                     "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: bare imports must be rewritten to emitted assets (vendor or relative module) before finalization",
@@ -2965,17 +3022,7 @@ fn generate_entry_js(
         ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
     )
     .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
-    js.push_str(&format!("const __zenith_static_ssr_data = {};\n", ssr_json));
-    js.push_str("function __zenith_read_ssr_data(staticValue) {\n");
-    js.push_str("  const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;\n");
-    js.push_str("  if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {\n");
-    js.push_str("    return runtimeValue;\n");
-    js.push_str("  }\n");
-    js.push_str("  return staticValue;\n");
-    js.push_str("}\n");
-    js.push_str("const __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);\n");
-    js.push_str("const data = __zenith_ssr_data;\n");
-    js.push_str("const ssr_data = __zenith_ssr_data;\n");
+    js.push_str(&page_runtime::render_runtime_data_helpers(&ssr_json));
     for block in &ir.hoisted.code {
         let trimmed = block.trim();
         if !trimmed.is_empty() {
@@ -3100,30 +3147,9 @@ fn generate_entry_js(
         "const __zenith_components = {};\n",
         components_table
     ));
-    js.push_str("const __zenith_has_route_html = true;\n");
-    js.push_str("function __zenith_apply_route_html(root) {\n");
-    js.push_str("  if (typeof __zenith_html !== 'string' || __zenith_html.length === 0) {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (typeof Document === 'undefined' || !(root instanceof Document)) {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (typeof DOMParser === 'undefined') {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  const parser = new DOMParser();\n");
-    js.push_str("  const parsed = parser.parseFromString(__zenith_html, 'text/html');\n");
-    js.push_str("  const currentApp = root.getElementById('app');\n");
-    js.push_str("  const nextApp = parsed.getElementById('app');\n");
-    js.push_str("  if (currentApp && nextApp) {\n");
-    js.push_str("    currentApp.replaceWith(nextApp);\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (root.body && parsed.body) {\n");
-    js.push_str("    root.body.replaceChildren(...parsed.body.children);\n");
-    js.push_str("  }\n");
-    js.push_str("}\n");
+    js.push_str(page_runtime::render_route_html_helpers());
     js.push_str("export function __zenith_mount(root = document, params = {}) {\n");
+    js.push_str("  __zenith_refresh_runtime_data();\n");
     js.push_str("  if (__zenith_has_route_html === true) {\n");
     js.push_str("    __zenith_apply_route_html(root);\n");
     js.push_str("  }\n");

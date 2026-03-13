@@ -12,6 +12,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
@@ -358,7 +359,16 @@ pub fn compile_tailwind_entry(
         input_path.display(),
         sha256_hex(source.as_bytes())
     );
-    let tmp_name = format!("zenith-tailwind-{}.css", stable_hash_8(&hash_seed));
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let tmp_name = format!(
+        "zenith-tailwind-{}-{}-{}.css",
+        stable_hash_8(&hash_seed),
+        std::process::id(),
+        unique_suffix
+    );
     let out_path = env::temp_dir().join(tmp_name);
 
     let output = Command::new(&cli_bin)

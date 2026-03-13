@@ -191,6 +191,38 @@ export function readCliPackageVersion(): string {
     }
 }
 
+function workspacePackageManifestPath(packageName: string): string {
+    switch (packageName) {
+        case '@zenithbuild/cli':
+            return resolve(CLI_ROOT, 'package.json');
+        case '@zenithbuild/core':
+            return resolve(CLI_ROOT, '../core/package.json');
+        case '@zenithbuild/compiler':
+            return resolve(CLI_ROOT, '../compiler/package.json');
+        case '@zenithbuild/runtime':
+            return resolve(CLI_ROOT, '../runtime/package.json');
+        case '@zenithbuild/router':
+            return resolve(CLI_ROOT, '../router/package.json');
+        case '@zenithbuild/bundler':
+            return resolve(CLI_ROOT, '../bundler/package.json');
+        default:
+            return '';
+    }
+}
+
+export function readWorkspacePackageVersion(packageName: string): string | null {
+    const manifestPath = workspacePackageManifestPath(packageName);
+    if (!manifestPath || !existsSync(manifestPath)) {
+        return null;
+    }
+    try {
+        const pkg = JSON.parse(readFileSync(manifestPath, 'utf8')) as { version?: unknown };
+        return typeof pkg.version === 'string' ? pkg.version : null;
+    } catch {
+        return null;
+    }
+}
+
 function createInstalledPlatformPackageCandidate(
     tool: ToolchainTool,
     packages: Record<string, PlatformPackageDefinition>,

@@ -66,7 +66,9 @@ fn multiple_attributes_then_children() {
     assert!(output.contains(r#"__zenith_expr = ["a", "b", "c", "d"]"#));
     assert!(output.contains(r#"data-zx-x="0""#));
     assert!(output.contains(r#"data-zx-y="1""#));
-    assert!(output.contains(r#"data-zx-e="2 3""#));
+    assert!(output.contains(r#"<span data-zx-e="2" style="display: contents"></span>"#));
+    assert!(output.contains(r#"<span data-zx-e="3" style="display: contents"></span>"#));
+    assert!(!output.contains(r#"data-zx-e="2 3""#));
 }
 
 #[test]
@@ -122,4 +124,23 @@ fn no_expression_merging() {
     assert!(output.contains(r#"__zenith_expr = ["a", "b"]"#));
     // Not merged into one
     assert!(!output.contains(r#"__zenith_expr = ["ab"]"#));
+}
+
+#[test]
+fn mixed_inline_text_and_code_use_stable_placeholders() {
+    let output = compile(r#"<p>{before}<code>{code}</code>{after}</p>"#);
+
+    assert!(output.contains(r#"__zenith_expr = ["before", "code", "after"]"#));
+    assert!(output.contains(r#"<span data-zx-e="0" style="display: contents"></span><code data-zx-e="1"></code><span data-zx-e="2" style="display: contents"></span>"#));
+    assert!(!output.contains(r#"<p data-zx-e="0 2">"#));
+}
+
+#[test]
+fn raw_text_elements_collapse_static_and_dynamic_content() {
+    let output = compile(r#"<title>ZenithBuild | {pageTitle}</title>"#);
+
+    assert!(output.contains(r#"ZenithBuild | "#));
+    assert!(output.contains(r#"pageTitle"#));
+    assert!(output.contains(r#"<title data-zx-e="0"></title>"#));
+    assert!(!output.contains("display: contents"));
 }

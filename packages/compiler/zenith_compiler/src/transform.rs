@@ -327,8 +327,84 @@ impl Transformer {
             }
         }
 
+        let raw_text_container = Self::is_raw_text_container(&elem.tag);
+        let raw_text_only_children = elem
+            .children
+            .iter()
+            .all(|child| matches!(child, Node::Text(_) | Node::Expression { .. }));
         let mut new_children = Vec::new();
         let mut expression_indices = Vec::new();
+        let expression_child_count = elem
+            .children
+            .iter()
+            .filter(|child| matches!(child, Node::Expression { .. }))
+            .count();
+        let has_non_expression_children = elem.children.iter().any(|child| match child {
+            Node::Expression { .. } => false,
+            Node::Text(text) => !text.trim().is_empty(),
+            _ => true,
+        });
+        let materialize_text_placeholders = !raw_text_container
+            && (expression_child_count > 1 || (expression_child_count > 0 && has_non_expression_children));
+
+        if raw_text_container && raw_text_only_children && expression_child_count > 0 {
+            let mut combined_parts = Vec::new();
+            let mut combined_source = None;
+
+            for child in elem.children {
+                match child {
+                    Node::Text(text) => {
+                        if !text.is_empty() {
+                            combined_parts.push(Self::quote_js_string(&text));
+                        }
+                    }
+                    Node::Expression { value, span } => {
+                        let rewritten = self.rewrite_expression(&value, RewriteContext::Text);
+                        combined_parts.push(format!("({})", rewritten));
+                        if combined_source.is_none() {
+                            combined_source = Some(span);
+                        }
+                    }
+                    other => {
+                        new_children.push(self.transform_node(other));
+                    }
+                }
+            }
+
+            let combined_expression = if combined_parts.is_empty() {
+                "\"\"".to_string()
+            } else {
+                combined_parts.join(" + ")
+            };
+
+            let idx = self.add_expression(combined_expression);
+            self.insert_marker(MarkerBinding {
+                index: idx,
+                kind: MarkerKind::Text,
+                selector: format!(r#"[data-zx-e~="{}"]"#, idx),
+                attr: None,
+                source: combined_source,
+            });
+            expression_indices.push(idx);
+            elem.children = new_children;
+
+            let indices_str = expression_indices
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            elem.attributes.push(Attribute::Static {
+                name: "data-zx-e".to_string(),
+                value: indices_str,
+            });
+
+            if pushed_scope {
+                self.scopes.pop();
+            }
+
+            return Node::Element(elem);
+        }
 
         for child in elem.children {
             match child {
@@ -345,7 +421,25 @@ impl Transformer {
                         attr: None,
                         source: Some(span),
                     });
-                    expression_indices.push(idx);
+                    if materialize_text_placeholders {
+                        new_children.push(Node::Element(ElementNode {
+                            tag: "span".to_string(),
+                            attributes: vec![
+                                Attribute::Static {
+                                    name: "data-zx-e".to_string(),
+                                    value: idx.to_string(),
+                                },
+                                Attribute::Static {
+                                    name: "style".to_string(),
+                                    value: "display: contents".to_string(),
+                                },
+                            ],
+                            children: vec![],
+                            self_closing: false,
+                        }));
+                    } else {
+                        expression_indices.push(idx);
+                    }
                 }
                 other => {
                     new_children.push(self.transform_node(other));
@@ -388,6 +482,26 @@ impl Transformer {
         }
 
         None
+    }
+
+    fn is_raw_text_container(tag: &str) -> bool {
+        matches!(tag, "title" | "textarea" | "script" | "style")
+    }
+
+    fn quote_js_string(value: &str) -> String {
+        let mut quoted = String::from("\"");
+        for ch in value.chars() {
+            match ch {
+                '\\' => quoted.push_str("\\\\"),
+                '"' => quoted.push_str("\\\""),
+                '\n' => quoted.push_str("\\n"),
+                '\r' => quoted.push_str("\\r"),
+                '\t' => quoted.push_str("\\t"),
+                _ => quoted.push(ch),
+            }
+        }
+        quoted.push('"');
+        quoted
     }
 
     fn rewrite_expression(&self, expr: &str, _context: RewriteContext) -> String {

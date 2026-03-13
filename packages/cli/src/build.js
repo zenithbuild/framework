@@ -13,7 +13,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { generateManifest } from './manifest.js';
@@ -21,6 +21,7 @@ import { buildComponentRegistry, expandComponents, extractTemplate, isDocumentMo
 import { collectExpandedComponentOccurrences } from './component-occurrences.js';
 import { findNextKnownComponentTag } from './component-tag-parser.js';
 import { applyOccurrenceRewritePlans, cloneComponentIrForInstance } from './component-instance-ir.js';
+import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
 import {
     createBundlerToolchain,
@@ -1024,7 +1025,7 @@ function extractServerScript(source, sourceFile, compilerOpts = {}) {
     const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     const serverMatches = [];
     const reservedServerExportRe =
-        /\bexport\s+const\s+(?:data|prerender|guard|load)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard)\s*\(|\bexport\s+const\s+(?:load|guard)\s*=/;
+        /\bexport\s+const\s+(?:data|prerender|guard|load|ssr_data|props|ssr)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard)\s*\(|\bexport\s+const\s+(?:load|guard)\s*=/;
 
     for (const match of source.matchAll(scriptRe)) {
         const attrs = String(match[1] || '');
@@ -2336,7 +2337,15 @@ async function collectAssets(rootDir) {
         entries.sort((a, b) => a.localeCompare(b));
         for (const name of entries) {
             const fullPath = join(dir, name);
-            const info = await stat(fullPath);
+            let info;
+            try {
+                info = await stat(fullPath);
+            } catch (error) {
+                if (error && typeof error === 'object' && error.code === 'ENOENT') {
+                    continue;
+                }
+                throw error;
+            }
             if (info.isDirectory()) {
                 await walk(fullPath);
                 continue;
@@ -2378,9 +2387,6 @@ export async function build(options) {
         experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true || config.experimental?.embeddedMarkupExpressions === true,
         strictDomLints: config.strictDomLints === true
     };
-
-    await rm(outDir, { recursive: true, force: true });
-    await mkdir(outDir, { recursive: true });
 
     ensureToolchainCompatibility(bundlerBin);
     const resolvedBundlerCandidate = getActiveToolchainCandidate(bundlerBin);
@@ -2434,13 +2440,7 @@ export async function build(options) {
         const componentOccurrences = collectExpandedComponentOccurrences(rawSource, registry, sourceFile);
         const pageOwnerSource = extractServerScript(rawSource, sourceFile, compilerOpts).source;
 
-        const baseName = sourceFile.slice(0, -extname(sourceFile).length);
-        let adjacentGuard = null;
-        let adjacentLoad = null;
-        for (const ext of ['.ts', '.js']) {
-            if (!adjacentGuard && existsSync(`${baseName}.guard${ext}`)) adjacentGuard = `${baseName}.guard${ext}`;
-            if (!adjacentLoad && existsSync(`${baseName}.load${ext}`)) adjacentLoad = `${baseName}.load${ext}`;
-        }
+        const { guardPath: adjacentGuard, loadPath: adjacentLoad } = resolveAdjacentServerModules(sourceFile);
 
         // 2a. Expand PascalCase component tags
         const { expandedSource } = expandComponents(
@@ -2460,12 +2460,18 @@ export async function build(options) {
             }
         );
 
-        const hasGuard = (extractedServer.serverScript && extractedServer.serverScript.has_guard) || adjacentGuard !== null;
-        const hasLoad = (extractedServer.serverScript && extractedServer.serverScript.has_load) || adjacentLoad !== null;
+        const composedServer = composeServerScriptEnvelope({
+            sourceFile,
+            inlineServerScript: extractedServer.serverScript,
+            adjacentGuardPath: adjacentGuard,
+            adjacentLoadPath: adjacentLoad
+        });
+        const hasGuard = composedServer.serverScript?.has_guard === true;
+        const hasLoad = composedServer.serverScript?.has_load === true;
 
-        if (extractedServer.serverScript) {
-            pageIr.server_script = extractedServer.serverScript;
-            pageIr.prerender = extractedServer.serverScript.prerender === true;
+        if (composedServer.serverScript) {
+            pageIr.server_script = composedServer.serverScript;
+            pageIr.prerender = composedServer.serverScript.prerender === true;
             if (pageIr.ssr_data === undefined) {
                 pageIr.ssr_data = null;
             }
@@ -2482,8 +2488,8 @@ export async function build(options) {
         // Apply metadata to IR
         pageIr.has_guard = hasGuard;
         pageIr.has_load = hasLoad;
-        pageIr.guard_module_ref = adjacentGuard ? relative(srcDir, adjacentGuard).replaceAll('\\', '/') : null;
-        pageIr.load_module_ref = adjacentLoad ? relative(srcDir, adjacentLoad).replaceAll('\\', '/') : null;
+        pageIr.guard_module_ref = composedServer.guardPath ? relative(srcDir, composedServer.guardPath).replaceAll('\\', '/') : null;
+        pageIr.load_module_ref = composedServer.loadPath ? relative(srcDir, composedServer.loadPath).replaceAll('\\', '/') : null;
 
         // Ensure IR has required array fields for merging
         pageIr.components_scripts = pageIr.components_scripts || {};

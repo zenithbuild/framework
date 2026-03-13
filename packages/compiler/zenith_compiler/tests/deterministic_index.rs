@@ -29,8 +29,10 @@ fn sibling_expressions_indexed_left_to_right() {
     let output = compile(input);
 
     assert!(output.contains(r#"__zenith_expr = ["x", "y", "z"]"#));
-    // Parent div should have all three indices
-    assert!(output.contains(r#"data-zx-e="0 1 2""#));
+    assert!(output.contains(r#"<span data-zx-e="0" style="display: contents"></span>"#));
+    assert!(output.contains(r#"<span data-zx-e="1" style="display: contents"></span>"#));
+    assert!(output.contains(r#"<span data-zx-e="2" style="display: contents"></span>"#));
+    assert!(!output.contains(r#"data-zx-e="0 1 2""#));
 }
 
 #[test]
@@ -55,6 +57,9 @@ fn complex_interleaving_deep_nesting() {
     assert!(output.contains(r#"__zenith_expr = ["a", "b", "c", "d", "e"]"#));
     assert!(output.contains(r#"data-zx-id="0""#)); // a
     assert!(output.contains(r#"data-zx-class="1""#)); // b
+    assert!(output.contains(r#"<span data-zx-e="2" style="display: contents"></span><span data-zx-e="3"></span>"#)
+        || output.contains(r#"<span data-zx-e="2" style="display: contents"></span><span data-zx-e="3" style="display: contents"></span>"#)
+        || output.contains(r#"<span data-zx-e="2" style="display: contents"></span><span data-zx-e="3"></span>"#));
 }
 
 #[test]

@@ -2,6 +2,8 @@
 // events.spec.js — Route change event tests
 // ---------------------------------------------------------------------------
 
+import { jest } from '@jest/globals';
+
 import {
     onRouteChange,
     _dispatchRouteChange,
@@ -11,7 +13,9 @@ import {
     _getRouteProtectionPolicy,
     on,
     off,
-    _dispatchRouteEvent
+    _dispatchRouteEvent,
+    _dispatchRouteEventAsync,
+    _clearRouteEventListeners
 } from '../dist/events.js';
 
 describe('Route Change Events', () => {
@@ -107,6 +111,7 @@ describe('Route Change Events', () => {
 
 describe('Route Protection Events & Policy', () => {
     afterEach(() => {
+        _clearRouteEventListeners();
         // Reset defaults
         setRouteProtectionPolicy({
             onDeny: undefined,
@@ -139,6 +144,7 @@ describe('Route Protection Events & Policy', () => {
         expect(globalThis.__zenith_route_protection_policy.defaultLoginPath).toBe('/login-global');
         expect(globalThis.__zenith_route_event_listeners).toBeDefined();
         expect(globalThis.__zenith_route_event_listeners['route-check:start'] instanceof Set).toBe(true);
+        expect(globalThis.__zenith_route_event_listeners['navigation:before-leave'] instanceof Set).toBe(true);
     });
 
     test('event lifecycle dispatches listeners in order', () => {
@@ -174,5 +180,73 @@ describe('Route Protection Events & Policy', () => {
             'deny:403',
             'redirect:302'
         ]);
+    });
+
+    test('awaited lifecycle handlers run sequentially in registration order', async () => {
+        const order = [];
+        on('navigation:before-leave', async () => {
+            order.push('first:start');
+            await Promise.resolve();
+            order.push('first:end');
+        });
+        on('navigation:before-leave', async () => {
+            order.push('second:start');
+            await Promise.resolve();
+            order.push('second:end');
+        });
+
+        await _dispatchRouteEventAsync('navigation:before-leave', {
+            navigationId: 7,
+            navigationType: 'push',
+            to: new URL('https://example.com/about'),
+            from: new URL('https://example.com/'),
+            routeId: '/about',
+            params: {},
+            stage: 'before-leave'
+        });
+
+        expect(order).toEqual([
+            'first:start',
+            'first:end',
+            'second:start',
+            'second:end'
+        ]);
+    });
+
+    test('listener failures emit navigation:error without stopping later listeners', async () => {
+        const logs = [];
+        const errors = [];
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            on('navigation:error', (payload) => {
+                errors.push(payload);
+            });
+            on('navigation:before-swap', () => {
+                logs.push('first');
+                throw new Error('boom');
+            });
+            on('navigation:before-swap', () => {
+                logs.push('second');
+            });
+
+            await _dispatchRouteEventAsync('navigation:before-swap', {
+                navigationId: 11,
+                navigationType: 'push',
+                to: new URL('https://example.com/docs'),
+                from: new URL('https://example.com/about'),
+                routeId: '/docs',
+                params: {},
+                stage: 'before-swap'
+            });
+
+            expect(logs).toEqual(['first', 'second']);
+            expect(errors).toHaveLength(1);
+            expect(errors[0].reason).toBe('listener-error');
+            expect(errors[0].hook).toBe('navigation:before-swap');
+            expect(errors[0].routeId).toBe('/docs');
+        } finally {
+            errorSpy.mockRestore();
+        }
     });
 });

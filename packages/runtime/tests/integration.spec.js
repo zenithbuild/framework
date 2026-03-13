@@ -368,7 +368,7 @@ describe('hydrate integration contract', () => {
     });
 
     test('hydrates compiler ref bindings before mount effects and clears refs on cleanup', () => {
-        container.innerHTML = '<section data-zx-r="0"></section>';
+        container.innerHTML = '<section data-zx-ref="0"></section>';
         const nodeRef = { current: null };
 
         const unmount = hydrate({
@@ -377,19 +377,19 @@ describe('hydrate integration contract', () => {
             expressions: [],
             markers: [],
             events: [],
-            refs: [{ index: 0, state_index: 0, selector: '[data-zx-r="0"]' }],
+            refs: [{ index: 0, state_index: 0, selector: '[data-zx-ref="0"]' }],
             state_values: [nodeRef],
             state_keys: ['nodeRef'],
             signals: []
         });
 
-        expect(nodeRef.current).toBe(container.querySelector('[data-zx-r="0"]'));
+        expect(nodeRef.current).toBe(container.querySelector('[data-zx-ref="0"]'));
         unmount();
         expect(nodeRef.current).toBeNull();
     });
 
     test('zenMount ctx.cleanup exists (editor contract: snippets/docs claim it)', () => {
-        container.innerHTML = '<section data-zx-r="0"></section>';
+        container.innerHTML = '<section data-zx-ref="0"></section>';
         const nodeRef = { current: null };
         let cleanupExists = false;
 
@@ -399,13 +399,13 @@ describe('hydrate integration contract', () => {
             expressions: [],
             markers: [],
             events: [],
-            refs: [{ index: 0, state_index: 0, selector: '[data-zx-r="0"]' }],
+            refs: [{ index: 0, state_index: 0, selector: '[data-zx-ref="0"]' }],
             state_values: [nodeRef],
             state_keys: ['nodeRef'],
             signals: [],
             components: [{
                 instance: 'c0',
-                selector: '[data-zx-r="0"]',
+                selector: '[data-zx-ref="0"]',
                 props: [],
                 create: (_host, _props, runtime) => ({
                     mount() {
@@ -423,7 +423,7 @@ describe('hydrate integration contract', () => {
     });
 
     test('ref.current is set when zenMount callback runs (ref readiness invariant)', () => {
-        container.innerHTML = '<section data-zx-r="0">content</section>';
+        container.innerHTML = '<section data-zx-ref="0">content</section>';
         const nodeRef = { current: null };
         let refReadyInMount = null;
 
@@ -433,13 +433,13 @@ describe('hydrate integration contract', () => {
             expressions: [],
             markers: [],
             events: [],
-            refs: [{ index: 0, state_index: 0, selector: '[data-zx-r="0"]' }],
+            refs: [{ index: 0, state_index: 0, selector: '[data-zx-ref="0"]' }],
             state_values: [nodeRef],
             state_keys: ['nodeRef'],
             signals: [],
             components: [{
                 instance: 'c0',
-                selector: '[data-zx-r="0"]',
+                selector: '[data-zx-ref="0"]',
                 props: [{ name: 'nodeRef', type: 'static', value: nodeRef }],
                 create: (_host, props, runtime) => {
                     const ref = props.nodeRef;
@@ -458,11 +458,11 @@ describe('hydrate integration contract', () => {
         });
 
         expect(refReadyInMount).toBe(true);
-        expect(nodeRef.current).toBe(container.querySelector('[data-zx-r="0"]'));
+        expect(nodeRef.current).toBe(container.querySelector('[data-zx-ref="0"]'));
     });
 
     test('zenOn + zenMount cleanup: handler does not fire after unmount', () => {
-        container.innerHTML = '<section data-zx-r="0"></section>';
+        container.innerHTML = '<section data-zx-ref="0"></section>';
         const nodeRef = { current: null };
         let resizeCount = 0;
 
@@ -472,13 +472,13 @@ describe('hydrate integration contract', () => {
             expressions: [],
             markers: [],
             events: [],
-            refs: [{ index: 0, state_index: 0, selector: '[data-zx-r="0"]' }],
+            refs: [{ index: 0, state_index: 0, selector: '[data-zx-ref="0"]' }],
             state_values: [nodeRef],
             state_keys: ['nodeRef'],
             signals: [],
             components: [{
                 instance: 'c0',
-                selector: '[data-zx-r="0"]',
+                selector: '[data-zx-ref="0"]',
                 props: [
                     { name: 'zenOn', type: 'static', value: zenOn },
                     { name: 'zenWindow', type: 'static', value: zenWindow }
