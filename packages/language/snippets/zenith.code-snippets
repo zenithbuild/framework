@@ -1,4 +1,56 @@
 {
+  "zen-component": {
+    "prefix": "zen-component",
+    "body": [
+      "<script lang=\"ts\">",
+      "\t$0",
+      "</script>",
+      "",
+      "<${1:main} class=\"${2:root}\">",
+      "\t",
+      "</${1:main}>"
+    ],
+    "description": "Zenith component skeleton with script and markup"
+  },
+  "zen-server-script": {
+    "prefix": "zen-server-script",
+    "body": [
+      "<script server lang=\"ts\">",
+      "\t$0",
+      "</script>"
+    ],
+    "description": "Server-side script block"
+  },
+  "zen-setup-script": {
+    "prefix": "zen-setup-script",
+    "body": [
+      "<script setup=\"ts\">",
+      "import ${1:Component} from \"${2:@/components/${1:Component}.zen}\"",
+      "",
+      "$0",
+      "</script>"
+    ],
+    "description": "Setup script block with component import"
+  },
+  "zen-guard-load": {
+    "prefix": "zen-guard-load",
+    "body": [
+      "<script server lang=\"ts\">",
+      "import { allow, redirect, deny, data } from '@zenithbuild/core/server'",
+      "",
+      "export const guard = async (ctx) => {",
+      "\t${1:// return allow(), redirect(url), or deny()}",
+      "\treturn allow()",
+      "}",
+      "",
+      "export const load = async (ctx) => {",
+      "\t$0",
+      "\treturn data({})",
+      "}",
+      "</script>"
+    ],
+    "description": "Route guard and load pattern for protected routes"
+  },
   "state-toggle": {
     "prefix": "state-toggle",
     "body": [

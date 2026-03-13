@@ -14,13 +14,40 @@
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
     { "open": "\"", "close": "\"" },
-    { "open": "'", "close": "'" }
+    { "open": "'", "close": "'" },
+    { "open": "`", "close": "`" },
+    { "open": "<!--", "close": "-->", "notIn": ["string"] }
   ],
   "surroundingPairs": [
     ["{", "}"],
     ["[", "]"],
     ["(", ")"],
     ["\"", "\""],
-    ["'", "'"]
-  ]
+    ["'", "'"],
+    ["`", "`"],
+    ["<", ">"]
+  ],
+  "colorizedBracketPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "wordPattern": "[A-Za-z_$][\\w$]*(?::[A-Za-z_][\\w-]*)*",
+  "indentationRules": {
+    "increaseIndentPattern": "<(?!area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr|/|!)[A-Za-z][\\w:-]*[^/>]*>(?!.*</)|\\{[^}]*$|\\([^)]*$",
+    "decreaseIndentPattern": "^\\s*(<\\/[A-Za-z][\\w:-]*>|\\}|\\))"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "<(?!area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)([A-Za-z][\\w:-]*)(?:[^/>]*?)>",
+      "afterText": "</\\1>",
+      "action": { "indent": "indentOutdent", "appendText": "\t" }
+    }
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*<!--\\s*#region\\b",
+      "end": "^\\s*<!--\\s*#endregion\\b"
+    }
+  }
 }

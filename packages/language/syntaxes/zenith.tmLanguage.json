@@ -4,7 +4,10 @@
   "scopeName": "text.html.zenith",
   "patterns": [
     { "include": "#comment" },
+    { "include": "#script-server-typescript" },
+    { "include": "#script-setup-typescript" },
     { "include": "#script-typescript" },
+    { "include": "#script-plain" },
     { "include": "#style-tag" },
     { "include": "#closing-tag" },
     { "include": "#opening-tag" },
@@ -15,6 +18,44 @@
       "begin": "<!--",
       "end": "-->",
       "name": "comment.block.zenith"
+    },
+    "script-server-typescript": {
+      "begin": "(<)(script)\\b(?=[^>]*\\bserver\\b)(?=[^>]*\\blang\\s*=\\s*(['\"])(?:ts|typescript)\\3)([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "4": { "name": "meta.tag.attributes.zenith" },
+        "5": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "end": "(</)(script)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "3": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "contentName": "meta.embedded.block.typescript source.ts",
+      "patterns": [
+        { "include": "source.ts" }
+      ]
+    },
+    "script-setup-typescript": {
+      "begin": "(<)(script)\\b(?=[^>]*\\bsetup\\s*=\\s*(['\"])(?:ts|typescript)\\3)([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "4": { "name": "meta.tag.attributes.zenith" },
+        "5": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "end": "(</)(script)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "3": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "contentName": "meta.embedded.block.typescript source.ts",
+      "patterns": [
+        { "include": "source.ts" }
+      ]
     },
     "script-typescript": {
       "begin": "(<)(script)\\b(?=[^>]*\\blang\\s*=\\s*(['\"])(?:ts|typescript)\\3)([^>]*)(>)",
@@ -34,6 +75,23 @@
       "patterns": [
         { "include": "source.ts" }
       ]
+    },
+    "script-plain": {
+      "begin": "(<)(script)\\b([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "3": { "name": "meta.tag.attributes.zenith" },
+        "4": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "end": "(</)(script)(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.zenith" },
+        "2": { "name": "entity.name.tag.script.zenith" },
+        "3": { "name": "punctuation.definition.tag.end.zenith" }
+      },
+      "contentName": "meta.embedded.block.script.zenith",
+      "patterns": []
     },
     "style-tag": {
       "begin": "(<)(style)\\b([^>]*)(>)",
@@ -55,7 +113,7 @@
       ]
     },
     "closing-tag": {
-      "match": "(</)([A-Za-z][\\w:-]*)(>)",
+      "match": "(</)([-A-Za-z][\\w:-]*)(>)",
       "captures": {
         "1": { "name": "punctuation.definition.tag.begin.zenith" },
         "2": { "name": "entity.name.tag.zenith" },
@@ -63,7 +121,7 @@
       }
     },
     "opening-tag": {
-      "begin": "(<)([A-Za-z][\\w:-]*)",
+      "begin": "(<)([-A-Za-z][\\w:-]*)",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.tag.begin.zenith" },
         "2": { "name": "entity.name.tag.zenith" }

@@ -43,7 +43,7 @@ function createEventCompletion(label: string): CompletionItem {
         }
       : {}),
     insertTextFormat: InsertTextFormat.Snippet,
-    insertText: `${label}={$1:handler}`
+    insertText: `${label}={\${1:handler}}`
   };
 }
 
@@ -53,7 +53,7 @@ function createPropHandlerCompletion(): CompletionItem {
     kind: CompletionItemKind.Snippet,
     detail: 'Pass handler props through components, then bind them back to on:* in component markup.',
     insertTextFormat: InsertTextFormat.Snippet,
-    insertText: 'onClick={$1:handler}'
+    insertText: 'onClick={${1:handler}}'
   };
 }
 
