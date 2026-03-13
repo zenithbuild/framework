@@ -1,0 +1,70 @@
+<script lang="ts">
+export interface Props {
+  href?: string;
+  class?: string;
+  target?: string;
+  rel?: string;
+  id?: string;
+  title?: string;
+  ariaLabel?: string;
+  ariaCurrent?: string;
+  ariaDisabled?: string;
+  elementRef?: any;
+  onClick?: (event: MouseEvent) => void;
+  onHoverIn?: (event: PointerEvent) => void;
+  onHoverOut?: (event: PointerEvent) => void;
+  onFocus?: (event: FocusEvent) => void;
+  onBlur?: (event: FocusEvent) => void;
+}
+
+const zenLinkProps = props as Props;
+const zenLinkHref = typeof zenLinkProps.href === "string" ? zenLinkProps.href : "";
+const zenLinkClass = typeof zenLinkProps.class === "string" ? zenLinkProps.class : "";
+const zenLinkTarget = typeof zenLinkProps.target === "string" ? zenLinkProps.target : "";
+const zenLinkRel = typeof zenLinkProps.rel === "string" ? zenLinkProps.rel : "";
+const zenLinkId = typeof zenLinkProps.id === "string" ? zenLinkProps.id : "";
+const zenLinkTitle = typeof zenLinkProps.title === "string" ? zenLinkProps.title : "";
+const zenLinkAriaLabel = typeof zenLinkProps.ariaLabel === "string" ? zenLinkProps.ariaLabel : "";
+const zenLinkAriaCurrent = typeof zenLinkProps.ariaCurrent === "string" ? zenLinkProps.ariaCurrent : "";
+const zenLinkAriaDisabled = typeof zenLinkProps.ariaDisabled === "string" ? zenLinkProps.ariaDisabled : "";
+const zenLinkElementRef = zenLinkProps.elementRef;
+const zenLinkRef = ref<HTMLAnchorElement>();
+const zenLinkClick = typeof zenLinkProps.onClick === "function" ? zenLinkProps.onClick : undefined;
+const zenLinkHoverIn = typeof zenLinkProps.onHoverIn === "function" ? zenLinkProps.onHoverIn : undefined;
+const zenLinkHoverOut = typeof zenLinkProps.onHoverOut === "function" ? zenLinkProps.onHoverOut : undefined;
+const zenLinkFocus = typeof zenLinkProps.onFocus === "function" ? zenLinkProps.onFocus : undefined;
+const zenLinkBlur = typeof zenLinkProps.onBlur === "function" ? zenLinkProps.onBlur : undefined;
+
+zenMount((ctx) => {
+  if (zenLinkElementRef) {
+    zenLinkElementRef.current = zenLinkRef.current;
+  }
+
+  ctx.cleanup(() => {
+    if (zenLinkElementRef) {
+      zenLinkElementRef.current = null;
+    }
+  });
+});
+</script>
+
+<a
+  ref={zenLinkRef}
+  data-zen-link="true"
+  href={zenLinkHref || undefined}
+  class={zenLinkClass || undefined}
+  target={zenLinkTarget || undefined}
+  rel={zenLinkRel || undefined}
+  id={zenLinkId || undefined}
+  title={zenLinkTitle || undefined}
+  aria-label={zenLinkAriaLabel || undefined}
+  aria-current={zenLinkAriaCurrent || undefined}
+  aria-disabled={zenLinkAriaDisabled || undefined}
+  on:click={zenLinkClick}
+  on:hoverin={zenLinkHoverIn}
+  on:hoverout={zenLinkHoverOut}
+  on:focus={zenLinkFocus}
+  on:blur={zenLinkBlur}
+>
+  <slot></slot>
+</a>

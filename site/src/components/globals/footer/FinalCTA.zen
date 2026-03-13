@@ -1,10 +1,10 @@
 <script lang="ts">
-import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import Button from "../ui/Button.zen";
+import SectionShell from "../../sections/SectionShell.zen";
+import Heading from "../../ui/Heading.zen";
+import Links from "../../ui/Links.zen";
 </script>
 
-<SectionShell tone="base" height="screen">
+<SectionShell tone="base" dense>
   <div class="flex flex-col flex-1">
 
     <!-- top zone: empty spacer — closing plate uses pure whitespace at top -->
@@ -22,12 +22,12 @@ import Button from "../ui/Button.zen";
     <!-- bottom zone: closing CTAs matching Hero language -->
     <div class="shrink-0 flex flex-col gap-6 pt-8 border-t border-border">
       <div class="flex gap-4">
-        <Button variant="primary" href="/docs">Start building</Button>
-        <Button variant="ghost" href="https://github.com/nicholasgriffintn/zenithbuild">GitHub</Button>
+        <Links surface="button" variant="primary" href="/docs">Start building</Links>
+        <Links surface="button" variant="ghost" href="https://github.com/zenithbuild/framework">GitHub</Links>
       </div>
       <div class="flex gap-8 text-xs text-muted-foreground font-mono">
         <span>MIT Licensed</span>
-        <span>v0.6.x</span>
+        <span>Release notes live</span>
         <span>@zenithbuild</span>
       </div>
     </div>

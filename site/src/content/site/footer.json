@@ -1,0 +1,91 @@
+{
+  "cta": {
+    "title": "BUILD ZENITH",
+    "description": "Zenith compiles your intent into the smallest possible output. No virtual DOM. No runtime framework. Just your application.",
+    "actions": [
+      {
+        "label": "Start building",
+        "href": "/docs"
+      },
+      {
+        "label": "GitHub",
+        "href": "https://github.com/zenithbuild/framework"
+      }
+    ]
+  },
+  "nav": {
+    "brand": {
+      "label": "Zenith.",
+      "description": "Deterministic web tooling with compiler-backed runtime and editor contracts kept on the same public surface."
+    },
+    "groups": [
+      {
+        "title": "Categories",
+        "links": [
+          {
+            "label": "Home",
+            "href": "/"
+          },
+          {
+            "label": "About",
+            "href": "/about"
+          },
+          {
+            "label": "Documentation",
+            "href": "/docs"
+          },
+          {
+            "label": "Blog",
+            "href": "/blog"
+          },
+          {
+            "label": "Editor Contract",
+            "href": "/docs#editor-contract"
+          }
+        ]
+      },
+      {
+        "title": "Resources",
+        "links": [
+          {
+            "label": "GitHub",
+            "href": "https://github.com/zenithbuild/framework"
+          },
+          {
+            "label": "Release Notes",
+            "href": "/blog"
+          },
+          {
+            "label": "Editor Tooling",
+            "href": "/docs#editor-contract"
+          },
+          {
+            "label": "Install Guide",
+            "href": "/docs#install-compatibility"
+          }
+        ]
+      },
+      {
+        "title": "Contact",
+        "links": [
+          {
+            "label": "hi@zenithbuild.dev",
+            "href": "mailto:hi@zenithbuild.dev"
+          },
+          {
+            "label": "Press & Media",
+            "href": "mailto:press@zenithbuild.dev"
+          },
+          {
+            "label": "Partnerships",
+            "href": "mailto:partners@zenithbuild.dev"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "copyrightPrefix": "Zenith Framework ©",
+    "signature": "Designed & Engineered by Zenithbuild"
+  }
+}

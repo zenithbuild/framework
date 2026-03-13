@@ -1,75 +1,82 @@
 <script lang="ts">
+import Links from "../../ui/Links.zen";
 import ZenithLogo from "../../ui/ZenithLogo.zen";
+
+interface Props {
+  content: any;
+}
+
+const footerNavContent = (props as Props).content;
 </script>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 w-full">
   
-  <div class="flex flex-col gap-6 lg:justify-start">
-    <a href="/" class="flex items-center gap-2 drop-shadow-sm transition-transform hover:scale-105" aria-label="Home">
+  <div data-footer-nav-group class="flex flex-col gap-6 lg:justify-start">
+    <Links href="/" class="flex items-center gap-2 drop-shadow-sm transition-transform hover:scale-105" ariaLabel="Home">
       <div class="h-8 w-8 text-foreground">
         <ZenithLogo />
       </div>
-      <span class="font-[var(--zen-font-heading)] font-semibold text-xl tracking-tight text-foreground">Zenith.</span>
-    </a>
+      <span class="font-[var(--zen-font-heading)] font-semibold text-xl tracking-tight text-foreground">{footerNavContent.nav.brand.label}</span>
+    </Links>
     <p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-      A new standard for web development. Building the future of the web with reactivity, speed, and elegance.
+      {footerNavContent.nav.brand.description}
     </p>
   </div>
 
-  <div class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">Categories</h3>
-    <a href="/" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Home
+  <div data-footer-nav-group class="flex flex-col gap-4">
+    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[0].title}</h3>
+    <Links href={footerNavContent.nav.groups[0].links[0].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[0].links[0].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="/docs" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Documentation
+    </Links>
+    <Links href={footerNavContent.nav.groups[0].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[0].links[1].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="/blog" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Blog
+    </Links>
+    <Links href={footerNavContent.nav.groups[0].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[0].links[2].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="/docs/zenith-contract" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Zenith Contract
+    </Links>
+    <Links href={footerNavContent.nav.groups[0].links[3].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[0].links[3].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
+    </Links>
   </div>
 
-  <div class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">Resources</h3>
-    <a href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      GitHub
+  <div data-footer-nav-group class="flex flex-col gap-4">
+    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[1].title}</h3>
+    <Links href={footerNavContent.nav.groups[1].links[0].href} target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[1].links[0].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="https://twitter.com/zenithbuild" target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Twitter
+    </Links>
+    <Links href={footerNavContent.nav.groups[1].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[1].links[1].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Awwwards Profile
+    </Links>
+    <Links href={footerNavContent.nav.groups[1].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[1].links[2].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Brand Assets
+    </Links>
+    <Links href={footerNavContent.nav.groups[1].links[3].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[1].links[3].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
+    </Links>
   </div>
 
-  <div class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">Contact</h3>
-    <a href="mailto:hi@zenithbuild.dev" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      hi@zenithbuild.dev
+  <div data-footer-nav-group class="flex flex-col gap-4">
+    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[2].title}</h3>
+    <Links href={footerNavContent.nav.groups[2].links[0].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[2].links[0].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="mailto:press@zenithbuild.dev" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Press & Media
+    </Links>
+    <Links href={footerNavContent.nav.groups[2].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[2].links[1].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
-    <a href="mailto:partners@zenithbuild.dev" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      Partnerships
+    </Links>
+    <Links href={footerNavContent.nav.groups[2].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+      {footerNavContent.nav.groups[2].links[2].label}
       <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </a>
+    </Links>
   </div>
 
 </div>

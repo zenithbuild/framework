@@ -1,41 +1,455 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
+import SectionIntro from "./SectionIntro.zen";
+import ScrollEnterGroup from "./ScrollEnterGroup.zen";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+
+interface Props {
+  content: any;
+}
+
+const runtimePrinciplesContent = (props as Props).content;
+const principleOne = runtimePrinciplesContent.principles[0];
+const principleTwo = runtimePrinciplesContent.principles[1];
+const principleThree = runtimePrinciplesContent.principles[2];
+
+const principleOneRef = ref<HTMLElement>();
+const principleTwoRef = ref<HTMLElement>();
+const principleThreeRef = ref<HTMLElement>();
+const runtimePrinciplesRef = ref<HTMLDivElement>();
+
+interface PrincipleParts {
+  title: HTMLElement | null;
+  copy: HTMLElement[];
+  meta: HTMLElement[];
+  panels: HTMLElement[];
+}
+
+type SmoothScrollProfile = "default" | "focus";
+const SMOOTH_SCROLL_PROFILE_EVENT = "zx-smooth-scroll-profile";
+
+function collectScopedElements(root: HTMLElement, selector: string): HTMLElement[] {
+  // zen-allow:dom-query scoped SplitText targeting inside pinned principle refs
+  return Array.from(root.querySelectorAll(selector)) as HTMLElement[];
+}
+
+function resolvePrincipleParts(root: HTMLElement): PrincipleParts {
+  // zen-allow:dom-query scoped SplitText targeting inside pinned principle refs
+  const title = root.querySelector("[data-story-title]") as HTMLElement | null;
+  return {
+    title,
+    copy: collectScopedElements(root, "[data-story-copy]"),
+    meta: collectScopedElements(root, "[data-story-meta]"),
+    panels: collectScopedElements(root, "[data-story-panel]"),
+  };
+}
+
+function clearPrincipleState(root: HTMLElement) {
+  const parts = resolvePrincipleParts(root);
+  gsap.set(parts.panels, { clearProps: "all" });
+}
+
+function setSmoothScrollProfile(profile: SmoothScrollProfile) {
+  const doc = zenDocument();
+  if (!doc) return;
+  doc.dispatchEvent(new CustomEvent(SMOOTH_SCROLL_PROFILE_EVENT, { detail: { profile } }));
+}
+
+function buildPrincipleTimeline(root: HTMLElement) {
+  const parts = resolvePrincipleParts(root);
+  const titleSplit = parts.title ? SplitText.create(parts.title, { type: "words,chars", mask: "chars" }) : null;
+  const copySplits = parts.copy.map((node) => SplitText.create(node, { type: "lines", mask: "lines" }));
+  const metaSplits = parts.meta.map((node) => SplitText.create(node, { type: "lines", mask: "lines" }));
+
+  const titleChars = titleSplit ? Array.from(titleSplit.chars) : [];
+  const copyLines = copySplits.flatMap((split) => Array.from(split.lines));
+  const metaLines = metaSplits.flatMap((split) => Array.from(split.lines));
+  const panels = parts.panels;
+
+  gsap.set(titleChars, {
+    yPercent: 112,
+    opacity: 0,
+    transformOrigin: "50% 100%",
+  });
+  gsap.set(copyLines, { yPercent: 108, opacity: 0 });
+  gsap.set(metaLines, { yPercent: 96, opacity: 0 });
+  gsap.set(panels, { y: 32, opacity: 0 });
+
+  const titleDuration = 0.3;
+  const copyDuration = 0.38;
+  const metaDuration = 0.3;
+  const panelDuration = 0.34;
+  const holdDuration = 0.62;
+
+  const timeline = gsap.timeline({
+    defaults: { ease: "power3.out" },
+    scrollTrigger: {
+      trigger: root,
+      start: "top top+=8%",
+      end: () => {
+        const win = zenWindow();
+        const distance = win ? Math.max(1360, Math.round(win.innerHeight * 1.9)) : 1480;
+        return `+=${distance}`;
+      },
+      scrub: 1.65,
+      pin: true,
+      pinSpacing: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+    },
+  });
+
+  timeline
+    .to(titleChars, {
+      yPercent: 0,
+      opacity: 1,
+      duration: titleDuration,
+      stagger: 0.014,
+      ease: "power4.out",
+    }, 0)
+    .to(copyLines, {
+      yPercent: 0,
+      opacity: 1,
+      duration: copyDuration,
+      stagger: 0.08,
+    }, 0.06)
+    .to(metaLines, {
+      yPercent: 0,
+      opacity: 1,
+      duration: metaDuration,
+      stagger: 0.06,
+    }, 0.12)
+    .to(panels, {
+      y: 0,
+      opacity: 1,
+      duration: panelDuration,
+      stagger: 0.08,
+    }, 0.14)
+    .to({}, { duration: holdDuration })
+    .to(titleChars, {
+      yPercent: -104,
+      opacity: 0,
+      duration: 0.18,
+      stagger: 0.012,
+      ease: "power2.in",
+    }, ">")
+    .to(copyLines, {
+      yPercent: -110,
+      opacity: 0,
+      duration: 0.2,
+      stagger: 0.05,
+      ease: "power2.in",
+    }, "<+0.04")
+    .to(metaLines, {
+      yPercent: -96,
+      opacity: 0,
+      duration: 0.18,
+      stagger: 0.04,
+      ease: "power2.in",
+    }, "<+0.05")
+    .to(panels, {
+      y: -28,
+      opacity: 0,
+      duration: 0.18,
+      stagger: 0.06,
+      ease: "power2.in",
+    }, "<");
+
+  return () => {
+    timeline.kill();
+    titleSplit?.revert();
+    copySplits.forEach((split) => split.revert());
+    metaSplits.forEach((split) => split.revert());
+    gsap.set(panels, { clearProps: "all" });
+  };
+}
+
+zenMount((ctx) => {
+  gsap.registerPlugin(ScrollTrigger, SplitText);
+
+  const groups = collectRefs(principleOneRef, principleTwoRef, principleThreeRef) as HTMLElement[];
+  if (groups.length === 0) return;
+  const slowZone = runtimePrinciplesRef.current;
+
+  const mm = gsap.matchMedia();
+  mm.add(
+    {
+      desktop: "(min-width: 1024px)",
+      reduceMotion: "(prefers-reduced-motion: reduce)",
+    },
+    (context) => {
+      const conditions = context.conditions as { desktop?: boolean; reduceMotion?: boolean };
+      if (!conditions.desktop || conditions.reduceMotion) {
+        groups.forEach((group) => clearPrincipleState(group));
+        return () => {};
+      }
+
+      const cleanup = groups.map((group) => buildPrincipleTimeline(group));
+      const lenisTrigger = slowZone ? ScrollTrigger.create({
+        trigger: slowZone,
+        start: "top 82%",
+        end: "bottom 18%",
+        onEnter: () => setSmoothScrollProfile("focus"),
+        onEnterBack: () => setSmoothScrollProfile("focus"),
+        onLeave: () => setSmoothScrollProfile("default"),
+        onLeaveBack: () => setSmoothScrollProfile("default"),
+      }) : null;
+      ScrollTrigger.refresh();
+
+      return () => {
+        lenisTrigger?.kill();
+        setSmoothScrollProfile("default");
+        cleanup.reverse().forEach((dispose) => dispose());
+      };
+    }
+  );
+
+  ctx.cleanup(() => {
+    mm.revert();
+  });
+});
 </script>
 
-<SectionShell tone="base" height="screen">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="red" height="screen" runway="long">
+  <div ref={runtimePrinciplesRef} class="flex flex-col flex-1 gap-16 md:gap-24 lg:gap-28">
 
-    <!-- top zone: micro label -->
-    <div class="shrink-0">
-      <div class="flex items-center gap-2">
-        <AccentMark color="red" variant="dot" />
-        <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Runtime</span>
+    <div class="grid gap-16 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] xl:gap-20 xl:items-start">
+      <div class="min-w-0 w-full pt-2 md:pt-4 xl:pt-10">
+        <SectionIntro
+          variant="narrow"
+          accentColor="red"
+          eyebrow={runtimePrinciplesContent.intro.eyebrow}
+          title={runtimePrinciplesContent.intro.title}
+          description={runtimePrinciplesContent.intro.description}
+        />
       </div>
-      <div class="mt-4">
-        <Heading size="section">RUNTIME AS THIN AS AIR.</Heading>
-      </div>
+
+      <ScrollEnterGroup variant="frame" class="min-w-0 xl:justify-self-end xl:max-w-sm xl:pt-24">
+        <div class="grid grid-cols-2 border border-border/80">
+          <div class="border-b border-r border-border/80 px-4 py-4 md:px-5 md:py-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{runtimePrinciplesContent.summaryGrid[0].label}</p>
+            <p class="mt-3 text-sm text-foreground">{runtimePrinciplesContent.summaryGrid[0].value}</p>
+          </div>
+          <div class="border-b border-border/80 px-4 py-4 md:px-5 md:py-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{runtimePrinciplesContent.summaryGrid[1].label}</p>
+            <p class="mt-3 text-sm text-foreground">{runtimePrinciplesContent.summaryGrid[1].value}</p>
+          </div>
+          <div class="border-r border-border/80 px-4 py-4 md:px-5 md:py-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{runtimePrinciplesContent.summaryGrid[2].label}</p>
+            <p class="mt-3 text-sm text-foreground">{runtimePrinciplesContent.summaryGrid[2].value}</p>
+          </div>
+          <div class="px-4 py-4 md:px-5 md:py-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{runtimePrinciplesContent.summaryGrid[3].label}</p>
+            <p class="mt-3 text-sm text-foreground">{runtimePrinciplesContent.summaryGrid[3].value}</p>
+          </div>
+        </div>
+
+        <div class="border-x border-b border-border/80 px-4 py-6 md:px-5 md:py-7">
+          <p class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+            {runtimePrinciplesContent.hydrationContract.eyebrow}
+          </p>
+          <p class="mt-5 text-sm leading-7 text-foreground">
+            {runtimePrinciplesContent.hydrationContract.description}
+          </p>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">
+            {runtimePrinciplesContent.hydrationContract.note}
+          </p>
+
+          <div class="mt-6 border-t border-border/70 pt-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{runtimePrinciplesContent.hydrationContract.surfaceLabel}</p>
+            <pre class="mt-4 overflow-auto border-y border-border/70 py-4 font-mono text-[12px] leading-6 text-foreground whitespace-pre">{runtimePrinciplesContent.hydrationContract.surfaceCode}</pre>
+          </div>
+        </div>
+      </ScrollEnterGroup>
     </div>
 
-    <!-- middle zone: statement stack -->
-    <div class="flex-1 flex flex-col justify-center py-12 gap-0">
-      <div class="group flex items-baseline justify-between border-t border-border py-5">
-        <span class="text-sm text-foreground font-medium">Marker-based hydration</span>
-        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Compiler-placed markers guide runtime binding — no virtual DOM.</span>
-      </div>
-      <div class="group flex items-baseline justify-between border-t border-border py-5">
-        <span class="text-sm text-foreground font-medium">Signal reactivity</span>
-        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Fine-grained updates via signal() — no full component re-render.</span>
-      </div>
-      <div class="group flex items-baseline justify-between border-t border-border py-5">
-        <span class="text-sm text-foreground font-medium">Scoped DOM access</span>
-        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">ref&lt;T&gt;() scopes all DOM reads — no global queries allowed.</span>
-      </div>
-      <div class="group flex items-baseline justify-between border-t border-border border-b py-5">
-        <span class="text-sm text-foreground font-medium">Zero dead code</span>
-        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">Tree-shaking removes unused bindings at build time.</span>
-      </div>
+    <div class="pt-16 md:pt-24 lg:pt-28"></div>
+
+    <div class="flex w-full flex-col gap-24 md:gap-32 lg:gap-40">
+
+      <!-- ╭─ PRINCIPLE 01 ─────────────────────────────── -->
+      <article ref={principleOneRef} class="flex flex-col gap-12 md:gap-16 lg:min-h-[84vh] lg:justify-center lg:gap-20 xl:min-h-screen 2xl:gap-24">
+        <!-- top editorial split -->
+        <div class="grid gap-12 md:gap-16 xl:grid-cols-[minmax(0,1.28fr)_minmax(20rem,0.72fr)] xl:gap-24 xl:items-start">
+          <div class="min-w-0">
+            <div class="flex items-start gap-5 md:gap-8">
+              <span data-story-meta class="pt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleOne.number}</span>
+              <div class="min-w-0">
+                <span data-story-title class="block max-w-[18ch] text-[clamp(2.1rem,4.8vw,4.25rem)] font-medium uppercase leading-[0.9] tracking-tight text-foreground [text-wrap:balance]">
+                  {principleOne.title}
+                </span>
+                <span data-story-copy class="mt-6 block max-w-[46rem] text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+                  {principleOne.intro}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="min-w-0 xl:pt-2">
+            <div data-story-panel class="border-l border-border/70 pl-8">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {principleOne.sideLabel}
+              </p>
+              <p data-story-copy class="mt-5 max-w-[20rem] text-sm leading-7 text-muted-foreground">
+                {principleOne.sideText}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- lower supporting grid -->
+        <div class="grid gap-10 md:gap-12 xl:grid-cols-[minmax(0,1.08fr)_minmax(20rem,0.92fr)] xl:gap-20 xl:pl-[5.25rem]">
+          <div data-story-panel class="max-w-[48rem]">
+            <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleOne.mainLabel}</p>
+            <p data-story-copy class="mt-8 text-base leading-8 text-foreground md:mt-10 md:text-lg md:leading-9">
+              {principleOne.mainTitle}
+            </p>
+            <p data-story-copy class="mt-6 max-w-xl text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+              {principleOne.mainText}
+            </p>
+          </div>
+          <div class="flex flex-col gap-8 md:gap-10">
+            <div data-story-panel class="border-t border-border/70 pt-5 md:pt-6">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {principleOne.support[0].label}
+              </p>
+              <p data-story-copy class="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+                {principleOne.support[0].text}
+              </p>
+            </div>
+            <div data-story-panel class="border-t border-border/70 pt-5 md:pt-6">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {principleOne.support[1].label}
+              </p>
+              <p data-story-copy class="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+                {principleOne.support[1].text}
+              </p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ╭─ PRINCIPLE 02 ─────────────────────────────── -->
+      <article ref={principleTwoRef} class="flex flex-col gap-12 md:gap-16 lg:min-h-[84vh] lg:justify-center lg:gap-20 xl:min-h-screen 2xl:gap-24">
+        <!-- top editorial split -->
+        <div class="grid gap-12 md:gap-16 xl:grid-cols-[minmax(0,1.28fr)_minmax(20rem,0.72fr)] xl:gap-24 xl:items-start">
+          <div class="min-w-0">
+            <div class="flex items-start gap-5 md:gap-8">
+              <span data-story-meta class="pt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleTwo.number}</span>
+              <div class="min-w-0">
+                <span data-story-title class="block max-w-[18ch] text-[clamp(2.1rem,4.8vw,4.25rem)] font-medium uppercase leading-[0.9] tracking-tight text-foreground [text-wrap:balance]">
+                  {principleTwo.title}
+                </span>
+                <span data-story-copy class="mt-6 block max-w-[46rem] text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+                  {principleTwo.intro}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="min-w-0 xl:pt-2">
+            <div data-story-panel class="border-l border-border/70 pl-8">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {principleTwo.sideLabel}
+              </p>
+              <p data-story-copy class="mt-5 max-w-[20rem] text-sm leading-7 text-muted-foreground">
+                {principleTwo.sideText}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- lower supporting grid -->
+        <div class="grid gap-10 md:gap-12 xl:grid-cols-[minmax(20rem,0.84fr)_minmax(0,1.08fr)] xl:gap-20 xl:pl-[5.25rem]">
+          <div class="flex flex-col gap-8 md:gap-10">
+            <div data-story-panel class="border-t border-border/70 pt-5 md:pt-6">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleTwo.support[0].label}</p>
+              <p data-story-copy class="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+                <span class="font-mono text-foreground">hydrate(payload)</span>,
+                <span class="font-mono text-foreground"> zenMount() </span>, and
+                <span class="font-mono text-foreground"> zeneffect(...) </span> as explicit boundaries.
+              </p>
+            </div>
+            <div data-story-panel class="border-t border-border/70 pt-5 md:pt-6">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleTwo.support[1].label}</p>
+              <p data-story-copy class="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+                {principleTwo.support[1].text}
+              </p>
+            </div>
+          </div>
+          <div data-story-panel class="max-w-[48rem]">
+            <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+              {principleTwo.mainLabel}
+            </p>
+            <p data-story-copy class="mt-8 text-base leading-8 text-foreground md:mt-10 md:text-lg md:leading-9">
+              {principleTwo.mainTitle}
+            </p>
+            <p data-story-copy class="mt-6 max-w-xl text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+              <span class="font-mono text-foreground">eval</span>,
+              <span class="font-mono text-foreground"> new Function </span>, and hidden framework lifecycle
+              layers are outside the contract.
+            </p>
+          </div>
+        </div>
+      </article>
+
+      <!-- ╭─ PRINCIPLE 03 ─────────────────────────────── -->
+      <article ref={principleThreeRef} class="flex flex-col gap-12 md:gap-16 lg:min-h-[84vh] lg:justify-center lg:gap-20 xl:min-h-screen 2xl:gap-24">
+        <!-- top editorial split -->
+        <div class="grid gap-12 md:gap-16 xl:grid-cols-[minmax(0,1.28fr)_minmax(20rem,0.72fr)] xl:gap-24 xl:items-start">
+          <div class="min-w-0">
+            <div class="flex items-start gap-5 md:gap-8">
+              <span data-story-meta class="pt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">{principleThree.number}</span>
+              <div class="min-w-0">
+                <span data-story-title class="block max-w-[19ch] text-[clamp(2.1rem,4.8vw,4.25rem)] font-medium uppercase leading-[0.9] tracking-tight text-foreground [text-wrap:balance]">
+                  {principleThree.title}
+                </span>
+                <span data-story-copy class="mt-6 block max-w-[46rem] text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+                  Bindings stay positional, primitives stay explicit, and browser work stays scoped to
+                  <span class="font-mono text-foreground"> ref&lt;T&gt;() </span>
+                  and
+                  <span class="font-mono text-foreground"> zenMount(...) </span>.
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="min-w-0 xl:pt-2">
+            <div data-story-panel class="border-l border-border/70 pl-8">
+              <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {principleThree.sideLabel}
+              </p>
+              <p data-story-copy class="mt-5 max-w-[20rem] text-sm leading-7 text-muted-foreground">
+                {principleThree.sideText}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- lower supporting grid -->
+        <div class="grid gap-10 md:gap-12 xl:grid-cols-[minmax(0,1.06fr)_minmax(20rem,0.94fr)] xl:gap-20 xl:pl-[5.25rem]">
+          <div data-story-panel class="max-w-[48rem]">
+            <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+              {principleThree.mainLabel}
+            </p>
+            <p data-story-copy class="mt-8 text-base leading-8 text-foreground md:mt-10 md:text-lg md:leading-9">
+              {principleThree.mainTitle}
+            </p>
+            <p data-story-copy class="mt-6 max-w-xl text-sm leading-7 text-muted-foreground md:mt-8 md:text-[15px] md:leading-8">
+              Use <span class="font-mono text-foreground">zenOn()</span>,
+              <span class="font-mono text-foreground"> zenResize()</span>, and
+              <span class="font-mono text-foreground"> collectRefs(...refs)</span> instead of raw global scans
+              or ad hoc listener wiring.
+            </p>
+          </div>
+          <div data-story-panel class="border-t border-border/70 pt-5 md:pt-6">
+            <p data-story-meta class="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+              {principleThree.supportCodeLabel}
+            </p>
+            <pre class="mt-5 overflow-auto border-y border-border/70 py-6 font-mono text-[12px] leading-6 text-foreground whitespace-pre">{principleThree.supportCode}</pre>
+          </div>
+        </div>
+      </article>
+
     </div>
 
   </div>

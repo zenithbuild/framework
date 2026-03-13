@@ -1,0 +1,89 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+type RevealVariant = "list" | "frame";
+
+export interface Props {
+  class?: string;
+  variant?: RevealVariant;
+}
+
+const incoming = props as Props;
+const variant = incoming.variant || "list";
+const rootClass = typeof incoming.class === "string" ? incoming.class : "";
+const rootRef = ref<HTMLDivElement>();
+
+function collectAnimatedChildren(root: HTMLDivElement): HTMLElement[] {
+  return Array.from(root.children).filter((node): node is HTMLElement => {
+    return node instanceof HTMLElement && node.dataset.enterSkip !== "true";
+  });
+}
+
+function clearRevealState(root: HTMLDivElement, children: HTMLElement[]) {
+  gsap.set(root, { clearProps: "clipPath,opacity,transform" });
+  gsap.set(children, { clearProps: "opacity,transform" });
+}
+
+zenMount((ctx) => {
+  gsap.registerPlugin(ScrollTrigger);
+
+  const root = rootRef.current;
+  if (!root) return;
+
+  const win = zenWindow();
+  const reduceMotion = !!win?.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const children = collectAnimatedChildren(root);
+
+  if (reduceMotion || children.length === 0) {
+    clearRevealState(root, children);
+    return;
+  }
+
+  const timeline = gsap.timeline({
+    defaults: { ease: "power4.out" },
+    scrollTrigger: {
+      trigger: root,
+      start: "top 78%",
+      once: true,
+      invalidateOnRefresh: true,
+    },
+  });
+
+  if (variant === "frame") {
+    gsap.set(root, { clipPath: "inset(0 0 100% 0)", opacity: 1 });
+    gsap.set(children, { y: 32, opacity: 0 });
+    timeline
+      .to(root, {
+        clipPath: "inset(0 0 0% 0)",
+        duration: 0.82,
+        ease: "power4.out",
+      })
+      .to(children, {
+        y: 0,
+        opacity: 1,
+        duration: 0.66,
+        stagger: 0.11,
+        ease: "power3.out",
+      }, ">-0.2");
+  } else {
+    gsap.set(children, { y: 28, opacity: 0 });
+    timeline.to(children, {
+      y: 0,
+      opacity: 1,
+      duration: 0.64,
+      stagger: 0.11,
+      ease: "power3.out",
+    });
+  }
+
+  ctx.cleanup(() => {
+    timeline.kill();
+    clearRevealState(root, children);
+  });
+});
+</script>
+
+<div ref={rootRef} class={rootClass}>
+  <slot />
+</div>

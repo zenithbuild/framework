@@ -1,0 +1,92 @@
+{
+  "pageTitle": "Release Notes",
+  "description": "Recent Zenith release notes covering merged core stability and editor-tooling work.",
+  "intro": {
+    "eyebrow": "Release Notes",
+    "title": "MERGED WORK. PUBLIC RECORD.",
+    "description": "The public site now surfaces the recent framework and editor batches directly. Install commands stay on the current train line, while the docs-side changelog records the merged core and language-tooling work through v0.6.18."
+  },
+  "chips": [
+    "Core stability locked",
+    "Editor parity shipped"
+  ],
+  "releaseActionLabel": "Open markdown",
+  "releases": [
+    {
+      "id": "v0-6-18",
+      "eyebrow": "Merged framework + tooling",
+      "version": "v0.6.18",
+      "description": "Core stability fixes, server/client routing hardening, and compiler-backed editor tooling now land together on one coherent release train.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/changelog/v0.6.18.md",
+      "items": [
+        {
+          "label": "01",
+          "description": "Slot-scope owner, marker namespace, SVG class binding, and CLI expression rewrite regressions were fixed without site-level workarounds."
+        },
+        {
+          "label": "02",
+          "description": "Server-authoritative routing, client fetch-before-commit navigation, lifecycle hooks, and the narrow document-transition prototype now share one documented contract."
+        },
+        {
+          "label": "03",
+          "description": "Structured compiler diagnostics, first ZEN-DOM quick fixes, canonical hover/completion parity, and packaged editor verification all align to the same 0.6.18 train."
+        }
+      ]
+    },
+    {
+      "id": "v0-6-17",
+      "eyebrow": "Release train",
+      "version": "v0.6.17",
+      "description": "Release metadata hardening kept the train aligned so publish and CI preflight no longer fail on already-bootstrapped platform package names.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/changelog/v0.6.17.md",
+      "items": [
+        {
+          "label": "01",
+          "description": "Train metadata checks now tolerate the expected npm tag state for existing platform packages."
+        },
+        {
+          "label": "02",
+          "description": "Release-train alignment remains enforced through the shared package version gate."
+        },
+        {
+          "label": "03",
+          "description": "Bundler, compiler, and package metadata now have one release line to promote instead of split train identities."
+        }
+      ]
+    },
+    {
+      "id": "v0-6-16",
+      "eyebrow": "Editor foundation",
+      "version": "v0.6.16",
+      "description": "The monorepo gained the canonical language package and language server as first-class release-train packages.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/changelog/v0.6.16.md",
+      "items": [
+        {
+          "label": "01",
+          "description": "Zenith now ships one canonical grammar, snippet set, and language-server path for editor support."
+        },
+        {
+          "label": "02",
+          "description": "CI coverage landed for grammar embedding, hover docs, completions, and DOM lint diagnostics."
+        }
+      ]
+    },
+    {
+      "id": "v0-6-1",
+      "eyebrow": "Docs baseline",
+      "version": "v0.6.1",
+      "description": "The documentation surface locked the internal Tailwind and dev CSS contracts that the public site still follows today.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/changelog/v0.6.1.md",
+      "items": [
+        {
+          "label": "01",
+          "description": "Tailwind v4 moved into the built-in Zenith pipeline for both dev and build."
+        },
+        {
+          "label": "02",
+          "description": "The docs locked `/__zenith_dev/styles.css` as the canonical dev CSS contract."
+        }
+      ]
+    }
+  ]
+}

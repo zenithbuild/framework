@@ -1,0 +1,65 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+import Button from "../../ui/Button.zen";
+import Links from "../../ui/Links.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutSponsorContent = (props as Props).content;
+const sponsorPrimaryDisabled = aboutSponsorContent.actions[0].href.trim().length === 0;
+const sponsorPrimaryDisabledClass = sponsorPrimaryDisabled ? "" : "hidden";
+const sponsorPrimaryEnabledClass = sponsorPrimaryDisabled ? "hidden" : "";
+</script>
+
+<SectionShell tone="red" height="auto" runway="normal">
+  <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2.5rem] border border-surface-border-red bg-card/75">
+    <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-red/70"></div>
+    <div data-enter-skip="true" class="pointer-events-none absolute -right-10 bottom-8 hidden h-40 w-40 rounded-full border border-surface-border-red/60 xl:block"></div>
+
+    <div class="grid gap-10 px-6 py-8 md:px-8 md:py-10 xl:grid-cols-[minmax(0,1.02fr)_minmax(20rem,0.98fr)] xl:gap-14 xl:px-10">
+      <div class="min-w-0">
+        <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutSponsorContent.intro.eyebrow}</p>
+        <h2 class="mt-5 font-display text-[clamp(2.4rem,5vw,4.8rem)] leading-[0.9] tracking-tight text-foreground">{aboutSponsorContent.intro.title}</h2>
+        <p class="mt-5 max-w-2xl text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutSponsorContent.intro.description}</p>
+
+        <div class="mt-8 border-l border-surface-border-red pl-5 md:pl-6">
+          <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutSponsorContent.pitch.label}</p>
+          <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutSponsorContent.pitch.text}</p>
+        </div>
+      </div>
+
+      <div class="min-w-0">
+        <div class="grid gap-4 md:grid-cols-2">
+          <article class="rounded-[1.6rem] border border-surface-border-red/80 bg-surface-0/75 p-5">
+            <h3 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutSponsorContent.reasons[0].title}</h3>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutSponsorContent.reasons[0].text}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-red/80 bg-surface-0/75 p-5">
+            <h3 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutSponsorContent.reasons[1].title}</h3>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutSponsorContent.reasons[1].text}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-red/80 bg-surface-0/75 p-5">
+            <h3 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutSponsorContent.reasons[2].title}</h3>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutSponsorContent.reasons[2].text}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-red/80 bg-surface-0/75 p-5">
+            <h3 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutSponsorContent.reasons[3].title}</h3>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutSponsorContent.reasons[3].text}</p>
+          </article>
+        </div>
+
+        <div class="mt-8 flex flex-wrap gap-4">
+          <Button class={sponsorPrimaryDisabledClass} variant={aboutSponsorContent.actions[0].variant} disabled={sponsorPrimaryDisabled}>{aboutSponsorContent.actions[0].label}</Button>
+          <Links surface="button" class={sponsorPrimaryEnabledClass} href={aboutSponsorContent.actions[0].href} variant={aboutSponsorContent.actions[0].variant}>{aboutSponsorContent.actions[0].label}</Links>
+          <Links surface="button" href={aboutSponsorContent.actions[1].href} variant={aboutSponsorContent.actions[1].variant}>{aboutSponsorContent.actions[1].label}</Links>
+          <Links surface="button" href={aboutSponsorContent.actions[2].href} variant={aboutSponsorContent.actions[2].variant}>{aboutSponsorContent.actions[2].label}</Links>
+        </div>
+
+        <p class="mt-5 max-w-xl text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutSponsorContent.supportNote}</p>
+      </div>
+    </div>
+  </ScrollEnterGroup>
+</SectionShell>

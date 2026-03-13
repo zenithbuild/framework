@@ -2,6 +2,12 @@
 import FooterNav from "./FooterNav.zen";
 import FooterCTA from "./FooterCTA.zen";
 
+interface Props {
+  content: any;
+}
+
+const footerShellContent = (props as Props).content;
+
 const footerRef = ref<HTMLElement>();
 
 zenMount((ctx) => {
@@ -52,13 +58,13 @@ zenMount((ctx) => {
 
 <footer ref={footerRef} class="fixed bottom-0 left-0 w-full z-0 bg-muted text-foreground flex flex-col overflow-hidden border-t border-border" data-zen-footer-container>
  
-  <FooterCTA />
-   <div class="w-full max-w-[1600px] mx-auto px-6 md:px-12 pt-24 md:pt-32 pb-12 flex flex-col items-center">
-    <FooterNav />
+  <FooterCTA content={footerShellContent} />
+   <div class="w-full max-w-[1600px] mx-auto px-6 md:px-12 pt-14 md:pt-18 pb-12 flex flex-col items-center">
+    <FooterNav content={footerShellContent} />
   </div>
   
   <div class="w-full max-w-[1600px] mx-auto px-6 md:px-12 py-8 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-muted-foreground uppercase tracking-[0.2em] border-t border-border z-10 relative">
-    <span>Zenith Framework © {new Date().getFullYear()}</span>
-    <span class="mt-4 md:mt-0">Designed & Engineered by Zenithbuild</span>
+    <span data-footer-meta-item>{footerShellContent.meta.copyrightPrefix} {new Date().getFullYear()}</span>
+    <span data-footer-meta-item class="mt-4 md:mt-0">{footerShellContent.meta.signature}</span>
   </div>
 </footer>

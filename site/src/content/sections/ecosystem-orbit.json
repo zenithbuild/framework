@@ -1,0 +1,137 @@
+{
+  "intro": {
+    "eyebrow": "Ecosystem",
+    "title": "ONE PUBLIC SURFACE.",
+    "description": "Zenith exposes one public import surface, then keeps the compiler, runtime, router, bundler, CLI, and editor packages moving under the same contracts. That same package graph now includes packaged VS Code-compatible delivery and direct Neovim LSP verification without splitting into editor-only rule paths."
+  },
+  "note": {
+    "label": "Public Boundary",
+    "text": "Projects import @zenithbuild/core. Inner packages stay implementation-side so compiler, router, runtime, bundler, and editor tooling can evolve under one contract."
+  },
+  "chips": [
+    "Core Is Public",
+    "ZEN-DOM Quick Fixes",
+    "VS Code + Neovim Verified"
+  ],
+  "showcase": {
+    "eyebrow": "Aligned Package Graph",
+    "title": "One toolchain. Stable boundaries.",
+    "sideStatusDefaultLabel": "Default",
+    "sideHoverLabel": "Inspecting",
+    "sideSelectedLabel": "Locked",
+    "sidePrompt": "Click locks a package. Orb hover only deepens the graph.",
+    "resetLabel": "Reset Focus",
+    "nodes": [
+      {
+        "id": "core",
+        "label": "core",
+        "caption": "public surface",
+        "detail": {
+          "eyebrow": "Public Surface",
+          "title": "CORE",
+          "description": "Applications stay on @zenithbuild/core while the compiler, runtime, router, bundler, and editor packages remain aligned underneath it.",
+          "packageName": "@zenithbuild/core",
+          "factA": "The core README defines this package as the sole public entrypoint for Zenith projects.",
+          "factB": "Direct imports from inner @zenithbuild/* packages are implementation-detail territory, not app-facing API."
+        }
+      },
+      {
+        "id": "language",
+        "label": "language",
+        "caption": "grammar + snippets",
+        "detail": {
+          "eyebrow": "Editor Surface",
+          "title": "LANGUAGE",
+          "description": "The language package carries the canonical .zen grammar, snippets, and VS Code-compatible packaging so editor affordances stay aligned with authored syntax.",
+          "packageName": "@zenithbuild/language",
+          "factA": "It provides the zenith language id, TextMate grammar, canonical snippets, and the bundled server path shipped in the extension artifact.",
+          "factB": "VS Code-compatible installs stay paired with the language server instead of inventing a parallel editor contract."
+        }
+      },
+      {
+        "id": "compiler",
+        "label": "compiler",
+        "caption": "IR + diagnostics",
+        "detail": {
+          "eyebrow": "Compilation Engine",
+          "title": "COMPILER",
+          "description": "The compiler lowers .zen source into deterministic bindings, emitted markup, and diagnostics before the browser ever starts executing.",
+          "packageName": "@zenithbuild/compiler",
+          "factA": "It owns the IR, payload ordering, and structural lowering contract that later packages consume blindly.",
+          "factB": "Compiler diagnostics are the canonical source of warnings surfaced in the CLI and language server."
+        }
+      },
+      {
+        "id": "runtime",
+        "label": "runtime",
+        "caption": "marker hydration",
+        "detail": {
+          "eyebrow": "Browser Executor",
+          "title": "RUNTIME",
+          "description": "Runtime hydrates compiler-authored markers, runs explicit bindings, and keeps DOM work inside refs, zenMount, zeneffect, and zenOn boundaries.",
+          "packageName": "@zenithbuild/runtime",
+          "factA": "Bindings stay positional. Runtime consumes payload order rather than reinterpreting structure or identifiers.",
+          "factB": "The browser layer is an executor over emitted tables, not a framework that rediscovers intent."
+        }
+      },
+      {
+        "id": "router",
+        "label": "router",
+        "caption": "RouteManifest",
+        "detail": {
+          "eyebrow": "Navigation Contract",
+          "title": "ROUTER",
+          "description": "Router consumes a RouteManifest in deterministic order, performs structural navigation, and delegates mount and unmount to runtime.",
+          "packageName": "@zenithbuild/router",
+          "factA": "Route matching is first-match-wins and blind to file-system discovery once the manifest is emitted.",
+          "factB": "The router contract forbids virtual DOM layers, semantic recovery, and hidden fallback routes."
+        }
+      },
+      {
+        "id": "bundler",
+        "label": "bundler",
+        "caption": "Rolldown pin",
+        "detail": {
+          "eyebrow": "Packaging Stage",
+          "title": "BUNDLER",
+          "description": "Bundler packages the emitted graph after compilation, preserves marker and expression order, and keeps Rolldown pinned at the packaging boundary.",
+          "packageName": "@zenithbuild/bundler",
+          "factA": "The bundler contract forbids symbol renames, semantic rewrites, or data-zx attribute changes after emission.",
+          "factB": "Rolldown belongs here as a pinned dependency in packaging, not as an authoring-time abstraction layer."
+        }
+      },
+      {
+        "id": "cli",
+        "label": "cli",
+        "caption": "dev + build loop",
+        "detail": {
+          "eyebrow": "Project Loop",
+          "title": "CLI",
+          "description": "The CLI owns the daily development loop: dev, build, preview, plugin management, and deterministic orchestration around the active toolchain.",
+          "packageName": "@zenithbuild/cli",
+          "factA": "It coordinates serving, building, previewing, and toolchain resolution without becoming a second framework layer.",
+          "factB": "Create-zenith scaffolds projects; the CLI stays with the ongoing project loop after that handoff."
+        }
+      },
+      {
+        "id": "language-server",
+        "label": "lsp",
+        "caption": "compiler-backed",
+        "detail": {
+          "eyebrow": "Diagnostic Surface",
+          "title": "LANGUAGE SERVER",
+          "description": "The language server runs the compiler-backed editor contract so diagnostics, ZEN-DOM quick fixes, hovers, and completions match the real Zenith toolchain.",
+          "packageName": "@zenithbuild/language-server",
+          "factA": "Diagnostics and quick fixes hang off the canonical compiler contract instead of a parallel in-editor parser.",
+          "factB": "Packaged VS Code and direct Neovim LSP verification both passed on the same server behavior."
+        }
+      }
+    ],
+    "detailLabels": {
+      "package": "Package",
+      "boundary": "Boundary",
+      "guardrail": "Guardrail",
+      "connections": "Connected Surfaces"
+    }
+  }
+}

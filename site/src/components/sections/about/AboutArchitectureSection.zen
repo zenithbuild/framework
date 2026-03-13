@@ -1,0 +1,123 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+import Tag from "../../ui/Tag.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutArchitectureContent = (props as Props).content;
+</script>
+
+<SectionShell tone="magenta" height="auto" runway="normal">
+  <div class="flex flex-col gap-14 md:gap-18 lg:gap-24">
+    <ScrollEnterGroup variant="list" class="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-start xl:gap-14">
+      <div class="min-w-0">
+        <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{aboutArchitectureContent.intro.eyebrow}</p>
+        <h2 class="mt-6 font-display text-[clamp(3rem,6vw,5rem)] font-semibold uppercase leading-[0.88] tracking-tight text-foreground">{aboutArchitectureContent.intro.title}</h2>
+      </div>
+
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,0.62fr)] xl:gap-8">
+        <p class="text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{aboutArchitectureContent.intro.description}</p>
+
+        <article class="rounded-[1.75rem] border border-surface-border-magenta/80 bg-card/55 p-5">
+          <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">{aboutArchitectureContent.intro.noteLabel}</p>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.intro.noteText}</p>
+        </article>
+      </div>
+    </ScrollEnterGroup>
+
+    <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2.25rem] border border-surface-border-magenta bg-card/75">
+      <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-magenta/70"></div>
+      <div data-enter-skip="true" class="pointer-events-none absolute -right-12 top-10 hidden h-40 w-40 rounded-full border border-surface-border-magenta/60 xl:block"></div>
+
+      <div class="grid gap-10 px-6 py-8 md:px-8 md:py-10 xl:grid-cols-[minmax(0,0.58fr)_minmax(0,1.42fr)] xl:gap-14 xl:px-10">
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutArchitectureContent.summary.label}</p>
+          <h3 class="mt-5 font-display text-[clamp(2rem,4vw,3rem)] leading-[0.9] tracking-tight text-foreground">{aboutArchitectureContent.summary.title}</h3>
+          <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutArchitectureContent.summary.text}</p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">01</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[0].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[0].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">02</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[1].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[1].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">03</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[2].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[2].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">04</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[3].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[3].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">05</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[4].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[4].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">06</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[5].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[5].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">07</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[6].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[6].description}</p>
+          </article>
+          <article class="rounded-[1.6rem] border border-surface-border-magenta/80 bg-surface-0/80 p-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">08</p>
+            <h4 class="mt-4 font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.parts[7].name}</h4>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.parts[7].description}</p>
+          </article>
+        </div>
+      </div>
+    </ScrollEnterGroup>
+
+    <div class="grid gap-8 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:gap-14">
+      <ScrollEnterGroup variant="list" class="min-w-0">
+        <article class="rounded-[2rem] border border-surface-border-magenta bg-card/70 p-6 md:p-7 xl:p-8">
+          <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutArchitectureContent.tooling.label}</p>
+          <h3 class="mt-5 font-display text-[clamp(2rem,4vw,3rem)] leading-[0.92] tracking-tight text-foreground">{aboutArchitectureContent.tooling.title}</h3>
+          <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutArchitectureContent.tooling.description}</p>
+
+          <div class="mt-8 flex flex-wrap gap-3">
+            <Tag variant="outline">{aboutArchitectureContent.tooling.verified[0]}</Tag>
+            <Tag variant="outline">{aboutArchitectureContent.tooling.verified[1]}</Tag>
+            <Tag variant="outline">{aboutArchitectureContent.tooling.verified[2]}</Tag>
+            <Tag variant="outline">{aboutArchitectureContent.tooling.verified[3]}</Tag>
+          </div>
+        </article>
+      </ScrollEnterGroup>
+
+      <ScrollEnterGroup variant="list" class="rounded-[2rem] border border-surface-border-magenta bg-card/70 px-6 md:px-8">
+        <article class="border-b border-border/80 py-6">
+          <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.tooling.features[0].title}</h4>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.tooling.features[0].text}</p>
+        </article>
+        <article class="border-b border-border/80 py-6">
+          <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.tooling.features[1].title}</h4>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.tooling.features[1].text}</p>
+        </article>
+        <article class="border-b border-border/80 py-6">
+          <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.tooling.features[2].title}</h4>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.tooling.features[2].text}</p>
+        </article>
+        <article class="py-6">
+          <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutArchitectureContent.tooling.features[3].title}</h4>
+          <p class="mt-4 text-sm leading-7 text-muted-foreground">{aboutArchitectureContent.tooling.features[3].text}</p>
+        </article>
+      </ScrollEnterGroup>
+    </div>
+  </div>
+</SectionShell>

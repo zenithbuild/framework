@@ -1,80 +1,415 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
+import SectionIntro from "./SectionIntro.zen";
+import Button from "../ui/Button.zen";
 import { gsap } from "gsap";
+import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
+import { SplitText } from "gsap/SplitText";
 
-const r0 = ref<HTMLDivElement>(); const r1 = ref<HTMLDivElement>();
-const r2 = ref<HTMLDivElement>(); const r3 = ref<HTMLDivElement>();
-const r4 = ref<HTMLDivElement>(); const r5 = ref<HTMLDivElement>();
-const rowRefs = [r0, r1, r2, r3, r4, r5];
+interface Convention {
+  id: string;
+  title: string;
+  label: string;
+  meaning: string;
+  description: string;
+  filename: string;
+  snippet: string;
+}
+
+interface SnippetLinePart {
+  indent: string;
+  content: string;
+}
+
+interface Props {
+  content: any;
+}
+
+const contractContent = (props as Props).content;
+const contractConventions = contractContent.conventions as Convention[];
+
+const scrambleChars = "<>/{}[]=+-01";
+const btnClass = "group w-full rounded-none border-0 bg-transparent px-0 py-5 font-inherit normal-case tracking-normal text-left text-muted-foreground transition-colors duration-200 hover:bg-transparent hover:text-foreground focus-visible:outline-none data-[active=true]:text-foreground md:py-6";
+const btnContentClass = "flex w-full items-start justify-between gap-6";
+const lblClass = "font-mono text-[10px] uppercase tracking-[0.26em] text-muted-foreground transition-colors duration-200 group-data-[active=true]:text-foreground";
+const ttlClass = "font-display text-xl leading-none tracking-tight text-foreground/80 transition-colors duration-200 group-hover:text-foreground group-data-[active=true]:text-foreground md:text-2xl";
+const meaningClass = "mt-2 max-w-md text-sm leading-relaxed text-muted-foreground/80 transition-colors duration-200 group-hover:text-muted-foreground group-data-[active=true]:text-muted-foreground";
+const indClass = "mt-1 h-6 w-px rounded-full bg-border opacity-50 transition-all duration-200 group-hover:opacity-80 group-data-[active=true]:bg-brand-magenta group-data-[active=true]:opacity-100";
+const metaClass = "font-mono text-[10px] uppercase tracking-[0.2em] -translate-x-2 text-muted-foreground/60 transition-all duration-200 group-hover:translate-x-0 group-hover:text-muted-foreground group-data-[active=true]:translate-x-0 group-data-[active=true]:text-foreground";
+const railLineClass = "block min-h-[1.5em] font-mono text-[9px] leading-6 uppercase tracking-[0.18em] text-muted-foreground/55 md:leading-7";
+const codeLineClass = "block min-h-[1.5em] whitespace-pre";
+
+state activeConventionId = contractConventions[0].id;
+state activeConventionTitle = contractConventions[0].title;
+state activeConventionLabel = contractConventions[0].label;
+state activeConventionFile = contractConventions[0].filename;
+
+const sectionRef = ref<HTMLDivElement>();
+const leftPanelRef = ref<HTMLDivElement>();
+const cardRef = ref<HTMLDivElement>();
+const lineRailRef = ref<HTMLDivElement>();
+const codeRef = ref<HTMLElement>();
+const descriptionRef = ref<HTMLParagraphElement>();
+
+let revealTimeline: gsap.core.Timeline | null = null;
+let previewTimeline: gsap.core.Timeline | null = null;
+let descTimeline: gsap.core.Timeline | null = null;
+let currentConvention = contractConventions[0];
+let renderedSnippet = contractConventions[0].snippet;
+
+function conventionById(id: string): Convention {
+  return contractConventions.find((c) => c.id === id) || contractConventions[0];
+}
+
+function buildMask(text: string): string {
+  let index = 0;
+  return text
+    .split("")
+    .map((char) => {
+      if (char === "\n" || char === " " || char === "\t") return char;
+      const next = scrambleChars[index % scrambleChars.length];
+      index += 1;
+      return next;
+    })
+    .join("");
+}
+
+function snippetLines(snippet: string): string[] {
+  return snippet.split("\n");
+}
+
+function splitSnippetLine(line: string): SnippetLinePart {
+  const match = line.match(/^([ \t]*)(.*)$/);
+  return {
+    indent: match ? match[1] : "",
+    content: match ? match[2] : line,
+  };
+}
+
+function createPreviewNode(doc: Document, className: string, text: string) {
+  const node = doc.createElement("span");
+  node.className = className;
+  node.innerText = text;
+  return node;
+}
+
+function createCodeLineNode(doc: Document, text: string, masked = false) {
+  const parts = splitSnippetLine(text);
+  const wrapper = doc.createElement("span");
+  const indentNode = doc.createElement("span");
+  const contentNode = doc.createElement("span");
+
+  wrapper.className = codeLineClass;
+  indentNode.className = "whitespace-pre";
+  contentNode.className = "whitespace-pre";
+
+  indentNode.innerText = parts.indent;
+  contentNode.innerText = masked ? buildMask(parts.content) : parts.content;
+
+  wrapper.append(indentNode, contentNode);
+  return wrapper;
+}
+
+function renderPreview(snippet: string, masked = false) {
+  const doc = zenDocument();
+  const rail = lineRailRef.current;
+  const code = codeRef.current;
+  if (!doc || !rail || !code) return [];
+
+  const lines = snippetLines(snippet);
+  rail.replaceChildren(
+    ...lines.map((_, index) => createPreviewNode(doc, railLineClass, String(index + 1).padStart(2, "0")))
+  );
+  const codeLines = lines.map((line) => createCodeLineNode(doc, line, masked));
+  code.replaceChildren(...codeLines);
+  renderedSnippet = snippet;
+  return codeLines;
+}
+
+function animateDescription(nextText: string) {
+  const el = descriptionRef.current;
+  if (!el) return;
+
+  descTimeline?.kill();
+  const exitMask = new SplitText(el, { type: "lines", linesClass: "overflow-hidden" });
+  const exitLines = new SplitText(exitMask.lines, { type: "lines" });
+
+  descTimeline = gsap.timeline({
+    defaults: { ease: "power3.out" },
+  });
+
+  descTimeline
+    .to(exitLines.lines, {
+      yPercent: -120,
+      opacity: 0,
+      duration: 0.3,
+      stagger: 0.04,
+    })
+    .call(() => {
+      exitLines.revert();
+      exitMask.revert();
+      el.textContent = nextText;
+
+      const enterMask = new SplitText(el, { type: "lines", linesClass: "overflow-hidden" });
+      const enterLines = new SplitText(enterMask.lines, { type: "lines" });
+      gsap.set(enterLines.lines, { yPercent: 120, opacity: 0 });
+
+      descTimeline!
+        .to(enterLines.lines, {
+          yPercent: 0,
+          opacity: 1,
+          duration: 0.4,
+          stagger: 0.05,
+        })
+        .call(() => {
+          enterLines.revert();
+          enterMask.revert();
+        });
+    });
+}
+
+function activateConvention(id: string) {
+  if (id === activeConventionId) return;
+
+  const next = conventionById(id);
+
+  activeConventionId = next.id;
+  activeConventionTitle = next.title;
+  activeConventionLabel = next.label;
+  activeConventionFile = next.filename;
+
+  animateDescription(next.description);
+
+  if (!codeRef.current || !lineRailRef.current) {
+    currentConvention = next;
+    renderedSnippet = next.snippet;
+    return;
+  }
+
+  const previousLines = snippetLines(renderedSnippet);
+  const outgoingLines = Array.from(codeRef.current.children) as HTMLElement[];
+
+  previewTimeline?.kill();
+  previewTimeline = gsap.timeline({ defaults: { ease: "power2.out" } });
+
+  outgoingLines.forEach((line, index) => {
+    const previousLine = splitSnippetLine(previousLines[index] || "");
+    const contentNode = line.lastElementChild as HTMLElement | null;
+    previewTimeline!.to(
+      line,
+      {
+        duration: 0.18,
+        opacity: 0,
+        y: -8,
+      },
+      index * 0.018
+    );
+    previewTimeline!.to(
+      contentNode || line,
+      previousLine.content.trim().length > 0
+        ? {
+          duration: 0.18,
+          opacity: 0,
+          y: -8,
+          scrambleText: {
+            text: buildMask(previousLine.content),
+            chars: scrambleChars,
+            speed: 1.1,
+          },
+          }
+        : {
+            duration: 0.18,
+            opacity: 0,
+            y: -8,
+          },
+      index * 0.018
+    );
+  });
+
+    previewTimeline.call(() => {
+      const nextLines = snippetLines(next.snippet).map(splitSnippetLine);
+      currentConvention = next;
+      const incomingLines = renderPreview(next.snippet, true);
+      gsap.set(incomingLines, { opacity: 0.2, y: 8 });
+
+      incomingLines.forEach((line, index) => {
+        const nextLine = nextLines[index] || { indent: "", content: "" };
+        const contentNode = line.lastElementChild as HTMLElement | null;
+        if (!contentNode) return;
+        gsap.set(contentNode, { opacity: 0.22, y: 8 });
+        previewTimeline!.to(
+          line,
+          {
+            duration: 0.24,
+            opacity: 1,
+            y: 0,
+          },
+          index * 0.026
+        );
+        previewTimeline!.to(
+          contentNode,
+          nextLine.content.trim().length > 0
+            ? {
+                duration: 0.24,
+                opacity: 1,
+                y: 0,
+                scrambleText: {
+                  text: nextLine.content,
+                  chars: scrambleChars,
+                  speed: 1.35,
+                  revealDelay: 0.02,
+                },
+              }
+            : {
+                duration: 0.24,
+                opacity: 1,
+                y: 0,
+              },
+          index * 0.026
+        );
+      });
+    });
+}
 
 zenMount((ctx) => {
-  const rows = collectRefs(...rowRefs);
-  if (!rows.length) return;
+  gsap.registerPlugin(ScrambleTextPlugin, SplitText);
 
-  gsap.set(rows, { y: 16, opacity: 0 });
+  const description = descriptionRef.current;
+  const section = sectionRef.current;
+  const revealTargets = collectRefs(leftPanelRef, cardRef);
+  let observer: IntersectionObserver | null = null;
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          gsap.to(rows, { y: 0, opacity: 1, duration: 0.6, stagger: 0.07, ease: "power3.out" });
-          observer.disconnect();
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
-  if (rows[0]) observer.observe(rows[0]);
-  ctx.cleanup(() => observer.disconnect());
+  renderPreview(contractConventions[0].snippet);
+  if (description) {
+    description.textContent = contractConventions[0].description;
+  }
+
+  if (revealTargets.length > 0) {
+    gsap.set(revealTargets, { y: 28, opacity: 0 });
+
+    if (section) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            revealTimeline?.kill();
+            revealTimeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+            revealTimeline
+              .to(revealTargets[0], { y: 0, opacity: 1, duration: 0.65 })
+              .to(revealTargets[1], { y: 0, opacity: 1, duration: 0.75 }, 0.08);
+            observer?.disconnect();
+          });
+        },
+        { threshold: 0.2 }
+      );
+      observer.observe(section);
+    } else {
+      revealTimeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      revealTimeline
+        .to(revealTargets[0], { y: 0, opacity: 1, duration: 0.65 })
+        .to(revealTargets[1], { y: 0, opacity: 1, duration: 0.75 }, 0.08);
+    }
+  }
+
+  ctx.cleanup(() => {
+    observer?.disconnect();
+    revealTimeline?.kill();
+    previewTimeline?.kill();
+    descTimeline?.kill();
+  });
 });
 </script>
 
-<SectionShell tone="purple" height="screen">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="purple" height="screen" >
+  <div ref={sectionRef} class="mx-auto flex w-full max-w-[1480px] flex-1 flex-col">
 
-    <div class="shrink-0 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-      <div>
-        <div class="flex items-center gap-2">
-          <AccentMark color="magenta" variant="dot" />
-          <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Contracts</span>
-        </div>
-        <div class="mt-4">
-          <Heading size="section">CONTRACTS, NOT CONVENTIONS.</Heading>
+    <SectionIntro
+      variant="split"
+      accentColor="magenta"
+      eyebrow={contractContent.intro.eyebrow}
+      title={contractContent.intro.title}
+      description={contractContent.intro.description}
+      class="pt-8 md:pt-10 lg:pt-14"
+      descriptionClass="text-sm leading-relaxed md:text-base md:leading-8 xl:text-right"
+    />
+
+    <div class="pt-20 md:pt-32 lg:pt-40"></div>
+
+    <div class="flex flex-col gap-20 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-20 xl:gap-24">
+      <div ref={leftPanelRef} class="flex flex-col">
+        <div class="border-y border-border/70">
+          <Button variant="ghost" ariaPressed={activeConventionId === contractConventions[0].id ? "true" : "false"} dataActive={activeConventionId === contractConventions[0].id ? "true" : "false"} class={btnClass} contentClass={btnContentClass} onHoverIn={() => activateConvention(contractConventions[0].id)} onFocus={() => activateConvention(contractConventions[0].id)} onClick={() => activateConvention(contractConventions[0].id)}>
+            <span class="grid flex-1 grid-cols-[auto_1fr] items-start gap-4 md:gap-5"><span class={lblClass}>{contractConventions[0].label}</span><span class="flex flex-col"><span class={ttlClass}>{contractConventions[0].title}</span><span class={meaningClass}>{contractConventions[0].meaning}</span></span></span>
+            <span class="flex items-start gap-4 pl-4"><span class={indClass}></span><span class={metaClass}>{contractContent.buttonMetaLabel}</span></span>
+          </Button>
+          <Button variant="ghost" ariaPressed={activeConventionId === contractConventions[1].id ? "true" : "false"} dataActive={activeConventionId === contractConventions[1].id ? "true" : "false"} class={btnClass} contentClass={btnContentClass} onHoverIn={() => activateConvention(contractConventions[1].id)} onFocus={() => activateConvention(contractConventions[1].id)} onClick={() => activateConvention(contractConventions[1].id)}>
+            <span class="grid flex-1 grid-cols-[auto_1fr] items-start gap-4 md:gap-5"><span class={lblClass}>{contractConventions[1].label}</span><span class="flex flex-col"><span class={ttlClass}>{contractConventions[1].title}</span><span class={meaningClass}>{contractConventions[1].meaning}</span></span></span>
+            <span class="flex items-start gap-4 pl-4"><span class={indClass}></span><span class={metaClass}>{contractContent.buttonMetaLabel}</span></span>
+          </Button>
+          <Button variant="ghost" ariaPressed={activeConventionId === contractConventions[2].id ? "true" : "false"} dataActive={activeConventionId === contractConventions[2].id ? "true" : "false"} class={btnClass} contentClass={btnContentClass} onHoverIn={() => activateConvention(contractConventions[2].id)} onFocus={() => activateConvention(contractConventions[2].id)} onClick={() => activateConvention(contractConventions[2].id)}>
+            <span class="grid flex-1 grid-cols-[auto_1fr] items-start gap-4 md:gap-5"><span class={lblClass}>{contractConventions[2].label}</span><span class="flex flex-col"><span class={ttlClass}>{contractConventions[2].title}</span><span class={meaningClass}>{contractConventions[2].meaning}</span></span></span>
+            <span class="flex items-start gap-4 pl-4"><span class={indClass}></span><span class={metaClass}>{contractContent.buttonMetaLabel}</span></span>
+          </Button>
+          <Button variant="ghost" ariaPressed={activeConventionId === contractConventions[3].id ? "true" : "false"} dataActive={activeConventionId === contractConventions[3].id ? "true" : "false"} class={btnClass} contentClass={btnContentClass} onHoverIn={() => activateConvention(contractConventions[3].id)} onFocus={() => activateConvention(contractConventions[3].id)} onClick={() => activateConvention(contractConventions[3].id)}>
+            <span class="grid flex-1 grid-cols-[auto_1fr] items-start gap-4 md:gap-5"><span class={lblClass}>{contractConventions[3].label}</span><span class="flex flex-col"><span class={ttlClass}>{contractConventions[3].title}</span><span class={meaningClass}>{contractConventions[3].meaning}</span></span></span>
+            <span class="flex items-start gap-4 pl-4"><span class={indClass}></span><span class={metaClass}>{contractContent.buttonMetaLabel}</span></span>
+          </Button>
+          <Button variant="ghost" ariaPressed={activeConventionId === contractConventions[4].id ? "true" : "false"} dataActive={activeConventionId === contractConventions[4].id ? "true" : "false"} class={btnClass} contentClass={btnContentClass} onHoverIn={() => activateConvention(contractConventions[4].id)} onFocus={() => activateConvention(contractConventions[4].id)} onClick={() => activateConvention(contractConventions[4].id)}>
+            <span class="grid flex-1 grid-cols-[auto_1fr] items-start gap-4 md:gap-5"><span class={lblClass}>{contractConventions[4].label}</span><span class="flex flex-col"><span class={ttlClass}>{contractConventions[4].title}</span><span class={meaningClass}>{contractConventions[4].meaning}</span></span></span>
+            <span class="flex items-start gap-4 pl-4"><span class={indClass}></span><span class={metaClass}>{contractContent.buttonMetaLabel}</span></span>
+          </Button>
         </div>
       </div>
-      <p class="text-muted-foreground text-sm md:text-right md:max-w-xs md:pb-2">
-        Every API boundary is a typed contract.<br/>Break the contract, break at compile time.
-      </p>
+
+      <div ref={cardRef} class="lg:sticky lg:top-32 lg:self-start">
+        <div class="relative overflow-hidden rounded-[20px] border border-border/80 bg-card/80 shadow-2xl backdrop-blur-xl dark:bg-card/90" style="max-height: clamp(460px, 70vh, 860px);">
+          <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-magenta/10 via-transparent to-brand-blue/10"></div>
+
+          <div class="relative flex items-center justify-between gap-6 border-b border-border/80 px-5 py-3 md:px-6">
+            <div class="flex items-center gap-4">
+              <div class="flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-brand-red"></span>
+                <span class="h-2 w-2 rounded-full bg-brand-gold"></span>
+                <span class="h-2 w-2 rounded-full bg-brand-blue"></span>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="font-mono text-[9px] uppercase tracking-[0.26em] text-muted-foreground">{contractContent.previewFrame.file}</span>
+                <span class="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/70">{activeConventionFile}</span>
+              </div>
+            </div>
+
+            <div class="hidden items-center gap-3 md:flex">
+              <span class="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground">{activeConventionLabel}</span>
+              <span class="h-px w-8 bg-border"></span>
+              <span class="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/75">{activeConventionTitle}</span>
+            </div>
+          </div>
+
+          <div class="relative grid grid-cols-[auto_1fr]" style="height: clamp(340px, 54vh, 660px);">
+            <div ref={lineRailRef} aria-hidden="true" class="hidden border-r border-border/70 bg-surface-1/40 px-3 py-5 md:flex md:flex-col"></div>
+            <div class="relative overflow-hidden">
+              <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/5"></div>
+              <pre class="relative h-full overflow-auto px-5 py-5 text-[12px] leading-6 text-card-foreground md:px-6 md:py-6 md:text-[13px] md:leading-7">
+                <code ref={codeRef} class="block min-w-max font-mono tab-[2]"></code>
+              </pre>
+            </div>
+          </div>
+
+          <div class="relative flex items-center justify-between border-t border-border/70 px-5 py-2.5 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground md:px-6">
+            <span>{contractContent.previewFrame.footerLeft}</span>
+            <span>{contractContent.previewFrame.footerRight}</span>
+          </div>
+        </div>
+
+        <div class="mt-8 lg:mt-10">
+          <span class="font-mono text-[10px] uppercase tracking-[0.26em] text-muted-foreground/80">{contractContent.activeConventionLabel}</span>
+          <p ref={descriptionRef} class="mt-4 text-sm leading-relaxed text-muted-foreground min-h-[4rem]">
+            {contractConventions[0].description}
+          </p>
+        </div>
+      </div>
     </div>
 
-    <div class="flex-1 flex flex-col justify-center py-12 gap-0">
-      <div ref={r0} class="flex items-baseline justify-between border-t border-border py-4">
-        <span class="font-mono text-sm text-foreground">guard(ctx)</span>
-        <span class="text-xs text-muted-foreground">Route protection — runs before render</span>
-      </div>
-      <div ref={r1} class="flex items-baseline justify-between border-t border-border py-4">
-        <span class="font-mono text-sm text-foreground">load(ctx)</span>
-        <span class="text-xs text-muted-foreground">Data fetching — server-only, typed payload</span>
-      </div>
-      <div ref={r2} class="flex items-baseline justify-between border-t border-border py-4">
-        <span class="font-mono text-sm text-foreground">on:event={handler}</span>
-        <span class="text-xs text-muted-foreground">Event binding — compiler-checked names</span>
-      </div>
-      <div ref={r3} class="flex items-baseline justify-between border-t border-border py-4">
-        <span class="font-mono text-sm text-foreground">ref&lt;T&gt;()</span>
-        <span class="text-xs text-muted-foreground">DOM access — scoped, never global queries</span>
-      </div>
-      <div ref={r4} class="flex items-baseline justify-between border-t border-border py-4">
-        <span class="font-mono text-sm text-foreground">signal()</span>
-        <span class="text-xs text-muted-foreground">Reactivity — explicit get/set, stable identity</span>
-      </div>
-      <div ref={r5} class="flex items-baseline justify-between border-t border-border border-b py-4">
-        <span class="font-mono text-sm text-foreground">state</span>
-        <span class="text-xs text-muted-foreground">Reactive binding — auto DOM updates</span>
-      </div>
-    </div>
-
+    <div class="pt-16 md:pt-24 lg:pt-32"></div>
   </div>
 </SectionShell>

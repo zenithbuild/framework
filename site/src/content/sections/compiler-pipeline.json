@@ -1,0 +1,70 @@
+{
+  "intro": {
+    "eyebrow": "Zero Cost Runtime",
+    "title": "ZERO COST RUNTIME.",
+    "description": "Zenith spends the work before the browser sees a page. The CLI scans routes, the compiler lowers each .zen file into deterministic IR, the bundler emits HTML, JS, and CSS, and the browser runtime only hydrates the markers the compiler already placed.",
+    "noteLabel": "Zero Cost Means",
+    "noteText": "No virtual DOM pass. No runtime template parser. No second semantic pass deciding structure after the compiler already did."
+  },
+  "chips": [
+    "RouteManifest First",
+    "IR Before Bundle",
+    "data-zx-* At Runtime"
+  ],
+  "surface": {
+    "eyebrow": "Deterministic Build Surface",
+    "title": "The browser receives already-decided structure.",
+    "description": "Compilation and bundling stay discrete. Zenith keeps semantics in the compiler, keeps packaging in the bundler, and keeps runtime work at the explicit marker boundary.",
+    "stages": [
+      {
+        "label": "Manifest",
+        "title": "Scan /pages into a deterministic RouteManifest.",
+        "description": "The CLI starts by ordering routes predictably and handing explicit page work to the compiler and bundler."
+      },
+      {
+        "label": "Compiler",
+        "title": "Lower each page into deterministic IR, bindings, and diagnostics.",
+        "description": "Structural decisions happen here. Runtime does not rediscover scopes, handlers, or reactive targets."
+      },
+      {
+        "label": "Bundler",
+        "title": "Emit HTML, JS, and CSS without semantic rewrites.",
+        "description": "Zenith packages the compiler graph after emission, with vendor output keyed against a pinned Rolldown revision."
+      },
+      {
+        "label": "Runtime",
+        "title": "Hydrate only the nodes the compiler explicitly marked.",
+        "description": "The browser runtime binds expressions and events through data-zx-* markers instead of interpreting template structure."
+      }
+    ],
+    "sideCards": [
+      {
+        "label": "Runtime Surface",
+        "description": "The final browser boundary is explicit markup plus explicit indices. There is no hidden discovery step.",
+        "code": "<button data-zx-on-click=\"0\">\n  <span data-zx-e=\"1\"></span>\n</button>",
+        "afterText": "Runtime work is execution over emitted markers, not a framework-level reconstruction pass."
+      },
+      {
+        "label": "Discrete Stages",
+        "description": "Zenith keeps the pipeline explicit: scan to manifest to compiler to bundler to dist/. No implicit chaining. No borrowed framework runtime hidden in the middle."
+      }
+    ]
+  },
+  "principles": [
+    {
+      "label": "Compiler Owns Structure",
+      "title": "If the compiler can decide it, runtime should not.",
+      "description": "Zenith pushes structural authority into compilation so the browser only executes explicit work."
+    },
+    {
+      "label": "Rolldown Stays In Packaging",
+      "title": "Bundling is a packaging step, not a second compiler.",
+      "description": "Zenith relies on Rolldown where bundling belongs and keeps marker indices, symbols, and emitted structure intact."
+    },
+    {
+      "label": "Minimal Browser Surface",
+      "title": "Hydration is the executor, not the author.",
+      "description": "The runtime binds marked nodes, attaches event handlers, and stays out of semantic interpretation."
+    }
+  ]
+}

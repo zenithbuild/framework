@@ -1,0 +1,112 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+import Button from "../../ui/Button.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutWhyContent = (props as Props).content;
+const openWhyId = signal<string>(aboutWhyContent.items[0].id);
+
+const rowClass = "border-t border-border/80 last:border-b";
+const triggerClass = "w-full rounded-none border-0 bg-transparent px-0 py-6 font-inherit text-left normal-case tracking-normal hover:bg-transparent md:py-7";
+const numberClass = "w-10 shrink-0 pt-1 font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground md:w-12";
+const titleClass = "font-display text-[clamp(1.4rem,2.8vw,2.1rem)] leading-[0.94] tracking-tight text-foreground";
+const summaryClass = "mt-3 max-w-3xl text-sm leading-7 text-muted-foreground md:text-[15px]";
+const badgeClass = "rounded-full border border-border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground";
+const detailGridClass = "grid overflow-hidden transition-[grid-template-rows,opacity] duration-500 ease-out";
+
+function toggleWhy(id: string) {
+  openWhyId.set(openWhyId.get() === id ? "" : id);
+}
+</script>
+
+<SectionShell tone="base" height="auto" runway="normal">
+  <div class="flex flex-col gap-14 md:gap-18 lg:gap-24">
+    <ScrollEnterGroup variant="list" class="w-full">
+      <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{aboutWhyContent.intro.eyebrow}</p>
+      <h2 class="mt-5 font-display text-[clamp(3rem,6vw,5rem)] font-semibold uppercase leading-[0.88] tracking-tight text-foreground">{aboutWhyContent.intro.title}</h2>
+
+      <div class="mt-7 grid gap-5 md:grid-cols-[10rem_minmax(0,1fr)] md:items-start md:gap-7">
+        <div class="hidden h-px bg-border md:block md:translate-y-4"></div>
+        <p class="text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{aboutWhyContent.intro.description}</p>
+      </div>
+    </ScrollEnterGroup>
+
+    <ScrollEnterGroup variant="list" class="w-full">
+      <div class={rowClass}>
+        <Button variant="ghost" class={triggerClass} contentClass="flex w-full items-start gap-5 md:gap-8" ariaExpanded={openWhyId.get() === aboutWhyContent.items[0].id ? "true" : "false"} onClick={() => toggleWhy(aboutWhyContent.items[0].id)}>
+          <span class={numberClass}>{aboutWhyContent.items[0].number}</span>
+          <div class="min-w-0 flex-1">
+            <p class={titleClass}>{aboutWhyContent.items[0].title}</p>
+            <p class={summaryClass}>{aboutWhyContent.items[0].summary}</p>
+          </div>
+          <span class={badgeClass}>Why</span>
+        </Button>
+        <div class={`${detailGridClass} ${openWhyId.get() === aboutWhyContent.items[0].id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`.trim()}>
+          <div class="overflow-hidden">
+            <div class="border-l border-border pl-[3.25rem] pr-6 pb-6 md:pl-12 xl:max-w-[44rem]">
+              <p class="text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutWhyContent.items[0].detail}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class={rowClass}>
+        <Button variant="ghost" class={triggerClass} contentClass="flex w-full items-start gap-5 md:gap-8" ariaExpanded={openWhyId.get() === aboutWhyContent.items[1].id ? "true" : "false"} onClick={() => toggleWhy(aboutWhyContent.items[1].id)}>
+          <span class={numberClass}>{aboutWhyContent.items[1].number}</span>
+          <div class="min-w-0 flex-1">
+            <p class={titleClass}>{aboutWhyContent.items[1].title}</p>
+            <p class={summaryClass}>{aboutWhyContent.items[1].summary}</p>
+          </div>
+          <span class={badgeClass}>Why</span>
+        </Button>
+        <div class={`${detailGridClass} ${openWhyId.get() === aboutWhyContent.items[1].id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`.trim()}>
+          <div class="overflow-hidden">
+            <div class="border-l border-border pl-[3.25rem] pr-6 pb-6 md:pl-12 xl:max-w-[44rem]">
+              <p class="text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutWhyContent.items[1].detail}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class={rowClass}>
+        <Button variant="ghost" class={triggerClass} contentClass="flex w-full items-start gap-5 md:gap-8" ariaExpanded={openWhyId.get() === aboutWhyContent.items[2].id ? "true" : "false"} onClick={() => toggleWhy(aboutWhyContent.items[2].id)}>
+          <span class={numberClass}>{aboutWhyContent.items[2].number}</span>
+          <div class="min-w-0 flex-1">
+            <p class={titleClass}>{aboutWhyContent.items[2].title}</p>
+            <p class={summaryClass}>{aboutWhyContent.items[2].summary}</p>
+          </div>
+          <span class={badgeClass}>Why</span>
+        </Button>
+        <div class={`${detailGridClass} ${openWhyId.get() === aboutWhyContent.items[2].id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`.trim()}>
+          <div class="overflow-hidden">
+            <div class="border-l border-border pl-[3.25rem] pr-6 pb-6 md:pl-12 xl:max-w-[44rem]">
+              <p class="text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutWhyContent.items[2].detail}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class={rowClass}>
+        <Button variant="ghost" class={triggerClass} contentClass="flex w-full items-start gap-5 md:gap-8" ariaExpanded={openWhyId.get() === aboutWhyContent.items[3].id ? "true" : "false"} onClick={() => toggleWhy(aboutWhyContent.items[3].id)}>
+          <span class={numberClass}>{aboutWhyContent.items[3].number}</span>
+          <div class="min-w-0 flex-1">
+            <p class={titleClass}>{aboutWhyContent.items[3].title}</p>
+            <p class={summaryClass}>{aboutWhyContent.items[3].summary}</p>
+          </div>
+          <span class={badgeClass}>Why</span>
+        </Button>
+        <div class={`${detailGridClass} ${openWhyId.get() === aboutWhyContent.items[3].id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`.trim()}>
+          <div class="overflow-hidden">
+            <div class="border-l border-border pl-[3.25rem] pr-6 pb-6 md:pl-12 xl:max-w-[44rem]">
+              <p class="text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutWhyContent.items[3].detail}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ScrollEnterGroup>
+  </div>
+</SectionShell>

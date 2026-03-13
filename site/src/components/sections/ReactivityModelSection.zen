@@ -1,54 +1,245 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
+import SectionIntro from "./SectionIntro.zen";
+import ScrollEnterGroup from "./ScrollEnterGroup.zen";
+import Button from "../ui/Button.zen";
+
+interface Props {
+  content: any;
+}
+
+const reactivityContent = (props as Props).content;
+
+const exampleView = signal("code");
+state demoCount = 0;
+
+const panelBaseClass = "absolute inset-0 transform-gpu transition-all duration-500 ease-out";
+const toggleButtonBaseClass = "rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-all duration-200";
+const activeToggleButtonClass = `${toggleButtonBaseClass} border-foreground bg-foreground text-background`;
+const inactiveToggleButtonClass = `${toggleButtonBaseClass} border-border bg-transparent text-muted-foreground hover:text-foreground`;
+const activePanelClass = `${panelBaseClass} pointer-events-auto translate-y-0 scale-100 opacity-100`;
+const inactivePanelClass = `${panelBaseClass} pointer-events-none translate-y-4 scale-[0.985] opacity-0`;
+
+const codePanelRef = ref<HTMLDivElement>();
+const livePanelRef = ref<HTMLDivElement>();
+
+function renderExampleView() {
+  const current = exampleView.get();
+  const codeIsActive = current === "code";
+  const liveIsActive = current === "live";
+
+  if (codePanelRef.current) {
+    codePanelRef.current.className = codeIsActive ? activePanelClass : inactivePanelClass;
+    codePanelRef.current.setAttribute("aria-hidden", codeIsActive ? "false" : "true");
+    if (codeIsActive) {
+      codePanelRef.current.removeAttribute("inert");
+    } else {
+      codePanelRef.current.setAttribute("inert", "");
+    }
+  }
+
+  if (livePanelRef.current) {
+    livePanelRef.current.className = liveIsActive ? activePanelClass : inactivePanelClass;
+    livePanelRef.current.setAttribute("aria-hidden", liveIsActive ? "false" : "true");
+    if (liveIsActive) {
+      livePanelRef.current.removeAttribute("inert");
+    } else {
+      livePanelRef.current.setAttribute("inert", "");
+    }
+  }
+}
+
+function showCode() {
+  exampleView.set("code");
+  renderExampleView();
+}
+
+function showLive() {
+  exampleView.set("live");
+  renderExampleView();
+}
+
+function incrementDemoCount() {
+  demoCount = demoCount + 1;
+}
+
+zenMount(() => {
+  renderExampleView();
+});
+
 </script>
 
-<SectionShell tone="gold" height="screen">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="gold" height="screen" runway="long">
+  <div class="flex flex-col flex-1 gap-16 md:gap-24 lg:gap-28">
 
-    <!-- top zone: micro label -->
-    <div class="shrink-0 flex items-center gap-2">
-      <AccentMark color="gold" variant="dot" />
-      <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Mental Model</span>
-    </div>
+    <div class="flex flex-col gap-20 md:gap-24 lg:gap-28">
+      <div class="min-w-0 w-full pt-2 md:pt-4 xl:pt-10">
+        <SectionIntro
+          variant="split"
+          accentColor="gold"
+          eyebrow={reactivityContent.intro.eyebrow}
+          title={reactivityContent.intro.title}
+          description={reactivityContent.intro.description}
+        />
 
-    <!-- middle zone: heading + code block -->
-    <div class="flex-1 flex flex-col justify-center py-12">
-      <div class="mb-10">
-        <Heading size="section">REACTIVITY BELONGS TO SCOPE.</Heading>
+        <ScrollEnterGroup variant="list" class="mt-10 flex flex-wrap gap-3 md:mt-12 md:gap-4">
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {reactivityContent.chips[0]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {reactivityContent.chips[1]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {reactivityContent.chips[2]}
+          </span>
+        </ScrollEnterGroup>
       </div>
 
-      <!-- Dominant motif: full-width code block -->
-      <div class="bg-card border border-border border-t-2 border-t-brand-gold rounded-lg overflow-x-auto">
-        <div class="flex items-center gap-2 px-5 py-3 border-b border-border">
-          <span class="text-xs font-mono text-muted-foreground tracking-widest">counter.zen</span>
-        </div>
-        <pre class="font-mono text-sm leading-8 text-card-foreground px-6 py-6 whitespace-pre">state count = 0
+      <div class="min-w-0">
+        <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2rem] border border-border bg-card">
+          <div data-enter-skip="true" class="pointer-events-none absolute -right-12 top-10 hidden h-40 w-40 rounded-full border border-surface-border-gold opacity-60 lg:block"></div>
+          <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-gold"></div>
+
+          <div class="flex flex-col gap-8 p-6 md:gap-10 md:p-8 lg:p-10">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div class="max-w-xl">
+                <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-muted-foreground">{reactivityContent.demo.eyebrow}</span>
+                <h3 class="mt-4 max-w-lg text-2xl font-medium uppercase leading-[0.9] tracking-tight text-card-foreground md:text-[2rem]">
+                  {reactivityContent.demo.title}
+                </h3>
+                <p class="mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+                  {reactivityContent.demo.description}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <Button
+                  variant="ghost"
+                  class={exampleView.get() === "code" ? activeToggleButtonClass : inactiveToggleButtonClass}
+                  ariaPressed={exampleView.get() === "code" ? "true" : "false"}
+                  ariaControls="reactivity-example-surface"
+                  onClick={showCode}
+                >
+                  {reactivityContent.demo.sourceButtonLabel}
+                </Button>
+                <Button
+                  variant="ghost"
+                  class={exampleView.get() === "live" ? activeToggleButtonClass : inactiveToggleButtonClass}
+                  ariaPressed={exampleView.get() === "live" ? "true" : "false"}
+                  ariaControls="reactivity-example-surface"
+                  onClick={showLive}
+                >
+                  {reactivityContent.demo.liveButtonLabel}
+                </Button>
+              </div>
+            </div>
+
+            <div id="reactivity-example-surface" class="relative min-h-[34rem] overflow-hidden rounded-[1.75rem] border border-border bg-surface-0 md:min-h-[36rem]">
+              <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-gold/10 via-transparent to-brand-blue/10"></div>
+
+              <div ref={codePanelRef} aria-hidden="false" class={activePanelClass}>
+                <div class="flex h-full flex-col">
+                  <div class="flex items-center justify-between gap-4 border-b border-border px-5 py-4 md:px-6">
+                    <div class="flex items-center gap-3">
+                      <span class="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{reactivityContent.demo.codeFile}</span>
+                      <span class="h-1.5 w-1.5 rounded-full bg-brand-gold"></span>
+                      <span class="text-[11px] text-muted-foreground">{reactivityContent.demo.codeMeta}</span>
+                    </div>
+                    <span class="rounded-full border border-border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {reactivityContent.demo.codeViewLabel}
+                    </span>
+                  </div>
+
+                  <pre class="relative min-h-0 flex-1 overflow-auto px-5 py-5 font-mono text-[12px] leading-6 text-card-foreground whitespace-pre md:px-6 md:py-6 md:text-[13px] md:leading-7">&lt;script lang="ts"&gt;
+state count = 0;
 
 function increment() &#123;
-  count = count + 1
+    count = count + 1;
 &#125;
+&lt;/script&gt;
 
-// Reactivity scoped to this file.
-// Slots see parent scope, not ours.</pre>
-      </div>
-    </div>
+&lt;button type="button" on:click=&#123;increment&#125;&gt;Count: &#123;count&#125;&lt;/button&gt;</pre>
+                </div>
+              </div>
 
-    <!-- bottom zone: principles tucked right -->
-    <div class="shrink-0 flex flex-col md:flex-row md:justify-end gap-8 pt-8 md:pt-12 border-t border-border">
-      <div class="flex flex-col gap-2 md:text-right">
-        <span class="text-xs font-mono text-foreground tracking-wide">Slots preserve parent scope</span>
-        <span class="text-xs text-muted-foreground">No re-binding. No proxy layers.</span>
+              <div ref={livePanelRef} aria-hidden="true" inert class={inactivePanelClass}>
+                <div class="flex h-full flex-col justify-between gap-8 p-6 md:gap-10 md:p-8 lg:p-10">
+                  <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="max-w-lg">
+                      <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{reactivityContent.demo.liveEyebrow}</p>
+                      <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                        {reactivityContent.demo.liveDescription}
+                      </p>
+                    </div>
+                    <span class="self-start rounded-full border border-border px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {reactivityContent.demo.liveTag}
+                    </span>
+                  </div>
+
+                  <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,18rem)] xl:items-end">
+                    <div class="rounded-[1.5rem] border border-border bg-card p-6 md:p-8">
+                      <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{reactivityContent.demo.interactiveEyebrow}</p>
+                      <p class="mt-4 text-sm leading-7 text-muted-foreground">
+                        {reactivityContent.demo.interactiveDescription}
+                      </p>
+
+                      <div class="mt-8">
+                          <button
+                            type="button"
+                          class="group inline-flex min-w-[16rem] items-center justify-between gap-6 rounded-[1.5rem] border border-foreground bg-foreground px-6 py-5 font-mono text-base uppercase tracking-[0.18em] text-background transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl disabled:cursor-default disabled:opacity-100 md:min-w-[18rem] md:px-7 md:py-6"
+                          on:click={incrementDemoCount}
+                        >
+                          <span>{reactivityContent.demo.counterLabel}</span>
+                          <span aria-live="polite" class="text-[clamp(1.6rem,5vw,2.4rem)] leading-none">{demoCount}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid gap-4">
+                      <div class="rounded-[1.5rem] border border-border bg-card px-5 py-5">
+                        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{reactivityContent.demo.boundOutputEyebrow}</p>
+                        <p aria-live="polite" class="mt-4 font-mono text-[clamp(2.5rem,8vw,4rem)] leading-none text-foreground">{demoCount}</p>
+                      </div>
+                      <div class="rounded-[1.5rem] border border-border bg-card px-5 py-5">
+                        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{reactivityContent.demo.ownershipEyebrow}</p>
+                        <p class="mt-4 text-sm leading-7 text-muted-foreground">
+                          {reactivityContent.demo.ownershipDescription}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollEnterGroup>
       </div>
-      <div class="flex flex-col gap-2 md:text-right">
-        <span class="text-xs font-mono text-foreground tracking-wide">Components are structural</span>
-        <span class="text-xs text-muted-foreground">Layout boundary, not reactive.</span>
-      </div>
-      <div class="flex flex-col gap-2 md:text-right">
-        <span class="text-xs font-mono text-foreground tracking-wide">State scoped to the file</span>
-        <span class="text-xs text-muted-foreground">No subscription zones per component.</span>
-      </div>
+
+      <ScrollEnterGroup variant="list" class="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-3">
+        <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+          <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{reactivityContent.principles[0].label}</p>
+          <p class="mt-4 text-base leading-8 text-foreground">{reactivityContent.principles[0].title}</p>
+          <p class="mt-3 text-sm leading-7 text-muted-foreground">
+            {reactivityContent.principles[0].description}
+          </p>
+        </div>
+
+        <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+          <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{reactivityContent.principles[1].label}</p>
+          <p class="mt-4 text-base leading-8 text-foreground">{reactivityContent.principles[1].title}</p>
+          <p class="mt-3 text-sm leading-7 text-muted-foreground">
+            {reactivityContent.principles[1].description}
+          </p>
+        </div>
+
+        <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+          <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{reactivityContent.principles[2].label}</p>
+          <p class="mt-4 text-base leading-8 text-foreground">{reactivityContent.principles[2].title}</p>
+          <p class="mt-3 text-sm leading-7 text-muted-foreground">
+            {reactivityContent.principles[2].description}
+          </p>
+        </div>
+      </ScrollEnterGroup>
     </div>
 
   </div>

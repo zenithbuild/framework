@@ -1,0 +1,448 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { SplitText } from "gsap/SplitText";
+import Button from "../ui/Button.zen";
+import EcosystemOrbitNode from "./EcosystemOrbitNode.zen";
+
+interface Props {
+  content: any;
+}
+
+interface NodeDetail { eyebrow: string; title: string; description: string; packageName: string; factA: string; factB: string; }
+interface OrbNode { id: string; label: string; caption: string; x: number; y: number; z: number; radius: number; detail: NodeDetail; }
+interface Edge { from: string; to: string; }
+
+const defaultNodeId = "core";
+const centerX = 280;
+const centerY = 280;
+const ecosystemShowcaseContent = (props as Props).content;
+const selectButtonBaseClass = "rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] transition-all duration-200";
+const selectButtonActiveClass = `${selectButtonBaseClass} border-foreground bg-foreground text-background`;
+const selectButtonInactiveClass = `${selectButtonBaseClass} border-border bg-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground`;
+const resetButtonActiveClass = "rounded-full border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-200 hover:text-foreground";
+const resetButtonDisabledClass = "rounded-full border border-border/60 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/45";
+
+const orbNodeLayouts = [
+  { id: "core", x: 280, y: 280, z: 170, radius: 18 },
+  { id: "language", x: 280, y: 88, z: 24, radius: 11 },
+  { id: "compiler", x: 176, y: 146, z: 76, radius: 12 },
+  { id: "runtime", x: 390, y: 150, z: 84, radius: 12 },
+  { id: "router", x: 116, y: 270, z: 56, radius: 11 },
+  { id: "bundler", x: 442, y: 284, z: 48, radius: 11 },
+  { id: "cli", x: 186, y: 424, z: -32, radius: 10 },
+  { id: "language-server", x: 362, y: 420, z: -28, radius: 10 },
+] as const;
+
+const orbNodes: OrbNode[] = orbNodeLayouts.map((layout) => {
+  const contentNode = ecosystemShowcaseContent.nodes.find((node) => node.id === layout.id) || ecosystemShowcaseContent.nodes[0];
+  return {
+    ...layout,
+    label: contentNode.label,
+    caption: contentNode.caption,
+    detail: contentNode.detail,
+  };
+});
+
+const orbEdges: Edge[] = [
+  { from: "core", to: "language" }, { from: "core", to: "compiler" }, { from: "core", to: "runtime" }, { from: "core", to: "router" },
+  { from: "core", to: "bundler" }, { from: "core", to: "cli" }, { from: "core", to: "language-server" }, { from: "language", to: "compiler" },
+  { from: "language", to: "language-server" }, { from: "compiler", to: "bundler" }, { from: "compiler", to: "cli" }, { from: "router", to: "runtime" },
+  { from: "runtime", to: "bundler" }, { from: "cli", to: "router" }, { from: "bundler", to: "language-server" },
+];
+
+state selectedNodeId = "";
+state activeDisplayedNodeId = defaultNodeId;
+state stageStatusLabel = ecosystemShowcaseContent.sideStatusDefaultLabel;
+state stageStatusValue = "@zenithbuild/core";
+
+const orbFrameRef = ref<HTMLDivElement>();
+const orbSurfaceRef = ref<HTMLDivElement>();
+const ringsRef = ref<SVGGElement>();
+const backEdgesRef = ref<SVGGElement>();
+const frontEdgesRef = ref<SVGGElement>();
+const auraRef = ref<SVGCircleElement>();
+const detailTagRef = ref<HTMLParagraphElement>();
+const detailTitleRef = ref<HTMLHeadingElement>();
+const detailDescRef = ref<HTMLParagraphElement>();
+const detailPackageRef = ref<HTMLParagraphElement>();
+const detailFactARef = ref<HTMLParagraphElement>();
+const detailFactBRef = ref<HTMLParagraphElement>();
+const detailConnectionsRef = ref<HTMLParagraphElement>();
+const groupRef0 = ref<SVGGElement>(); const groupRef1 = ref<SVGGElement>(); const groupRef2 = ref<SVGGElement>(); const groupRef3 = ref<SVGGElement>();
+const groupRef4 = ref<SVGGElement>(); const groupRef5 = ref<SVGGElement>(); const groupRef6 = ref<SVGGElement>(); const groupRef7 = ref<SVGGElement>();
+const glowRef0 = ref<SVGCircleElement>(); const glowRef1 = ref<SVGCircleElement>(); const glowRef2 = ref<SVGCircleElement>(); const glowRef3 = ref<SVGCircleElement>();
+const glowRef4 = ref<SVGCircleElement>(); const glowRef5 = ref<SVGCircleElement>(); const glowRef6 = ref<SVGCircleElement>(); const glowRef7 = ref<SVGCircleElement>();
+const labelRef0 = ref<SVGTextElement>(); const labelRef1 = ref<SVGTextElement>(); const labelRef2 = ref<SVGTextElement>(); const labelRef3 = ref<SVGTextElement>();
+const labelRef4 = ref<SVGTextElement>(); const labelRef5 = ref<SVGTextElement>(); const labelRef6 = ref<SVGTextElement>(); const labelRef7 = ref<SVGTextElement>();
+
+let edgeElements: SVGPathElement[] = [];
+let detailTimeline: gsap.core.Timeline | null = null;
+let renderedNodeId = defaultNodeId;
+let detailSplits: SplitText[] = [];
+let reducedMotion = false;
+let ambientTween: gsap.core.Tween | null = null;
+let ringTween: gsap.core.Tween | null = null;
+let auraTween: gsap.core.Tween | null = null;
+let orbHovering = false;
+
+function nodeById(id: string) { return orbNodes.find((node) => node.id === id) || orbNodes[0]; }
+function resolvedDisplayedNodeId() { return selectedNodeId || defaultNodeId; }
+function edgeDepth(edge: Edge) { const from = nodeById(edge.from); const to = nodeById(edge.to); if (from.z > 0 && to.z > 0) return "front"; if (from.z <= 0 && to.z <= 0) return "back"; return "cross"; }
+function edgeTier(edge: Edge) { return edge.from === "core" || edge.to === "core" ? "primary" : "secondary"; }
+function edgeStroke(edge: Edge) { return edgeTier(edge) === "primary" ? "var(--color-brand-purple)" : edgeDepth(edge) === "front" ? "var(--color-orb-link-front)" : "var(--color-orb-link-back)"; }
+function baseEdgeOpacity(edge: Edge) {
+  const depth = edgeDepth(edge);
+  const tier = edgeTier(edge);
+  if (tier === "primary") return depth === "front" ? 0.42 : depth === "cross" ? 0.28 : 0.18;
+  return depth === "front" ? 0.18 : depth === "cross" ? 0.11 : 0.07;
+}
+function connectedTo(nodeId: string, focusId: string) { return nodeId === focusId || orbEdges.some((edge) => ((edge.from === focusId && edge.to === nodeId) || (edge.to === focusId && edge.from === nodeId))); }
+function connectedNodeLabels(id: string) {
+  const labels = orbEdges.reduce((acc, edge) => { if (edge.from === id) acc.push(nodeById(edge.to).label); if (edge.to === id) acc.push(nodeById(edge.from).label); return acc; }, [] as string[]);
+  return Array.from(new Set(labels)).join(" · ");
+}
+function orbEdgePath(edge: Edge) {
+  const from = nodeById(edge.from);
+  const to = nodeById(edge.to);
+  const midX = (from.x + to.x) / 2;
+  const midY = (from.y + to.y) / 2;
+  const offsetX = midX - centerX;
+  const offsetY = midY - centerY;
+  const distance = Math.sqrt(offsetX * offsetX + offsetY * offsetY) || 1;
+  const bulge = edgeTier(edge) === "primary" ? 24 + Math.abs(from.z - to.z) * 0.08 : 14 + Math.abs(from.z - to.z) * 0.05;
+  return `M${from.x},${from.y} Q${midX + (offsetX / distance) * bulge},${midY + (offsetY / distance) * bulge} ${to.x},${to.y}`;
+}
+
+function setStageStatus() {
+  const activeNode = nodeById(activeDisplayedNodeId);
+  stageStatusLabel = selectedNodeId ? ecosystemShowcaseContent.sideSelectedLabel : orbHovering ? ecosystemShowcaseContent.sideHoverLabel : ecosystemShowcaseContent.sideStatusDefaultLabel;
+  stageStatusValue = activeNode.detail.packageName;
+}
+
+function clearDetailSplits() {
+  detailSplits.forEach((split) => split.revert());
+  detailSplits = [];
+}
+
+function detailLineRefs() {
+  return collectRefs(detailTagRef, detailDescRef, detailPackageRef, detailFactARef, detailFactBRef, detailConnectionsRef) as HTMLElement[];
+}
+
+function splitDetailContent() {
+  const splits: SplitText[] = [];
+  const title = detailTitleRef.current;
+  const titleSplit = title ? SplitText.create(title, { type: "chars", mask: "chars" }) : null;
+  if (titleSplit) splits.push(titleSplit);
+  const lineSplits = detailLineRefs().map((node) => SplitText.create(node, { type: "lines", mask: "lines" }));
+  lineSplits.forEach((split) => splits.push(split));
+  return {
+    splits,
+    titleChars: titleSplit ? Array.from(titleSplit.chars) as HTMLElement[] : [],
+    lineNodes: lineSplits.flatMap((split) => Array.from(split.lines) as HTMLElement[]),
+  };
+}
+
+function setDetailContent(id: string) {
+  const detail = nodeById(id).detail;
+  if (detailTagRef.current) detailTagRef.current.innerText = detail.eyebrow;
+  if (detailTitleRef.current) detailTitleRef.current.innerText = detail.title;
+  if (detailDescRef.current) detailDescRef.current.innerText = detail.description;
+  if (detailPackageRef.current) detailPackageRef.current.innerText = detail.packageName;
+  if (detailFactARef.current) detailFactARef.current.innerText = detail.factA;
+  if (detailFactBRef.current) detailFactBRef.current.innerText = detail.factB;
+  if (detailConnectionsRef.current) detailConnectionsRef.current.innerText = `Connected surfaces: ${connectedNodeLabels(id)}`;
+}
+
+function transitionDetail(id: string, immediate = false) {
+  if (id === renderedNodeId && !immediate) return;
+  detailTimeline?.kill();
+  clearDetailSplits();
+  if (immediate || reducedMotion) { setDetailContent(id); renderedNodeId = id; return; }
+  const exit = splitDetailContent();
+  detailSplits = exit.splits;
+  detailTimeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+  detailTimeline
+    .to(exit.titleChars, { yPercent: -108, opacity: 0, duration: 0.18, stagger: 0.012, ease: "power2.in" }, 0)
+    .to(exit.lineNodes, { yPercent: -110, opacity: 0, duration: 0.18, stagger: 0.03, ease: "power2.in" }, 0.02)
+    .call(() => {
+      clearDetailSplits();
+      setDetailContent(id);
+      renderedNodeId = id;
+      const enter = splitDetailContent();
+      detailSplits = enter.splits;
+      gsap.set(enter.titleChars, { yPercent: 112, opacity: 0, transformOrigin: "50% 100%" });
+      gsap.set(enter.lineNodes, { yPercent: 108, opacity: 0 });
+      detailTimeline!
+        .to(enter.titleChars, { yPercent: 0, opacity: 1, duration: 0.28, stagger: 0.014, ease: "power4.out" })
+        .to(enter.lineNodes, { yPercent: 0, opacity: 1, duration: 0.28, stagger: 0.035 }, 0.05)
+        .call(() => clearDetailSplits());
+    });
+}
+
+function buildEdges() {
+  const doc = zenDocument();
+  const backLayer = backEdgesRef.current;
+  const frontLayer = frontEdgesRef.current;
+  if (!doc || !backLayer || !frontLayer) return;
+  edgeElements.forEach((edge) => edge.remove());
+  edgeElements = [];
+  orbEdges.forEach((edge) => {
+    const depth = edgeDepth(edge);
+    const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", orbEdgePath(edge));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke-width", edgeTier(edge) === "primary" ? (depth === "front" ? "1.75" : "1.3") : depth === "front" ? "1.15" : "0.95");
+    path.setAttribute("stroke", edgeStroke(edge));
+    path.setAttribute("stroke-opacity", String(baseEdgeOpacity(edge)));
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    if (edgeTier(edge) === "secondary" || depth !== "front") path.setAttribute("stroke-dasharray", depth === "cross" ? "3 7" : "2.5 7.5");
+    (depth === "back" ? backLayer : frontLayer).appendChild(path);
+    edgeElements.push(path);
+  });
+}
+
+function renderGraph(immediate = false) {
+  const focusId = activeDisplayedNodeId;
+  const duration = immediate || reducedMotion ? 0 : 0.24;
+  const hoverBoost = orbHovering ? 0.08 : 0;
+  const groups = collectRefs(groupRef0, groupRef1, groupRef2, groupRef3, groupRef4, groupRef5, groupRef6, groupRef7);
+  const glows = collectRefs(glowRef0, glowRef1, glowRef2, glowRef3, glowRef4, glowRef5, glowRef6, glowRef7);
+  const labels = collectRefs(labelRef0, labelRef1, labelRef2, labelRef3, labelRef4, labelRef5, labelRef6, labelRef7);
+  groups.forEach((group, index) => {
+    const node = orbNodes[index];
+    const active = node.id === focusId;
+    const linked = connectedTo(node.id, focusId);
+    gsap.to(group, {
+      scale: active ? 1.08 : linked ? 1.028 : orbHovering ? 1.006 : 0.988,
+      opacity: active ? 1 : linked ? 0.96 : Math.min((node.z > 0 ? 0.78 : 0.58) + hoverBoost, 0.92),
+      duration,
+      transformOrigin: `${node.x}px ${node.y}px`,
+      ease: "power2.out"
+    });
+    gsap.to(glows[index], {
+      attr: { r: active ? node.radius + 15 : linked ? node.radius + 10 : orbHovering ? node.radius + 8 : node.radius + 6 },
+      opacity: active ? 0.3 : linked ? 0.16 : orbHovering ? 0.1 : node.z > 0 ? 0.07 : 0.04,
+      duration,
+      ease: "power2.out"
+    });
+    gsap.to(labels[index], { opacity: active ? 0.95 : linked ? 0.72 : orbHovering ? 0.58 : 0.48, y: active ? -2 : 0, duration, ease: "power2.out" });
+  });
+  edgeElements.forEach((path, index) => {
+    const edge = orbEdges[index];
+    const active = edge.from === focusId || edge.to === focusId;
+    const tier = edgeTier(edge);
+    gsap.to(path, {
+      attr: { "stroke-opacity": active ? (tier === "primary" ? "0.9" : "0.5") : String(baseEdgeOpacity(edge) + (orbHovering ? (tier === "primary" ? 0.05 : 0.03) : 0)) },
+      strokeWidth: active ? (tier === "primary" ? 2.45 : 1.65) : tier === "primary" ? (edgeDepth(edge) === "front" ? 1.75 : 1.3) : edgeDepth(edge) === "front" ? 1.15 : 0.95,
+      duration,
+      ease: "power2.out"
+    });
+  });
+  gsap.to(auraRef.current, { opacity: focusId === "core" ? (orbHovering ? 0.12 : 0.08) : orbHovering ? 0.095 : 0.065, duration, ease: "power2.out" });
+  gsap.to(ringsRef.current, { opacity: orbHovering ? 0.92 : 0.78, duration, ease: "power2.out" });
+}
+
+function handleOrbPointerEnter() {
+  if (orbHovering) return;
+  orbHovering = true;
+  setStageStatus();
+  renderGraph();
+}
+
+function handleOrbPointerLeave() {
+  orbHovering = false;
+  setStageStatus();
+  renderGraph();
+  if (!reducedMotion && orbSurfaceRef.current) {
+    gsap.to(orbSurfaceRef.current, { x: 0, y: 0, rotateX: 0, rotateY: 0, duration: 0.7, ease: "power3.out", overwrite: true });
+  }
+}
+
+function handleOrbPointerMove(event: PointerEvent) {
+  if (reducedMotion || !orbSurfaceRef.current) return;
+  const rect = orbSurfaceRef.current.getBoundingClientRect();
+  const relativeX = (event.clientX - rect.left) / rect.width - 0.5;
+  const relativeY = (event.clientY - rect.top) / rect.height - 0.5;
+  gsap.to(orbSurfaceRef.current, {
+    x: relativeX * 8,
+    y: relativeY * 8,
+    rotateY: relativeX * 5.5,
+    rotateX: relativeY * -4.5,
+    duration: 0.65,
+    ease: "power3.out",
+    overwrite: true
+  });
+}
+
+function syncDisplayedNode(immediate = false) {
+  const nextId = resolvedDisplayedNodeId();
+  const changed = nextId !== activeDisplayedNodeId;
+  activeDisplayedNodeId = nextId;
+  setStageStatus();
+  renderGraph(immediate);
+  if (changed || immediate) transitionDetail(nextId, immediate);
+}
+
+function selectNode(id: string) {
+  if (selectedNodeId === id && activeDisplayedNodeId === id) return;
+  selectedNodeId = id;
+  syncDisplayedNode();
+}
+
+function resetSelection() {
+  if (selectedNodeId === "" && activeDisplayedNodeId === defaultNodeId) return;
+  selectedNodeId = "";
+  syncDisplayedNode();
+}
+
+function handleNodeKeydown(event: KeyboardEvent, id: string) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(id); } }
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  gsap.registerPlugin(SplitText);
+  reducedMotion = !!win?.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setDetailContent(defaultNodeId);
+  renderedNodeId = defaultNodeId;
+  buildEdges();
+  syncDisplayedNode(true);
+  const offResize = zenResize(() => { buildEdges(); syncDisplayedNode(true); });
+  ctx.cleanup(offResize);
+  if (!reducedMotion) {
+    if (orbFrameRef.current) ambientTween = gsap.to(orbFrameRef.current, { y: -6, duration: 6.2, repeat: -1, yoyo: true, ease: "sine.inOut" });
+    if (ringsRef.current) ringTween = gsap.to(ringsRef.current, { rotation: 2.6, duration: 18, repeat: -1, yoyo: true, transformOrigin: "50% 50%", ease: "sine.inOut" });
+    if (auraRef.current) auraTween = gsap.to(auraRef.current, { attr: { r: 198 }, opacity: 0.1, duration: 4.8, repeat: -1, yoyo: true, ease: "sine.inOut" });
+  }
+  ctx.cleanup(() => {
+    detailTimeline?.kill();
+    ambientTween?.kill();
+    ringTween?.kill();
+    auraTween?.kill();
+    clearDetailSplits();
+    edgeElements.forEach((edge) => edge.remove());
+    edgeElements = [];
+  });
+});
+</script>
+
+<div class="flex flex-col gap-10 xl:flex-row xl:items-start xl:gap-12 2xl:gap-14">
+  <div class="min-w-0 xl:basis-[64%]">
+    <div ref={orbFrameRef} class="relative overflow-hidden rounded-[2.4rem] border border-border/70 bg-card">
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(180,93,255,0.16),transparent_34%),radial-gradient(circle_at_82%_24%,rgba(255,86,139,0.12),transparent_30%),radial-gradient(circle_at_50%_82%,rgba(82,169,255,0.12),transparent_34%)]"></div>
+      <div class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-magenta/70"></div>
+
+      <div class="relative flex flex-col gap-6 p-5 md:gap-7 md:p-7 lg:p-8">
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div class="max-w-xl">
+            <span class="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{ecosystemShowcaseContent.eyebrow}</span>
+            <h3 class="mt-4 max-w-lg text-2xl font-medium uppercase leading-[0.9] tracking-tight text-card-foreground md:text-[2rem]">{ecosystemShowcaseContent.title}</h3>
+          </div>
+          <div class="border-l border-border/70 pl-5 md:max-w-[14rem] md:pl-6">
+            <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{stageStatusLabel}</p>
+            <p class="mt-3 text-sm leading-7 text-card-foreground">{stageStatusValue}</p>
+          </div>
+        </div>
+
+        <div class="relative h-[22rem] sm:h-[24rem] md:h-[28rem] xl:h-[31rem] 2xl:h-[33rem] [perspective:1400px]">
+          <div
+            ref={orbSurfaceRef}
+            class="h-full w-full will-change-transform [transform-style:preserve-3d]"
+            on:pointerenter={handleOrbPointerEnter}
+            on:pointerleave={handleOrbPointerLeave}
+            on:pointermove={handleOrbPointerMove}
+          >
+          <svg viewBox="0 0 560 560" class="h-full w-full overflow-visible">
+            <circle ref={auraRef} cx="280" cy="280" r="194" class="pointer-events-none fill-orb-glow" opacity="0.08" />
+            <g ref={ringsRef} class="pointer-events-none">
+              <path d="M 92,286 A 188,52 0 0,0 468,286" class="fill-none stroke-orb-ring-back" stroke-width="0.8" stroke-dasharray="4 6" />
+              <path d="M 126,208 A 154,34 0 0,0 434,208" class="fill-none stroke-orb-ring-back" stroke-width="0.6" stroke-dasharray="4 6" />
+              <path d="M 126,364 A 154,34 0 0,0 434,364" class="fill-none stroke-orb-ring-back" stroke-width="0.6" stroke-dasharray="4 6" />
+              <path d="M 280,92 A 48,188 0 0,0 280,468" class="fill-none stroke-orb-ring-back" stroke-width="0.55" stroke-dasharray="4 7" />
+              <path d="M 280,92 A 48,188 0 0,0 280,468" transform="rotate(60,280,280)" class="fill-none stroke-orb-ring-back" stroke-width="0.55" stroke-dasharray="4 7" />
+              <path d="M 280,92 A 48,188 0 0,0 280,468" transform="rotate(120,280,280)" class="fill-none stroke-orb-ring-back" stroke-width="0.55" stroke-dasharray="4 7" />
+              <path d="M 92,286 A 188,52 0 0,1 468,286" class="fill-none stroke-orb-ring-front" stroke-width="0.9" />
+              <path d="M 126,208 A 154,34 0 0,1 434,208" class="fill-none stroke-orb-ring-front" stroke-width="0.7" />
+              <path d="M 126,364 A 154,34 0 0,1 434,364" class="fill-none stroke-orb-ring-front" stroke-width="0.7" />
+              <path d="M 280,92 A 48,188 0 0,1 280,468" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
+              <path d="M 280,92 A 48,188 0 0,1 280,468" transform="rotate(60,280,280)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
+              <path d="M 280,92 A 48,188 0 0,1 280,468" transform="rotate(120,280,280)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
+            </g>
+            <g ref={backEdgesRef} class="pointer-events-none"></g>
+            <g ref={frontEdgesRef} class="pointer-events-none"></g>
+
+            <EcosystemOrbitNode groupRef={groupRef0} glowRef={glowRef0} labelRef={labelRef0} variant="core" x={280} y={280} radius={18} glowRadius={26} glowOpacity="0.15" label={orbNodes[0].label} caption={orbNodes[0].caption} labelY={284} captionY={309} fillClass="fill-brand-purple" strokeClass="stroke-brand-purple" labelFontSize="10.5" captionFontSize="8.5" onSelect={() => selectNode("core")} onKeydown={(event) => handleNodeKeydown(event, "core")} />
+            <EcosystemOrbitNode groupRef={groupRef1} glowRef={glowRef1} labelRef={labelRef1} x={280} y={88} radius={11} glowRadius={17} label={orbNodes[1].label} caption={orbNodes[1].caption} labelY={72} captionY={108} fillClass="fill-brand-magenta" strokeClass="stroke-brand-magenta" onSelect={() => selectNode("language")} onKeydown={(event) => handleNodeKeydown(event, "language")} />
+            <EcosystemOrbitNode groupRef={groupRef2} glowRef={glowRef2} labelRef={labelRef2} x={176} y={146} radius={12} glowRadius={18} label={orbNodes[2].label} caption={orbNodes[2].caption} labelY={128} captionY={166} fillClass="fill-brand-gold" strokeClass="stroke-brand-gold" onSelect={() => selectNode("compiler")} onKeydown={(event) => handleNodeKeydown(event, "compiler")} />
+            <EcosystemOrbitNode groupRef={groupRef3} glowRef={glowRef3} labelRef={labelRef3} x={390} y={150} radius={12} glowRadius={18} label={orbNodes[3].label} caption={orbNodes[3].caption} labelY={132} captionY={170} fillClass="fill-brand-blue" strokeClass="stroke-brand-blue" onSelect={() => selectNode("runtime")} onKeydown={(event) => handleNodeKeydown(event, "runtime")} />
+            <EcosystemOrbitNode groupRef={groupRef4} glowRef={glowRef4} labelRef={labelRef4} x={116} y={270} radius={11} glowRadius={17} label={orbNodes[4].label} caption={orbNodes[4].caption} labelY={252} captionY={290} fillClass="fill-brand-blue" strokeClass="stroke-brand-blue" onSelect={() => selectNode("router")} onKeydown={(event) => handleNodeKeydown(event, "router")} />
+            <EcosystemOrbitNode groupRef={groupRef5} glowRef={glowRef5} labelRef={labelRef5} x={442} y={284} radius={11} glowRadius={17} label={orbNodes[5].label} caption={orbNodes[5].caption} labelY={266} captionY={304} fillClass="fill-brand-gold" strokeClass="stroke-brand-gold" onSelect={() => selectNode("bundler")} onKeydown={(event) => handleNodeKeydown(event, "bundler")} />
+            <EcosystemOrbitNode groupRef={groupRef6} glowRef={glowRef6} labelRef={labelRef6} x={186} y={424} radius={10} glowRadius={16} glowOpacity="0.06" label={orbNodes[6].label} caption={orbNodes[6].caption} labelY={444} captionY={462} fillClass="fill-brand-blue" strokeClass="stroke-brand-blue" onSelect={() => selectNode("cli")} onKeydown={(event) => handleNodeKeydown(event, "cli")} />
+            <EcosystemOrbitNode groupRef={groupRef7} glowRef={glowRef7} labelRef={labelRef7} x={362} y={420} radius={10} glowRadius={16} glowOpacity="0.06" label={orbNodes[7].label} caption={orbNodes[7].caption} labelY={440} captionY={458} fillClass="fill-brand-magenta" strokeClass="stroke-brand-magenta" labelFontSize="8" onSelect={() => selectNode("language-server")} onKeydown={(event) => handleNodeKeydown(event, "language-server")} />
+          </svg>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-3 border-t border-border/60 pt-5">
+          <Button variant="ghost" class={selectedNodeId === "core" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("core")} ariaPressed={selectedNodeId === "core" ? "true" : "false"}>{orbNodes[0].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "language" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("language")} ariaPressed={selectedNodeId === "language" ? "true" : "false"}>{orbNodes[1].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "compiler" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("compiler")} ariaPressed={selectedNodeId === "compiler" ? "true" : "false"}>{orbNodes[2].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "runtime" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("runtime")} ariaPressed={selectedNodeId === "runtime" ? "true" : "false"}>{orbNodes[3].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "router" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("router")} ariaPressed={selectedNodeId === "router" ? "true" : "false"}>{orbNodes[4].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "bundler" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("bundler")} ariaPressed={selectedNodeId === "bundler" ? "true" : "false"}>{orbNodes[5].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "cli" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("cli")} ariaPressed={selectedNodeId === "cli" ? "true" : "false"}>{orbNodes[6].label}</Button>
+          <Button variant="ghost" class={selectedNodeId === "language-server" ? selectButtonActiveClass : selectButtonInactiveClass} onClick={() => selectNode("language-server")} ariaPressed={selectedNodeId === "language-server" ? "true" : "false"}>{orbNodes[7].label}</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="min-w-0 xl:basis-[36%] xl:pt-4">
+    <div class="flex min-h-full flex-col gap-8 xl:border-l xl:border-border/70 xl:pl-8 2xl:pl-10">
+      <div class="flex items-center justify-between gap-4">
+        <p class="max-w-[14rem] font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{ecosystemShowcaseContent.sidePrompt}</p>
+        <Button
+          variant="ghost"
+          class={selectedNodeId === "" && activeDisplayedNodeId === defaultNodeId ? resetButtonDisabledClass : resetButtonActiveClass}
+          onClick={resetSelection}
+          disabled={selectedNodeId === "" && activeDisplayedNodeId === defaultNodeId}
+        >
+          {ecosystemShowcaseContent.resetLabel}
+        </Button>
+      </div>
+
+      <div class="flex min-h-[22rem] flex-col justify-between gap-6 md:min-h-[24rem] xl:min-h-[26rem]">
+        <div>
+          <p ref={detailTagRef} class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Public Surface</p>
+          <h3 ref={detailTitleRef} class="mt-4 max-w-[10ch] text-[clamp(2rem,4.4vw,3.5rem)] font-medium uppercase leading-[0.9] tracking-tight text-foreground">CORE</h3>
+          <p ref={detailDescRef} class="mt-5 max-w-xl text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+            Applications stay on @zenithbuild/core while the compiler, runtime, router, bundler, and editor packages remain aligned underneath it.
+          </p>
+        </div>
+
+        <div class="grid gap-6 border-t border-border/70 pt-5 md:gap-7 md:pt-6">
+          <div>
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ecosystemShowcaseContent.detailLabels.package}</p>
+            <p ref={detailPackageRef} class="mt-3 font-mono text-sm text-foreground">@zenithbuild/core</p>
+          </div>
+
+          <div class="grid gap-6 md:gap-7">
+            <div>
+              <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ecosystemShowcaseContent.detailLabels.boundary}</p>
+              <p ref={detailFactARef} class="mt-3 text-sm leading-7 text-muted-foreground">The core README defines this package as the sole public entrypoint for Zenith projects.</p>
+            </div>
+
+            <div>
+              <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ecosystemShowcaseContent.detailLabels.guardrail}</p>
+              <p ref={detailFactBRef} class="mt-3 text-sm leading-7 text-muted-foreground">Direct imports from inner @zenithbuild/* packages are implementation-detail territory, not app-facing API.</p>
+            </div>
+          </div>
+
+          <div class="border-t border-border/70 pt-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ecosystemShowcaseContent.detailLabels.connections}</p>
+            <p ref={detailConnectionsRef} class="mt-3 text-sm leading-7 text-muted-foreground">Connected surfaces: language · compiler · runtime · router · bundler · cli · language-server</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>

@@ -1,0 +1,81 @@
+{
+  "intro": {
+    "eyebrow": "Get Started",
+    "title": "THREE COMMANDS. ZERO CONFIG.",
+    "description": "Zenith’s stable path stays literal: scaffold through create-zenith, step into the generated app, and start the dev loop. Open each command for the exact contract behind it."
+  },
+  "stablePath": {
+    "label": "Stable Path",
+    "beforeCode": "The canonical stable scaffold entry is ",
+    "code": "create-zenith",
+    "afterCode": ". Beta installs stay opt-in, and the full compatibility proof still lives in the install contract docs."
+  },
+  "steps": [
+    {
+      "id": "scaffold",
+      "number": "01",
+      "heading": "Scaffold the app",
+      "command": "npm create zenith@latest my-app",
+      "badge": "Stable",
+      "panelTitle": "Scaffold Contract",
+      "panelBody": {
+        "beforeCode": "",
+        "code": "create-zenith",
+        "afterCode": " is the canonical stable scaffold entry. It generates the project, applies optional tooling only when requested, and exits without becoming part of runtime or build orchestration."
+      },
+      "asideLabel": "Also supported",
+      "asideBody": {
+        "firstCode": "bun create zenith",
+        "middle": " and ",
+        "secondCode": "pnpm create zenith",
+        "after": " follow the same scaffold contract."
+      }
+    },
+    {
+      "id": "enter",
+      "number": "02",
+      "heading": "Enter the generated project",
+      "command": "cd my-app",
+      "badge": "Generated",
+      "panelTitle": "Generated Surface",
+      "panelBody": "The scaffolded app already reflects the choices made during setup. If you declined ESLint, Prettier, or path aliases, Zenith does not leave behind placeholder scripts or stray config files.",
+      "asideLabel": "Clean-room rule",
+      "asideBody": "Same version plus the same scaffold answers must produce the same file tree deterministically."
+    },
+    {
+      "id": "dev",
+      "number": "03",
+      "heading": "Start the dev loop",
+      "command": "bun run dev",
+      "badge": "Daily Loop",
+      "panelTitle": "Development Loop",
+      "panelBody": {
+        "beforeCode": "This is the canonical local loop used across Zenith starters. For full compatibility verification, the install contract also checks a clean-room install and ",
+        "code": "zenith build",
+        "afterCode": " after scaffold."
+      },
+      "asideLabel": "Build proof",
+      "asideBody": "Stable and train releases are validated when scaffold, install, and build succeed deterministically."
+    }
+  ],
+  "followThrough": {
+    "label": "Canonical follow-through",
+    "commands": [
+      "npm install",
+      "npx zenith build"
+    ],
+    "note": "The section above is the quick local start. The install compatibility contract extends that path into a deterministic install-and-build proof for stable releases."
+  },
+  "actions": [
+    {
+      "label": "Read the docs",
+      "href": "/docs",
+      "variant": "primary"
+    },
+    {
+      "label": "Release notes",
+      "href": "/blog",
+      "variant": "secondary"
+    }
+  ]
+}

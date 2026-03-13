@@ -1,0 +1,86 @@
+{
+  "intro": {
+    "eyebrow": "Runtime",
+    "title": "RUNTIME AS THIN AS AIR.",
+    "description": "Zenith keeps the browser surface literal. Runtime receives emitted markers, binding tables, and explicit setup boundaries, then executes that work without rediscovering structure."
+  },
+  "summaryGrid": [
+    {
+      "label": "Boundary",
+      "value": "Executor"
+    },
+    {
+      "label": "Hydration",
+      "value": "Explicit"
+    },
+    {
+      "label": "Bindings",
+      "value": "Positional"
+    },
+    {
+      "label": "DOM Work",
+      "value": "Ref-Scoped"
+    }
+  ],
+  "hydrationContract": {
+    "eyebrow": "Hydration Contract · ZEN-RULE-107",
+    "description": "Hydration consumes explicit payload tables with stable marker, expression, and event ordering.",
+    "note": "Discovery passes are banned. Fallback behavior is banned. If payload order drifts, runtime throws instead of improvising.",
+    "surfaceLabel": "Emitted Surface",
+    "surfaceCode": "<button data-zx-on-click=\"0\">\n  <span data-zx-e=\"1\"></span>\n</button>"
+  },
+  "principles": [
+    {
+      "number": "01",
+      "title": "Hydrate by markers, not discovery.",
+      "intro": "Compiler-authored marker and event tables tell runtime exactly where to bind. The browser does not scan DOM structure to recover intent.",
+      "sideLabel": "Hydration Surface",
+      "sideText": "Marker, expression, and event indices arrive in compiler order so runtime can bind the exact nodes it was handed.",
+      "mainLabel": "Marker Table",
+      "mainTitle": "Compiler emission fixes marker, expression, and event ordering before hydration starts. The browser receives positions, not a structure to infer.",
+      "mainText": "Binding is positional and deterministic. Runtime attaches work to the nodes the compiler already chose instead of searching the DOM for semantic intent.",
+      "support": [
+        {
+          "label": "Failure Mode",
+          "text": "If marker order or payload order drifts, runtime throws. There is no recovery pass and no silent fallback path."
+        },
+        {
+          "label": "Discovery Status",
+          "text": "Banned. The browser never walks the tree to guess handler targets, component ownership, or reactive scope."
+        }
+      ]
+    },
+    {
+      "number": "02",
+      "title": "Execute payloads. Do not reinterpret them.",
+      "intro": "Runtime executes emitted artifacts and explicit mount boundaries. It does not parse expression strings or rebuild a framework layer after build.",
+      "sideLabel": "Execution Surface",
+      "sideText": "Artifacts arrive precomputed. Browser work is dispatch, mount, and update over emitted payloads.",
+      "mainLabel": "Runtime Contract · ZEN-RULE-106",
+      "mainTitle": "Runtime executes deterministic payload work. It does not interpret strings or recover structure the compiler already decided.",
+      "mainText": "eval, new Function, and hidden framework lifecycle layers are outside the contract.",
+      "support": [
+        {
+          "label": "Allowed",
+          "text": "hydrate(payload), zenMount(), and zeneffect(...) as explicit boundaries."
+        },
+        {
+          "label": "Banned",
+          "text": "Runtime parsing, semantic recovery, and framework-style discovery between emitted output and the DOM."
+        }
+      ]
+    },
+    {
+      "number": "03",
+      "title": "Keep runtime work in explicit primitives and refs.",
+      "intro": "Bindings stay positional, primitives stay explicit, and browser work stays scoped to ref<T>() and zenMount(...).",
+      "sideLabel": "Scoped Surface",
+      "sideText": "Refs, signals, and explicit helpers keep browser work narrow, inspectable, and deterministic.",
+      "mainLabel": "Binding + DOM Contract",
+      "mainTitle": "Runtime never resolves identifiers by name. Signals, lowered state, refs, and setup boundaries stay explicit all the way to the browser.",
+      "mainText": "Use zenOn(), zenResize(), and collectRefs(...refs) instead of raw global scans or ad hoc listener wiring.",
+      "supportCodeLabel": "Explicit Primitive",
+      "supportCode": "const count = signal(0)\ncount.set(count.get() + 1)"
+    }
+  ]
+}

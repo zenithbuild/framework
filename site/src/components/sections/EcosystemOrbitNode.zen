@@ -1,0 +1,100 @@
+<script lang="ts">
+export interface Props {
+  x: number;
+  y: number;
+  radius: number;
+  glowRadius: number;
+  glowOpacity?: string;
+  label: string;
+  caption: string;
+  labelY: number;
+  captionY: number;
+  fillClass: string;
+  strokeClass: string;
+  groupRef?: any;
+  glowRef?: any;
+  labelRef?: any;
+  variant?: "core" | "standard";
+  labelFontSize?: string;
+  captionFontSize?: string;
+  onPreview?: () => void;
+  onClearPreview?: () => void;
+  onSelect?: () => void;
+  onKeydown?: (event: KeyboardEvent) => void;
+}
+
+const incoming = props as Props;
+const variant = incoming.variant === "core" ? "core" : "standard";
+const glowOpacity = incoming.glowOpacity || "0.08";
+const labelFontSize = incoming.labelFontSize || "8.5";
+const captionFontSize = incoming.captionFontSize || "7.5";
+const x = incoming.x;
+const y = incoming.y;
+const radius = incoming.radius;
+const glowRadius = incoming.glowRadius;
+const label = incoming.label;
+const caption = incoming.caption;
+const labelY = incoming.labelY;
+const captionY = incoming.captionY;
+const fillClass = incoming.fillClass;
+const strokeClass = incoming.strokeClass;
+const groupRef = incoming.groupRef;
+const glowRef = incoming.glowRef;
+const labelRef = incoming.labelRef;
+const onPreview = incoming.onPreview;
+const onClearPreview = incoming.onClearPreview;
+const onSelect = incoming.onSelect;
+const onKeydown = incoming.onKeydown;
+const innerFillClass = variant === "core" ? "fill-primary" : "fill-card";
+const titleClass = variant === "core" ? "fill-primary-foreground" : "fill-foreground";
+const strokeWidth = variant === "core" ? "2.2" : "1.5";
+const labelWeight = variant === "core" ? "700" : "400";
+const hitRadius = variant === "core" ? radius + 24 : radius + 18;
+
+function handlePreview() {
+  if (typeof onPreview === "function") onPreview();
+}
+
+function handleClearPreview() {
+  if (typeof onClearPreview === "function") onClearPreview();
+}
+
+function handleSelect() {
+  if (typeof onSelect === "function") onSelect();
+}
+
+function handleNodeKeydown(event: KeyboardEvent) {
+  if (typeof onKeydown === "function") onKeydown(event);
+}
+</script>
+
+<g
+  ref={groupRef}
+  tabindex="0"
+  role="button"
+  class="cursor-pointer outline-none"
+  on:pointerenter={handlePreview}
+  on:pointerleave={handleClearPreview}
+  on:focus={handlePreview}
+  on:blur={handleClearPreview}
+  on:click={handleSelect}
+  on:keydown={handleNodeKeydown}
+>
+  <circle cx={x} cy={y} r={hitRadius} class="fill-transparent" opacity="0.001" />
+  <circle
+    ref={glowRef}
+    cx={x}
+    cy={y}
+    r={glowRadius}
+    class={`pointer-events-none ${fillClass}`}
+    opacity={glowOpacity}
+  />
+  <circle cx={x} cy={y} r={radius} class={`pointer-events-none ${innerFillClass}`} />
+  <circle cx={x} cy={y} r={radius} class={`pointer-events-none fill-none ${strokeClass}`} stroke-width={strokeWidth} />
+  <text x={x} y={labelY} text-anchor="middle" class={`pointer-events-none ${titleClass}`} font-size={labelFontSize} font-family="monospace" font-weight={labelWeight}>
+    {label}
+  </text>
+  <text ref={labelRef} x={x} y={captionY} text-anchor="middle" class="pointer-events-none fill-muted-foreground" font-size={captionFontSize} font-family="monospace">
+    {caption}
+  </text>
+</g>

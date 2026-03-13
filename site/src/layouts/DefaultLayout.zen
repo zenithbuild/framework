@@ -1,34 +1,46 @@
 <script setup="ts">
 import "../styles/globals.css";
+import SmoothScrollController from "@/components/globals/SmoothScrollController.zen";
+import RouteTransitionShell from "@/components/globals/RouteTransitionShell.zen";
 import Navigation from "@/components/ui/Navigation.zen";
 import Footer from "@/components/globals/footer/Footer.zen";
 
 interface Props {
     title?: string;
     description?: string;
+    navigationContent: any;
+    footerContent: any;
 }
 
-const incoming = props as Props;
-const title = incoming.title ?? "Home";
-const description = incoming.description ?? "";
+const defaultLayoutTitle = (props as Props).title ?? "Home";
+const defaultLayoutDescription = (props as Props).description ?? "";
+const defaultLayoutNavigationContent = (props as Props).navigationContent;
+const defaultLayoutFooterContent = (props as Props).footerContent;
+const transitionFrameRef = ref<HTMLDivElement>();
 </script>
 
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZenithBuild | {title}</title>
-    <meta name="description" content={description} />
+    <title>ZenithBuild | {defaultLayoutTitle}</title>
+    <meta name="description" content={defaultLayoutDescription} />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Rajdhani:wght@500;600;700&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body class="min-h-screen overflow-x-hidden bg-background text-foreground">
-    <Navigation />
+    <Navigation content={defaultLayoutNavigationContent} />
+    <SmoothScrollController />
     <main class="relative z-10 w-full overflow-x-hidden bg-background">
-        <slot />
+        <div class="relative isolate w-full overflow-x-hidden">
+            <RouteTransitionShell content={defaultLayoutNavigationContent.transitionPrototype} frameRef={transitionFrameRef} />
+            <div ref={transitionFrameRef} class="relative z-10">
+                <slot />
+            </div>
+        </div>
     </main>
-    <Footer />
+    <Footer content={defaultLayoutFooterContent} />
 </body>
 </html>
