@@ -3,7 +3,7 @@ title: "Route Protection (guard/load)"
 description: "How to securely protect Zenith routes using server-enforced guard and load exports."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-02-27"
+last_updated: "2026-03-12"
 tags: ["routing", "security", "guard", "load"]
 nav:
   order: 50
@@ -19,12 +19,15 @@ Zenith enforces this principle by executing `guard` and `load` on the server bef
 
 ## The Contract
 
-You can export `guard` and `load` from `<script server lang="ts">` in your `.zen` component, or from adjacent `page.guard.ts` / `page.load.ts` files.
+You can export `guard` and `load` from one `<script server lang="ts">` block in your `.zen` page, or from adjacent sibling modules:
+
+- `<route>.guard.ts` / `<route>.load.ts`
+- `page.guard.ts` / `page.load.ts` next to `index.zen`
 
 They must return a canonical `RouteResult`:
 - `allow()`
 - `redirect(location, status?)`
-- `deny(status?, message?)`
+- `deny(status?, message?)` where status is `401`, `403`, or `404`
 - `data(payload)`
 
 ### Execution Order
@@ -35,6 +38,7 @@ They must return a canonical `RouteResult`:
 
 2. **`load(ctx)`**: Runs second (only if `guard` did not short-circuit). Fetch data needed for rendering.
    - **Allowed Returns:** `data()`, `redirect()`, `deny()`.
+   - **Plain Object Shortcut:** Returning a plain object is treated the same as `data(payload)`.
    - **Legacy Compatibility:** You cannot mix `load`/`data` exports with legacy `ssr`/`ssr_data` exports in the same route.
 
 ## Example: Secure Dashboard
@@ -90,23 +94,20 @@ Both `guard` and `load` receive a single `ctx` object argument which provides ac
 ### Static Site Generation (SSG)
 Routes protected with `guard(ctx)` or `load(ctx)` **cannot be statically generated**. If you have `export const prerender = true` in the same file, or enforce global static build, the compiler will throw a build error.
 
-### Client Router (No-Flash UX)
-When navigating via SPA links (`<a data-zen-link>`), the Zenith Router detects guarded server routes. It intercepts the navigation, pings `/__zenith/route-check` in the background, and will only transition the browser once the server allows access. If denied, the user remains on their current page without a flash of unauthorized content.
+### Client Router (Advisory Preflight, Server-Authoritative Commit)
+When navigating via marked soft-nav links (`<a data-zen-link>`), the router may preflight guarded server routes through `/__zenith/route-check` using the target pathname plus query string. That preflight is advisory only.
 
-If redirected, the router seamlessly follows the redirect.
+The actual soft-navigation authority is the direct same-origin HTML fetch for the target URL:
+- if the server returns a successful HTML page, the router may soft-commit it
+- if the server returns a redirect, deny, non-HTML response, or fetch failure, the router falls back to browser navigation
+
+Client routing never overrules the server result.
 
 ### Optional Client Policy and Events
-For SPA UX tuning (not security), you can configure route-protection behavior and subscribe to lifecycle events:
+You can still subscribe to advisory route-protection events:
 
 ```ts
-import { setRouteProtectionPolicy, on, off } from "@zenithbuild/router";
-
-setRouteProtectionPolicy({
-  defaultLoginPath: "/login",
-  deny401RedirectToLogin: true,
-  forbiddenPath: "/403",
-  onDeny: "stay" // or "redirect" | "render403" | (result) => {}
-});
+import { on, off } from "@zenithbuild/router";
 
 const handleDeny = (payload) => {
   console.warn("Denied route", payload.routeId, payload.result?.status);
@@ -118,10 +119,16 @@ off("route:deny", handleDeny);
 ```
 
 Supported route-protection events:
-- `guard:start`
-- `guard:end`
 - `route-check:start`
 - `route-check:end`
 - `route-check:error`
 - `route:deny`
 - `route:redirect`
+
+## Direct Request Outcomes
+
+- `redirect(...)` returns the provided 3xx status and `Location` header immediately.
+- `deny(401|403|404, ...)` returns a matched-route status and plain-text body immediately.
+- A matched-route `deny(404, ...)` is different from an unmatched route 404.
+- A thrown error inside an executing `guard(ctx)` or `load(ctx)` returns `500 text/plain`.
+- If Zenith cannot produce a canonical route result from the extracted server module at all, the direct HTML response carries `__zenith_error.code = "LOAD_FAILED"`.

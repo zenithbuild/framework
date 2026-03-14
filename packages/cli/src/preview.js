@@ -565,7 +565,7 @@ export async function createPreviewServer(options) {
         if (result && result.kind === 'deny') {
           const status = Number.isInteger(result.status) ? result.status : 403;
           res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-          res.end(result.message || (status === 401 ? 'Unauthorized' : 'Forbidden'));
+          res.end(result.message || defaultRouteDenyMessage(status));
           return;
         }
         if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
@@ -723,6 +723,13 @@ export async function executeServerRoute({
   };
 }
 
+export function defaultRouteDenyMessage(status) {
+  if (status === 401) return 'Unauthorized';
+  if (status === 403) return 'Forbidden';
+  if (status === 404) return 'Not Found';
+  return 'Internal Server Error';
+}
+
 /**
  * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
  * @returns {Promise<Record<string, unknown> | null>}
@@ -748,11 +755,12 @@ export async function executeServerScript(input) {
   }
 
   if (result.kind === 'deny') {
+    const status = Number.isInteger(result.status) ? result.status : 403;
     return {
       __zenith_error: {
-        status: Number.isInteger(result.status) ? result.status : 403,
-        code: 'ACCESS_DENIED',
-        message: String(result.message || 'Access denied')
+        status,
+        code: status >= 500 ? 'LOAD_FAILED' : (status === 404 ? 'NOT_FOUND' : 'ACCESS_DENIED'),
+        message: String(result.message || defaultRouteDenyMessage(status))
       }
     };
   }

@@ -1,72 +1,171 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
+import SectionIntro from "./SectionIntro.zen";
+import ScrollEnterGroup from "./ScrollEnterGroup.zen";
+
+interface Props {
+  content: any;
+}
+
+const compilerPipelineContent = (props as Props).content;
 </script>
 
-<SectionShell tone="base" height="screen">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="base" height="screen" runway="long">
+  <div class="flex flex-col flex-1 gap-16 md:gap-24 lg:gap-28">
 
-    <!-- top zone: micro label -->
-    <div class="shrink-0">
-      <div class="flex items-center gap-2">
-        <AccentMark color="purple" variant="dot" />
-        <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Compiler</span>
+    <div class="flex flex-col gap-20 md:gap-24 lg:gap-28">
+      <div class="min-w-0 w-full pt-2 md:pt-4 xl:pt-10">
+        <SectionIntro
+          variant="side-note"
+          accentColor="blue"
+          eyebrow={compilerPipelineContent.intro.eyebrow}
+          title={compilerPipelineContent.intro.title}
+          description={compilerPipelineContent.intro.description}
+          noteLabel={compilerPipelineContent.intro.noteLabel}
+          noteText={compilerPipelineContent.intro.noteText}
+        />
+
+        <ScrollEnterGroup variant="list" class="mt-10 flex flex-wrap gap-3 md:mt-12 md:gap-4 xl:justify-end">
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {compilerPipelineContent.chips[0]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {compilerPipelineContent.chips[1]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {compilerPipelineContent.chips[2]}
+          </span>
+        </ScrollEnterGroup>
       </div>
-      <div class="mt-4">
-        <Heading size="section">ZERO RUNTIME COST.</Heading>
+
+      <div class="min-w-0">
+        <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2rem] border border-border bg-card">
+          <div data-enter-skip="true" class="pointer-events-none absolute -right-12 top-10 hidden h-40 w-40 rounded-full border border-surface-border-blue opacity-60 lg:block"></div>
+          <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-blue"></div>
+
+          <div class="flex flex-col gap-10 p-6 md:gap-12 md:p-8 lg:p-10">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div class="max-w-lg">
+                <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-muted-foreground">{compilerPipelineContent.surface.eyebrow}</span>
+                <h3 class="mt-4 max-w-md text-2xl font-medium uppercase leading-[0.9] tracking-tight text-card-foreground md:text-[2rem]">
+                    {compilerPipelineContent.surface.title}
+                </h3>
+              </div>
+
+              <p class="max-w-sm text-sm leading-7 text-muted-foreground">
+                {compilerPipelineContent.surface.description}
+              </p>
+            </div>
+
+            <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)] lg:gap-10">
+              <div class="relative pl-12 md:pl-14">
+                <div class="absolute left-4 top-4 bottom-4 w-px bg-border"></div>
+
+                <div class="relative rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <div class="absolute -left-12 top-6 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card font-mono text-[11px] text-card-foreground md:-left-14 md:h-9 md:w-9">
+                    01
+                  </div>
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.stages[0].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">
+                    {compilerPipelineContent.surface.stages[0].title}
+                  </p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.stages[0].description}
+                  </p>
+                </div>
+
+                <div class="relative mt-6 rounded-[1.5rem] border border-border bg-surface-0 p-5 md:mt-7 md:p-6">
+                  <div class="absolute -left-12 top-6 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card font-mono text-[11px] text-card-foreground md:-left-14 md:h-9 md:w-9">
+                    02
+                  </div>
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.stages[1].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">
+                    {compilerPipelineContent.surface.stages[1].title}
+                  </p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.stages[1].description}
+                  </p>
+                </div>
+
+                <div class="relative mt-6 rounded-[1.5rem] border border-border bg-surface-0 p-5 md:mt-7 md:p-6">
+                  <div class="absolute -left-12 top-6 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card font-mono text-[11px] text-card-foreground md:-left-14 md:h-9 md:w-9">
+                    03
+                  </div>
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.stages[2].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">
+                    {compilerPipelineContent.surface.stages[2].title}
+                  </p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.stages[2].description}
+                  </p>
+                </div>
+
+                <div class="relative mt-6 rounded-[1.5rem] border border-border bg-surface-0 p-5 md:mt-7 md:p-6">
+                  <div class="absolute -left-12 top-6 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card font-mono text-[11px] text-card-foreground md:-left-14 md:h-9 md:w-9">
+                    04
+                  </div>
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.stages[3].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">
+                    {compilerPipelineContent.surface.stages[3].title}
+                  </p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.stages[3].description}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-6 md:gap-7">
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.sideCards[0].label}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.sideCards[0].description}
+                  </p>
+
+                  <pre class="mt-5 overflow-auto rounded-[1.25rem] border border-border bg-card px-4 py-4 font-mono text-[12px] leading-6 text-card-foreground whitespace-pre">{compilerPipelineContent.surface.sideCards[0].code}</pre>
+
+                  <p class="mt-4 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.sideCards[0].afterText}
+                  </p>
+                </div>
+
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.surface.sideCards[1].label}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {compilerPipelineContent.surface.sideCards[1].description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollEnterGroup>
       </div>
     </div>
 
-    <!-- middle zone: pipeline strip -->
-    <div class="flex-1 flex items-center py-12">
-      <div class="w-full grid grid-cols-1 md:grid-cols-4 gap-px">
-        <div class="group border border-border p-6 flex flex-col gap-3">
-          <span class="font-mono text-xs text-muted-foreground">01</span>
-          <span class="font-mono text-sm text-foreground">Parse</span>
-          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            .zen source → AST via Babel parser integration.
-          </p>
-        </div>
-        <div class="group border border-border p-6 flex flex-col gap-3">
-          <span class="font-mono text-xs text-muted-foreground">02</span>
-          <span class="font-mono text-sm text-foreground">Transform</span>
-          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            AST → IR with event bindings, reactivity markers.
-          </p>
-        </div>
-        <div class="group border border-border p-6 flex flex-col gap-3">
-          <span class="font-mono text-xs text-muted-foreground">03</span>
-          <span class="font-mono text-sm text-foreground">Emit</span>
-          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            IR → optimized HTML + minimal JS hydration markers.
-          </p>
-        </div>
-        <div class="group border border-border p-6 flex flex-col gap-3">
-          <span class="font-mono text-xs text-muted-foreground">04</span>
-          <span class="font-mono text-sm text-foreground">Bundle</span>
-          <p class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            Tree-shaken vendor splits, CSS extraction, zero dead code.
-          </p>
-        </div>
+    <ScrollEnterGroup variant="list" class="grid grid-cols-1 gap-6 border-t border-border pt-12 md:gap-8 md:pt-16 lg:grid-cols-3">
+      <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+        <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.principles[0].label}</p>
+        <p class="mt-4 text-base leading-8 text-foreground">{compilerPipelineContent.principles[0].title}</p>
+        <p class="mt-3 text-sm leading-7 text-muted-foreground">
+          {compilerPipelineContent.principles[0].description}
+        </p>
       </div>
-    </div>
 
-    <!-- bottom zone: stats -->
-    <div class="shrink-0 flex flex-wrap gap-x-12 gap-y-4 pt-8 md:pt-12 border-t border-border">
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">0kb</span>
-        <span class="text-xs text-muted-foreground">Runtime overhead.</span>
+      <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+        <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.principles[1].label}</p>
+        <p class="mt-4 text-base leading-8 text-foreground">{compilerPipelineContent.principles[1].title}</p>
+        <p class="mt-3 text-sm leading-7 text-muted-foreground">
+          {compilerPipelineContent.principles[1].description}
+        </p>
       </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">100%</span>
-        <span class="text-xs text-muted-foreground">Compile-time resolved.</span>
+
+      <div class="rounded-[1.5rem] border border-border p-6 md:p-7">
+        <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{compilerPipelineContent.principles[2].label}</p>
+        <p class="mt-4 text-base leading-8 text-foreground">{compilerPipelineContent.principles[2].title}</p>
+        <p class="mt-3 text-sm leading-7 text-muted-foreground">
+          {compilerPipelineContent.principles[2].description}
+        </p>
       </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">Babel</span>
-        <span class="text-xs text-muted-foreground">Parser integration.</span>
-      </div>
-    </div>
+    </ScrollEnterGroup>
 
   </div>
 </SectionShell>

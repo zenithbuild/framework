@@ -12,11 +12,12 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
 use oxc_allocator::Allocator;
-use oxc_ast::{ast, VisitMut};
+use oxc_ast::{VisitMut, ast};
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::Parser;
 use oxc_span::SourceType;
@@ -228,13 +229,14 @@ pub fn canonicalize_page_id(page_path: &str) -> String {
 // Post-Build Validation
 // ---------------------------------------------------------------------------
 
-/// Validate that the bundled output contains all expected `data-zx-e` placeholders.
+/// Validate that the bundled output contains all expected expression placeholders.
 pub fn validate_placeholders(html: &str, expression_count: usize) -> Result<(), Vec<Diagnostic>> {
     let mut found_indices = std::collections::HashSet::new();
 
     // Regex to find all data-zx-* attributes and capture their values (quoted or unquoted)
     // Matches: data-zx-something="value" OR data-zx-something='value' OR data-zx-something=value
     let re = Regex::new(r#"data-zx-[a-z-]+=(?:"([^"]+)"|'([^']+)'|([^\s>"']+))"#).unwrap();
+    let comment_re = Regex::new(r#"<!--\s*zx-e:(\d+)\s*-->"#).unwrap();
 
     for cap in re.captures_iter(html) {
         // Value is in group 1, 2, or 3
@@ -253,6 +255,13 @@ pub fn validate_placeholders(html: &str, expression_count: usize) -> Result<(), 
         }
     }
 
+    for cap in comment_re.captures_iter(html) {
+        let val = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        if let Ok(idx) = val.parse::<usize>() {
+            found_indices.insert(idx);
+        }
+    }
+
     let mut missing = Vec::new();
     for i in 0..expression_count {
         if !found_indices.contains(&i) {
@@ -260,7 +269,7 @@ pub fn validate_placeholders(html: &str, expression_count: usize) -> Result<(), 
                 level: DiagnosticLevel::Error,
                 message: format!("Missing placeholder for expression index {}", i),
                 context: Some(format!(
-                    "Expected index {} in a data-zx-e or data-zx-on-* attribute",
+                    "Expected index {} in a data-zx-e, data-zx-on-*, or comment placeholder",
                     i
                 )),
             });
@@ -353,12 +362,17 @@ pub fn compile_tailwind_entry(
     }
 
     let cli_bin = resolve_tailwind_cli(project_root)?;
-    let hash_seed = format!(
-        "{}:{}",
-        input_path.display(),
-        sha256_hex(source.as_bytes())
+    let hash_seed = format!("{}:{}", input_path.display(), sha256_hex(source.as_bytes()));
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let tmp_name = format!(
+        "zenith-tailwind-{}-{}-{}.css",
+        stable_hash_8(&hash_seed),
+        std::process::id(),
+        unique_suffix
     );
-    let tmp_name = format!("zenith-tailwind-{}.css", stable_hash_8(&hash_seed));
     let out_path = env::temp_dir().join(tmp_name);
 
     let output = Command::new(&cli_bin)
@@ -714,6 +728,13 @@ mod tests {
     fn test_validate_placeholders_with_events() {
         let html = r#"<button data-zx-on-click="0"></button>"#;
         assert!(validate_placeholders(html, 1).is_ok());
+    }
+
+    #[test]
+    fn test_validate_placeholders_with_comment_markers() {
+        let html =
+            r#"<option>Prefix <!--zx-e:0--></option><button data-zx-on-click="1">Save</button>"#;
+        assert!(validate_placeholders(html, 2).is_ok());
     }
 
     #[test]

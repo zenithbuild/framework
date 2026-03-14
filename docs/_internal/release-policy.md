@@ -50,7 +50,7 @@ Zenith uses a three-branch release train with shared package versions across `be
 
 ## Latest Promotion
 
-Promote `latest` only after the `train -> master` merge has been validated.
+Promote `latest` only after the `train -> master` merge has been validated. The canonical path is [promote-latest.yml](../../.github/workflows/promote-latest.yml), run manually from `master`.
 
 Minimum promotion:
 
@@ -68,6 +68,15 @@ npm dist-tag add @zenithbuild/runtime@0.6.13 latest
 npm dist-tag add @zenithbuild/router@0.6.13 latest
 npm dist-tag add @zenithbuild/bundler@0.6.13 latest
 npm dist-tag add @zenithbuild/compiler@0.6.13 latest
+npm dist-tag add @zenithbuild/language@0.6.13 latest
+npm dist-tag add @zenithbuild/language-server@0.6.13 latest
 ```
 
-npm Trusted Publishing currently covers `npm publish`, not `npm dist-tag add`, so `promote-latest.yml` is an approval-gated stub and the actual promotion step remains a manual authenticated maintainer action.
+npm Trusted Publishing currently covers `npm publish`, not `npm dist-tag add`. `promote-latest.yml` therefore uses a protected `NPM_DIST_TAG_TOKEN` secret in the `npm-release` environment for dist-tag writes only. The workflow:
+
+- reads the target version from `TRAIN_VERSION` on `master`
+- verifies every framework package is already published at that version
+- verifies every package currently has `train=<TRAIN_VERSION>`
+- fails if any package is missing or if `latest` is already ahead of `train`
+- promotes the exact published version to `latest` without republishing tarballs
+- verifies `latest` and `train` both resolve to `TRAIN_VERSION` and that `beta` is unchanged

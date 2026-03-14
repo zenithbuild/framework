@@ -8,8 +8,10 @@ export interface Props {
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   ariaLabel?: string;
+  ariaPressed?: string;
   onPress?: (event: MouseEvent) => void;
   onClick?: (event: MouseEvent) => void;
+  elementRef?: any;
   class?: string;
 }
 
@@ -21,9 +23,12 @@ const targetValue = typeof props.target === "string" ? props.target : "";
 const relValue = typeof props.rel === "string" ? props.rel : "";
 const disabledValue = props.disabled === true;
 const ariaLabelValue = typeof props.ariaLabel === "string" ? props.ariaLabel : "";
+const ariaPressedValue = typeof props.ariaPressed === "string" ? props.ariaPressed : undefined;
 const hasHref = hrefValue.length > 0;
 const buttonType = props.type || "button";
 const ariaDisabled = disabledValue ? "true" : undefined;
+const forwardedElementRef = props.elementRef;
+const localRef = ref<HTMLButtonElement>();
 
 const baseClasses = "inline-flex items-center justify-center rounded-full border transition-colors duration-200";
 const variantClasses =
@@ -50,13 +55,24 @@ const onClick =
 const linkClass = staticCls + (hasHref ? "" : " hidden");
 const buttonClass = staticCls + (hasHref ? " hidden" : "");
 const disabledAttr = disabledValue && !hasHref ? true : undefined;
+
+zenMount((ctx) => {
+  if (forwardedElementRef) {
+    forwardedElementRef.current = localRef.current;
+  }
+
+  ctx.cleanup(() => {
+    if (forwardedElementRef) {
+      forwardedElementRef.current = null;
+    }
+  });
+});
 </script>
 
 <span class="contents">
   <a
     data-zen-icon-btn
     data-zen-icon-btn-link
-    data-zen-link="true"
     href={hrefValue || undefined}
     target={targetValue || undefined}
     rel={relValue || undefined}
@@ -68,11 +84,13 @@ const disabledAttr = disabledValue && !hasHref ? true : undefined;
     <slot />
   </a>
   <button
+    ref={localRef}
     data-zen-icon-btn
     type={buttonType}
     disabled={disabledAttr}
     class={buttonClass}
     aria-label={ariaLabelValue}
+    aria-pressed={ariaPressedValue}
     aria-disabled={ariaDisabled}
     on:click={onClick}
   >

@@ -6,13 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.6.18] - 2026-03-13
+
 ### Changed
 
-- Fixed slot-scoped owner attribution so slotted refs/state/signals keep parent scope through component occurrence collection and emitted child props.
+- Fixed slot-scoped owner attribution so slotted refs, state, and signals keep parent scope through component occurrence collection and emitted child props.
 - Separated compiler ref markers from dynamic attr markers (`data-zx-ref` vs `data-zx-*`) to prevent same-node marker collisions during hydration.
 - Fixed runtime SVG `class` bindings to apply through SVG-safe attribute writes while preserving existing HTML `class` behavior.
 - Fixed CLI post-compiler expression rewriting so mixed reactive/local-const component expressions stay fully rewritten in final built binding functions.
-- Added focused regression coverage for slot-scope ownership, marker namespace separation, SVG class binding, component-expression rewriting, and final props-prelude ref emission.
+- Hardened server routing, client fetch-before-commit navigation, lifecycle hooks, and the narrow transition prototype around one documented routing contract.
+- Added structured compiler diagnostics to the language-tooling bridge, shipped the first compiler-code-backed `ZEN-DOM-*` quick fixes, and aligned hover/completion coverage to the documented Zenith surface.
+- Hardened the site wrapper/dev path around toolchain selection, public-asset sync, and rebuild handoff behavior so the real site path stays on the verified framework contracts.
 
 ## [0.6.17] - 2026-03-06
 

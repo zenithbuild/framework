@@ -23,6 +23,7 @@ const FRAMEWORK_INTEROP_DENYLIST: &[&str] = &[
 pub struct VendorBuildResult {
     pub specifiers: Vec<String>,
     pub filename: String,
+    pub content: String,
 }
 
 pub async fn bundle_vendor(
@@ -137,6 +138,7 @@ pub async fn bundle_vendor(
         return Ok(Some(VendorBuildResult {
             specifiers: sorted_externals,
             filename: final_filename,
+            content,
         }));
     }
 
@@ -211,6 +213,7 @@ pub async fn bundle_vendor(
     Ok(Some(VendorBuildResult {
         specifiers: sorted_externals,
         filename: final_filename,
+        content: content.to_string(),
     }))
 }
 

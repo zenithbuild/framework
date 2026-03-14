@@ -1,5 +1,5 @@
 
-import { validateServerExports, resolveServerPayload } from '../src/server-contract.js';
+import { allow, data, deny, redirect, resolveRouteResult, resolveServerPayload, validateServerExports } from '../src/server-contract.js';
 
 describe('Server Contract Validation and Payload Resolution', () => {
 
@@ -160,6 +160,135 @@ describe('Server Contract Validation and Payload Resolution', () => {
             await expect(resolveServerPayload({
                 exports: { data: { constructor: 'fn' } }, ctx, filePath: 'test.zen'
             })).rejects.toThrow(/forbidden prototype pollution key "constructor"/);
+        });
+    });
+
+    describe('resolveRouteResult', () => {
+        const ctx = {
+            params: { id: '42' },
+            url: new URL('http://localhost/users/42?tab=profile'),
+            request: new Request('http://localhost/users/42?tab=profile'),
+            route: { id: 'users/[id]', file: 'users/[id].zen', pattern: '/users/:id' },
+            env: {}
+        };
+
+        test('runs guard before load and passes env mutations through', async () => {
+            const calls = [];
+            const resolved = await resolveRouteResult({
+                exports: {
+                    guard: async (incomingCtx) => {
+                        calls.push(`guard:${incomingCtx.params.id}`);
+                        incomingCtx.env.role = 'admin';
+                        return allow();
+                    },
+                    load: async (incomingCtx) => {
+                        calls.push(`load:${incomingCtx.env.role}`);
+                        return data({ ok: true, role: incomingCtx.env.role });
+                    }
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(calls).toEqual(['guard:42', 'load:admin']);
+            expect(resolved).toEqual({
+                result: { kind: 'data', data: { ok: true, role: 'admin' } },
+                trace: { guard: 'allow', load: 'data' }
+            });
+        });
+
+        test('guard redirect short-circuits load', async () => {
+            let loadCalls = 0;
+            const resolved = await resolveRouteResult({
+                exports: {
+                    guard: async (_ctx) => redirect('/login?next=%2Fusers%2F42', 307),
+                    load: async (_ctx) => {
+                        loadCalls += 1;
+                        return { ok: true };
+                    }
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(loadCalls).toBe(0);
+            expect(resolved).toEqual({
+                result: { kind: 'redirect', location: '/login?next=%2Fusers%2F42', status: 307 },
+                trace: { guard: 'redirect', load: 'none' }
+            });
+        });
+
+        test('guard deny short-circuits load', async () => {
+            let loadCalls = 0;
+            const resolved = await resolveRouteResult({
+                exports: {
+                    guard: async (_ctx) => deny(403, 'Admins only'),
+                    load: async (_ctx) => {
+                        loadCalls += 1;
+                        return { ok: true };
+                    }
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(loadCalls).toBe(0);
+            expect(resolved).toEqual({
+                result: { kind: 'deny', status: 403, message: 'Admins only' },
+                trace: { guard: 'deny', load: 'none' }
+            });
+        });
+
+        test('load plain objects are wrapped as data results', async () => {
+            const resolved = await resolveRouteResult({
+                exports: {
+                    load: async (incomingCtx) => ({ id: incomingCtx.params.id, tab: incomingCtx.url.searchParams.get('tab') })
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(resolved).toEqual({
+                result: { kind: 'data', data: { id: '42', tab: 'profile' } },
+                trace: { guard: 'none', load: 'data' }
+            });
+        });
+
+        test('load can return route-level 404 deny', async () => {
+            const resolved = await resolveRouteResult({
+                exports: {
+                    load: async (_ctx) => deny(404, 'Record not found')
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(resolved).toEqual({
+                result: { kind: 'deny', status: 404, message: 'Record not found' },
+                trace: { guard: 'none', load: 'deny' }
+            });
+        });
+
+        test('guard-only mode executes guard and skips load', async () => {
+            let loadCalls = 0;
+            const resolved = await resolveRouteResult({
+                exports: {
+                    guard: async (_ctx) => allow(),
+                    load: async (_ctx) => {
+                        loadCalls += 1;
+                        return { ok: true };
+                    }
+                },
+                ctx: { ...ctx, env: {} },
+                filePath: 'users/[id].zen',
+                guardOnly: true
+            });
+
+            expect(loadCalls).toBe(0);
+            expect(resolved).toEqual({
+                result: { kind: 'allow' },
+                trace: { guard: 'allow', load: 'none' }
+            });
         });
     });
 

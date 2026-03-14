@@ -129,6 +129,17 @@
           "source_path": "documentation/contracts/navigation.md"
         },
         {
+          "slug": "contracts/navigation-lifecycle",
+          "title": "Navigation Lifecycle Contract",
+          "label": "Navigation Lifecycle Contract",
+          "url": "/docs/contracts/navigation-lifecycle",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/navigation-lifecycle.md"
+        },
+        {
           "slug": "contracts/no-magic",
           "title": "No Magic Contract",
           "label": "No Magic Contract",
@@ -540,6 +551,7 @@
     "/docs/contracts/hydration-contract",
     "/docs/contracts/ir-envelope",
     "/docs/contracts/navigation",
+    "/docs/contracts/navigation-lifecycle",
     "/docs/contracts/no-magic",
     "/docs/contracts/props-contract",
     "/docs/contracts/router-contract",

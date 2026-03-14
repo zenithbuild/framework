@@ -1,0 +1,107 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutModelContent = (props as Props).content;
+</script>
+
+<SectionShell tone="blue" height="auto" runway="normal">
+  <div class="flex flex-col gap-14 md:gap-18 lg:gap-24">
+    <ScrollEnterGroup variant="list" class="grid gap-8 border-t border-surface-border-blue/80 pt-8">
+      <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{aboutModelContent.intro.eyebrow}</p>
+
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)] xl:items-end xl:gap-10">
+        <h2 class="font-display text-[clamp(3rem,6vw,5.2rem)] font-semibold uppercase leading-[0.88] tracking-tight text-foreground">{aboutModelContent.intro.title}</h2>
+        <p class="text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{aboutModelContent.intro.description}</p>
+      </div>
+    </ScrollEnterGroup>
+
+    <div class="grid gap-8 xl:grid-cols-[minmax(0,0.68fr)_minmax(0,1.32fr)] xl:gap-14">
+      <ScrollEnterGroup variant="list" class="min-w-0">
+        <article class="rounded-[2.25rem] border border-surface-border-blue bg-card/70 p-6 md:p-7 xl:p-8">
+          <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutModelContent.differenceIntro.label}</p>
+          <h3 class="mt-5 font-display text-[clamp(2rem,4vw,3rem)] leading-[0.9] tracking-tight text-foreground">{aboutModelContent.differenceIntro.title}</h3>
+          <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.differenceIntro.text}</p>
+
+          <div class="mt-8 grid gap-4">
+            <article class="border-t border-border/80 pt-4">
+              <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutModelContent.differenceCards[0].title}</h4>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutModelContent.differenceCards[0].text}</p>
+            </article>
+            <article class="border-t border-border/80 pt-4">
+              <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutModelContent.differenceCards[1].title}</h4>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutModelContent.differenceCards[1].text}</p>
+            </article>
+            <article class="border-t border-border/80 pt-4">
+              <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutModelContent.differenceCards[2].title}</h4>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutModelContent.differenceCards[2].text}</p>
+            </article>
+            <article class="border-t border-border/80 pt-4">
+              <h4 class="font-display text-xl leading-none tracking-tight text-foreground">{aboutModelContent.differenceCards[3].title}</h4>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground">{aboutModelContent.differenceCards[3].text}</p>
+            </article>
+          </div>
+        </article>
+      </ScrollEnterGroup>
+
+      <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2.25rem] border border-surface-border-blue bg-card/75">
+        <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-blue/70"></div>
+        <div data-enter-skip="true" class="pointer-events-none absolute -right-12 bottom-10 hidden h-40 w-40 rounded-full border border-surface-border-blue/60 xl:block"></div>
+
+        <div class="px-6 py-8 md:px-8 md:py-10 xl:px-10">
+          <article class="grid gap-5 border-b border-border/80 pb-6 xl:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{aboutModelContent.comparisons[0].label}</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[0].leftTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[0].leftText}</p>
+            </div>
+            <div class="min-w-0 border-t border-border/70 pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[0].rightTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[0].rightText}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-5 border-b border-border/80 py-6 xl:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{aboutModelContent.comparisons[1].label}</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[1].leftTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[1].leftText}</p>
+            </div>
+            <div class="min-w-0 border-t border-border/70 pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[1].rightTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[1].rightText}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-5 border-b border-border/80 py-6 xl:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{aboutModelContent.comparisons[2].label}</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[2].leftTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[2].leftText}</p>
+            </div>
+            <div class="min-w-0 border-t border-border/70 pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[2].rightTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[2].rightText}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-5 pt-6 xl:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:gap-8">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{aboutModelContent.comparisons[3].label}</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[3].leftTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[3].leftText}</p>
+            </div>
+            <div class="min-w-0 border-t border-border/70 pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
+              <h3 class="font-display text-[1.45rem] leading-none tracking-tight text-foreground">{aboutModelContent.comparisons[3].rightTitle}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutModelContent.comparisons[3].rightText}</p>
+            </div>
+          </article>
+        </div>
+      </ScrollEnterGroup>
+    </div>
+  </div>
+</SectionShell>

@@ -56,14 +56,13 @@ async function startLanguageClient(context) {
   const serverPath = getConfiguredServerPath(context);
   const serverOptions = {
     run: {
-      command: process.execPath,
-      args: [serverPath, "--stdio"],
-      options: { env: process.env }
+      module: serverPath,
+      transport: import_node.TransportKind.stdio
     },
     debug: {
-      command: process.execPath,
-      args: ["--inspect=6010", serverPath, "--stdio"],
-      options: { env: process.env }
+      module: serverPath,
+      transport: import_node.TransportKind.stdio,
+      options: { execArgv: ["--inspect=6010"] }
     }
   };
   const clientOptions = {
@@ -84,10 +83,7 @@ async function restartLanguageClient(context) {
   }
   await startLanguageClient(context);
 }
-function activate(context) {
-  void startLanguageClient(context).catch((error) => {
-    void vscode.window.showErrorMessage(`Zenith: failed to start language server: ${String(error)}`);
-  });
+async function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand("zenith.restartServer", async () => {
       await restartLanguageClient(context);
@@ -102,6 +98,12 @@ function activate(context) {
       await restartLanguageClient(context);
     })
   );
+  try {
+    await startLanguageClient(context);
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Zenith: failed to start language server: ${String(error)}`);
+    throw error;
+  }
 }
 function deactivate() {
   return client?.stop();

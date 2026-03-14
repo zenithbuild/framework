@@ -7,6 +7,7 @@ import { createZenithLogger } from '../dist/ui/logger.js';
 import {
     checkCompatibility,
     getBundlerVersion,
+    getLocalZenithVersions,
     maybeWarnAboutZenithVersionMismatch
 } from '../dist/version-check.js';
 import { readCliPackageVersion } from '../dist/toolchain-paths.js';
@@ -135,6 +136,33 @@ describe('zenith version check', () => {
             expect(version.version).toBe('0.6.4');
         } finally {
             rmSync(bundler.root, { recursive: true, force: true });
+        }
+    });
+
+    test('prefers workspace package versions when explicitly requested', () => {
+        const projectRoot = createFakeProject({
+            core: '0.6.17',
+            cli: '0.6.17',
+            compiler: '0.6.17',
+            runtime: '0.6.17',
+            router: '0.6.17',
+            bundler: '0.6.17'
+        });
+
+        try {
+            const versions = getLocalZenithVersions({
+                projectRoot,
+                preferWorkspacePackageVersions: true
+            });
+
+            expect(versions.projectCli).toBe(CLI_VERSION);
+            expect(versions.core).toBe(CLI_VERSION);
+            expect(versions.compiler).toBe(CLI_VERSION);
+            expect(versions.runtime).toBe(CLI_VERSION);
+            expect(versions.router).toBe(CLI_VERSION);
+            expect(versions.bundlerPackage).toBe(CLI_VERSION);
+        } finally {
+            rmSync(projectRoot, { recursive: true, force: true });
         }
     });
 

@@ -4,6 +4,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
 
@@ -12,6 +13,7 @@ use zenith_bundler::CompilerOutput;
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
+mod page_runtime;
 mod template_bridge;
 mod vendor;
 
@@ -271,7 +273,7 @@ struct RouterRouteEntry {
     load_module_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum MarkerKind {
     Text,
@@ -518,11 +520,16 @@ fn run() -> Result<(), String> {
     let css_rel = format!("assets/styles.{}.css", css_hash);
     let css_path = out_dir_tmp.join(&css_rel);
     write_file(&css_path, &final_css_content)?;
+    let mut expected_asset_contents = BTreeMap::<String, String>::new();
+    expected_asset_contents.insert(css_rel.clone(), final_css_content.clone());
 
     // 4. Generate Runtime & Assets
     let runtime_rel = ensure_runtime_asset(&out_dir_tmp, &template_assets.runtime_source)?;
     let runtime_import_spec = runtime_import_specifier(&runtime_rel)?;
+    expected_asset_contents.insert(runtime_rel.clone(), template_assets.runtime_source.clone());
+    let core_js = generate_core_module_js(&runtime_import_spec);
     let (core_rel, core_hash) = ensure_core_asset(&out_dir_tmp, &runtime_rel)?;
+    expected_asset_contents.insert(core_rel.clone(), core_js);
     let core_import_spec = format!("/{}", core_rel);
 
     // Collect all component scripts from inputs
@@ -599,6 +606,7 @@ fn run() -> Result<(), String> {
 
         let js_path = out_dir_tmp.join(&js_rel);
         write_file(&js_path, &js)?;
+        expected_asset_contents.insert(js_rel.clone(), js.clone());
 
         manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
         if input.ir.server_script.is_some() && !input.ir.prerender {
@@ -685,9 +693,29 @@ fn run() -> Result<(), String> {
         let r_rel = format!("assets/router.{}.js", router_hash);
         router_rel_path = Some(format!("/{}", r_rel));
         write_file(&out_dir_tmp.join(&r_rel), &router_source)?;
+        expected_asset_contents.insert(r_rel, router_source);
     }
 
-    verify_emitted_js_imports(&out_dir_tmp)?;
+    if let Some(meta) = &vendor_result {
+        let vendor_path = out_dir_tmp.join("assets").join(&meta.filename);
+        expected_asset_contents.insert(format!("assets/{}", meta.filename), meta.content.clone());
+        if !vendor_path.exists() {
+            write_file(&vendor_path, &meta.content)?;
+        }
+    }
+
+    for (rel, content) in &expected_asset_contents {
+        let path = out_dir_tmp.join(rel);
+        if !path.exists() {
+            write_file(&path, content)?;
+        }
+    }
+
+    let known_emitted_assets = expected_asset_contents
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    verify_emitted_js_imports(&out_dir_tmp, &known_emitted_assets)?;
 
     // Final Manifest with Router
     let final_manifest = Manifest {
@@ -800,13 +828,38 @@ fn run() -> Result<(), String> {
     }
 
     // 8. Atomic Swap
-    // dist_tmp -> dist
-    if out_dir.exists() {
-        fs::remove_dir_all(&out_dir)
-            .map_err(|e| format!("failed to remove existing out_dir: {e}"))?;
+    // Move the current dist aside first so the live output is not blocked on a
+    // recursive delete. This keeps the serving gap to a narrow rename handoff.
+    let legacy_out_dir_prev = out_dir.with_extension("prev");
+    if legacy_out_dir_prev.exists() {
+        let _ = fs::remove_dir_all(&legacy_out_dir_prev);
     }
-    fs::rename(&out_dir_tmp, &out_dir)
-        .map_err(|e| format!("failed to rename temp dir to output dir: {e}"))?;
+    let backup_token = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let out_dir_prev = out_dir.with_extension(format!("prev.{}.{}", process::id(), backup_token));
+    if out_dir.exists() {
+        fs::rename(&out_dir, &out_dir_prev).map_err(|e| {
+            format!(
+                "failed to move existing out_dir to backup '{}': {e}",
+                out_dir_prev.display()
+            )
+        })?;
+    }
+    if let Err(error) = fs::rename(&out_dir_tmp, &out_dir) {
+        if out_dir_prev.exists() && !out_dir.exists() {
+            let _ = fs::rename(&out_dir_prev, &out_dir);
+        }
+        return Err(format!(
+            "failed to rename temp dir '{}' to output dir '{}': {error}",
+            out_dir_tmp.display(),
+            out_dir.display()
+        ));
+    }
+    if out_dir_prev.exists() {
+        let _ = fs::remove_dir_all(&out_dir_prev);
+    }
 
     Ok(())
 }
@@ -1428,7 +1481,10 @@ fn has_runtime_zen_reference(js: &str) -> bool {
     specifier_re.is_match(js)
 }
 
-fn verify_emitted_js_imports(out_dir: &PathBuf) -> Result<(), String> {
+fn verify_emitted_js_imports(
+    out_dir: &PathBuf,
+    known_emitted_assets: &BTreeSet<String>,
+) -> Result<(), String> {
     let assets_dir = out_dir.join("assets");
     if !assets_dir.exists() {
         return Ok(());
@@ -1477,7 +1533,11 @@ fn verify_emitted_js_imports(out_dir: &PathBuf) -> Result<(), String> {
                         )
                     })?
             } else if spec.starts_with('/') {
-                out_dir.join(spec.trim_start_matches('/'))
+                let normalized = spec.trim_start_matches('/').replace('\\', "/");
+                if known_emitted_assets.contains(&normalized) {
+                    continue;
+                }
+                out_dir.join(normalized)
             } else {
                 return Err(format!(
                     "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: {}\n  recommended_action: bare imports must be rewritten to emitted assets (vendor or relative module) before finalization",
@@ -1849,6 +1909,26 @@ fn derive_binding_tables(
 
     let attr_re = Regex::new(r#"data-zx-([A-Za-z0-9_-]+)=(?:"([^"]+)"|'([^']+)'|([^\s>"']+))"#)
         .map_err(|e| format!("failed to compile binding regex: {e}"))?;
+    let comment_re = Regex::new(r#"<!--\s*zx-e:(\d+)\s*-->"#)
+        .map_err(|e| format!("failed to compile comment binding regex: {e}"))?;
+
+    for captures in comment_re.captures_iter(&ir.html) {
+        let raw_value = captures
+            .get(1)
+            .map(|m| m.as_str())
+            .ok_or_else(|| "failed to parse comment binding index".to_string())?;
+        let index = parse_expression_index(raw_value, expression_count, "comment:zx-e")?;
+        insert_marker(
+            &mut marker_slots,
+            MarkerBinding {
+                index,
+                kind: MarkerKind::Text,
+                selector: format!("comment:zx-e:{index}"),
+                attr: None,
+                source: None,
+            },
+        )?;
+    }
 
     for captures in attr_re.captures_iter(&ir.html) {
         let attr_name = captures
@@ -2263,13 +2343,17 @@ fn emit_helper_module_recursive(
         if spec.starts_with("zenith:") {
             return Err(format!(
                 "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: zenith:* imports are not allowed inside emitted helper modules; move the import to a component script or inline runtime primitives",
-                module_id, module_id, stack.join(" -> ")
+                module_id,
+                module_id,
+                stack.join(" -> ")
             ));
         }
         if !is_relative_or_absolute_specifier(&spec) {
             return Err(format!(
                 "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
-                module_id, module_id, stack.join(" -> ")
+                module_id,
+                module_id,
+                stack.join(" -> ")
             ));
         }
         if spec.starts_with('/') {
@@ -2965,17 +3049,7 @@ fn generate_entry_js(
         ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
     )
     .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
-    js.push_str(&format!("const __zenith_static_ssr_data = {};\n", ssr_json));
-    js.push_str("function __zenith_read_ssr_data(staticValue) {\n");
-    js.push_str("  const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;\n");
-    js.push_str("  if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {\n");
-    js.push_str("    return runtimeValue;\n");
-    js.push_str("  }\n");
-    js.push_str("  return staticValue;\n");
-    js.push_str("}\n");
-    js.push_str("const __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);\n");
-    js.push_str("const data = __zenith_ssr_data;\n");
-    js.push_str("const ssr_data = __zenith_ssr_data;\n");
+    js.push_str(&page_runtime::render_runtime_data_helpers(&ssr_json));
     for block in &ir.hoisted.code {
         let trimmed = block.trim();
         if !trimmed.is_empty() {
@@ -3010,9 +3084,8 @@ fn generate_entry_js(
     };
     let (expr_fns_js, runtime_expression_bindings) =
         build_expression_fns_and_bindings(&bindings_to_use);
-    let expression_bindings_json =
-        serde_json::to_string(&runtime_expression_bindings)
-            .map_err(|e| format!("failed to serialize expression table: {e}"))?;
+    let expression_bindings_json = serde_json::to_string(&runtime_expression_bindings)
+        .map_err(|e| format!("failed to serialize expression table: {e}"))?;
 
     js.push_str(&generate_state_table_js(&ir.hoisted.state)?);
     js.push_str(&generate_state_keys_js(&ir.hoisted.state)?);
@@ -3100,30 +3173,9 @@ fn generate_entry_js(
         "const __zenith_components = {};\n",
         components_table
     ));
-    js.push_str("const __zenith_has_route_html = true;\n");
-    js.push_str("function __zenith_apply_route_html(root) {\n");
-    js.push_str("  if (typeof __zenith_html !== 'string' || __zenith_html.length === 0) {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (typeof Document === 'undefined' || !(root instanceof Document)) {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (typeof DOMParser === 'undefined') {\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  const parser = new DOMParser();\n");
-    js.push_str("  const parsed = parser.parseFromString(__zenith_html, 'text/html');\n");
-    js.push_str("  const currentApp = root.getElementById('app');\n");
-    js.push_str("  const nextApp = parsed.getElementById('app');\n");
-    js.push_str("  if (currentApp && nextApp) {\n");
-    js.push_str("    currentApp.replaceWith(nextApp);\n");
-    js.push_str("    return;\n");
-    js.push_str("  }\n");
-    js.push_str("  if (root.body && parsed.body) {\n");
-    js.push_str("    root.body.replaceChildren(...parsed.body.children);\n");
-    js.push_str("  }\n");
-    js.push_str("}\n");
+    js.push_str(page_runtime::render_route_html_helpers());
     js.push_str("export function __zenith_mount(root = document, params = {}) {\n");
+    js.push_str("  __zenith_refresh_runtime_data();\n");
     js.push_str("  if (__zenith_has_route_html === true) {\n");
     js.push_str("    __zenith_apply_route_html(root);\n");
     js.push_str("  }\n");
@@ -3132,7 +3184,9 @@ fn generate_entry_js(
     js.push_str("    ir_version: __zenith_ir_version,\n");
     js.push_str("    graph_hash: __zenith_graph_hash,\n");
     js.push_str("    expressions: __zenith_expression_bindings,\n");
-    js.push_str("    expr_fns: typeof __zenith_expr_fns !== 'undefined' ? __zenith_expr_fns : [],\n");
+    js.push_str(
+        "    expr_fns: typeof __zenith_expr_fns !== 'undefined' ? __zenith_expr_fns : [],\n",
+    );
     js.push_str("    markers: __zenith_markers,\n");
     js.push_str("    events: __zenith_events,\n");
     js.push_str("    refs: __zenith_refs,\n");
@@ -3257,7 +3311,10 @@ fn build_expression_fns_and_bindings(
                 )
             })
             .collect();
-        format!("const __zenith_expr_fns = [\n  {}\n];\n", fn_defs.join(",\n  "))
+        format!(
+            "const __zenith_expr_fns = [\n  {}\n];\n",
+            fn_defs.join(",\n  ")
+        )
     };
     let runtime_bindings: Vec<serde_json::Value> = bindings
         .iter()
@@ -3285,8 +3342,8 @@ fn build_expression_fns_and_bindings(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_expression_fns_and_bindings, CompilerExpressionBinding, CompilerSourcePosition,
-        CompilerSourceSpan,
+        CompilerExpressionBinding, CompilerIr, CompilerSourcePosition, CompilerSourceSpan,
+        MarkerKind, build_expression_fns_and_bindings, derive_binding_tables,
     };
 
     #[test]
@@ -3303,8 +3360,14 @@ mod tests {
                 compiled_expr: Some("signalMap.get(0).get() ? \"on\" : \"off\"".to_string()),
                 source: Some(CompilerSourceSpan {
                     file: "src/pages/index.zen".to_string(),
-                    start: CompilerSourcePosition { line: 12, column: 5 },
-                    end: CompilerSourcePosition { line: 12, column: 30 },
+                    start: CompilerSourcePosition {
+                        line: 12,
+                        column: 5,
+                    },
+                    end: CompilerSourcePosition {
+                        line: 12,
+                        column: 30,
+                    },
                     snippet: Some("count ? \"on\" : \"off\"".to_string()),
                 }),
             },
@@ -3325,12 +3388,57 @@ mod tests {
         assert!(js.contains("const __zenith_expr_fns = ["));
         assert!(js.contains("const signalMap = __ctx.signalMap;"));
         assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
-        assert_eq!(runtime_bindings[0]["signal_indices"], serde_json::json!([0, 2]));
+        assert_eq!(
+            runtime_bindings[0]["signal_indices"],
+            serde_json::json!([0, 2])
+        );
         assert_eq!(
             runtime_bindings[0]["source"]["file"],
             serde_json::json!("src/pages/index.zen")
         );
         assert!(runtime_bindings[1].get("fn_index").is_none());
+    }
+
+    #[test]
+    fn derive_binding_tables_supports_comment_text_markers() {
+        let ir = CompilerIr {
+            schema_version: None,
+            warnings: Vec::new(),
+            ir_version: 1,
+            graph_hash: Some(String::new()),
+            graph_edges: Vec::new(),
+            graph_nodes: Vec::new(),
+            html:
+                "<option>Prefix <!--zx-e:0--></option><button data-zx-on-click=\"1\">Save</button>"
+                    .to_string(),
+            expressions: vec!["label".to_string(), "increment".to_string()],
+            modules: Default::default(),
+            imports: Default::default(),
+            server_script: Default::default(),
+            prerender: false,
+            ssr_data: Default::default(),
+            hoisted: Default::default(),
+            components_scripts: Default::default(),
+            component_instances: Default::default(),
+            signals: Default::default(),
+            expression_bindings: Default::default(),
+            marker_bindings: Default::default(),
+            event_bindings: Default::default(),
+            ref_bindings: Default::default(),
+            style_blocks: Default::default(),
+            has_guard: false,
+            has_load: false,
+            guard_module_ref: None,
+            load_module_ref: None,
+        };
+
+        let (markers, events) = derive_binding_tables(&ir).expect("derive bindings");
+        assert_eq!(markers.len(), 2);
+        assert_eq!(markers[0].kind, MarkerKind::Text);
+        assert_eq!(markers[0].selector, "comment:zx-e:0");
+        assert_eq!(markers[1].kind, MarkerKind::Event);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].selector, r#"[data-zx-on-click="1"]"#);
     }
 }
 

@@ -3,7 +3,7 @@ title: "Editor Integration Contract"
 description: "Language id, scope, snippets, diagnostics, and troubleshooting for Zenith editor tooling."
 version: "0.1"
 status: "canonical"
-last_updated: "2026-03-06"
+last_updated: "2026-03-10"
 tags: ["contracts", "editor", "lsp", "snippets", "diagnostics"]
 ---
 
@@ -48,13 +48,15 @@ Snippets are sourced from canonical docs. All snippets avoid patterns that trigg
 | `ZEN-DOM-LISTENER` | Use `zenOn(target, eventName, handler)` and register disposer via zenMount `ctx.cleanup`. |
 | `ZEN-DOM-WRAPPER` | Use `zenWindow()` / `zenDocument()` instead of typeof/globalThis guards. |
 
-Diagnostics come from the canonical compiler stdin contract: the language server sends source text plus file path to `@zenithbuild/compiler`, requires `schemaVersion: 1`, and maps the returned warning envelopes into LSP diagnostics.
+Diagnostics come from the canonical compiler stdin contract: the language server sends source text plus file path to `@zenithbuild/compiler`, requires `schemaVersion: 1`, and maps the returned structured compiler diagnostics into LSP diagnostics. Legacy `warnings[]` remain transition-compatible, but the compiler stays the only rule source.
 
 ## Quick Fixes (Code Actions)
 
 - **ZEN-DOM-QUERY:** Suppress with comment, or insert ref + TODO (partial fix).
 - **ZEN-DOM-LISTENER:** Replace with zenOn template and comment out old line.
 - **ZEN-DOM-WRAPPER:** Replace with zenWindow() / zenDocument().
+
+These quick fixes are compiler-code-backed only. The language server must not invent editor-only fix rules outside stable compiler diagnostics.
 
 ## Strict Mode
 
@@ -82,6 +84,12 @@ During monorepo development, build the extension package and launch it from VS C
 
 ```bash
 bun run --cwd packages/language build
+```
+
+To build a downloadable VS Code-compatible artifact from the packaged extension path:
+
+```bash
+bun run --cwd packages/language package:vsix
 ```
 
 The extension owns:
@@ -137,6 +145,12 @@ lspconfig.zenith = {
 
 lspconfig.zenith.setup({})
 ```
+
+## Verified Parity
+
+- Packaged VS Code verification passed for compiler-backed diagnostics, `strictDomLints`, supported `ZEN-DOM-*` quick fixes, canonical hovers, and canonical completions.
+- Direct Neovim verification passed on the default Node `--stdio` path for the same diagnostics, quick fixes, hover, and completion surface.
+- VS Code-compatible environments consume the packaged `@zenithbuild/language` extension path; plain LSP clients consume `@zenithbuild/language-server` directly.
 
 ## Troubleshooting
 

@@ -1,0 +1,67 @@
+{
+  "mainLinks": [
+    {
+      "label": "Home",
+      "href": "/"
+    },
+    {
+      "label": "About",
+      "href": "/about"
+    },
+    {
+      "label": "Docs",
+      "href": "/docs"
+    },
+    {
+      "label": "Blog",
+      "href": "/blog"
+    },
+    {
+      "label": "GitHub",
+      "href": "https://github.com/zenithbuild/framework"
+    }
+  ],
+  "footerLinks": [
+    {
+      "label": "Twitter",
+      "href": "https://twitter.com/zenithbuild"
+    },
+    {
+      "label": "GitHub",
+      "href": "https://github.com/zenithbuild/framework"
+    },
+    {
+      "label": "Contract",
+      "href": "/docs#editor-contract"
+    }
+  ],
+  "transitionPrototype": {
+    "showRail": false,
+    "eyebrow": "Transition Prototype",
+    "label": "Soft navigation is intentionally limited to Home, About, Blog, and Docs route-entry while the transition shell is proven.",
+    "routes": [
+      "/",
+      "/about",
+      "/blog",
+      "/docs"
+    ],
+    "links": [
+      {
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "label": "About",
+        "href": "/about"
+      },
+      {
+        "label": "Blog",
+        "href": "/blog"
+      },
+      {
+        "label": "Docs",
+        "href": "/docs"
+      }
+    ]
+  }
+}

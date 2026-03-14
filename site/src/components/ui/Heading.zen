@@ -5,22 +5,35 @@ export interface Props {
   class?: string;
 }
 
-const forwardedRef = (props as Props).elementRef;
+const incoming = props as Props;
+const resolvedSize = incoming.size || "hero";
+const forwardedRef = incoming.elementRef;
+const className = typeof incoming.class === "string" ? incoming.class : "";
 const localRef = ref<HTMLSpanElement>();
 const textRef = forwardedRef ? forwardedRef : localRef;
+const rootClass = (
+  "flex flex-col font-[var(--zen-font-heading)] font-semibold uppercase tracking-tighter text-foreground mix-blend-normal [perspective:2000px] " +
+  (resolvedSize === "hero" ? "w-full overflow-visible text-center" : "w-full min-w-0 overflow-visible text-left")
+).trim();
+const textClass = (
+  (resolvedSize === "hero"
+    ? "inline-block w-full whitespace-nowrap text-center leading-[0.85] [transform-style:preserve-3d] [transform:rotateX(12deg)]"
+    : resolvedSize === "section"
+    ? "block max-w-full text-[clamp(2.75rem,7vw,5.75rem)] leading-[0.88] whitespace-normal [text-wrap:balance] [transform-style:preserve-3d] [transform:rotateX(10deg)]"
+    : "block max-w-full text-[clamp(1.75rem,4.5vw,3.25rem)] leading-[0.92] whitespace-normal [text-wrap:balance] [transform-style:preserve-3d] [transform:rotateX(8deg)]") +
+  " " +
+  className
+).trim();
 
 zenMount((ctx) => {
-  let charRatio = 0;
   const titleEl = textRef.current;
   if (!titleEl) return;
 
   const sizeAttr = titleEl.getAttribute("data-size") || "hero";
-  const fillRatioMap: Record<string, number> = {
-    hero: 0.96,
-    section: 0.80,
-    base: 0.60,
-  };
-  const fillRatio = fillRatioMap[sizeAttr] || 0.96;
+  if (sizeAttr !== "hero") return;
+
+  let charRatio = 0;
+  const fillRatio = 0.96;
 
   function fitTitle() {
     const win = zenWindow();
@@ -53,8 +66,8 @@ zenMount((ctx) => {
 });
 </script>
 
-<div class="w-full text-center font-[var(--zen-font-heading)] font-semibold tracking-tighter text-foreground uppercase m-0 leading-[0.85] flex flex-col mix-blend-normal overflow-visible [perspective:2000px]">
-  <span ref={textRef} data-size="hero" class="w-full text-center whitespace-nowrap inline-block [transform-style:preserve-3d] [transform:rotateX(12deg)]">
+<div class={rootClass}>
+  <span ref={textRef} data-size={resolvedSize} class={textClass}>
     <slot />
   </span>
 </div>

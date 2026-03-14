@@ -58,7 +58,7 @@ Controlled props override internal state.
 - No free identifiers in template examples.
 
 ## Route Protection (guard/load)
-- **Always** use `export const guard = async (ctx) => ...` and `export const load = async (ctx) => ...` in `<script server lang="ts">` or adjacent files (`page.guard.ts`/`page.load.ts`) for protected routes.
+- **Always** use `export const guard = async (ctx) => ...` and `export const load = async (ctx) => ...` in `<script server lang="ts">` or adjacent route modules (`<route>.guard.ts`/`<route>.load.ts`; `page.guard.ts`/`page.load.ts` are accepted beside `index.zen`).
 - **Server is Security**: Client execution of these functions is exclusively for UX flash-prevention.
 - `guard(ctx)` returns `allow()`, `redirect(url)`, or `deny()`. It evaluates before `load`.
 - `load(ctx)` returns `data(payload)`, `redirect(url)`, or `deny()`. It executes after `guard`.

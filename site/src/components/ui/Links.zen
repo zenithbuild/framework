@@ -1,0 +1,401 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { twMerge } from "tailwind-merge";
+
+export interface Props {
+  href?: string;
+  target?: string;
+  rel?: string;
+  id?: string;
+  title?: string;
+  surface?: "inline" | "button";
+  variant?: string;
+  size?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+  ariaCurrent?: string;
+  ariaDisabled?: string;
+  ariaControls?: string;
+  ariaExpanded?: string;
+  ariaPressed?: string;
+  dataActive?: string;
+  elementRef?: any;
+  class?: string;
+  contentClass?: string;
+  onPress?: (event: MouseEvent) => void;
+  onClick?: (event: MouseEvent) => void;
+  onHoverIn?: (event: PointerEvent) => void;
+  onHoverOut?: (event: PointerEvent) => void;
+  onFocus?: (event: FocusEvent) => void;
+  onBlur?: (event: FocusEvent) => void;
+}
+
+const provenSoftNavRouteEntries = ["/", "/about", "/blog", "/docs"];
+const provenRouteEntrySet = new Set<string>(provenSoftNavRouteEntries);
+
+function normalizeRouteEntryHref(href: string | null | undefined): string {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (hrefValue.length === 0) {
+    return "";
+  }
+
+  const pathname = hrefValue.split("#", 1)[0].split("?", 1)[0];
+  if (pathname.length === 0) {
+    return "";
+  }
+
+  if (pathname === "/") {
+    return "/";
+  }
+
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
+function isExternalHref(href: string | null | undefined) {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (hrefValue.length === 0) {
+    return false;
+  }
+
+  return /^(?:[a-z][a-z\d+\-.]*:|\/\/)/i.test(hrefValue);
+}
+
+function isHashHref(href: string | null | undefined) {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (hrefValue.length === 0) {
+    return false;
+  }
+
+  return hrefValue.startsWith("#") || hrefValue.includes("#");
+}
+
+function isInternalHref(href: string | null | undefined) {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (hrefValue.length === 0) {
+    return false;
+  }
+
+  return hrefValue.startsWith("/") && !hrefValue.startsWith("//");
+}
+
+function isProvenSoftNavRouteEntry(href: string | null | undefined) {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (!isInternalHref(hrefValue) || hrefValue.includes("?") || hrefValue.includes("#")) {
+    return false;
+  }
+
+  return provenRouteEntrySet.has(normalizeRouteEntryHref(hrefValue));
+}
+
+function classifySiteHref(href: string | null | undefined) {
+  const hrefValue = typeof href === "string" ? href.trim() : "";
+  if (hrefValue.length === 0) {
+    return "invalid";
+  }
+
+  if (isExternalHref(hrefValue)) {
+    return "external";
+  }
+
+  if (isHashHref(hrefValue)) {
+    return "hash";
+  }
+
+  if (isProvenSoftNavRouteEntry(hrefValue)) {
+    return "proven-route-entry";
+  }
+
+  if (isInternalHref(hrefValue)) {
+    return "internal-fallback";
+  }
+
+  return "external";
+}
+
+function mergeLinkRel(target: string | null | undefined, rel: string | null | undefined) {
+  const targetValue = typeof target === "string" ? target.trim() : "";
+  const relValue = typeof rel === "string" ? rel.trim() : "";
+  if (targetValue !== "_blank") {
+    return relValue;
+  }
+
+  const tokens = new Set(
+    relValue
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0),
+  );
+  tokens.add("noopener");
+  tokens.add("noreferrer");
+  return Array.from(tokens).join(" ");
+}
+
+const siteLinkProps = props as Props;
+const siteLinkHref = typeof siteLinkProps.href === "string" ? siteLinkProps.href.trim() : "";
+const siteLinkTarget = typeof siteLinkProps.target === "string" ? siteLinkProps.target.trim() : "";
+const siteLinkRel = mergeLinkRel(siteLinkTarget, siteLinkProps.rel);
+const siteLinkId = typeof siteLinkProps.id === "string" ? siteLinkProps.id : "";
+const siteLinkTitle = typeof siteLinkProps.title === "string" ? siteLinkProps.title : "";
+const siteLinkVariant =
+  siteLinkProps.variant === "secondary"
+    ? "secondary"
+    : siteLinkProps.variant === "outline"
+    ? "outline"
+    : siteLinkProps.variant === "ghost"
+    ? "ghost"
+    : "primary";
+const siteLinkSize = siteLinkProps.size === "sm" ? "sm" : siteLinkProps.size === "lg" ? "lg" : "md";
+const siteLinkDisabled = siteLinkProps.disabled === true;
+const siteLinkAriaLabel = typeof siteLinkProps.ariaLabel === "string" ? siteLinkProps.ariaLabel : "";
+const siteLinkAriaCurrent = typeof siteLinkProps.ariaCurrent === "string" ? siteLinkProps.ariaCurrent : "";
+const siteLinkIncomingAriaDisabled = typeof siteLinkProps.ariaDisabled === "string" ? siteLinkProps.ariaDisabled : "";
+const siteLinkAriaControls = typeof siteLinkProps.ariaControls === "string" ? siteLinkProps.ariaControls : "";
+const siteLinkAriaExpanded = typeof siteLinkProps.ariaExpanded === "string" ? siteLinkProps.ariaExpanded : "";
+const siteLinkAriaPressed = typeof siteLinkProps.ariaPressed === "string" ? siteLinkProps.ariaPressed : "";
+const siteLinkDataActive = typeof siteLinkProps.dataActive === "string" ? siteLinkProps.dataActive : "";
+const siteLinkClassName = typeof siteLinkProps.class === "string" ? siteLinkProps.class : "";
+const siteLinkContentClassName = typeof siteLinkProps.contentClass === "string" ? siteLinkProps.contentClass : "";
+const siteLinkSurface =
+  siteLinkProps.surface === "button" ||
+  typeof siteLinkProps.variant === "string" ||
+  typeof siteLinkProps.size === "string" ||
+  siteLinkContentClassName.length > 0
+    ? "button"
+    : "inline";
+const siteLinkClass = classifySiteHref(siteLinkHref);
+const siteLinkShouldUseSoftNav = !siteLinkDisabled && siteLinkTarget.length === 0 && siteLinkClass === "proven-route-entry";
+const siteLinkShouldRenderAnchor = !siteLinkDisabled && siteLinkHref.length > 0;
+const siteLinkShouldUseDisabledState = siteLinkDisabled || siteLinkHref.length === 0;
+const siteLinkAriaDisabled = siteLinkShouldUseDisabledState ? "true" : siteLinkIncomingAriaDisabled;
+const siteLinkAnchorRef = ref<HTMLElement>();
+const siteLinkDisabledRef = ref<HTMLElement>();
+const siteLinkAnchorOverlayRef = ref<HTMLSpanElement>();
+const siteLinkDisabledOverlayRef = ref<HTMLSpanElement>();
+
+const siteLinkBaseButtonClass = "group relative isolate overflow-hidden inline-flex items-center justify-center rounded-full border font-mono uppercase tracking-[0.18em] transition-colors duration-200";
+const siteLinkVariantClassesMap: Record<string, string> = {
+  primary: "border-primary bg-primary text-primary-foreground",
+  secondary: "border-border bg-secondary text-secondary-foreground",
+  outline: "border-border bg-transparent text-foreground",
+  ghost: "border-transparent bg-transparent text-muted-foreground",
+};
+const siteLinkSizeClassesMap: Record<string, string> = {
+  sm: "px-4 py-2 text-[10px]",
+  md: "px-5 py-2.5 text-[10px]",
+  lg: "px-7 py-3 text-[11px]",
+};
+const siteLinkOverlayClassesMap: Record<string, string> = {
+  primary: "bg-accent dark:bg-accent",
+  secondary: "bg-primary/20 dark:bg-primary/25",
+  outline: "bg-primary/15 dark:bg-primary/20",
+  ghost: "bg-primary/10 dark:bg-primary/15",
+};
+
+const siteLinkResolvedClass =
+  siteLinkSurface === "button"
+    ? twMerge(
+        siteLinkBaseButtonClass,
+        siteLinkVariantClassesMap[siteLinkVariant] ? siteLinkVariantClassesMap[siteLinkVariant] : siteLinkVariantClassesMap.primary,
+        siteLinkSizeClassesMap[siteLinkSize] ? siteLinkSizeClassesMap[siteLinkSize] : siteLinkSizeClassesMap.md,
+        siteLinkShouldUseDisabledState ? "pointer-events-none opacity-60" : "",
+        siteLinkClassName,
+      )
+    : twMerge(siteLinkClassName, siteLinkShouldUseDisabledState ? "pointer-events-none opacity-60" : "");
+const siteLinkOverlayClass =
+  siteLinkSurface === "button"
+    ? siteLinkOverlayClassesMap[siteLinkVariant] ? siteLinkOverlayClassesMap[siteLinkVariant] : siteLinkOverlayClassesMap.primary
+    : "";
+const siteLinkClickHandler =
+  typeof siteLinkProps.onPress === "function"
+    ? siteLinkProps.onPress
+    : typeof siteLinkProps.onClick === "function"
+    ? siteLinkProps.onClick
+    : undefined;
+const siteLinkHoverInHandler = typeof siteLinkProps.onHoverIn === "function" ? siteLinkProps.onHoverIn : undefined;
+const siteLinkHoverOutHandler = typeof siteLinkProps.onHoverOut === "function" ? siteLinkProps.onHoverOut : undefined;
+const siteLinkFocusHandler = typeof siteLinkProps.onFocus === "function" ? siteLinkProps.onFocus : undefined;
+const siteLinkBlurHandler = typeof siteLinkProps.onBlur === "function" ? siteLinkProps.onBlur : undefined;
+const siteLinkContentClass =
+  siteLinkSurface === "button"
+    ? `relative z-10 ${siteLinkContentClassName}`.trim()
+    : `contents ${siteLinkContentClassName}`.trim();
+const siteLinkAnchorClass = `${siteLinkResolvedClass}${siteLinkShouldRenderAnchor ? "" : " hidden"}`.trim();
+const siteLinkDisabledClass = `${siteLinkResolvedClass}${siteLinkShouldUseDisabledState ? "" : " hidden"}`.trim();
+
+function activeRootElement() {
+  if (siteLinkShouldRenderAnchor) {
+    return siteLinkAnchorRef.current;
+  }
+  return siteLinkDisabledRef.current;
+}
+
+function activeOverlayElement() {
+  if (siteLinkShouldRenderAnchor) {
+    return siteLinkAnchorOverlayRef.current;
+  }
+  return siteLinkDisabledOverlayRef.current;
+}
+
+function siteLinkResolveDirection(event: PointerEvent, element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const distances = {
+    top: Math.abs(event.clientY - rect.top),
+    right: Math.abs(rect.right - event.clientX),
+    bottom: Math.abs(rect.bottom - event.clientY),
+    left: Math.abs(event.clientX - rect.left),
+  };
+  const nearest = Object.entries(distances).sort((left, right) => left[1] - right[1])[0];
+  return nearest ? nearest[0] : "bottom";
+}
+
+function siteLinkEdgeState(direction: string) {
+  if (direction === "left") {
+    return { scaleX: 0, scaleY: 1, transformOrigin: "0% 50%" };
+  }
+  if (direction === "right") {
+    return { scaleX: 0, scaleY: 1, transformOrigin: "100% 50%" };
+  }
+  if (direction === "top") {
+    return { scaleX: 1, scaleY: 0, transformOrigin: "50% 0%" };
+  }
+  return { scaleX: 1, scaleY: 0, transformOrigin: "50% 100%" };
+}
+
+function animateOverlayIn(event: PointerEvent) {
+  if (siteLinkSurface !== "button" || siteLinkShouldUseDisabledState) return;
+  const siteLinkOverlay = activeOverlayElement();
+  const siteLinkRoot = event.currentTarget instanceof HTMLElement ? event.currentTarget : activeRootElement();
+  if (!siteLinkOverlay || !siteLinkRoot) return;
+  const nextState = siteLinkEdgeState(siteLinkResolveDirection(event, siteLinkRoot));
+  gsap.killTweensOf(siteLinkOverlay);
+  gsap.set(siteLinkOverlay, nextState);
+  gsap.to(siteLinkOverlay, {
+    scaleX: 1,
+    scaleY: 1,
+    duration: 0.4,
+    ease: "power4.out",
+    overwrite: true,
+  });
+}
+
+function animateOverlayOut(event: PointerEvent) {
+  if (siteLinkSurface !== "button" || siteLinkShouldUseDisabledState) return;
+  const siteLinkOverlay = activeOverlayElement();
+  const siteLinkRoot = event.currentTarget instanceof HTMLElement ? event.currentTarget : activeRootElement();
+  if (!siteLinkOverlay || !siteLinkRoot) return;
+  const nextState = siteLinkEdgeState(siteLinkResolveDirection(event, siteLinkRoot));
+  gsap.killTweensOf(siteLinkOverlay);
+  gsap.to(siteLinkOverlay, {
+    scaleX: nextState.scaleX,
+    scaleY: nextState.scaleY,
+    transformOrigin: nextState.transformOrigin,
+    duration: 0.35,
+    ease: "power3.inOut",
+    overwrite: true,
+  });
+}
+
+function handleHoverIn(event: PointerEvent) {
+  animateOverlayIn(event);
+  if (typeof siteLinkHoverInHandler === "function") {
+    siteLinkHoverInHandler(event);
+  }
+}
+
+function handleHoverOut(event: PointerEvent) {
+  animateOverlayOut(event);
+  if (typeof siteLinkHoverOutHandler === "function") {
+    siteLinkHoverOutHandler(event);
+  }
+}
+
+function handleFocus(event: FocusEvent) {
+  if (typeof siteLinkFocusHandler === "function") {
+    siteLinkFocusHandler(event);
+  }
+}
+
+function handleBlur(event: FocusEvent) {
+  if (typeof siteLinkBlurHandler === "function") {
+    siteLinkBlurHandler(event);
+  }
+}
+
+function handleClick(event: MouseEvent) {
+  if (siteLinkShouldUseDisabledState) {
+    event.preventDefault();
+    return;
+  }
+  if (typeof siteLinkClickHandler === "function") {
+    siteLinkClickHandler(event);
+  }
+}
+
+zenMount((ctx) => {
+  if (siteLinkProps.elementRef) {
+    siteLinkProps.elementRef.current = activeRootElement();
+  }
+
+  ctx.cleanup(() => {
+    if (siteLinkProps.elementRef) {
+      siteLinkProps.elementRef.current = null;
+    }
+  });
+});
+</script>
+
+<span class="contents">
+  <a
+    ref={siteLinkAnchorRef}
+    href={siteLinkHref || undefined}
+    class={siteLinkAnchorClass}
+    data-zen-link={siteLinkShouldUseSoftNav ? "true" : undefined}
+    target={siteLinkTarget || undefined}
+    rel={siteLinkRel || undefined}
+    id={siteLinkShouldRenderAnchor ? siteLinkId || undefined : undefined}
+    title={siteLinkTitle || undefined}
+    aria-label={siteLinkAriaLabel || undefined}
+    aria-current={siteLinkAriaCurrent || undefined}
+    aria-controls={siteLinkAriaControls || undefined}
+    aria-expanded={siteLinkAriaExpanded || undefined}
+    aria-pressed={siteLinkAriaPressed || undefined}
+    aria-disabled={siteLinkAriaDisabled || undefined}
+    data-active={siteLinkDataActive || undefined}
+    on:click={handleClick}
+    on:hoverin={handleHoverIn}
+    on:hoverout={handleHoverOut}
+    on:focus={handleFocus}
+    on:blur={handleBlur}
+  >
+    <span
+      ref={siteLinkAnchorOverlayRef}
+      aria-hidden="true"
+      class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
+      style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
+    ></span>
+    <div class={siteLinkContentClass}><slot /></div>
+  </a>
+
+  <span
+    ref={siteLinkDisabledRef}
+    class={siteLinkDisabledClass}
+    id={siteLinkShouldUseDisabledState ? siteLinkId || undefined : undefined}
+    title={siteLinkTitle || undefined}
+    aria-label={siteLinkAriaLabel || undefined}
+    aria-current={siteLinkAriaCurrent || undefined}
+    aria-controls={siteLinkAriaControls || undefined}
+    aria-expanded={siteLinkAriaExpanded || undefined}
+    aria-pressed={siteLinkAriaPressed || undefined}
+    aria-disabled={siteLinkAriaDisabled || undefined}
+    data-active={siteLinkDataActive || undefined}
+  >
+    <span
+      ref={siteLinkDisabledOverlayRef}
+      aria-hidden="true"
+      class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
+      style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
+    ></span>
+    <div class={siteLinkContentClass}><slot /></div>
+  </span>
+</span>

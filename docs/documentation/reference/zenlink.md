@@ -1,44 +1,47 @@
 ---
 title: "ZenLink Reference"
-description: "Opt-in link marker behavior for client navigation enhancements."
-version: "0.3"
+description: "Canonical anchor-based opt-in surface for client navigation enhancement."
+version: "0.4"
 status: "canonical"
-last_updated: "2026-02-22"
+last_updated: "2026-03-12"
 tags: ["reference", "navigation", "zenlink"]
 ---
 
 # ZenLink Reference
 
-## Contract: Marker Behavior
+## Contract: ZenLink Emits the Canonical Anchor Surface
 
-Contract: ZenLink behavior is opt-in via `data-zen-link` on standard anchor elements.
+Contract: `ZenLink` is a thin convenience wrapper over a semantic anchor marked with `data-zen-link`.
 
-Invariant: Unmarked anchor elements preserve default browser navigation behavior.
-
-Definition of Done:
-- Plain anchors hard reload.
-- Marked anchors may opt into client enhancement where supported.
-
-Failure Modes:
-- Runtime intercepts unmarked links.
-- Link behavior depends on hidden router state.
-
-Evidence:
-- Route parity tests pass with direct URL entry and hard refresh.
-
-## Contract: Usage
-
-Contract: Use semantic anchor markup for links.
-
-Invariant: Link destination remains explicit in `href`.
+Invariant: `ZenLink` does not define a separate navigation contract. It exists to emit the same explicit opt-in surface as `a[data-zen-link]`.
 
 Definition of Done:
-- Canonical examples show only standards-based link markup.
-- Docs avoid non-contract link APIs.
+- `ZenLink` renders a real `<a href="...">`.
+- `ZenLink` applies `data-zen-link`.
+- Unmarked anchors continue to hard navigate.
 
-Failure Modes:
-- Link examples rely on framework-specific hidden behavior.
-- Runtime API examples contradict hard-reload default policy.
+## Contract: What ZenLink Is Not
 
-Evidence:
-- Canonical link examples are validated during docs drift checks.
+ZenLink is not:
+- A button substitute
+- A hidden routing API
+- A guarantee that navigation will stay client-side
+
+If the router cannot safely mirror server truth, Zenith falls back to browser navigation even for `ZenLink`.
+
+## Site-Level Normalization
+
+The Zenith site now routes link rendering through a canonical site wrapper at `site/src/components/ui/Links.zen`.
+
+That wrapper does not replace the router contract. It classifies site hrefs and only emits the canonical soft-nav anchor contract for the currently proven route-entry set:
+- `/`
+- `/about`
+- `/blog`
+- `/docs`
+
+The site wrapper keeps these surfaces on plain anchors for now:
+- external links
+- `mailto:` and `tel:` links
+- same-page hash links
+- cross-route deep-hash links such as `/docs#routing`
+- internal routes outside the proven route-entry set

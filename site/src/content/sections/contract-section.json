@@ -1,0 +1,61 @@
+{
+  "intro": {
+    "eyebrow": "Contracts",
+    "title": "CONTRACTS, NOT CONVENTIONS.",
+    "description": "The Zenith contract is explicit at author time, visible in output, and enforced before the browser has to guess."
+  },
+  "previewFrame": {
+    "file": "contract-preview.zen",
+    "footerLeft": "persistent preview",
+    "footerRight": "line-resolved transition"
+  },
+  "buttonMetaLabel": "Preview",
+  "activeConventionLabel": "Active Convention",
+  "conventions": [
+    {
+      "id": "starter-page-composition",
+      "title": "Starter Page Composition",
+      "label": "01",
+      "meaning": "The starter template composes a page through DefaultLayout.",
+      "description": "This markup block comes straight from the current basic starter page. It uses real Zenith page composition, canonical on:click binding, and slot-driven layout usage instead of invented shell components.",
+      "filename": "index.zen",
+      "snippet": "<DefaultLayout>\n    <section class=\"container\">\n        <h1>Zenith Basic Starter</h1>\n        <p>Start with a single route, a minimal layout, and plain global CSS.</p>\n        <div class=\"actions\">\n            <button on:click={increment} class=\"button\">Count: {count}</button>\n            <span class=\"link\">Add routes later under <code>src/pages</code>.</span>\n        </div>\n    </section>\n</DefaultLayout>"
+    },
+    {
+      "id": "state-driven-markup",
+      "title": "State-Driven Markup",
+      "label": "02",
+      "meaning": "Use state when a value directly drives DOM output.",
+      "description": "The canonical reactivity docs use state for DOM-facing updates and pair it with a function-valued on:click handler. The syntax here matches current Zenith documentation exactly.",
+      "filename": "reactivity-model.md",
+      "snippet": "<script lang=\"ts\">\nstate open = false\nfunction toggle() { open = !open }\n<\\/script>\n\n<button on:click={toggle}>{open ? \"Open\" : \"Closed\"}</button>"
+    },
+    {
+      "id": "signal-updates",
+      "title": "Signal Updates",
+      "label": "03",
+      "meaning": "signal() uses explicit get/set updates with stable identity.",
+      "description": "The current reactivity docs define signal() with explicit get() and set() calls. This is the canonical low-level update shape for frequent or cross-boundary values.",
+      "filename": "reactivity-model.md",
+      "snippet": "const count = signal(0)\ncount.set(count.get() + 1)"
+    },
+    {
+      "id": "layout-slot-surface",
+      "title": "Layout Slot Surface",
+      "label": "04",
+      "meaning": "Layouts expose real structure through a literal <slot />.",
+      "description": "The basic starter DefaultLayout is authored as plain Zenith markup with a real slot outlet. It shows the structural surface the page composes into, not a fabricated runtime wrapper.",
+      "filename": "DefaultLayout.zen",
+      "snippet": "<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Zenith Basic Starter</title>\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/logo.svg\" />\n</head>\n<body>\n    <header class=\"site-header\">\n        <a href=\"/\" class=\"brand\">Zenith Basic Starter</a>\n    </header>\n    <main class=\"site-main\">\n        <slot />\n    </main>\n</body>\n</html>"
+    },
+    {
+      "id": "function-valued-events",
+      "title": "Function-Valued Events",
+      "label": "05",
+      "meaning": "Component APIs forward function props into canonical DOM bindings.",
+      "description": "The current events docs show component handlers transported as function references, then wired back into DOM markup through on:click. This is the canonical event-forwarding pattern in Zenith today.",
+      "filename": "events.md",
+      "snippet": "<script lang=\"ts\">\ninterface Props {\n  onClick: () => void;\n}\n\nconst incoming = props as Props;\n<\\/script>\n\n<button on:click={incoming.onClick}>Increment</button>"
+    }
+  ]
+}

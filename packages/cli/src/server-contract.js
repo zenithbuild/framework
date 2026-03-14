@@ -61,8 +61,11 @@ function assertValidRouteResultShape(value, where, allowedKinds) {
     }
 
     if (kind === 'deny') {
-        if (!Number.isInteger(value.status) || (value.status !== 401 && value.status !== 403)) {
-            throw new Error(`[Zenith] ${where}: deny status must be 401 or 403.`);
+        if (
+            !Number.isInteger(value.status) ||
+            (value.status !== 401 && value.status !== 403 && value.status !== 404)
+        ) {
+            throw new Error(`[Zenith] ${where}: deny status must be 401, 403, or 404.`);
         }
         if (value.message !== undefined && typeof value.message !== 'string') {
             throw new Error(`[Zenith] ${where}: deny message must be a string when provided.`);

@@ -1,24 +1,28 @@
 <script server lang="ts">
-import fs from "fs";
-import path from "path";
-
-let coreVersion = "0.0.0";
-try {
-    const pkgPath = path.resolve("node_modules/@zenithbuild/core/package.json");
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    coreVersion = pkg.version;
-} catch {}
+import { pageContent, repoContent, sectionContent, siteContent } from "../content/index";
 
 interface PageProps {
     title: string;
     description: string;
     coreVersion: string;
+    site: {
+        navigation: typeof siteContent.navigation;
+        footer: typeof siteContent.footer;
+        hero: typeof siteContent.hero;
+    };
+    sections: typeof sectionContent;
 }
 
 export const data: PageProps = {
-    title: "Home",
-    description: "ZenithBuild framework homepage and ecosystem overview.",
-    coreVersion,
+    title: pageContent.index.title,
+    description: pageContent.index.description,
+    coreVersion: repoContent.trainVersion,
+    site: {
+        navigation: siteContent.navigation,
+        footer: siteContent.footer,
+        hero: siteContent.hero,
+    },
+    sections: sectionContent,
 };
 </script>
 
@@ -32,15 +36,16 @@ import ReactivityModelSection from "@/components/sections/ReactivityModelSection
 import RuntimePrinciplesSection from "@/components/sections/RuntimePrinciplesSection.zen";
 import EcosystemOrbitSection from "@/components/sections/EcosystemOrbitSection.zen";
 import GettingStartedSection from "@/components/sections/GettingStartedSection.zen";
+
 </script>
 
-<DefaultLayout title={data.title} description={data.description}>
-    <Hero version={data.coreVersion} />
-    <ContractSection />
-    <CompilerPipelineSection />
-    <DeterminismConsoleSection />
-    <ReactivityModelSection />
-    <RuntimePrinciplesSection />
-    <EcosystemOrbitSection />
-    <GettingStartedSection />
+<DefaultLayout title={data.title} description={data.description} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <Hero version={data.coreVersion} content={data.site.hero} />
+    <ContractSection content={data.sections.contractSection} />
+    <CompilerPipelineSection content={data.sections.compilerPipeline} />
+    <DeterminismConsoleSection content={data.sections.determinismConsole} />
+    <ReactivityModelSection content={data.sections.reactivityModel} />
+    <RuntimePrinciplesSection content={data.sections.runtimePrinciples} />
+    <EcosystemOrbitSection content={data.sections.ecosystemOrbit} />
+    <GettingStartedSection content={data.sections.gettingStarted} />
 </DefaultLayout>

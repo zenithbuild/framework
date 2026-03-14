@@ -1,17 +1,20 @@
 <script lang="ts">
 import ZenithLogo from "./ZenithLogo.zen";
-import Button from "./Button.zen";
 import Tag from "./Tag.zen";
 import Heading from "./Heading.zen";
+import Links from "./Links.zen";
 import { gsap } from "gsap";
 import { SplitText } from "gsap/SplitText";
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin";
 
 export interface Props {
   version?: string;
+  content: any;
 }
 
-const versionLabel = "v" + ((props as Props).version || "0.0.0");
+const heroVersion = (props as Props).version || "0.0.0";
+const heroContent = (props as Props).content;
+const versionLabel = "v" + heroVersion;
 
 const refTitle = ref<HTMLSpanElement>();
 const refDesc = ref<HTMLParagraphElement>();
@@ -112,9 +115,13 @@ zenMount((ctx) => {
   if (metasCol1 || metasCol2) {
     const col1Children = metasCol1 ? Array.from(metasCol1.children) : [];
     const col2Children = metasCol2 ? Array.from(metasCol2.children) : [];
-    const headers = [...col1Children.filter((el) => el.classList.contains("opacity-70")), ...col2Children.filter((el) => el.classList.contains("opacity-70"))];
-    const metasItems = [...col1Children.filter((el) => !el.classList.contains("opacity-70")), ...col2Children.filter((el) => !el.classList.contains("opacity-70"))];
-    gsap.set([...headers, ...metasItems], { y: 20, opacity: 0 });
+    const headers = col1Children
+      .filter((el) => el.classList.contains("opacity-70"))
+      .concat(col2Children.filter((el) => el.classList.contains("opacity-70")));
+    const metasItems = col1Children
+      .filter((el) => !el.classList.contains("opacity-70"))
+      .concat(col2Children.filter((el) => !el.classList.contains("opacity-70")));
+    gsap.set(headers.concat(metasItems), { y: 20, opacity: 0 });
     tl.to(headers, { y: 0, opacity: 1, duration: 0.8, stagger: 0.05, ease: "power3.out" }, textStartTime + 0.3);
     tl.to(metasItems, { y: 0, opacity: 1, duration: 0.8, stagger: 0.04, ease: "power3.out" }, textStartTime + 0.4);
   }
@@ -147,13 +154,13 @@ zenMount((ctx) => {
       </div>
       
       <p ref={refDesc} class="text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-muted-foreground max-w-[200px] text-right leading-loose">
-        ENGINEERED FOR<br/>DETERMINISM.
+        {heroContent.topLabel.split("\n")[0]}<br/>{heroContent.topLabel.split("\n")[1]}
       </p>
     </div>
 
     <!-- Middle Giant Typography -->
     <div class="flex flex-col items-center justify-center flex-grow w-full py-8 md:py-16 overflow-visible gap-6">
-      <h1><Heading size="hero" elementRef={refTitle}>ZENITH BUILD</Heading></h1>
+      <h1><Heading size="hero" elementRef={refTitle}>{heroContent.title}</Heading></h1>
       <div ref={refVersion} class="flex justify-center">
         <Tag variant="muted">{versionLabel}</Tag>
       </div>
@@ -163,27 +170,27 @@ zenMount((ctx) => {
     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-12 w-full border-t border-border pt-8 md:pt-12 px-6 md:px-12 max-w-[1600px] mx-auto">
       <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
         <div ref={refBtnInit} class="w-full md:w-auto">
-          <Button href="/docs" variant="primary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
-            Initialize
-          </Button>
+          <Links surface="button" href={heroContent.actions[0].href} variant="primary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+            {heroContent.actions[0].label}
+          </Links>
         </div>
         <div ref={refBtnSource} class="w-full md:w-auto">
-          <Button href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" variant="secondary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
-            Source
-          </Button>
+          <Links surface="button" href={heroContent.actions[1].href} target="_blank" rel="noopener" variant="secondary" class="w-full md:w-auto px-8 md:px-12 h-[3.5rem] tracking-[0.2em] text-[10px] md:text-xs">
+            {heroContent.actions[1].label}
+          </Links>
         </div>
       </div>
 
       <div class="flex flex-wrap gap-12 md:gap-24 text-[9px] md:text-[10px] font-mono tracking-[0.25em] uppercase text-muted-foreground">
         <div ref={refMetasCol1} class="flex flex-col gap-3 md:gap-4">
-          <span class="text-foreground font-semibold mb-1 opacity-70">Architecture</span>
-          <span class="hover:text-foreground transition-colors cursor-pointer">Reactivity</span>
-          <span class="hover:text-foreground transition-colors cursor-pointer">Zero-JS</span>
+          <span class="text-foreground font-semibold mb-1 opacity-70">{heroContent.metaColumns[0].label}</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">{heroContent.metaColumns[0].items[0]}</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">{heroContent.metaColumns[0].items[1]}</span>
         </div>
         <div ref={refMetasCol2} class="flex flex-col gap-3 md:gap-4">
-          <span class="text-foreground font-semibold mb-1 opacity-70">Ecosystem</span>
-          <span class="hover:text-foreground transition-colors cursor-pointer">Compiler</span>
-          <span class="hover:text-foreground transition-colors cursor-pointer">Subagents</span>
+          <span class="text-foreground font-semibold mb-1 opacity-70">{heroContent.metaColumns[1].label}</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">{heroContent.metaColumns[1].items[0]}</span>
+          <span class="hover:text-foreground transition-colors cursor-pointer">{heroContent.metaColumns[1].items[1]}</span>
         </div>
       </div>
     </div>

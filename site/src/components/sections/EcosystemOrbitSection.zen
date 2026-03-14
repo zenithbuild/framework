@@ -1,393 +1,54 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
-import { gsap } from "gsap";
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
+import SectionIntro from "./SectionIntro.zen";
+import ScrollEnterGroup from "./ScrollEnterGroup.zen";
+import EcosystemOrbitShowcase from "./EcosystemOrbitShowcase.zen";
 
-/* ── Data model ── */
-interface OrbNode {
-  id: string; label: string; desc: string;
-  x: number; y: number; z: number;
-  r: number; accent: string;
+interface Props {
+  content: any;
 }
 
-interface NodeDetail {
-  title: string;
-  desc: string;
-  tag: string;
-}
-
-const CX = 250;
-const CY = 250;
-
-/* Nodes on sphere surface. z > 0 = front, z < 0 = back */
-const nodes: OrbNode[] = [
-  { id: "core",     label: "core",       desc: "Shared types + IR",    x: 250, y: 248, z: 155, r: 16, accent: "brand-purple" },
-  { id: "router",   label: "router",     desc: "SSR routing",          x: 310, y: 112, z: 68,  r: 12, accent: "brand-blue" },
-  { id: "runtime",  label: "runtime",    desc: "Marker hydration",     x: 392, y: 210, z: 45,  r: 11, accent: "brand-magenta" },
-  { id: "compiler", label: "compiler",   desc: "AST → IR → HTML",      x: 365, y: 360, z: -92, r: 9,  accent: "brand-gold" },
-  { id: "bundler",  label: "bundler",    desc: "Tree-shaken output",   x: 138, y: 370, z: -85, r: 9,  accent: "brand-red" },
-  { id: "cli",      label: "cli",        desc: "Build orchestration",  x: 112, y: 178, z: 76,  r: 12, accent: "brand-blue" },
-  { id: "lang",     label: "lang-tools", desc: "Editor intelligence",  x: 188, y: 105, z: -78, r: 9,  accent: "brand-magenta" },
-];
-
-const fallbackDesc: NodeDetail = {
-  title: "NETWORK",
-  desc: "Interact with an orb to view details.",
-  tag: "SELECT",
-};
-
-const nodeDetails: Record<string, NodeDetail> = {
-  core: { title: "CORE", desc: "Shared types, IR contracts, and compiler-facing primitives.", tag: "CENTER" },
-  router: { title: "ROUTER", desc: "SSR route contracts and navigation boundaries.", tag: "ROUTE" },
-  runtime: { title: "RUNTIME", desc: "Marker hydration with the smallest possible browser surface.", tag: "HYDRATE" },
-  compiler: { title: "COMPILER", desc: "AST to IR to HTML with compile-time diagnostics.", tag: "COMPILE" },
-  bundler: { title: "BUNDLER", desc: "Deterministic packaging and tree-shaken output.", tag: "PACKAGE" },
-  cli: { title: "CLI", desc: "Build orchestration and train-facing developer workflows.", tag: "COMMAND" },
-  lang: { title: "LANG-TOOLS", desc: "Editor grammar, hovers, completions, and diagnostics.", tag: "EDITOR" },
-};
-
-state detailTitle = fallbackDesc.title;
-state detailDesc = fallbackDesc.desc;
-state detailTag = fallbackDesc.tag;
-
-interface Edge { from: string; to: string; }
-
-const edges: Edge[] = [
-  { from: "core", to: "router" },
-  { from: "core", to: "runtime" },
-  { from: "core", to: "compiler" },
-  { from: "core", to: "bundler" },
-  { from: "core", to: "cli" },
-  { from: "cli",  to: "compiler" },
-  { from: "cli",  to: "bundler" },
-  { from: "bundler", to: "runtime" },
-  { from: "router",  to: "runtime" },
-];
-
-function nodeById(id: string) { return nodes.find(n => n.id === id)!; }
-function isFront(n: OrbNode) { return n.z > 0; }
-
-/* Curved edge that bulges outward — simulates sphere-surface travel */
-function orbEdgePath(e: Edge): string {
-  const a = nodeById(e.from);
-  const b = nodeById(e.to);
-  const mx = (a.x + b.x) / 2;
-  const my = (a.y + b.y) / 2;
-  const dx = mx - CX;
-  const dy = my - CY;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const bulge = 30 + Math.abs(a.z - b.z) * 0.15;
-  const cx = mx + (dx / dist) * bulge;
-  const cy = my + (dy / dist) * bulge;
-  return `M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`;
-}
-
-function edgeDepth(e: Edge): "front" | "back" | "cross" {
-  const a = nodeById(e.from);
-  const b = nodeById(e.to);
-  if (isFront(a) && isFront(b)) return "front";
-  if (!isFront(a) && !isFront(b)) return "back";
-  return "cross";
-}
-
-/* ── Refs ── */
-const svgRef = ref<SVGSVGElement>();
-
-const eRef0 = ref<SVGPathElement>(); const eRef1 = ref<SVGPathElement>();
-const eRef2 = ref<SVGPathElement>(); const eRef3 = ref<SVGPathElement>();
-const eRef4 = ref<SVGPathElement>(); const eRef5 = ref<SVGPathElement>();
-const eRef6 = ref<SVGPathElement>(); const eRef7 = ref<SVGPathElement>();
-const eRef8 = ref<SVGPathElement>();
-const edgeRefs = [eRef0, eRef1, eRef2, eRef3, eRef4, eRef5, eRef6, eRef7, eRef8];
-
-const gRef0 = ref<SVGCircleElement>(); const gRef1 = ref<SVGCircleElement>();
-const gRef2 = ref<SVGCircleElement>(); const gRef3 = ref<SVGCircleElement>();
-const gRef4 = ref<SVGCircleElement>(); const gRef5 = ref<SVGCircleElement>();
-const gRef6 = ref<SVGCircleElement>();
-const glowRefs = [gRef0, gRef1, gRef2, gRef3, gRef4, gRef5, gRef6];
-
-const lRef0 = ref<SVGTextElement>(); const lRef1 = ref<SVGTextElement>();
-const lRef2 = ref<SVGTextElement>(); const lRef3 = ref<SVGTextElement>();
-const lRef4 = ref<SVGTextElement>(); const lRef5 = ref<SVGTextElement>();
-const lRef6 = ref<SVGTextElement>();
-const descRefs = [lRef0, lRef1, lRef2, lRef3, lRef4, lRef5, lRef6];
-
-/* ── Hover handlers ── */
-function handleHoverIn(idx: number) {
-  const node = nodes[idx];
-  const desc = descRefs[idx]?.current;
-  const detail = nodeDetails[node.id] || fallbackDesc;
-
-  detailTitle = detail.title;
-  detailDesc = detail.desc;
-  detailTag = detail.tag;
-
-  if (desc) gsap.to(desc, { opacity: 1, duration: 0.2 });
-
-  edges.forEach((e, i) => {
-    const path = edgeRefs[i]?.current;
-    if (!path) return;
-    if (e.from === node.id || e.to === node.id) {
-      gsap.to(path, { attr: { "stroke-opacity": "0.85" }, strokeWidth: 2.5, duration: 0.25 });
-    }
-  });
-}
-
-function handleHoverOut(idx: number) {
-  const desc = descRefs[idx]?.current;
-
-  detailTitle = fallbackDesc.title;
-  detailDesc = fallbackDesc.desc;
-  detailTag = fallbackDesc.tag;
-
-  if (desc) gsap.to(desc, { opacity: 0, duration: 0.2 });
-
-  edges.forEach((e, i) => {
-    const path = edgeRefs[i]?.current;
-    if (!path) return;
-    const d = edgeDepth(e);
-    const base = d === "front" ? "0.4" : d === "back" ? "0.15" : "0.25";
-    gsap.to(path, { attr: { "stroke-opacity": base }, strokeWidth: 1.5, duration: 0.25 });
-  });
-}
-
-/* ── Animation ── */
-zenMount((ctx) => {
-  const svg = svgRef.current;
-  if (!svg) return;
-
-  gsap.registerPlugin(MotionPathPlugin);
-  const ns = "http://www.w3.org/2000/svg";
-  const created: SVGElement[] = [];
-
-  /* Node glow pulses — front breathes stronger */
-  const glowEls = collectRefs(...glowRefs);
-  glowEls.forEach((gl, i) => {
-    const n = nodes[i];
-    gsap.to(gl, {
-      attr: { r: n.r + 8 },
-      opacity: isFront(n) ? 0.3 : 0.12,
-      duration: 2.2 + i * 0.35,
-      repeat: -1, yoyo: true, ease: "sine.inOut", delay: i * 0.5,
-    });
-  });
-
-  /* Deterministic packet timing — no random */
-  const durs   = [4.8, 6.2, 5.6, 4.2, 5.0, 6.8, 4.5, 5.4, 5.8];
-  const delays = [0, 0.6, 1.2, 1.8, 0.3, 0.9, 1.5, 2.1, 0.45];
-  const colors = [
-    "var(--brand-purple)", "var(--brand-blue)", "var(--brand-magenta)",
-    "var(--brand-gold)", "var(--brand-red)", "var(--brand-blue)",
-    "var(--brand-purple)", "var(--brand-red)", "var(--brand-magenta)",
-  ];
-
-  /* Spawn packets along each edge */
-  const edgeEls = collectRefs(...edgeRefs);
-  edgeEls.forEach((pathEl, i) => {
-    const depth = edgeDepth(edges[i]);
-    const bright = depth === "front" ? 0.85 : depth === "back" ? 0.3 : 0.55;
-
-    const glow = zenDocument().createElementNS(ns, "circle");
-    glow.setAttribute("r", "5");
-    glow.setAttribute("fill", colors[i]);
-    glow.setAttribute("opacity", String(bright * 0.3));
-    svg.appendChild(glow); created.push(glow);
-
-    const dot = zenDocument().createElementNS(ns, "circle");
-    dot.setAttribute("r", "2.5");
-    dot.setAttribute("fill", colors[i]);
-    dot.setAttribute("opacity", String(bright));
-    svg.appendChild(dot); created.push(dot);
-
-    const dur = durs[i];
-    const del = delays[i];
-
-    gsap.to(dot, {
-      motionPath: { path: pathEl, align: pathEl, alignOrigin: [0.5, 0.5] },
-      duration: dur, repeat: -1, yoyo: true, ease: "none", delay: del,
-    });
-    gsap.to(glow, {
-      motionPath: { path: pathEl, align: pathEl, alignOrigin: [0.5, 0.5] },
-      duration: dur, repeat: -1, yoyo: true, ease: "none", delay: del,
-    });
-
-    /* Cross-edges: packet fades mid-journey (going "behind" the orb) */
-    if (depth === "cross") {
-      gsap.to([dot, glow], {
-        keyframes: [
-          { opacity: bright, duration: dur * 0.3 },
-          { opacity: bright * 0.2, duration: dur * 0.4 },
-          { opacity: bright, duration: dur * 0.3 },
-        ],
-        repeat: -1, yoyo: true, delay: del,
-      });
-    }
-  });
-
-  ctx.cleanup(() => {
-    gsap.killTweensOf("*");
-    created.forEach(el => el.remove());
-  });
-});
-
-const p0 = orbEdgePath(edges[0]);
-const p1 = orbEdgePath(edges[1]);
-const p2 = orbEdgePath(edges[2]);
-const p3 = orbEdgePath(edges[3]);
-const p4 = orbEdgePath(edges[4]);
-const p5 = orbEdgePath(edges[5]);
-const p6 = orbEdgePath(edges[6]);
-const p7 = orbEdgePath(edges[7]);
-const p8 = orbEdgePath(edges[8]);
+const ecosystemSectionContent = (props as Props).content;
 </script>
 
-<SectionShell tone="magenta" height="screen" runway="long">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="magenta" height="auto" runway="normal">
+  <div class="flex flex-1 flex-col gap-14 md:gap-18 lg:gap-20">
+    <div class="w-full pt-1 md:pt-2 xl:pt-6">
+      <SectionIntro
+        variant="full"
+        accentColor="magenta"
+        eyebrow={ecosystemSectionContent.intro.eyebrow}
+        title={ecosystemSectionContent.intro.title}
+        description={ecosystemSectionContent.intro.description}
+      />
 
-    <!-- top zone -->
-    <div class="shrink-0 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-      <div>
-        <div class="flex items-center gap-2">
-          <AccentMark color="magenta" variant="dot" />
-          <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Ecosystem</span>
+      <ScrollEnterGroup variant="list" class="mt-8 flex flex-col gap-10 md:mt-10 xl:gap-12">
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] xl:gap-12">
+          <div class="hidden xl:block"></div>
+          <div class="min-w-0 border-l border-border pl-6 xl:pl-7">
+            <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{ecosystemSectionContent.note.label}</p>
+            <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">
+              {ecosystemSectionContent.note.text}
+            </p>
+          </div>
         </div>
-        <div class="mt-4">
-          <Heading size="section">ONE SCOPE, MANY PACKAGES.</Heading>
+
+        <div class="flex flex-wrap gap-3 md:gap-4 xl:justify-end">
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground">
+            {ecosystemSectionContent.chips[0]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground">
+            {ecosystemSectionContent.chips[1]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground">
+            {ecosystemSectionContent.chips[2]}
+          </span>
         </div>
-      </div>
-      <p class="text-muted-foreground text-sm md:text-right md:max-w-xs md:pb-2">
-        Every package under <span class="font-mono text-foreground">@zenithbuild</span> serves one role.
-      </p>
+      </ScrollEnterGroup>
     </div>
 
-    <!-- middle zone: orb network -->
-    <div class="flex-1 flex items-center justify-center py-8">
-      <div class="w-full max-w-lg mx-auto">
-        <svg ref={svgRef} viewBox="0 0 500 500" class="w-full h-auto overflow-visible">
-
-          <!-- Ambient glow -->
-          <circle cx="250" cy="250" r="175" class="fill-orb-glow" opacity="0.07" />
-
-          <!-- ═══ BACK WIREFRAME (dim, dashed) ═══ -->
-          <path d="M 88,256 A 162,42 0 0,0 412,256" class="fill-none stroke-orb-ring-back" stroke-width="0.7" stroke-dasharray="4 5" />
-          <path d="M 118,192 A 132,26 0 0,0 382,192" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
-          <path d="M 118,318 A 132,26 0 0,0 382,318" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
-          <path d="M 250,88 A 42,162 0 0,0 250,412" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
-          <path d="M 250,88 A 42,162 0 0,0 250,412" transform="rotate(60,250,250)" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
-          <path d="M 250,88 A 42,162 0 0,0 250,412" transform="rotate(120,250,250)" class="fill-none stroke-orb-ring-back" stroke-width="0.5" stroke-dasharray="3 6" />
-
-          <!-- ═══ BACK EDGES ═══ -->
-          <path ref={eRef2} d={p2} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
-          <path ref={eRef3} d={p3} class="fill-none stroke-orb-link-back" stroke-opacity="0.25" stroke-width="1.5" />
-          <path ref={eRef5} d={p5} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
-          <path ref={eRef6} d={p6} class="fill-none stroke-orb-link-back" stroke-opacity="0.20" stroke-width="1.5" />
-          <path ref={eRef7} d={p7} class="fill-none stroke-orb-link-back" stroke-opacity="0.22" stroke-width="1.5" />
-
-          <!-- ═══ BACK NODES (smaller, dimmer) ═══ -->
-          <g on:hoverin={() => handleHoverIn(3)} on:hoverout={() => handleHoverOut(3)} class="cursor-pointer">
-            <circle ref={gRef3} cx="365" cy="360" r="9" class="fill-brand-gold" opacity="0.08" />
-            <circle cx="365" cy="360" r="7" class="fill-card" opacity="0.5" />
-            <circle cx="365" cy="360" r="7" class="fill-none stroke-brand-gold" stroke-width="1" opacity="0.5" />
-            <text x="365" y="380" text-anchor="middle" class="fill-muted-foreground" font-size="8" font-family="monospace" opacity="0.5">compiler</text>
-            <text ref={lRef3} x="365" y="392" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">AST → IR → HTML</text>
-          </g>
-          <g on:hoverin={() => handleHoverIn(4)} on:hoverout={() => handleHoverOut(4)} class="cursor-pointer">
-            <circle ref={gRef4} cx="138" cy="370" r="9" class="fill-brand-red" opacity="0.08" />
-            <circle cx="138" cy="370" r="7" class="fill-card" opacity="0.5" />
-            <circle cx="138" cy="370" r="7" class="fill-none stroke-brand-red" stroke-width="1" opacity="0.5" />
-            <text x="138" y="390" text-anchor="middle" class="fill-muted-foreground" font-size="8" font-family="monospace" opacity="0.5">bundler</text>
-            <text ref={lRef4} x="138" y="402" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">Tree-shaken output</text>
-          </g>
-          <g on:hoverin={() => handleHoverIn(6)} on:hoverout={() => handleHoverOut(6)} class="cursor-pointer">
-            <circle ref={gRef6} cx="188" cy="105" r="9" class="fill-brand-magenta" opacity="0.08" />
-            <circle cx="188" cy="105" r="7" class="fill-card" opacity="0.5" />
-            <circle cx="188" cy="105" r="7" class="fill-none stroke-brand-magenta" stroke-width="1" opacity="0.5" />
-            <text x="188" y="95" text-anchor="middle" class="fill-muted-foreground" font-size="7.5" font-family="monospace" opacity="0.5">lang-tools</text>
-            <text ref={lRef6} x="188" y="83" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">Editor intelligence</text>
-          </g>
-
-          <!-- ═══ FRONT WIREFRAME (solid, brighter) ═══ -->
-          <path d="M 88,256 A 162,42 0 0,1 412,256" class="fill-none stroke-orb-ring-front" stroke-width="0.8" />
-          <path d="M 118,192 A 132,26 0 0,1 382,192" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
-          <path d="M 118,318 A 132,26 0 0,1 382,318" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
-          <path d="M 250,88 A 42,162 0 0,1 250,412" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
-          <path d="M 250,88 A 42,162 0 0,1 250,412" transform="rotate(60,250,250)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
-          <path d="M 250,88 A 42,162 0 0,1 250,412" transform="rotate(120,250,250)" class="fill-none stroke-orb-ring-front" stroke-width="0.6" />
-
-           {/* Front links */}
-          <path ref={eRef0} d={p0} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef1} d={p1} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef4} d={p4} class="fill-none stroke-orb-link-front" stroke-opacity="0.4" stroke-width="1.5" />
-          <path ref={eRef8} d={p8} class="fill-none stroke-orb-link-front" stroke-opacity="0.35" stroke-width="1.5" />
-
-          <!-- ═══ FRONT NODES (bigger, brighter) ═══ -->
-          <g on:hoverin={() => handleHoverIn(0)} on:hoverout={() => handleHoverOut(0)} class="cursor-pointer">
-            <circle ref={gRef0} cx="250" cy="248" r="16" class="fill-brand-purple" opacity="0.12" />
-            <circle cx="250" cy="248" r="14" class="fill-primary" />
-            <circle cx="250" cy="248" r="14" class="fill-none stroke-brand-purple" stroke-width="2" />
-            <text x="250" y="252" text-anchor="middle" class="fill-primary-foreground" font-size="9" font-family="monospace" font-weight="bold">core</text>
-            <text ref={lRef0} x="250" y="270" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">Shared types + IR</text>
-          </g>
-          <g on:hoverin={() => handleHoverIn(1)} on:hoverout={() => handleHoverOut(1)} class="cursor-pointer">
-            <circle ref={gRef1} cx="310" cy="112" r="12" class="fill-brand-blue" opacity="0.12" />
-            <circle cx="310" cy="112" r="10" class="fill-card" />
-            <circle cx="310" cy="112" r="10" class="fill-none stroke-brand-blue" stroke-width="1.5" />
-            <text x="310" y="98" text-anchor="middle" class="fill-foreground" font-size="9" font-family="monospace">router</text>
-            <text ref={lRef1} x="310" y="86" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">SSR routing</text>
-          </g>
-          <g on:hoverin={() => handleHoverIn(2)} on:hoverout={() => handleHoverOut(2)} class="cursor-pointer">
-            <circle ref={gRef2} cx="392" cy="210" r="11" class="fill-brand-magenta" opacity="0.12" />
-            <circle cx="392" cy="210" r="9" class="fill-card" />
-            <circle cx="392" cy="210" r="9" class="fill-none stroke-brand-magenta" stroke-width="1.5" />
-            <text x="392" y="196" text-anchor="middle" class="fill-foreground" font-size="9" font-family="monospace">runtime</text>
-            <text ref={lRef2} x="392" y="184" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">Marker hydration</text>
-          </g>
-          <g on:hoverin={() => handleHoverIn(5)} on:hoverout={() => handleHoverOut(5)} class="cursor-pointer">
-            <circle ref={gRef5} cx="112" cy="178" r="12" class="fill-brand-blue" opacity="0.12" />
-            <circle cx="112" cy="178" r="10" class="fill-card" />
-            <circle cx="112" cy="178" r="10" class="fill-none stroke-brand-blue" stroke-width="1.5" />
-            <text x="112" y="164" text-anchor="middle" class="fill-foreground" font-size="9" font-family="monospace">cli</text>
-            <text ref={lRef5} x="112" y="152" text-anchor="middle" class="fill-muted-foreground" font-size="7" opacity="0">Build orchestration</text>
-          </g>
-
-        </svg>
-      </div>
-    </div>
-
-    <!-- detail panel -->
-    <div class="shrink-0 h-28 flex flex-col justify-end border-t border-orb-ring-back/30 pt-4 mb-4">
-      <div class="flex items-center gap-3 mb-2">
-        <span class="font-mono text-xs tracking-widest uppercase text-muted-foreground">{detailTag}</span>
-        <h2 class="font-display text-2xl font-semibold tracking-tighter uppercase">{detailTitle}</h2>
-      </div>
-      <p class="text-muted-foreground text-sm max-w-lg leading-relaxed">{detailDesc}</p>
-    </div>
-
-    <!-- bottom zone: package descriptors -->
-    <div class="shrink-0 flex flex-wrap gap-x-12 gap-y-4 pt-8 md:pt-12 border-t border-border">
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">router</span>
-        <span class="text-xs text-muted-foreground">SSR routing contracts.</span>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">runtime</span>
-        <span class="text-xs text-muted-foreground">Marker hydration.</span>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">compiler</span>
-        <span class="text-xs text-muted-foreground">AST → IR → HTML.</span>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">bundler</span>
-        <span class="text-xs text-muted-foreground">Tree-shaken output.</span>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span class="font-mono text-xs text-foreground">language-tools</span>
-        <span class="text-xs text-muted-foreground">Editor intelligence.</span>
-      </div>
-    </div>
-
+    <ScrollEnterGroup variant="frame">
+          <EcosystemOrbitShowcase content={ecosystemSectionContent.showcase} />
+    </ScrollEnterGroup>
   </div>
 </SectionShell>

@@ -1,0 +1,438 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { off as offRouteEvent, on as onRouteEvent } from "@zenithbuild/router/events";
+
+interface TransitionPrototypeContent {
+  routes?: string[];
+}
+
+interface Props {
+  content?: TransitionPrototypeContent;
+  frameRef?: any;
+}
+
+const transitionShellContent = props.content;
+const transitionShellRoutes = resolvePrototypeRoutes(transitionShellContent);
+const transitionShellEnabled = transitionShellRoutes.length > 1;
+const transitionShellFrameRef = props.frameRef;
+
+state transitionState = "idle";
+state transitionActive = false;
+
+const routeTransitionOverlayRef = ref<HTMLDivElement>();
+const routeTransitionOverlayEdgeRef = ref<HTMLDivElement>();
+const routeTransitionOverlayGlowRef = ref<HTMLDivElement>();
+
+let activeNavigationId = 0;
+let activePrototypeNavigation = false;
+let leavePromise: Promise<void> | null = null;
+
+function normalizePrototypePath(pathname: string | null | undefined): string {
+  if (!pathname || pathname.trim().length === 0) {
+    return "";
+  }
+
+  if (pathname === "/") {
+    return "/";
+  }
+
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
+function resolvePrototypeRoutes(content?: TransitionPrototypeContent): string[] {
+  const rawRoutes = Array.isArray(content?.routes) ? content.routes : [];
+  const normalized = rawRoutes
+    .map((route) => normalizePrototypePath(route))
+    .filter((route) => route.length > 0);
+
+  return Array.from(new Set(normalized));
+}
+
+function readPrototypePath(routeLike: URL | { pathname?: string | null } | null | undefined): string {
+  if (!routeLike) {
+    return "";
+  }
+
+  if (routeLike instanceof URL) {
+    return normalizePrototypePath(routeLike.pathname);
+  }
+
+  if (typeof routeLike === "object" && typeof routeLike.pathname === "string") {
+    return normalizePrototypePath(routeLike.pathname);
+  }
+
+  return "";
+}
+
+function readPrototypeHash(routeLike: URL | { hash?: string | null } | null | undefined): string {
+  if (!routeLike) {
+    return "";
+  }
+
+  if (routeLike instanceof URL) {
+    return routeLike.hash || "";
+  }
+
+  if (typeof routeLike === "object" && typeof routeLike.hash === "string") {
+    return routeLike.hash;
+  }
+
+  return "";
+}
+
+function isPrototypeRoute(pathname: string, routes: string[]): boolean {
+  const normalizedPath = normalizePrototypePath(pathname);
+  if (normalizedPath.length === 0) {
+    return false;
+  }
+
+  return routes.includes(normalizedPath);
+}
+
+function isPrototypeTransitionNavigation(payload: any, routes: string[]): boolean {
+  const fromPath = readPrototypePath(payload?.from);
+  const toPath = readPrototypePath(payload?.to);
+  const toHash = readPrototypeHash(payload?.to);
+
+  if (fromPath.length === 0 || toPath.length === 0 || fromPath === toPath) {
+    return false;
+  }
+
+  if (toPath === "/docs" && toHash.length > 0) {
+    return false;
+  }
+
+  return isPrototypeRoute(fromPath, routes) && isPrototypeRoute(toPath, routes);
+}
+
+function prefersReducedMotion() {
+  const win = zenWindow();
+  if (!win || typeof win.matchMedia !== "function") {
+    return false;
+  }
+  return win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function transitionTargets() {
+  return collectRefs(
+    transitionShellFrameRef,
+    routeTransitionOverlayRef,
+    routeTransitionOverlayEdgeRef,
+    routeTransitionOverlayGlowRef,
+  );
+}
+
+function killTransitionTweens() {
+  const targets = transitionTargets();
+  if (targets.length > 0) {
+    gsap.killTweensOf(targets);
+  }
+}
+
+function clearTransitionStyles() {
+  killTransitionTweens();
+  if (transitionShellFrameRef?.current) {
+    gsap.set(transitionShellFrameRef.current, { clearProps: "opacity,transform,filter,visibility,willChange" });
+  }
+  if (routeTransitionOverlayRef.current) {
+    gsap.set(routeTransitionOverlayRef.current, {
+      yPercent: 100,
+      opacity: 1,
+      visibility: "visible",
+      willChange: "transform",
+    });
+  }
+  if (routeTransitionOverlayEdgeRef.current) {
+    gsap.set(routeTransitionOverlayEdgeRef.current, { clearProps: "opacity,transform,willChange" });
+  }
+  if (routeTransitionOverlayGlowRef.current) {
+    gsap.set(routeTransitionOverlayGlowRef.current, { clearProps: "opacity,transform,willChange" });
+  }
+}
+
+function settleDelay(delaySeconds: number) {
+  return new Promise<void>((resolve) => {
+    gsap.delayedCall(delaySeconds, () => resolve());
+  });
+}
+
+function matchesActiveNavigation(payload: any) {
+  return (
+    transitionShellEnabled &&
+    activePrototypeNavigation &&
+    typeof payload?.navigationId === "number" &&
+    payload.navigationId === activeNavigationId
+  );
+}
+
+function resetPrototypeState() {
+  clearTransitionStyles();
+  activePrototypeNavigation = false;
+  activeNavigationId = 0;
+  leavePromise = null;
+  transitionActive = false;
+  transitionState = "idle";
+}
+
+async function animateLeave() {
+  const frame = transitionShellFrameRef?.current;
+  const overlay = routeTransitionOverlayRef.current;
+  const overlayEdge = routeTransitionOverlayEdgeRef.current;
+  const overlayGlow = routeTransitionOverlayGlowRef.current;
+  if (!frame || !overlay || !overlayEdge || !overlayGlow) {
+    return;
+  }
+
+  killTransitionTweens();
+  gsap.set(overlay, { yPercent: 100, willChange: "transform" });
+  gsap.set(frame, { opacity: 1, y: 0, filter: "blur(0px)", visibility: "visible", willChange: "transform,opacity,filter" });
+
+  if (prefersReducedMotion()) {
+    gsap.set(overlay, { yPercent: 0 });
+    gsap.set(frame, { autoAlpha: 0 });
+    return;
+  }
+
+  return await new Promise<void>((resolve) => {
+    const timeline = gsap.timeline({
+      defaults: { ease: "power2.inOut" },
+      onComplete: () => resolve(),
+      onInterrupt: () => resolve(),
+    });
+    timeline.to(frame, {
+      opacity: 0.84,
+      y: -14,
+      filter: "blur(3px)",
+      duration: 0.24,
+      willChange: "transform,opacity,filter",
+    }, 0);
+    timeline.to(overlay, { yPercent: 0, duration: 0.54, ease: "expo.inOut", willChange: "transform" }, 0);
+    timeline.fromTo(
+      overlayGlow,
+      { opacity: 0.42, scaleX: 0.92, y: 36 },
+      { opacity: 0.86, scaleX: 1, y: 0, duration: 0.32, ease: "power3.out", willChange: "transform,opacity" },
+      0.1,
+    );
+    timeline.fromTo(
+      overlayEdge,
+      { opacity: 0.35, scaleX: 0.94 },
+      { opacity: 1, scaleX: 1, duration: 0.24, ease: "power2.out", willChange: "transform,opacity" },
+      0.14,
+    );
+    timeline.set(frame, {
+      autoAlpha: 0,
+      y: 0,
+      filter: "blur(0px)",
+      willChange: "transform,opacity,filter",
+    });
+  });
+}
+
+async function settleBeforeSwap() {
+  if (leavePromise) {
+    await leavePromise;
+  }
+  if (!prefersReducedMotion()) {
+    await settleDelay(0.05);
+  }
+}
+
+function prepareEnterState() {
+  const frame = transitionShellFrameRef?.current;
+  const overlay = routeTransitionOverlayRef.current;
+  const overlayEdge = routeTransitionOverlayEdgeRef.current;
+  const overlayGlow = routeTransitionOverlayGlowRef.current;
+  if (!frame || !overlay || !overlayEdge || !overlayGlow) {
+    return;
+  }
+
+  killTransitionTweens();
+  gsap.set(frame, {
+    autoAlpha: 0,
+    y: 28,
+    filter: "blur(10px)",
+    willChange: "transform,opacity,filter",
+  });
+  gsap.set(overlay, { yPercent: 0, opacity: 1, visibility: "visible", willChange: "transform" });
+  gsap.set(overlayEdge, { opacity: 1, scaleX: 1, willChange: "transform,opacity" });
+  gsap.set(overlayGlow, { opacity: 0.86, scaleX: 1, y: 0, willChange: "transform,opacity" });
+}
+
+async function animateEnter() {
+  const frame = transitionShellFrameRef?.current;
+  const overlay = routeTransitionOverlayRef.current;
+  const overlayEdge = routeTransitionOverlayEdgeRef.current;
+  const overlayGlow = routeTransitionOverlayGlowRef.current;
+  if (!frame || !overlay || !overlayEdge || !overlayGlow) {
+    return;
+  }
+
+  killTransitionTweens();
+
+  if (prefersReducedMotion()) {
+    gsap.set(overlay, { yPercent: -100 });
+    gsap.set(frame, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
+    return;
+  }
+
+  return await new Promise<void>((resolve) => {
+    const revealTimeline = gsap.timeline({
+      defaults: { ease: "expo.inOut" },
+      onComplete: () => {
+        gsap.set(frame, {
+          visibility: "visible",
+          opacity: 0,
+          y: 28,
+          filter: "blur(10px)",
+          willChange: "transform,opacity,filter",
+        });
+        const frameTimeline = gsap.timeline({
+          defaults: { ease: "power3.out" },
+          onComplete: () => resolve(),
+          onInterrupt: () => resolve(),
+        });
+        frameTimeline.to(frame, {
+          opacity: 1,
+          y: 0,
+          filter: "blur(0px)",
+          duration: 0.38,
+          willChange: "transform,opacity,filter",
+        });
+      },
+      onInterrupt: () => resolve(),
+    });
+    revealTimeline.to(overlay, { yPercent: -100, duration: 0.5, willChange: "transform" }, 0);
+    revealTimeline.to(overlayGlow, { opacity: 0.18, scaleX: 0.94, y: -32, duration: 0.24, ease: "power2.out" }, 0);
+    revealTimeline.to(overlayEdge, { opacity: 0.42, scaleX: 0.96, duration: 0.2, ease: "power2.out" }, 0.02);
+  });
+}
+
+function handleNavigationRequest(payload: any) {
+  if (!transitionShellEnabled) {
+    return;
+  }
+
+  activeNavigationId = typeof payload?.navigationId === "number" ? payload.navigationId : 0;
+  activePrototypeNavigation = isPrototypeTransitionNavigation(payload, transitionShellRoutes);
+  leavePromise = null;
+  killTransitionTweens();
+
+  if (!activePrototypeNavigation) {
+    transitionActive = false;
+    clearTransitionStyles();
+    transitionState = "idle";
+    return;
+  }
+
+  transitionActive = true;
+  clearTransitionStyles();
+  transitionState = "requested";
+}
+
+async function handleBeforeLeave(payload: any) {
+  if (!matchesActiveNavigation(payload)) {
+    return;
+  }
+
+  transitionState = "leaving";
+  leavePromise = animateLeave();
+  await leavePromise;
+}
+
+async function handleBeforeSwap(payload: any) {
+  if (!matchesActiveNavigation(payload)) {
+    return;
+  }
+
+  transitionState = "swap-hold";
+  await settleBeforeSwap();
+}
+
+function handleContentSwapped(payload: any) {
+  if (!matchesActiveNavigation(payload)) {
+    return;
+  }
+
+  transitionState = "swapped";
+  prepareEnterState();
+}
+
+async function handleBeforeEnter(payload: any) {
+  if (!matchesActiveNavigation(payload)) {
+    return;
+  }
+
+  transitionState = "entering";
+  await animateEnter();
+}
+
+function handleEnterComplete(payload: any) {
+  if (!matchesActiveNavigation(payload)) {
+    return;
+  }
+
+  resetPrototypeState();
+}
+
+function handleAbort(payload: any) {
+  if (typeof payload?.navigationId !== "number" || payload.navigationId !== activeNavigationId) {
+    return;
+  }
+
+  resetPrototypeState();
+}
+
+function handleError(payload: any) {
+  if (typeof payload?.navigationId !== "number" || payload.navigationId !== activeNavigationId) {
+    return;
+  }
+
+  resetPrototypeState();
+}
+
+zenMount((ctx) => {
+  clearTransitionStyles();
+
+  if (!transitionShellEnabled) {
+    return;
+  }
+
+  onRouteEvent("navigation:request", handleNavigationRequest);
+  onRouteEvent("navigation:before-leave", handleBeforeLeave);
+  onRouteEvent("navigation:before-swap", handleBeforeSwap);
+  onRouteEvent("navigation:content-swapped", handleContentSwapped);
+  onRouteEvent("navigation:before-enter", handleBeforeEnter);
+  onRouteEvent("navigation:enter-complete", handleEnterComplete);
+  onRouteEvent("navigation:abort", handleAbort);
+  onRouteEvent("navigation:error", handleError);
+
+  ctx.cleanup(() => {
+    offRouteEvent("navigation:request", handleNavigationRequest);
+    offRouteEvent("navigation:before-leave", handleBeforeLeave);
+    offRouteEvent("navigation:before-swap", handleBeforeSwap);
+    offRouteEvent("navigation:content-swapped", handleContentSwapped);
+    offRouteEvent("navigation:before-enter", handleBeforeEnter);
+    offRouteEvent("navigation:enter-complete", handleEnterComplete);
+    offRouteEvent("navigation:abort", handleAbort);
+    offRouteEvent("navigation:error", handleError);
+    resetPrototypeState();
+  });
+});
+</script>
+
+<div class="pointer-events-none fixed inset-0 z-[60] overflow-hidden" data-transition-state={transitionState} data-transition-active={transitionActive ? "true" : "false"}>
+  <div
+    ref={routeTransitionOverlayRef}
+    aria-hidden="true"
+    class="absolute inset-0 bg-background will-change-transform"
+    style="transform: translate3d(0, 100%, 0);"
+  >
+    <div ref={routeTransitionOverlayEdgeRef} aria-hidden="true" class="absolute inset-x-0 top-0 h-px bg-border/80"></div>
+    <div
+      ref={routeTransitionOverlayGlowRef}
+      aria-hidden="true"
+      class="absolute left-1/2 top-0 h-32 w-[72%] -translate-x-1/2 rounded-b-[999px] bg-brand-cyan/10 blur-3xl"
+    ></div>
+  </div>
+</div>

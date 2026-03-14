@@ -102,4 +102,22 @@ describe('completions', () => {
       }
     }
   });
+
+  test('event completion insertText uses valid VS Code snippet syntax', () => {
+    const attrItems = getCompletionItems(`<button on></button>`, { line: 0, character: 10 });
+    const eventItems = attrItems.filter((item) => typeof item.label === 'string' && item.label.startsWith('on:'));
+
+    expect(eventItems.length).toBeGreaterThan(0);
+
+    for (const item of eventItems) {
+      const text = typeof item.insertText === 'string' ? item.insertText : '';
+      expect(text).toContain('${1:handler}');
+      expect(text).not.toMatch(/\$1:handler/);
+    }
+
+    const propItem = attrItems.find((item) => item.label === 'onClick={handler}');
+    expect(propItem).toBeDefined();
+    const propText = typeof propItem!.insertText === 'string' ? propItem!.insertText : '';
+    expect(propText).toContain('${1:handler}');
+  });
 });
