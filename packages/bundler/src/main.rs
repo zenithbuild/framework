@@ -13,9 +13,9 @@ use zenith_bundler::CompilerOutput;
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
+mod page_runtime;
 mod template_bridge;
 mod vendor;
-mod page_runtime;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -273,7 +273,7 @@ struct RouterRouteEntry {
     load_module_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum MarkerKind {
     Text,
@@ -838,11 +838,14 @@ fn run() -> Result<(), String> {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
-    let out_dir_prev =
-        out_dir.with_extension(format!("prev.{}.{}", process::id(), backup_token));
+    let out_dir_prev = out_dir.with_extension(format!("prev.{}.{}", process::id(), backup_token));
     if out_dir.exists() {
-        fs::rename(&out_dir, &out_dir_prev)
-            .map_err(|e| format!("failed to move existing out_dir to backup '{}': {e}", out_dir_prev.display()))?;
+        fs::rename(&out_dir, &out_dir_prev).map_err(|e| {
+            format!(
+                "failed to move existing out_dir to backup '{}': {e}",
+                out_dir_prev.display()
+            )
+        })?;
     }
     if let Err(error) = fs::rename(&out_dir_tmp, &out_dir) {
         if out_dir_prev.exists() && !out_dir.exists() {
@@ -1906,6 +1909,26 @@ fn derive_binding_tables(
 
     let attr_re = Regex::new(r#"data-zx-([A-Za-z0-9_-]+)=(?:"([^"]+)"|'([^']+)'|([^\s>"']+))"#)
         .map_err(|e| format!("failed to compile binding regex: {e}"))?;
+    let comment_re = Regex::new(r#"<!--\s*zx-e:(\d+)\s*-->"#)
+        .map_err(|e| format!("failed to compile comment binding regex: {e}"))?;
+
+    for captures in comment_re.captures_iter(&ir.html) {
+        let raw_value = captures
+            .get(1)
+            .map(|m| m.as_str())
+            .ok_or_else(|| "failed to parse comment binding index".to_string())?;
+        let index = parse_expression_index(raw_value, expression_count, "comment:zx-e")?;
+        insert_marker(
+            &mut marker_slots,
+            MarkerBinding {
+                index,
+                kind: MarkerKind::Text,
+                selector: format!("comment:zx-e:{index}"),
+                attr: None,
+                source: None,
+            },
+        )?;
+    }
 
     for captures in attr_re.captures_iter(&ir.html) {
         let attr_name = captures
@@ -2320,13 +2343,17 @@ fn emit_helper_module_recursive(
         if spec.starts_with("zenith:") {
             return Err(format!(
                 "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: zenith:* imports are not allowed inside emitted helper modules; move the import to a component script or inline runtime primitives",
-                module_id, module_id, stack.join(" -> ")
+                module_id,
+                module_id,
+                stack.join(" -> ")
             ));
         }
         if !is_relative_or_absolute_specifier(&spec) {
             return Err(format!(
                 "ERROR: Emission failed - unresolved import\n  unresolved_specifier: {spec}\n  referenced_from_asset: assets/modules/{}\n  originating_module: {}\n  dependency_chain:\n    {} -> {spec}\n  recommended_action: ensure compiler IR includes module {spec} OR inline helper into parent module",
-                module_id, module_id, stack.join(" -> ")
+                module_id,
+                module_id,
+                stack.join(" -> ")
             ));
         }
         if spec.starts_with('/') {
@@ -3057,9 +3084,8 @@ fn generate_entry_js(
     };
     let (expr_fns_js, runtime_expression_bindings) =
         build_expression_fns_and_bindings(&bindings_to_use);
-    let expression_bindings_json =
-        serde_json::to_string(&runtime_expression_bindings)
-            .map_err(|e| format!("failed to serialize expression table: {e}"))?;
+    let expression_bindings_json = serde_json::to_string(&runtime_expression_bindings)
+        .map_err(|e| format!("failed to serialize expression table: {e}"))?;
 
     js.push_str(&generate_state_table_js(&ir.hoisted.state)?);
     js.push_str(&generate_state_keys_js(&ir.hoisted.state)?);
@@ -3158,7 +3184,9 @@ fn generate_entry_js(
     js.push_str("    ir_version: __zenith_ir_version,\n");
     js.push_str("    graph_hash: __zenith_graph_hash,\n");
     js.push_str("    expressions: __zenith_expression_bindings,\n");
-    js.push_str("    expr_fns: typeof __zenith_expr_fns !== 'undefined' ? __zenith_expr_fns : [],\n");
+    js.push_str(
+        "    expr_fns: typeof __zenith_expr_fns !== 'undefined' ? __zenith_expr_fns : [],\n",
+    );
     js.push_str("    markers: __zenith_markers,\n");
     js.push_str("    events: __zenith_events,\n");
     js.push_str("    refs: __zenith_refs,\n");
@@ -3283,7 +3311,10 @@ fn build_expression_fns_and_bindings(
                 )
             })
             .collect();
-        format!("const __zenith_expr_fns = [\n  {}\n];\n", fn_defs.join(",\n  "))
+        format!(
+            "const __zenith_expr_fns = [\n  {}\n];\n",
+            fn_defs.join(",\n  ")
+        )
     };
     let runtime_bindings: Vec<serde_json::Value> = bindings
         .iter()
@@ -3311,8 +3342,8 @@ fn build_expression_fns_and_bindings(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_expression_fns_and_bindings, CompilerExpressionBinding, CompilerSourcePosition,
-        CompilerSourceSpan,
+        CompilerExpressionBinding, CompilerIr, CompilerSourcePosition, CompilerSourceSpan,
+        MarkerKind, build_expression_fns_and_bindings, derive_binding_tables,
     };
 
     #[test]
@@ -3329,8 +3360,14 @@ mod tests {
                 compiled_expr: Some("signalMap.get(0).get() ? \"on\" : \"off\"".to_string()),
                 source: Some(CompilerSourceSpan {
                     file: "src/pages/index.zen".to_string(),
-                    start: CompilerSourcePosition { line: 12, column: 5 },
-                    end: CompilerSourcePosition { line: 12, column: 30 },
+                    start: CompilerSourcePosition {
+                        line: 12,
+                        column: 5,
+                    },
+                    end: CompilerSourcePosition {
+                        line: 12,
+                        column: 30,
+                    },
                     snippet: Some("count ? \"on\" : \"off\"".to_string()),
                 }),
             },
@@ -3351,12 +3388,57 @@ mod tests {
         assert!(js.contains("const __zenith_expr_fns = ["));
         assert!(js.contains("const signalMap = __ctx.signalMap;"));
         assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
-        assert_eq!(runtime_bindings[0]["signal_indices"], serde_json::json!([0, 2]));
+        assert_eq!(
+            runtime_bindings[0]["signal_indices"],
+            serde_json::json!([0, 2])
+        );
         assert_eq!(
             runtime_bindings[0]["source"]["file"],
             serde_json::json!("src/pages/index.zen")
         );
         assert!(runtime_bindings[1].get("fn_index").is_none());
+    }
+
+    #[test]
+    fn derive_binding_tables_supports_comment_text_markers() {
+        let ir = CompilerIr {
+            schema_version: None,
+            warnings: Vec::new(),
+            ir_version: 1,
+            graph_hash: Some(String::new()),
+            graph_edges: Vec::new(),
+            graph_nodes: Vec::new(),
+            html:
+                "<option>Prefix <!--zx-e:0--></option><button data-zx-on-click=\"1\">Save</button>"
+                    .to_string(),
+            expressions: vec!["label".to_string(), "increment".to_string()],
+            modules: Default::default(),
+            imports: Default::default(),
+            server_script: Default::default(),
+            prerender: false,
+            ssr_data: Default::default(),
+            hoisted: Default::default(),
+            components_scripts: Default::default(),
+            component_instances: Default::default(),
+            signals: Default::default(),
+            expression_bindings: Default::default(),
+            marker_bindings: Default::default(),
+            event_bindings: Default::default(),
+            ref_bindings: Default::default(),
+            style_blocks: Default::default(),
+            has_guard: false,
+            has_load: false,
+            guard_module_ref: None,
+            load_module_ref: None,
+        };
+
+        let (markers, events) = derive_binding_tables(&ir).expect("derive bindings");
+        assert_eq!(markers.len(), 2);
+        assert_eq!(markers[0].kind, MarkerKind::Text);
+        assert_eq!(markers[0].selector, "comment:zx-e:0");
+        assert_eq!(markers[1].kind, MarkerKind::Event);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].selector, r#"[data-zx-on-click="1"]"#);
     }
 }
 
