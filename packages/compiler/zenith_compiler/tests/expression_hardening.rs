@@ -66,8 +66,8 @@ fn multiple_attributes_then_children() {
     assert!(output.contains(r#"__zenith_expr = ["a", "b", "c", "d"]"#));
     assert!(output.contains(r#"data-zx-x="0""#));
     assert!(output.contains(r#"data-zx-y="1""#));
-    assert!(output.contains(r#"<span data-zx-e="2" style="display: contents"></span>"#));
-    assert!(output.contains(r#"<span data-zx-e="3" style="display: contents"></span>"#));
+    assert!(output.contains(r#"<!--zx-e:2-->"#));
+    assert!(output.contains(r#"<!--zx-e:3-->"#));
     assert!(!output.contains(r#"data-zx-e="2 3""#));
 }
 
@@ -131,7 +131,7 @@ fn mixed_inline_text_and_code_use_stable_placeholders() {
     let output = compile(r#"<p>{before}<code>{code}</code>{after}</p>"#);
 
     assert!(output.contains(r#"__zenith_expr = ["before", "code", "after"]"#));
-    assert!(output.contains(r#"<span data-zx-e="0" style="display: contents"></span><code data-zx-e="1"></code><span data-zx-e="2" style="display: contents"></span>"#));
+    assert!(output.contains(r#"<!--zx-e:0--><code data-zx-e="1"></code><!--zx-e:2-->"#));
     assert!(!output.contains(r#"<p data-zx-e="0 2">"#));
 }
 
@@ -142,5 +142,14 @@ fn raw_text_elements_collapse_static_and_dynamic_content() {
     assert!(output.contains(r#"ZenithBuild | "#));
     assert!(output.contains(r#"pageTitle"#));
     assert!(output.contains(r#"<title data-zx-e="0"></title>"#));
+    assert!(!output.contains("display: contents"));
+}
+
+#[test]
+fn option_mixed_text_and_expression_uses_parser_safe_placeholder() {
+    let output = compile(r#"<option>Prefix {label}</option>"#);
+
+    assert!(output.contains(r#"__zenith_expr = ["label"]"#));
+    assert!(output.contains(r#"<option>Prefix <!--zx-e:0--></option>"#));
     assert!(!output.contains("display: contents"));
 }

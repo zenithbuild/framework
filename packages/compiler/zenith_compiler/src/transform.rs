@@ -414,29 +414,20 @@ impl Transformer {
                 Node::Expression { value, span } => {
                     let rewritten = self.rewrite_expression(&value, RewriteContext::Text);
                     let idx = self.add_expression(rewritten);
+                    let selector = if materialize_text_placeholders {
+                        format!("comment:zx-e:{}", idx)
+                    } else {
+                        format!(r#"[data-zx-e~="{}"]"#, idx)
+                    };
                     self.insert_marker(MarkerBinding {
                         index: idx,
                         kind: MarkerKind::Text,
-                        selector: format!(r#"[data-zx-e~="{}"]"#, idx),
+                        selector,
                         attr: None,
                         source: Some(span),
                     });
                     if materialize_text_placeholders {
-                        new_children.push(Node::Element(ElementNode {
-                            tag: "span".to_string(),
-                            attributes: vec![
-                                Attribute::Static {
-                                    name: "data-zx-e".to_string(),
-                                    value: idx.to_string(),
-                                },
-                                Attribute::Static {
-                                    name: "style".to_string(),
-                                    value: "display: contents".to_string(),
-                                },
-                            ],
-                            children: vec![],
-                            self_closing: false,
-                        }));
+                        new_children.push(Node::Text(format!("<!--zx-e:{}-->", idx)));
                     } else {
                         expression_indices.push(idx);
                     }
