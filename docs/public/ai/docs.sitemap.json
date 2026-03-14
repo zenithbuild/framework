@@ -12,6 +12,7 @@
     "/docs/contracts/hydration-contract",
     "/docs/contracts/ir-envelope",
     "/docs/contracts/navigation",
+    "/docs/contracts/navigation-lifecycle",
     "/docs/contracts/no-magic",
     "/docs/contracts/props-contract",
     "/docs/contracts/router-contract",

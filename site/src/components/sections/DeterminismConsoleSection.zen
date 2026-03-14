@@ -1,65 +1,113 @@
 <script lang="ts">
 import SectionShell from "./SectionShell.zen";
-import Heading from "../ui/Heading.zen";
-import AccentMark from "../ui/AccentMark.zen";
+import SectionIntro from "./SectionIntro.zen";
+import ScrollEnterGroup from "./ScrollEnterGroup.zen";
+
+interface Props {
+  content: any;
+}
+
+const determinismContent = (props as Props).content;
 </script>
 
-<SectionShell tone="blue" height="screen">
-  <div class="flex flex-col flex-1">
+<SectionShell tone="blue" height="screen" runway="long">
+  <div class="flex flex-col flex-1 gap-16 md:gap-24 lg:gap-28">
 
-    <!-- top zone: label left, stat tags right -->
-    <div class="shrink-0 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-      <div>
-        <div class="flex items-center gap-2">
-          <AccentMark color="blue" variant="dot" />
-          <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">Determinism</span>
-        </div>
-        <div class="mt-4">
-          <Heading size="section">SAME INPUT, SAME OUTPUT.</Heading>
-        </div>
-      </div>
-      <div class="flex gap-4 md:pb-2">
-        <span class="font-mono text-xs text-muted-foreground border border-border rounded-full px-3 py-1">no side effects</span>
-        <span class="font-mono text-xs text-muted-foreground border border-border rounded-full px-3 py-1">reproducible builds</span>
-      </div>
-    </div>
+    <div class="flex flex-col gap-20 md:gap-24 lg:gap-28">
+      <div class="min-w-0 w-full pt-2 md:pt-4 xl:pt-10">
+        <SectionIntro
+          variant="full"
+          accentColor="blue"
+          eyebrow={determinismContent.intro.eyebrow}
+          title={determinismContent.intro.title}
+          description={determinismContent.intro.description}
+          noteLabel={determinismContent.intro.noteLabel}
+          noteText={determinismContent.intro.noteText}
+        />
 
-    <!-- middle zone: asymmetric 40/60 split -->
-    <div class="flex-1 flex flex-col md:flex-row gap-8 py-12">
-      <!-- left: contracts list -->
-      <div class="md:w-2/5 flex flex-col justify-center gap-6">
-        <div class="border-l-2 border-brand-blue pl-4">
-          <span class="font-mono text-sm text-foreground">Deterministic builds</span>
-          <p class="text-xs text-muted-foreground mt-1">Given the same source tree, Zenith produces byte-identical output every time.</p>
-        </div>
-        <div class="border-l-2 border-brand-blue pl-4">
-          <span class="font-mono text-sm text-foreground">No hidden state</span>
-          <p class="text-xs text-muted-foreground mt-1">Compilation depends only on source files and explicit config — never ambient globals.</p>
-        </div>
-        <div class="border-l-2 border-brand-blue pl-4">
-          <span class="font-mono text-sm text-foreground">Marker-based hydration</span>
-          <p class="text-xs text-muted-foreground mt-1">Runtime finds exactly the nodes the compiler marked — no DOM diffing, no surprises.</p>
-        </div>
+        <ScrollEnterGroup variant="list" class="mt-10 flex flex-wrap gap-3 md:mt-12 md:gap-4">
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {determinismContent.chips[0]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {determinismContent.chips[1]}
+          </span>
+          <span class="rounded-full border border-border px-4 py-2 font-mono text-[11px] tracking-[0.18em] uppercase text-foreground">
+            {determinismContent.chips[2]}
+          </span>
+        </ScrollEnterGroup>
       </div>
 
-      <!-- right: console mock -->
-      <div class="md:w-3/5 flex items-center">
-        <div class="w-full bg-card border border-border rounded-lg p-6 font-mono text-xs">
-          <div class="flex items-center gap-2 pb-3 border-b border-border mb-4">
-            <span class="w-2.5 h-2.5 rounded-full bg-destructive"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-accent"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-brand-blue"></span>
-            <span class="text-muted-foreground ml-2">build output</span>
-          </div>
-          <div class="space-y-1.5 text-muted-foreground">
-            <div><span class="text-brand-blue">✓</span> src/pages/index.zen → 2.1kb</div>
-            <div><span class="text-brand-blue">✓</span> src/pages/docs.zen → 3.4kb</div>
-            <div><span class="text-brand-blue">✓</span> src/pages/blog.zen → 1.8kb</div>
-            <div class="pt-2 border-t border-border text-foreground">
-              <span class="text-brand-blue">done</span> · 3 pages · 7.3kb total · deterministic ✓
+      <div class="min-w-0">
+        <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2rem] border border-border bg-card">
+          <div data-enter-skip="true" class="pointer-events-none absolute -left-12 top-10 hidden h-40 w-40 rounded-full border border-surface-border-blue opacity-60 lg:block"></div>
+          <div data-enter-skip="true" class="pointer-events-none absolute left-8 top-8 h-px w-24 bg-brand-blue"></div>
+
+          <div class="flex flex-col gap-10 p-6 md:gap-12 md:p-8 lg:p-10">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div class="max-w-lg">
+                <span class="font-mono text-[11px] tracking-[0.22em] uppercase text-muted-foreground">{determinismContent.surface.eyebrow}</span>
+                <h3 class="mt-4 max-w-md text-2xl font-medium uppercase leading-[0.9] tracking-tight text-card-foreground md:text-[2rem]">
+                  {determinismContent.surface.title}
+                </h3>
+              </div>
+
+              <p class="max-w-sm text-sm leading-7 text-muted-foreground">
+                {determinismContent.surface.description}
+              </p>
+            </div>
+
+            <div class="grid gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-10">
+              <div class="grid gap-6 md:gap-7">
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{determinismContent.surface.cards[0].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">{determinismContent.surface.cards[0].title}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">{determinismContent.surface.cards[0].description}</p>
+                </div>
+
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{determinismContent.surface.cards[1].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">{determinismContent.surface.cards[1].title}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">{determinismContent.surface.cards[1].description}</p>
+                </div>
+
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{determinismContent.surface.cards[2].label}</p>
+                  <p class="mt-3 text-lg font-medium leading-7 text-card-foreground">{determinismContent.surface.cards[2].title}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">{determinismContent.surface.cards[2].description}</p>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-6 md:gap-7">
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <div class="flex items-center gap-2 border-b border-border pb-3">
+                    <span class="h-2.5 w-2.5 rounded-full bg-destructive"></span>
+                    <span class="h-2.5 w-2.5 rounded-full bg-accent"></span>
+                    <span class="h-2.5 w-2.5 rounded-full bg-brand-blue"></span>
+                    <span class="ml-2 font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{determinismContent.surface.buildCheck.label}</span>
+                  </div>
+
+                  <div class="mt-5 space-y-3 font-mono text-[12px] leading-6 text-card-foreground">
+                    <div><span class="text-brand-blue">✓</span> {determinismContent.surface.buildCheck.lines[0]}</div>
+                    <div><span class="text-brand-blue">✓</span> {determinismContent.surface.buildCheck.lines[1]}</div>
+                    <div><span class="text-brand-blue">✓</span> {determinismContent.surface.buildCheck.lines[2]}</div>
+                    <div><span class="text-brand-blue">✓</span> {determinismContent.surface.buildCheck.lines[3]}</div>
+                    <div class="border-t border-border pt-3 text-muted-foreground">
+                      {determinismContent.surface.buildCheck.status}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rounded-[1.5rem] border border-border bg-surface-0 p-5 md:p-6">
+                  <p class="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">{determinismContent.surface.runtimeAlignment.label}</p>
+                  <p class="mt-3 text-sm leading-7 text-muted-foreground">
+                    {determinismContent.surface.runtimeAlignment.description}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </ScrollEnterGroup>
       </div>
     </div>
 

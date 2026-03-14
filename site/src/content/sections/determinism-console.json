@@ -1,0 +1,50 @@
+{
+  "intro": {
+    "eyebrow": "Determinism",
+    "title": "SAME INPUT, SAME OUTPUT.",
+    "description": "Determinism in Zenith starts with explicit stages. Route discovery, compilation, and bundling run in fixed order, so the same source tree and the same explicit config produce the same emitted result.",
+    "noteLabel": "Output Contract",
+    "noteText": "No hidden stage reordering. No ambient globals. No runtime heuristics quietly changing what gets emitted."
+  },
+  "chips": [
+    "Stable Route Order",
+    "Explicit Config Only",
+    "Repeatable Emission"
+  ],
+  "surface": {
+    "eyebrow": "Deterministic Build Surface",
+    "title": "The build should never improvise.",
+    "description": "If source and config do not change, neither should route ordering, emitted markers, or the shape of the final asset graph.",
+    "cards": [
+      {
+        "label": "Deterministic Builds",
+        "title": "The same source tree and explicit config should produce the same output bytes.",
+        "description": "Zenith treats repeatability as a contract, not a best-effort property layered on after the build."
+      },
+      {
+        "label": "No Hidden State",
+        "title": "Compilation depends on source files and explicit configuration, never ambient globals.",
+        "description": "When output changes, the reason should exist in the tree, not in invisible process state."
+      },
+      {
+        "label": "Fixed Boundaries",
+        "title": "Manifest generation, compilation, and bundling remain discrete stages.",
+        "description": "No implicit chaining mutates the output path after the deterministic pipeline has already been set."
+      }
+    ],
+    "buildCheck": {
+      "label": "build check",
+      "lines": [
+        "✓ scan -> RouteManifest (stable order)",
+        "✓ compiler -> deterministic IR",
+        "✓ bundler -> emitted HTML + JS + CSS",
+        "✓ identical input -> identical hashes"
+      ],
+      "status": "done · output verified · deterministic"
+    },
+    "runtimeAlignment": {
+      "label": "Runtime Alignment",
+      "description": "Runtime consumes the emitted markers it gets. It does not rewrite the compiler's structure after the build completes."
+    }
+  }
+}

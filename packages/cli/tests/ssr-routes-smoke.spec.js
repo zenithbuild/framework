@@ -20,6 +20,39 @@ async function makeProject(files) {
     return { root, pagesDir, outDir };
 }
 
+async function closeServerInstance(instance) {
+    if (!instance) {
+        return;
+    }
+
+    const server = instance.server;
+    if (!server || typeof server.once !== 'function') {
+        instance.close();
+        return;
+    }
+
+    await new Promise((resolveClose) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolveClose(undefined);
+        };
+
+        server.once('close', finish);
+        try {
+            instance.close();
+        } catch {
+            finish();
+            return;
+        }
+
+        setTimeout(finish, 250);
+    });
+}
+
 describe('SSR Route Independence & Payload Smoke Test', () => {
     let project;
     let dev;
@@ -27,11 +60,11 @@ describe('SSR Route Independence & Payload Smoke Test', () => {
 
     afterEach(async () => {
         if (dev) {
-            dev.close();
+            await closeServerInstance(dev);
             dev = null;
         }
         if (preview) {
-            preview.close();
+            await closeServerInstance(preview);
             preview = null;
         }
         if (project) {

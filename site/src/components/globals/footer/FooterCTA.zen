@@ -1,67 +1,163 @@
 <script lang="ts">
-import Heading from "../../ui/Heading.zen";
-import Button from "../../ui/Button.zen";
 import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+import Links from "../../ui/Links.zen";
 
-const refPath = ref<SVGPathElement>();
+interface Props {
+  content: any;
+}
+
+const footerCtaContent = (props as Props).content;
+
+function collectActionItems(root: HTMLDivElement | null): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(root.children).filter((node): node is HTMLElement => node instanceof HTMLElement);
+}
+
+function collectNavItems(groups: HTMLElement[]): HTMLElement[] {
+  return groups.flatMap((group) =>
+    Array.from(group.children).filter((node): node is HTMLElement => node instanceof HTMLElement)
+  );
+}
 
 zenMount((ctx) => {
-  const path = refPath.current;
-  const footerElement = path?.closest("footer");
-  const mainWrapper = footerElement?.previousElementSibling;
-  if (!path || !mainWrapper || !footerElement) return;
-  if (!(mainWrapper instanceof HTMLElement) || !(footerElement instanceof HTMLElement)) return;
+  gsap.registerPlugin(SplitText);
 
-  gsap.registerPlugin(ScrollTrigger);
-  gsap.set(path, { attr: { d: "M 0 200 Q 500 350 1000 200" } });
+  const win = zenWindow();
+  const doc = zenDocument();
+  if (!win || !doc) return;
 
-  const footerHeight = footerElement.getBoundingClientRect().height;
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const root = doc.querySelector("[data-footer-cta]") as HTMLDivElement | null;
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const title = doc.querySelector("[data-footer-cta-title]") as HTMLHeadingElement | null;
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const description = doc.querySelector("[data-footer-cta-description]") as HTMLParagraphElement | null;
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const actions = doc.querySelector("[data-footer-cta-actions]") as HTMLDivElement | null;
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const navGroups = Array.from(doc.querySelectorAll("[data-footer-nav-group]")).filter(
+    (node): node is HTMLDivElement => node instanceof HTMLDivElement
+  );
+  // zen-allow:dom-query Footer CTA reveal is scoped to stable data hooks until footer ref hoisting is reliable in this build path.
+  const metaItems = Array.from(doc.querySelectorAll("[data-footer-meta-item]")).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement
+  );
 
-  const animation = gsap.to(path, {
-    attr: { d: "M 0 200 Q 500 200 1000 200" },
-    ease: "power2.out",
-    scrollTrigger: {
-      trigger: mainWrapper,
-      start: "bottom bottom",
-      end: () => `+=${footerHeight}`,
-      scrub: 1,
-      invalidateOnRefresh: true,
-    },
+  if (!root || !title || !description) return;
+
+  const reduceMotion = !!win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const actionItems = collectActionItems(actions);
+  const navItems = collectNavItems(navGroups);
+
+  if (reduceMotion) {
+    gsap.set([title, description, ...actionItems, ...navItems, ...metaItems], { clearProps: "all" });
+    return;
+  }
+
+  const titleSplit = SplitText.create(title, { type: "words,chars", mask: "chars" });
+  const descriptionSplit = SplitText.create(description, { type: "lines", mask: "lines" });
+  const titleChars = Array.from(titleSplit.chars) as HTMLElement[];
+  const descriptionLines = Array.from(descriptionSplit.lines) as HTMLElement[];
+
+  gsap.set(titleChars, {
+    yPercent: 112,
+    opacity: 0,
+    transformOrigin: "50% 100%",
+  });
+  gsap.set(descriptionLines, { yPercent: 108, opacity: 0 });
+  gsap.set(actionItems, { y: 26, opacity: 0 });
+  gsap.set(navItems, { y: 24, opacity: 0 });
+  gsap.set(metaItems, { y: 20, opacity: 0 });
+
+  const timeline = gsap.timeline({
+    paused: true,
+    defaults: { ease: "power4.out" },
   });
 
-  ScrollTrigger.refresh();
+  timeline
+    .to(titleChars, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 0.34,
+      stagger: 0.016,
+      ease: "power4.out",
+    })
+    .to(descriptionLines, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 0.42,
+      stagger: 0.08,
+      ease: "power3.out",
+    }, 0.18)
+    .to(actionItems, {
+      y: 0,
+      opacity: 1,
+      duration: 0.64,
+      stagger: 0.1,
+      ease: "power3.out",
+    }, 0.36)
+    .to(navItems, {
+      y: 0,
+      opacity: 1,
+      duration: 0.58,
+      stagger: 0.04,
+      ease: "power3.out",
+    }, 0.52)
+    .to(metaItems, {
+      y: 0,
+      opacity: 1,
+      duration: 0.5,
+      stagger: 0.08,
+      ease: "power3.out",
+    }, 0.72);
+
+  let revealed = false;
+
+  function maybeReveal() {
+    if (revealed) return;
+    const remaining = doc.documentElement.scrollHeight - (win.scrollY + win.innerHeight);
+    const threshold = Math.max(title.offsetHeight * 1.75 + (actions?.offsetHeight || 0), 240);
+    if (remaining <= threshold) {
+      revealed = true;
+      timeline.play(0);
+    }
+  }
+
+  maybeReveal();
+  const offScroll = zenOn(win, "scroll", maybeReveal, { passive: true });
+  const offResize = zenResize(maybeReveal);
+
   ctx.cleanup(() => {
-    if (animation) animation.kill();
-    ScrollTrigger.getAll().forEach((t) => t.kill());
+    offScroll();
+    offResize();
+    timeline.kill();
+    titleSplit.revert();
+    descriptionSplit.revert();
+    gsap.set([title, description, ...actionItems, ...navItems, ...metaItems], { clearProps: "all" });
   });
 });
 </script>
 
-<div class="w-full min-h-screen flex flex-col">
-
-  <!-- Curved CTA heading -->
-  <div class="flex-1 flex flex-col items-center justify-center gap-8 px-6">
-    <div class="w-full overflow-hidden select-none">
-      <svg viewBox="0 0 1000 400" class="text-foreground text-[14vw] px-4 md:px-12 pointer-events-none" preserveAspectRatio="xMidYMid meet">
-        <path ref={refPath} id="zenith-cta-curve-path" fill="transparent" d="M 0 200 Q 500 350 1000 200" stroke="none" />
-        <text font-size="140" class="fill-current font-display font-bold tracking-tighter uppercase pointer-events-none" text-anchor="middle" dominant-baseline="text-after-edge">
-          <textPath href="#zenith-cta-curve-path" startOffset="50%">
-            BUILD DIFFERENT
-          </textPath>
-        </text>
-      </svg>
+<div data-footer-cta class="w-full">
+  <div class="flex min-h-[44svh] w-full flex-col px-6 pt-10 md:min-h-[50svh] md:px-12 md:pt-14 lg:min-h-[54svh] lg:pt-16">
+    <div class="flex flex-1 flex-col justify-end gap-8 md:gap-10">
+      <div class="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden px-5 md:px-8 lg:px-12">
+        <h2 data-footer-cta-title class="w-full px-[0.02em] text-center font-[var(--zen-font-heading)] font-semibold uppercase tracking-[-0.058em] text-foreground leading-[0.8] whitespace-nowrap text-[clamp(4.25rem,14.25vw,13rem)] [transform-style:preserve-3d] [transform:rotateX(12deg)]">
+          {footerCtaContent.cta.title}
+        </h2>
+      </div>
     </div>
 
-    <p class="text-muted-foreground text-sm text-center max-w-md">
-      Zenith compiles your intent into the smallest possible output.
-      No virtual DOM. No runtime framework. Just your application.
-    </p>
+    <div class="mx-auto flex w-full max-w-3xl flex-col items-center gap-5 pb-8 md:gap-6 md:pb-10">
+      <p data-footer-cta-description class="text-center text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+        {footerCtaContent.cta.description}
+      </p>
 
-    <div class="flex gap-4">
-      <Button variant="primary" href="/docs">Start building</Button>
-      <Button variant="ghost" href="https://github.com/nicholasgriffintn/zenithbuild">GitHub</Button>
+      <div data-footer-cta-actions class="flex flex-wrap items-center justify-center gap-4">
+        <Links surface="button" variant="primary" href={footerCtaContent.cta.actions[0].href}>{footerCtaContent.cta.actions[0].label}</Links>
+        <Links surface="button" variant="ghost" href={footerCtaContent.cta.actions[1].href}>{footerCtaContent.cta.actions[1].label}</Links>
+      </div>
     </div>
   </div>
-
 </div>

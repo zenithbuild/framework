@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/router",
-  "version": "0.6.17",
+  "version": "0.6.18",
   "description": "File-based SPA router for Zenith framework with deterministic, compile-time route resolution",
   "license": "MIT",
   "type": "module",
@@ -8,6 +8,9 @@
   "files": [
     "dist",
     "template.js",
+    "template-core.js",
+    "template-lifecycle.js",
+    "template-navigation.js",
     "index.js",
     "index.d.ts",
     "README.md",
@@ -18,6 +21,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./template": "./template.js",
+    "./events": "./dist/events.js",
     "./ZenLink.zen": "./dist/ZenLink.zen"
   },
   "keywords": [

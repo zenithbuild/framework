@@ -1,0 +1,30 @@
+{
+  "topLabel": "ENGINEERED FOR\nDETERMINISM.",
+  "title": "ZENITH BUILD",
+  "actions": [
+    {
+      "label": "Initialize",
+      "href": "/docs"
+    },
+    {
+      "label": "Source",
+      "href": "https://github.com/zenithbuild/framework"
+    }
+  ],
+  "metaColumns": [
+    {
+      "label": "Architecture",
+      "items": [
+        "Reactivity",
+        "Deterministic Runtime"
+      ]
+    },
+    {
+      "label": "Ecosystem",
+      "items": [
+        "Compiler",
+        "Language Server"
+      ]
+    }
+  ]
+}

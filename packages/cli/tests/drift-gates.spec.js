@@ -196,7 +196,7 @@ describe('drift gates', () => {
         expect(hits).toEqual([]);
     });
 
-    test('dist bundles exclude forbidden routing/runtime primitives', async () => {
+    test('dist bundles restrict routing/runtime primitives to the documented surfaces', async () => {
         const root = await mkdtemp(join(tmpdir(), 'zenith-drift-gates-'));
         const pagesDir = join(root, 'pages');
         const outDir = join(root, 'dist');
@@ -217,11 +217,15 @@ describe('drift gates', () => {
             await build({ pagesDir, outDir, config: { softNavigation: true } });
 
             const files = collectFiles(outDir, ['.js']);
-            const hits = scanFiles(
+            const forbiddenHits = scanFiles(
                 files,
-                /history\.(?:push|replace)State(?!\s*\(\s*null\s*,\s*["']["']\s*,\s*window\.location\.href\s*\))|\beval\(|\bnew\s+Function\(|\bFunction\(|__zenith_ssr=/
+                /\beval\(|\bnew\s+Function\(|\bFunction\(|__zenith_ssr=/
             );
-            expect(hits).toEqual([]);
+            expect(forbiddenHits).toEqual([]);
+
+            const historyHits = scanFiles(files, /history\.(?:push|replace)State/);
+            expect(historyHits.length).toBeGreaterThan(0);
+            expect(historyHits.every((file) => /[/\\]assets[/\\]router\./.test(file))).toBe(true);
         } finally {
             await rm(root, { recursive: true, force: true });
         }

@@ -363,10 +363,14 @@ describe('Dev Server', () => {
             return null;
         }, { timeoutMs: 5000, intervalMs: 120 });
 
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        const later = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
+        const later = await waitFor(async () => {
+            const state = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
+            if (state.status === 'ok' && state.buildId === settled.buildId) {
+                return state;
+            }
+            return null;
+        }, { timeoutMs: 5000, intervalMs: 120 });
 
-        expect(later.status).toBe('ok');
         expect(later.buildId).toBe(settled.buildId);
     });
 

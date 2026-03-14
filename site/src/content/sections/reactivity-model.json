@@ -1,0 +1,48 @@
+{
+  "intro": {
+    "eyebrow": "Reactivity Scope",
+    "title": "REACTIVITY BELONGS TO SCOPE.",
+    "description": "Zenith keeps reactivity attached to the file and markup that own it. Use state for DOM-facing updates, keep slot expressions resolved against parent scope, and avoid hidden component boundaries deciding what is reactive."
+  },
+  "chips": [
+    "state Drives DOM",
+    "signal Keeps Identity",
+    "Slots Stay Parent-Side"
+  ],
+  "demo": {
+    "eyebrow": "Interactive Scope Demo",
+    "title": "One example, two surfaces.",
+    "description": "Flip between the authored Zenith source and the same mounted live counter. The outer shell never remounts; only the inner surface changes.",
+    "sourceButtonLabel": "View Source",
+    "liveButtonLabel": "View Live Example",
+    "codeFile": "CounterSection.zen",
+    "codeMeta": "canonical state counter",
+    "codeViewLabel": "code view",
+    "liveEyebrow": "Live Counter",
+    "liveDescription": "This button is owned by this file scope. Clicking it updates the bound text in place without creating a separate component-owned reactive scope.",
+    "liveTag": "file-owned state",
+    "interactiveEyebrow": "Interactive Surface",
+    "interactiveDescription": "The same authored pattern from the code view, presented as a tactile control.",
+    "counterLabel": "Count",
+    "boundOutputEyebrow": "Bound Output",
+    "ownershipEyebrow": "Ownership",
+    "ownershipDescription": "This count belongs to the current file scope. If this markup were passed through a slot, parent expressions would still resolve against the parent binding."
+  },
+  "principles": [
+    {
+      "label": "State Owns Local DOM",
+      "title": "Use state when the value directly drives markup you own.",
+      "description": "The binding stays in the current file scope and updates the exact DOM surface it controls."
+    },
+    {
+      "label": "Slots Preserve Parent Scope",
+      "title": "Slot expressions keep the parent binding they came from.",
+      "description": "Component-local state does not silently rebind slot content to a new internal ownership layer."
+    },
+    {
+      "label": "Components Stay Structural",
+      "title": "Components shape markup, not hidden reactive zones.",
+      "description": "Local state or signal affects component-owned markup only unless values are explicitly passed outward."
+    }
+  ]
+}

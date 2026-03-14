@@ -189,6 +189,33 @@ describe('generateManifest', () => {
         await expect(generateManifest(pagesDir)).rejects.toThrow('Catch-all segment');
     });
 
+    test('rejects duplicate concrete routes from different files', async () => {
+        pagesDir = await createPages([
+            'docs.zen',
+            'docs/index.zen'
+        ]);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Duplicate route path');
+    });
+
+    test('rejects structurally ambiguous param siblings', async () => {
+        pagesDir = await createPages([
+            'users/[id].zen',
+            'users/[slug].zen'
+        ]);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Ambiguous route patterns');
+    });
+
+    test('rejects structurally ambiguous catch-all siblings', async () => {
+        pagesDir = await createPages([
+            'docs/[...slug].zen',
+            'docs/[...all].zen'
+        ]);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Ambiguous route patterns');
+    });
+
     test('ignores non-.zen files', async () => {
         pagesDir = await createPages([
             'index.zen',

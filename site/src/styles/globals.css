@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "lenis/dist/lenis.css";
 @custom-variant dark (&:where(.dark, .dark *));
 @source "../**/*.{zen,ts,js}";
 
@@ -75,11 +76,11 @@
   --surface-border-red: oklch(0.94 0.04 26);
 
   /* orb wireframe */
-  --orb-ring-front: oklch(0.72 0.015 285);
-  --orb-ring-back: oklch(0.82 0.008 285);
-  --orb-link-front: oklch(0.60 0.02 285);
-  --orb-link-back: oklch(0.78 0.01 285);
-  --orb-glow: oklch(0.88 0.06 304);
+  --orb-ring-front: oklch(0.74 0.03 292);
+  --orb-ring-back: oklch(0.84 0.015 292);
+  --orb-link-front: oklch(0.62 0.045 300);
+  --orb-link-back: oklch(0.78 0.02 292);
+  --orb-glow: oklch(0.9 0.08 304);
 
   /* Fonts */
   --zen-font-sans: "Sora", "Avenir Next", "Segoe UI", sans-serif;
@@ -152,11 +153,11 @@
   --surface-border-red: oklch(0.26 0.06 26);
 
   /* orb wireframe (dark) */
-  --orb-ring-front: oklch(0.48 0.025 285);
-  --orb-ring-back: oklch(0.30 0.015 285);
-  --orb-link-front: oklch(0.52 0.03 285);
-  --orb-link-back: oklch(0.30 0.015 285);
-  --orb-glow: oklch(0.32 0.08 304);
+  --orb-ring-front: oklch(0.54 0.045 294);
+  --orb-ring-back: oklch(0.34 0.02 288);
+  --orb-link-front: oklch(0.64 0.06 304);
+  --orb-link-back: oklch(0.38 0.03 292);
+  --orb-glow: oklch(0.42 0.1 304);
 }
 
 @theme inline {

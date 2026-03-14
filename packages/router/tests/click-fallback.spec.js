@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
 // click-fallback.spec.js — Zenith Router
 // ---------------------------------------------------------------------------
-// Regression test: the router template click handler must NOT call
-// preventDefault() on data-zen-link clicks, and must not use
-// pushState/replaceState. Navigation must be fail-safe.
+// Regression test: marked links must opt into soft navigation explicitly,
+// fetch fresh HTML before commit, and preserve browser fallbacks when the
+// router cannot safely complete the navigation.
 // ---------------------------------------------------------------------------
 
 import assert from 'node:assert/strict';
@@ -19,7 +19,8 @@ const manifestJson = JSON.stringify(
         chunks: {
             '/': '/assets/index.aaaaaaa1.js',
             '/about': '/assets/about.bbbbbbb2.js'
-        }
+        },
+        server_routes: ['/about']
     },
     null,
     2
@@ -31,61 +32,68 @@ const opts = { manifestJson, runtimeImport, coreImport };
 
 const source = renderRouterModule(opts);
 
-// 1. Find the click handler block
-const clickStart = source.indexOf("document.addEventListener('click'");
+const clickStart = source.indexOf('document.addEventListener("click"');
 assert.ok(clickStart >= 0, 'router template must register delegated click handler');
 
-const clickEnd = source.indexOf('});', clickStart);
-assert.ok(clickEnd > clickStart, 'click handler must have a closing bracket');
+const clickEnd = source.indexOf('window.addEventListener("popstate"', clickStart);
+assert.ok(clickEnd > clickStart, 'click handler block must terminate before popstate setup');
 
 const clickBlock = source.slice(clickStart, clickEnd);
 
-// 2. The click handler must NOT call preventDefault
 assert.ok(
-    !clickBlock.includes('preventDefault'),
-    'click handler must NOT call preventDefault() — if the router fails, links must still work via browser default'
+    clickBlock.includes('closest("a[data-zen-link]")'),
+    'click handler must only intercept marked semantic anchors'
+);
+assert.ok(
+    clickBlock.includes('event.preventDefault();'),
+    'click handler must prevent default only after explicit opt-in eligibility is confirmed'
+);
+assert.ok(
+    clickBlock.includes('performNavigation(targetUrl, "push", null)'),
+    'click handler must delegate to the soft-navigation pipeline'
 );
 
-// 3. The click handler must still call location.assign (wrapped in try/catch)
 assert.ok(
-    clickBlock.includes('window.location.assign(url.href)'),
-    'click handler must call location.assign for hard navigation'
+    source.includes('fetch(targetUrl.href'),
+    'router template must fetch fresh route HTML before committing a soft navigation'
+);
+assert.ok(
+    source.includes('history.pushState('),
+    'router template must push history on successful forward soft navigation'
+);
+assert.ok(
+    source.includes('history.replaceState('),
+    'router template must replace history state for initial entry and popstate bookkeeping'
+);
+assert.ok(
+    source.includes('window.location.assign(targetUrl.href);'),
+    'router template must keep assign-based hard fallback for forward navigation failures'
+);
+assert.ok(
+    source.includes('window.location.replace(targetUrl.href);'),
+    'router template must keep replace-based hard fallback for popstate recovery'
+);
+assert.ok(
+    source.includes('"navigation:before-leave"') &&
+    source.includes('"navigation:before-enter"'),
+    'router template must expose navigation lifecycle hooks for transition orchestration'
+);
+assert.ok(
+    source.includes('await emitNavigationEvent(context, "navigation:before-swap"'),
+    'router template must await before-swap lifecycle hooks before DOM commit'
 );
 
-// 4. The location.assign must be wrapped in try/catch for fail-safety
 assert.ok(
-    clickBlock.includes('try {'),
-    'location.assign must be wrapped in try/catch for fail-safe behavior'
+    !source.includes('__zenith_ssr='),
+    'router template must not encode SSR payload into query strings'
 );
-assert.ok(
-    clickBlock.includes('catch'),
-    'click handler must catch errors from location.assign'
-);
-
-// 5. No pushState/replaceState anywhere in the entire template
-assert.ok(
-    !source.includes('pushState'),
-    'router template must NOT use pushState'
-);
-assert.ok(
-    !source.includes('replaceState'),
-    'router template must NOT use replaceState'
-);
-
-// 6. No eval/new Function anywhere
 assert.ok(
     !source.includes('eval('),
-    'router template must NOT use eval()'
+    'router template must not use eval()'
 );
 assert.ok(
     !source.includes('new Function('),
-    'router template must NOT use new Function()'
-);
-
-// 7. No __zenith_ssr= query param channel
-assert.ok(
-    !source.includes('__zenith_ssr='),
-    'router template must NOT use __zenith_ssr= query param channel'
+    'router template must not use new Function()'
 );
 
 console.log('click-fallback.spec.js passed');

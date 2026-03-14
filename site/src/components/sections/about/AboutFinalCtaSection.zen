@@ -1,0 +1,29 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+import Links from "../../ui/Links.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutFinalCtaContent = (props as Props).content;
+</script>
+
+<SectionShell tone="gold" height="auto" runway="normal">
+  <ScrollEnterGroup variant="frame" class="rounded-[2.25rem] border border-surface-border-gold bg-card/70 px-6 py-8 md:px-8 md:py-10 xl:px-10">
+    <div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-14">
+      <div class="min-w-0">
+        <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutFinalCtaContent.eyebrow}</p>
+        <h2 class="mt-5 font-display text-[clamp(2.1rem,4.6vw,4rem)] leading-[0.92] tracking-tight text-foreground">{aboutFinalCtaContent.title}</h2>
+        <p class="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutFinalCtaContent.text}</p>
+      </div>
+
+      <div class="flex flex-wrap gap-4 xl:justify-end">
+        <Links surface="button" href={aboutFinalCtaContent.actions[0].href} variant={aboutFinalCtaContent.actions[0].variant}>{aboutFinalCtaContent.actions[0].label}</Links>
+        <Links surface="button" href={aboutFinalCtaContent.actions[1].href} variant={aboutFinalCtaContent.actions[1].variant}>{aboutFinalCtaContent.actions[1].label}</Links>
+        <Links surface="button" href={aboutFinalCtaContent.actions[2].href} variant={aboutFinalCtaContent.actions[2].variant}>{aboutFinalCtaContent.actions[2].label}</Links>
+      </div>
+    </div>
+  </ScrollEnterGroup>
+</SectionShell>

@@ -1,0 +1,226 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+
+type IntroVariant = "full" | "split" | "offset" | "side-note" | "narrow";
+type AccentColor = "blue" | "gold" | "red" | "magenta" | "purple";
+
+export interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+  noteLabel?: string;
+  noteText?: string;
+  variant?: IntroVariant;
+  accentColor?: AccentColor;
+  class?: string;
+  headingClass?: string;
+  descriptionClass?: string;
+  noteClass?: string;
+}
+
+const sectionIntroVariant = (props as Props).variant || "split";
+const sectionIntroAccentColor = (props as Props).accentColor || "blue";
+const sectionIntroOuterClass = typeof (props as Props).class === "string" ? (props as Props).class : "";
+const sectionIntroHeadingClass = typeof (props as Props).headingClass === "string" ? (props as Props).headingClass : "";
+const sectionIntroDescriptionClass = typeof (props as Props).descriptionClass === "string" ? (props as Props).descriptionClass : "";
+const sectionIntroNoteClass = typeof (props as Props).noteClass === "string" ? (props as Props).noteClass : "";
+const sectionIntroEyebrow = (props as Props).eyebrow;
+const sectionIntroTitle = (props as Props).title;
+const sectionIntroDescription = (props as Props).description;
+const sectionIntroNoteLabel = (props as Props).noteLabel || "Editorial Note";
+const sectionIntroNoteText = (props as Props).noteText || "";
+const hasNote = typeof (props as Props).noteText === "string" && (props as Props).noteText.trim().length > 0;
+
+const eyebrowClassMap: Record<IntroVariant, string> = {
+  full: "",
+  split: "",
+  offset: "",
+  "side-note": "",
+  narrow: "",
+};
+
+const contentClassMap: Record<IntroVariant, string> = {
+  full: "mt-7 grid gap-8 md:mt-10 md:gap-10 xl:gap-16",
+  split: "mt-7 grid gap-8 md:mt-10 md:gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.6fr)] xl:items-end xl:gap-20",
+  offset: "mt-7 grid gap-8 md:mt-10 md:gap-10 xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)] xl:items-start xl:gap-18",
+  "side-note": "mt-7 grid gap-8 md:mt-10 md:gap-10 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.6fr)] xl:items-start xl:gap-20",
+  narrow: "mt-7 grid gap-8 md:mt-10 md:gap-10 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)] xl:items-start xl:gap-18",
+};
+
+const titleWrapClassMap: Record<IntroVariant, string> = {
+  full: "min-w-0",
+  split: "min-w-0",
+  offset: "min-w-0",
+  "side-note": "min-w-0",
+  narrow: "min-w-0",
+};
+
+const descriptionWrapClassMap: Record<IntroVariant, string> = {
+  full: "min-w-0 xl:w-full",
+  split: "min-w-0 xl:self-end xl:justify-self-end xl:w-full",
+  offset: "min-w-0 xl:self-end xl:justify-self-end xl:w-full xl:pt-3",
+  "side-note": "min-w-0 xl:w-full",
+  narrow: "min-w-0 xl:w-full",
+};
+
+const noteWrapClassMap: Record<IntroVariant, string> = {
+  full: "min-w-0 xl:w-full xl:border-l xl:border-border xl:pl-7",
+  split: "min-w-0 xl:w-full xl:border-l xl:border-border xl:pl-7",
+  offset: "min-w-0 xl:w-full xl:border-l xl:border-border xl:pl-7",
+  "side-note": "min-w-0 xl:w-full xl:border-l xl:border-border xl:pl-8",
+  narrow: "min-w-0 xl:w-full xl:border-l xl:border-border xl:pl-7",
+};
+const eyebrowClass = eyebrowClassMap[sectionIntroVariant] || eyebrowClassMap.split;
+const contentClass = contentClassMap[sectionIntroVariant] || contentClassMap.split;
+const titleWrapClass = titleWrapClassMap[sectionIntroVariant] || titleWrapClassMap.split;
+const descriptionWrapClass = descriptionWrapClassMap[sectionIntroVariant] || descriptionWrapClassMap.split;
+const noteWrapClass = hasNote ? (noteWrapClassMap[sectionIntroVariant] || noteWrapClassMap.split) : "hidden";
+
+const resolvedHeadingClass = (
+  (sectionIntroVariant === "full" ? "max-w-none text-[clamp(3rem,7vw,6.2rem)]" : "") +
+  " " +
+  sectionIntroHeadingClass
+).trim();
+const resolvedDescriptionClass = `text-base leading-8 text-muted-foreground md:text-lg md:leading-9 ${sectionIntroDescriptionClass}`.trim();
+const resolvedNoteClass = `text-sm leading-7 text-muted-foreground md:text-[15px] ${sectionIntroNoteClass}`.trim();
+const accentClassMap: Record<AccentColor, string> = {
+  blue: "bg-brand-blue",
+  gold: "bg-brand-gold",
+  red: "bg-brand-red",
+  magenta: "bg-brand-magenta",
+  purple: "bg-brand-purple",
+};
+const accentClass = accentClassMap[sectionIntroAccentColor] || accentClassMap.blue;
+const headingRootClass = "flex w-full min-w-0 flex-col overflow-visible text-left font-[var(--zen-font-heading)] font-semibold uppercase tracking-tighter text-foreground mix-blend-normal";
+const headingTextClass = (
+  "block max-w-full whitespace-normal leading-[0.88] [text-wrap:balance] text-[clamp(2.75rem,7vw,5.75rem)] " +
+  resolvedHeadingClass
+).trim();
+
+const introRef = ref<HTMLDivElement>();
+const eyebrowRef = ref<HTMLDivElement>();
+const titleRef = ref<HTMLSpanElement>();
+const descriptionRef = ref<HTMLParagraphElement>();
+const noteLabelRef = ref<HTMLParagraphElement>();
+const noteBodyRef = ref<HTMLParagraphElement>();
+
+zenMount((ctx) => {
+  gsap.registerPlugin(ScrollTrigger, SplitText);
+
+  const root = introRef.current;
+  const eyebrow = eyebrowRef.current;
+  const title = titleRef.current;
+  const description = descriptionRef.current;
+  if (!root || !eyebrow || !title || !description) return;
+
+  const win = zenWindow();
+  const reduceMotion = !!win?.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reduceMotion) {
+    gsap.set(
+      collectRefs(eyebrowRef, titleRef, descriptionRef, noteLabelRef, noteBodyRef),
+      { clearProps: "all" }
+    );
+    return;
+  }
+
+  const titleSplit = SplitText.create(title, { type: "words,chars", mask: "chars" });
+  const descriptionSplit = SplitText.create(description, { type: "lines", mask: "lines" });
+  const noteTargets = hasNote ? collectRefs(noteLabelRef, noteBodyRef) as HTMLElement[] : [];
+  const noteSplits = noteTargets.map((node) => SplitText.create(node, { type: "lines", mask: "lines" }));
+
+  const titleChars = Array.from(titleSplit.chars) as HTMLElement[];
+  const descriptionLines = Array.from(descriptionSplit.lines) as HTMLElement[];
+  const noteLines = noteSplits.flatMap((split) => Array.from(split.lines) as HTMLElement[]);
+
+  gsap.set(eyebrow, { y: 18, opacity: 0 });
+  gsap.set(titleChars, {
+    yPercent: 112,
+    opacity: 0,
+    transformOrigin: "50% 100%",
+  });
+  gsap.set(descriptionLines, { yPercent: 108, opacity: 0 });
+  gsap.set(noteLines, { yPercent: 96, opacity: 0 });
+
+  const timeline = gsap.timeline({
+    defaults: { ease: "power4.out" },
+    scrollTrigger: {
+      trigger: root,
+      start: "top 80%",
+      once: true,
+      invalidateOnRefresh: true,
+    },
+  });
+
+  timeline
+    .to(eyebrow, {
+      y: 0,
+      opacity: 1,
+      duration: 0.44,
+    })
+    .to(titleChars, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 0.34,
+      stagger: 0.016,
+      ease: "power4.out",
+    }, 0.08)
+    .to(descriptionLines, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 0.42,
+      stagger: 0.08,
+      ease: "power3.out",
+    }, 0.24)
+    .to(noteLines, {
+      yPercent: 0,
+      opacity: 1,
+      duration: 0.34,
+      stagger: 0.07,
+      ease: "power3.out",
+    }, 0.38);
+
+  ctx.cleanup(() => {
+    timeline.kill();
+    titleSplit.revert();
+    descriptionSplit.revert();
+    noteSplits.forEach((split) => split.revert());
+    gsap.set(
+      [eyebrow, ...titleChars, ...descriptionLines, ...noteLines],
+      { clearProps: "all" }
+    );
+  });
+});
+</script>
+
+<div ref={introRef} class={`min-w-0 ${sectionIntroOuterClass}`.trim()}>
+  <div ref={eyebrowRef} class={eyebrowClass}>
+    <div class="flex items-center gap-2">
+      <span class={`inline-block h-2 w-2 rounded-full ${accentClass}`.trim()}></span>
+      <span class="text-xs font-mono tracking-widest uppercase text-muted-foreground">{sectionIntroEyebrow}</span>
+    </div>
+  </div>
+
+  <div class={contentClass}>
+    <div class={titleWrapClass}>
+      <div class={headingRootClass}>
+        <span ref={titleRef} class={headingTextClass}>{sectionIntroTitle}</span>
+      </div>
+    </div>
+
+    <div class={descriptionWrapClass}>
+      <p ref={descriptionRef} class={resolvedDescriptionClass}>{sectionIntroDescription}</p>
+    </div>
+
+    <div class={noteWrapClass}>
+      <p ref={noteLabelRef} class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">
+        {sectionIntroNoteLabel}
+      </p>
+      <p ref={noteBodyRef} class={`mt-3 ${resolvedNoteClass}`.trim()}>
+        {sectionIntroNoteText}
+      </p>
+    </div>
+  </div>
+</div>

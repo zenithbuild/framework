@@ -1,20 +1,185 @@
 <script server lang="ts">
-    export const data = {
-        pageTitle: "Zenith Tailwind Starter About"
+    import { pageContent, siteContent } from "../content/index";
+
+    const githubApiBase = "https://api.github.com";
+    const githubRequestHeaders = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "Zenith About Page"
+    };
+
+    interface GitHubRepo {
+        name: string;
+        fork: boolean;
+        archived: boolean;
+    }
+
+    interface GitHubContributorResponse {
+        login: string;
+        avatar_url: string;
+        html_url: string;
+        contributions: number;
+        type?: string;
+    }
+
+    interface AboutContributor {
+        login: string;
+        avatarUrl: string;
+        profileUrl: string;
+        contributions: number;
+        repositoryCount: number;
+        repositoryLabel: string;
+    }
+
+    interface ContributorAccumulator {
+        login: string;
+        avatarUrl: string;
+        profileUrl: string;
+        contributions: number;
+        repositories: Set<string>;
+    }
+
+    interface ContributorPayload {
+        contributors: AboutContributor[];
+        repositoryCount: number;
+    }
+
+    async function fetchGitHubJson<T>(url: string): Promise<T> {
+        const response = await fetch(url, {
+            headers: githubRequestHeaders,
+        });
+
+        if (!response.ok) {
+            throw new Error(`GitHub request failed: ${response.status}`);
+        }
+
+        return await response.json() as T;
+    }
+
+    async function fetchGitHubContributorPayload(org: string, maxContributors: number): Promise<ContributorPayload> {
+        const repositories = await fetchGitHubJson<GitHubRepo[]>(`${githubApiBase}/orgs/${org}/repos?per_page=100&type=public&sort=updated`);
+        const activeRepositories = repositories.filter((repository) => {
+            return !repository.fork && !repository.archived && repository.name !== ".github";
+        });
+        const contributorMap = new Map<string, ContributorAccumulator>();
+
+        for (const repository of activeRepositories) {
+            try {
+                const repositoryContributors = await fetchGitHubJson<GitHubContributorResponse[]>(`${githubApiBase}/repos/${org}/${repository.name}/contributors?per_page=100`);
+
+                for (const contributor of repositoryContributors) {
+                    if (!contributor.login || contributor.type === "Bot" || contributor.login.endsWith("[bot]")) {
+                        continue;
+                    }
+
+                    const existingContributor = contributorMap.get(contributor.login);
+                    if (existingContributor) {
+                        existingContributor.contributions = existingContributor.contributions + contributor.contributions;
+                        existingContributor.repositories.add(repository.name);
+                        continue;
+                    }
+
+                    contributorMap.set(contributor.login, {
+                        login: contributor.login,
+                        avatarUrl: contributor.avatar_url,
+                        profileUrl: contributor.html_url,
+                        contributions: contributor.contributions,
+                        repositories: new Set([repository.name])
+                    });
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        const contributors = Array.from(contributorMap.values())
+            .sort((left, right) => {
+                if (right.contributions !== left.contributions) {
+                    return right.contributions - left.contributions;
+                }
+
+                if (right.repositories.size !== left.repositories.size) {
+                    return right.repositories.size - left.repositories.size;
+                }
+
+                return left.login.localeCompare(right.login);
+            })
+            .slice(0, maxContributors)
+            .map((contributor) => {
+                return {
+                    login: contributor.login,
+                    avatarUrl: contributor.avatarUrl,
+                    profileUrl: contributor.profileUrl,
+                    contributions: contributor.contributions,
+                    repositoryCount: contributor.repositories.size,
+                    repositoryLabel: Array.from(contributor.repositories).slice(0, 3).join(" · "),
+                };
+            });
+
+        return {
+            contributors,
+            repositoryCount: activeRepositories.length,
+        };
+    }
+
+    export const load = async (ctx) => {
+        const contributorSection = pageContent.about.sections.contributors;
+        let contributorPayload: ContributorPayload = {
+            contributors: [],
+            repositoryCount: 0,
+        };
+        let contributorFetchFailed = false;
+
+        try {
+            contributorPayload = await fetchGitHubContributorPayload(contributorSection.githubOrg, contributorSection.maxContributors);
+        } catch {
+            contributorFetchFailed = true;
+        }
+
+        return {
+            pageTitle: pageContent.about.pageTitle,
+            pageDescription: pageContent.about.description,
+            aboutPageContent: {
+                ...pageContent.about,
+                sections: {
+                    ...pageContent.about.sections,
+                    contributors: {
+                        ...contributorSection,
+                        contributorCount: contributorPayload.contributors.length,
+                        repositoryCount: contributorPayload.repositoryCount,
+                        contributors: contributorPayload.contributors,
+                        contributorFetchFailed,
+                    }
+                }
+            },
+            site: {
+                navigation: siteContent.navigation,
+                footer: siteContent.footer,
+            }
+        };
     };
 </script>
 
-<DefaultLayout>
-    <section class="mx-auto max-w-3xl space-y-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
-        <h1 class="text-3xl font-semibold text-slate-100">About This Tailwind Starter</h1>
-        <p class="text-slate-300">
-            Tailwind entry lives in <code>src/styles/globals.css</code>, and Zenith compiles it
-            internally during <code>zenith dev</code> and <code>zenith build</code>.
-        </p>
-        <div class="flex flex-wrap items-center gap-3 text-sky-300">
-            <a href="/" class="underline-offset-4 hover:underline">Back to home</a>
-            <a href="/blog" class="underline-offset-4 hover:underline">Visit blog</a>
-            <a href="/docs" class="underline-offset-4 hover:underline">Visit docs</a>
-        </div>
-    </section>
+<script setup="ts">
+    import DefaultLayout from "@/layouts/DefaultLayout.zen";
+    import AboutHeroSection from "@/components/sections/about/AboutHeroSection.zen";
+    import AboutWhySection from "@/components/sections/about/AboutWhySection.zen";
+    import AboutPhilosophySection from "@/components/sections/about/AboutPhilosophySection.zen";
+    import AboutModelSection from "@/components/sections/about/AboutModelSection.zen";
+    import AboutArchitectureSection from "@/components/sections/about/AboutArchitectureSection.zen";
+    import AboutStatusSection from "@/components/sections/about/AboutStatusSection.zen";
+    import AboutContributorsSection from "@/components/sections/about/AboutContributorsSection.zen";
+    import AboutSponsorSection from "@/components/sections/about/AboutSponsorSection.zen";
+    import AboutFinalCtaSection from "@/components/sections/about/AboutFinalCtaSection.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <AboutHeroSection content={data.aboutPageContent.sections.hero} />
+    <AboutWhySection content={data.aboutPageContent.sections.why} />
+    <AboutPhilosophySection content={data.aboutPageContent.sections.philosophy} />
+    <AboutModelSection content={data.aboutPageContent.sections.model} />
+    <AboutArchitectureSection content={data.aboutPageContent.sections.architecture} />
+    <AboutStatusSection content={data.aboutPageContent.sections.status} />
+    <AboutContributorsSection content={data.aboutPageContent.sections.contributors} />
+    <AboutSponsorSection content={data.aboutPageContent.sections.sponsor} />
+    <AboutFinalCtaSection content={data.aboutPageContent.sections.finalCta} />
 </DefaultLayout>

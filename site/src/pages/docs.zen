@@ -1,19 +1,161 @@
 <script server lang="ts">
-    export const data = {
-        pageTitle: "Zenith Tailwind Starter Docs"
-    };
+import { pageContent, repoContent, siteContent } from "../content/index";
+
+export const data = {
+    pageTitle: pageContent.docs.pageTitle,
+    description: pageContent.docs.description,
+    coreVersion: repoContent.trainVersion,
+    content: pageContent.docs,
+    site: {
+        navigation: siteContent.navigation,
+        footer: siteContent.footer,
+    }
+};
 </script>
 
-<DefaultLayout>
-    <section class="mx-auto max-w-3xl space-y-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-8">
-        <h1 class="text-3xl font-semibold text-slate-100">Starter Docs</h1>
-        <p class="text-slate-300">
-            Start documentation pages here. Add nested routes under <code>src/pages/docs</code> as your site grows.
-        </p>
-        <div class="flex flex-wrap items-center gap-3 text-sky-300">
-            <a href="/" class="underline-offset-4 hover:underline">Home</a>
-            <a href="/about" class="underline-offset-4 hover:underline">About</a>
-            <a href="/blog" class="underline-offset-4 hover:underline">Blog</a>
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import Links from "@/components/ui/Links.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.description} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <section class="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pb-24 pt-28 md:px-10 md:pt-36 lg:px-12">
+        <div class="max-w-4xl">
+            <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{data.content.intro.eyebrow}</p>
+            <h1 class="mt-6 max-w-[11ch] text-[clamp(3rem,9vw,7rem)] font-display font-semibold uppercase leading-[0.88] tracking-tight text-foreground">
+                {data.content.intro.title}
+            </h1>
+            <p class="mt-8 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">
+                {data.content.intro.description}
+            </p>
+
+            <div class="mt-10 flex flex-wrap gap-3">
+                <span class="rounded-full border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                    Core train v{data.coreVersion}
+                </span>
+                <span class="rounded-full border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                    {data.content.chips[0]}
+                </span>
+                <span class="rounded-full border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                    {data.content.chips[1]}
+                </span>
+                <span class="rounded-full border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">
+                    {data.content.chips[2]}
+                </span>
+            </div>
+        </div>
+
+        <div class="grid gap-6 md:grid-cols-2">
+            <Links
+                id={data.content.surfaceCards[0].id}
+                href={data.content.surfaceCards[0].href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="group flex min-h-[15rem] flex-col justify-between rounded-[2rem] border border-border/70 bg-card/70 p-7 transition-colors duration-200 hover:border-foreground/25 hover:bg-card"
+            >
+                <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.surfaceCards[0].eyebrow}</p>
+                    <h2 class="mt-5 text-2xl font-medium uppercase leading-[0.95] tracking-tight text-card-foreground">{data.content.surfaceCards[0].title}</h2>
+                    <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                        {data.content.surfaceCards[0].description}
+                    </p>
+                </div>
+                <span class="mt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">{data.content.surfaceCards[0].actionLabel}</span>
+            </Links>
+
+            <Links
+                id={data.content.surfaceCards[1].id}
+                href={data.content.surfaceCards[1].href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="group flex min-h-[15rem] flex-col justify-between rounded-[2rem] border border-border/70 bg-card/70 p-7 transition-colors duration-200 hover:border-foreground/25 hover:bg-card"
+            >
+                <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.surfaceCards[1].eyebrow}</p>
+                    <h2 class="mt-5 text-2xl font-medium uppercase leading-[0.95] tracking-tight text-card-foreground">{data.content.surfaceCards[1].title}</h2>
+                    <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                        {data.content.surfaceCards[1].description}
+                    </p>
+                </div>
+                <span class="mt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">{data.content.surfaceCards[1].actionLabel}</span>
+            </Links>
+
+            <Links
+                id={data.content.surfaceCards[2].id}
+                href={data.content.surfaceCards[2].href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="group flex min-h-[15rem] flex-col justify-between rounded-[2rem] border border-border/70 bg-card/70 p-7 transition-colors duration-200 hover:border-foreground/25 hover:bg-card"
+            >
+                <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.surfaceCards[2].eyebrow}</p>
+                    <h2 class="mt-5 text-2xl font-medium uppercase leading-[0.95] tracking-tight text-card-foreground">{data.content.surfaceCards[2].title}</h2>
+                    <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                        {data.content.surfaceCards[2].description}
+                    </p>
+                </div>
+                <span class="mt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">{data.content.surfaceCards[2].actionLabel}</span>
+            </Links>
+
+            <Links
+                id={data.content.surfaceCards[3].id}
+                href={data.content.surfaceCards[3].href}
+                class="group flex min-h-[15rem] flex-col justify-between rounded-[2rem] border border-border/70 bg-card/70 p-7 transition-colors duration-200 hover:border-foreground/25 hover:bg-card"
+            >
+                <div>
+                    <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.surfaceCards[3].eyebrow}</p>
+                    <h2 class="mt-5 text-2xl font-medium uppercase leading-[0.95] tracking-tight text-card-foreground">{data.content.surfaceCards[3].title}</h2>
+                    <p class="mt-5 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                        {data.content.surfaceCards[3].description}
+                    </p>
+                </div>
+                <span class="mt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">{data.content.surfaceCards[3].actionLabel}</span>
+            </Links>
+        </div>
+
+        <div class="grid gap-10 border-t border-border pt-12 lg:grid-cols-[1.2fr_0.8fr] lg:gap-14">
+            <div>
+                <p class="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.verifiedSurface.eyebrow}</p>
+                <div class="mt-8 grid gap-6">
+                    <div class="border-l border-border pl-5 md:pl-6">
+                        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{data.content.verifiedSurface.items[0].label}</p>
+                        <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                            {data.content.verifiedSurface.items[0].description}
+                        </p>
+                    </div>
+                    <div class="border-l border-border pl-5 md:pl-6">
+                        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{data.content.verifiedSurface.items[1].label}</p>
+                        <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                            {data.content.verifiedSurface.items[1].description}
+                        </p>
+                    </div>
+                    <div class="border-l border-border pl-5 md:pl-6">
+                        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{data.content.verifiedSurface.items[2].label}</p>
+                        <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                            {data.content.verifiedSurface.items[2].description}
+                        </p>
+                    </div>
+                    <div class="border-l border-border pl-5 md:pl-6">
+                        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{data.content.verifiedSurface.items[3].label}</p>
+                        <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px] md:leading-8">
+                            {data.content.verifiedSurface.items[3].description}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-[2rem] border border-border/70 bg-card/70 p-7">
+                <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{data.content.startPaths.eyebrow}</p>
+                <div class="mt-6 space-y-5 font-mono text-sm text-foreground">
+                    <div class="border-t border-border pt-5">{data.content.startPaths.commands[0]}</div>
+                    <div class="border-t border-border pt-5">{data.content.startPaths.commands[1]}</div>
+                    <div class="border-t border-border pt-5">{data.content.startPaths.commands[2]}</div>
+                    <div class="border-t border-border pt-5">{data.content.startPaths.commands[3]}</div>
+                </div>
+                <p class="mt-6 text-sm leading-7 text-muted-foreground">
+                    {data.content.startPaths.note.before}<code>{data.content.startPaths.note.code}</code>{data.content.startPaths.note.after}
+                </p>
+            </div>
         </div>
     </section>
 </DefaultLayout>

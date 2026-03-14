@@ -1,7 +1,7 @@
 export type RouteResult =
     | { kind: "allow" }
     | { kind: "redirect"; location: string; status?: number }
-    | { kind: "deny"; status: 401 | 403 | 500; message?: string }
+    | { kind: "deny"; status: 401 | 403 | 404; message?: string }
     | { kind: "data"; data: any };
 
 export type GuardResult = Extract<RouteResult, { kind: "allow" | "redirect" | "deny" }>;
@@ -22,7 +22,7 @@ export interface RouteContext {
     };
     allow(): { kind: "allow" };
     redirect(location: string, status?: number): { kind: "redirect"; location: string; status: number };
-    deny(status: 401 | 403 | 500, message?: string): { kind: "deny"; status: 401 | 403 | 500; message?: string };
+    deny(status: 401 | 403 | 404, message?: string): { kind: "deny"; status: 401 | 403 | 404; message?: string };
     data(payload: any): { kind: "data"; data: any };
 }
 
@@ -41,6 +41,38 @@ export interface RouteProtectionPolicy {
     forbiddenPath?: string;
 }
 
+export type NavigationType = "push" | "pop";
+
+export interface NavigationLifecyclePayload {
+    navigationId: number;
+    navigationType: NavigationType;
+    to: URL | null;
+    from: URL | null;
+    routeId: string;
+    params: Record<string, string>;
+    stage: string;
+    document?: {
+        title: string;
+        hasSsrData: boolean;
+        status: number;
+    };
+    scroll?: {
+        mode: "top" | "restore" | "hash";
+        x: number;
+        y: number;
+        hash: string;
+    };
+    reason?: string;
+    hook?: string;
+    location?: string;
+    status?: number;
+    historyCommitted?: boolean;
+    error?: unknown;
+    [key: string]: unknown;
+}
+
+export type RouteEventHandler = (payload: unknown) => void | Promise<void>;
+
 export type RouteEventName =
     | "guard:start"
     | "guard:end"
@@ -48,8 +80,18 @@ export type RouteEventName =
     | "route-check:end"
     | "route-check:error"
     | "route:deny"
-    | "route:redirect";
+    | "route:redirect"
+    | "navigation:request"
+    | "navigation:before-leave"
+    | "navigation:leave-complete"
+    | "navigation:data-ready"
+    | "navigation:before-swap"
+    | "navigation:content-swapped"
+    | "navigation:before-enter"
+    | "navigation:enter-complete"
+    | "navigation:abort"
+    | "navigation:error";
 
 export declare function setRouteProtectionPolicy(policy: RouteProtectionPolicy): void;
-export declare function on(eventName: RouteEventName, handler: (payload: any) => void): void;
-export declare function off(eventName: RouteEventName, handler: (payload: any) => void): void;
+export declare function on(eventName: RouteEventName, handler: RouteEventHandler): void;
+export declare function off(eventName: RouteEventName, handler: RouteEventHandler): void;

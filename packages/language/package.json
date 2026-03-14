@@ -2,7 +2,7 @@
   "name": "@zenithbuild/language",
   "displayName": "Zenith Language Support",
   "description": "Canonical Zenith syntax highlighting, snippets, and VS Code integration",
-  "version": "0.6.17",
+  "version": "0.6.18",
   "publisher": "ZenithBuild",
   "license": "MIT",
   "private": false,
@@ -48,12 +48,13 @@
   "scripts": {
     "build": "bun run build:server && rm -rf out && mkdir -p out && bun x esbuild src/extension.ts --bundle --outfile=out/extension.cjs --external:vscode --external:vscode-languageclient/node --format=cjs --platform=node && cp ../language-server/dist/server.mjs out/server.mjs",
     "build:server": "bun run --cwd ../language-server build",
+    "package:vsix": "bun run build && node scripts/package-vsix.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.spec.mjs",
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.6.17",
+    "@zenithbuild/compiler": "0.6.18",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.11",
     "vscode-languageclient": "^9.0.1"

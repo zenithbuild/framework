@@ -14,8 +14,9 @@ const variantClasses =
     : variant === "muted"
     ? "border-border bg-muted text-muted-foreground"
     : "border-border text-muted-foreground";
+const resolvedClass = (baseClasses + " " + variantClasses + " " + className).trim();
 </script>
 
-<span class={(baseClasses + " " + variantClasses + " " + className).trim()}>
+<span class={resolvedClass}>
   <slot />
 </span>

@@ -11,7 +11,7 @@
         "title": "Contracts",
         "summary": "Normative framework contracts and invariants.",
         "order": 10,
-        "count": 20
+        "count": 21
       },
       {
         "slug": "syntax",
@@ -342,6 +342,33 @@
       ],
       "source_path": "documentation/contracts/navigation.md",
       "url": "/docs/contracts/navigation",
+      "category": "contracts",
+      "category_title": "Contracts",
+      "category_order": 10,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/navigation-lifecycle",
+      "title": "Navigation Lifecycle Contract",
+      "status": "canonical",
+      "tags": [
+        "navigation",
+        "routing",
+        "lifecycle",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/navigation-lifecycle.md",
+      "url": "/docs/contracts/navigation-lifecycle",
       "category": "contracts",
       "category_title": "Contracts",
       "category_order": 10,

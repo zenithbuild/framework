@@ -22,7 +22,7 @@ Required defaults:
 - Use canonical primitives (`state`, `signal`, `ref`) per docs.
 - Use controlled/uncontrolled prop triplets for interactive components.
 - Preserve parent scope for slot content.
-- Route protection MUST be implemented via `guard(ctx)` and `load(ctx)` exports in `<script server>` or adjacent files, returning canonical `RouteResult` types (`allow()`, `redirect()`, `deny()`, `data()`).
+- Route protection MUST be implemented via `guard(ctx)` and `load(ctx)` exports in `<script server>` or adjacent route modules, returning canonical `RouteResult` types (`allow()`, `redirect()`, `deny()`, `data()`).
 
 ## Copy-Paste System Prompt
 

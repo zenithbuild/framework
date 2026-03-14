@@ -1,4 +1,6 @@
 <script lang="ts">
+import IconButton from "./IconButton.zen";
+
 const themeToggleRef = ref<HTMLButtonElement>();
 state currentTheme = "light";
 
@@ -55,16 +57,15 @@ zenMount(() => {
 });
 </script>
 
-<button
-  ref={themeToggleRef}
+<IconButton
+  elementRef={themeToggleRef}
   type="button"
-  data-zen-theme-toggle="true"
-  aria-label={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-  aria-pressed={currentTheme === "dark" ? "true" : "false"}
-  class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-foreground transition-colors hover:border-ring hover:bg-secondary"
-  on:click={handleToggleClick}
+  ariaLabel={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+  ariaPressed={currentTheme === "dark" ? "true" : "false"}
+  class="border border-border bg-muted text-foreground hover:border-ring hover:bg-secondary"
+  onClick={handleToggleClick}
 >
   <span class="theme-icon pointer-events-none text-sm transition-transform duration-200" data-zen-theme-icon="true">
     {currentTheme === "dark" ? "🌙" : "☀️"}
   </span>
-</button>
+</IconButton>

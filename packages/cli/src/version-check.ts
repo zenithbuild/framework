@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
     readCliPackageVersion,
     readInstalledPackageVersion,
+    readWorkspacePackageVersion,
     resolveBundlerBin
 } from './toolchain-paths.js';
 
@@ -303,13 +304,27 @@ export function getBundlerVersion(bundlerBinPath: string | null | undefined): Bu
 }
 
 export function getLocalZenithVersions(
-    { projectRoot, bundlerBinPath }: { projectRoot?: string | null; bundlerBinPath?: string | null } = {}
+    {
+        projectRoot,
+        bundlerBinPath,
+        preferWorkspacePackageVersions = false
+    }: {
+        projectRoot?: string | null;
+        bundlerBinPath?: string | null;
+        preferWorkspacePackageVersions?: boolean;
+    } = {}
 ): ZenithVersions {
     const resolvedBundlerBin = bundlerBinPath || resolveBundlerBin(projectRoot ?? null);
     const bundlerVersion = getBundlerVersion(resolvedBundlerBin);
+    const readPackageVersion = (packageName: string): string | null => {
+        if (preferWorkspacePackageVersions) {
+            return readWorkspacePackageVersion(packageName) || readInstalledPackageVersion(packageName, projectRoot ?? null);
+        }
+        return readInstalledPackageVersion(packageName, projectRoot ?? null);
+    };
     const versions: ZenithVersions = {
         cli: readCliPackageVersion(),
-        projectCli: readInstalledPackageVersion('@zenithbuild/cli', projectRoot ?? null),
+        projectCli: readPackageVersion('@zenithbuild/cli'),
         core: null,
         compiler: null,
         runtime: null,
@@ -322,7 +337,7 @@ export function getLocalZenithVersions(
     };
 
     for (const [key, packageName] of PACKAGE_KEYS) {
-        versions[key] = readInstalledPackageVersion(packageName, projectRoot ?? null);
+        versions[key] = readPackageVersion(packageName);
     }
 
     versions.targetVersion = determineTargetVersion(versions);
@@ -423,7 +438,8 @@ export async function maybeWarnAboutZenithVersionMismatch(
         return { status: 'ok', issues: [], details: { targetVersion: '0.0.0', versions: {}, summary: '' } };
     }
 
-    const versions = getLocalZenithVersions({ projectRoot, bundlerBinPath });
+    const preferWorkspacePackageVersions = process.env.ZENITH_PREFER_WORKSPACE_PACKAGES === '1';
+    const versions = getLocalZenithVersions({ projectRoot, bundlerBinPath, preferWorkspacePackageVersions });
     versions.projectRoot = projectRoot ?? null;
     const result = checkCompatibility(versions);
     const onceKey = `zenith-version-check:${describeVersions(versions)}:${result.status}`;

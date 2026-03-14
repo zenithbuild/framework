@@ -1,0 +1,44 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import SectionIntro from "../SectionIntro.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+import Links from "../../ui/Links.zen";
+import Tag from "../../ui/Tag.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutHeroContent = (props as Props).content;
+</script>
+
+<SectionShell tone="red" height="auto" runway="normal">
+  <div class="flex flex-col gap-14 md:gap-18 lg:gap-24">
+    <SectionIntro
+      variant="side-note"
+      accentColor="blue"
+      eyebrow={aboutHeroContent.intro.eyebrow}
+      title={aboutHeroContent.intro.title}
+      description={aboutHeroContent.intro.description}
+      noteLabel={aboutHeroContent.intro.noteLabel}
+      noteText={aboutHeroContent.intro.noteText}
+    />
+
+    <ScrollEnterGroup variant="list" class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end xl:gap-14">
+      <div class="flex flex-wrap gap-3">
+        <Tag variant="outline">{aboutHeroContent.chips[0]}</Tag>
+        <Tag variant="outline">{aboutHeroContent.chips[1]}</Tag>
+        <Tag variant="outline">{aboutHeroContent.chips[2]}</Tag>
+      </div>
+
+      <div class="flex flex-wrap gap-4 xl:justify-end">
+        <Links surface="button" href={aboutHeroContent.actions[0].href} variant={aboutHeroContent.actions[0].variant}>
+          {aboutHeroContent.actions[0].label}
+        </Links>
+        <Links surface="button" href={aboutHeroContent.actions[1].href} variant={aboutHeroContent.actions[1].variant}>
+          {aboutHeroContent.actions[1].label}
+        </Links>
+      </div>
+    </ScrollEnterGroup>
+  </div>
+</SectionShell>

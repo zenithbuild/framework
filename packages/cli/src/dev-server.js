@@ -19,6 +19,7 @@ import { build } from './build.js';
 import { createSilentLogger } from './ui/logger.js';
 import { readChangeFingerprint } from './dev-watch.js';
 import {
+    defaultRouteDenyMessage,
     executeServerRoute,
     injectSsrPayload,
     loadRouteManifest,
@@ -94,6 +95,7 @@ export async function createDevServer(options) {
     let currentCssHref = '';
     let currentCssContent = '';
     let actualPort = port;
+    let currentRoutes = [];
 
     function _publicHost() {
         if (host === '0.0.0.0' || host === '::') {
@@ -186,6 +188,36 @@ export async function createDevServer(options) {
             return true;
         }
         return secFetchDest === 'empty';
+    }
+
+    function _isBuildSwapReadError(error) {
+        const code = typeof error?.code === 'string' ? error.code : '';
+        return code === 'ENOENT' || code === 'ENOTDIR';
+    }
+
+    function _delay(ms) {
+        return new Promise((resolveDelay) => {
+            setTimeout(resolveDelay, ms);
+        });
+    }
+
+    async function _readFileForRequest(filePath, encoding = undefined) {
+        const attempts = buildStatus === 'building' ? 200 : 1;
+        let lastError = null;
+        for (let attempt = 0; attempt < attempts; attempt += 1) {
+            try {
+                return encoding === undefined
+                    ? await readFile(filePath)
+                    : await readFile(filePath, encoding);
+            } catch (error) {
+                lastError = error;
+                if (!_isBuildSwapReadError(error) || attempt === attempts - 1) {
+                    throw error;
+                }
+                await _delay(50);
+            }
+        }
+        throw lastError;
     }
 
     function _buildNotFoundPayload(pathname, category, cause) {
@@ -341,6 +373,24 @@ export async function createDevServer(options) {
         return true;
     }
 
+    async function _loadRoutesForRequests() {
+        if (buildStatus === 'building' && Array.isArray(currentRoutes) && currentRoutes.length > 0) {
+            return currentRoutes;
+        }
+        try {
+            const routes = await loadRouteManifest(outDir);
+            if (Array.isArray(routes) && routes.length > 0) {
+                currentRoutes = routes;
+                return routes;
+            }
+        } catch (error) {
+            if (!(Array.isArray(currentRoutes) && currentRoutes.length > 0)) {
+                throw error;
+            }
+        }
+        return currentRoutes;
+    }
+
     function _broadcastEvent(type, payload = {}) {
         const eventBuildId = Number.isInteger(payload.buildId) ? payload.buildId : buildId;
         const data = JSON.stringify({
@@ -368,6 +418,7 @@ export async function createDevServer(options) {
         logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
         const initialBuild = await build({ pagesDir, outDir, config, logger });
         await _syncCssStateFromBuild(initialBuild, buildId);
+        currentRoutes = await loadRouteManifest(outDir);
         if (currentCssHref.length > 0) {
             logger.css(`ready (${currentCssHref})`, { onceKey: `css-ready:${buildId}:${currentCssHref}` });
         }
@@ -521,7 +572,7 @@ export async function createDevServer(options) {
                     return;
                 }
 
-                const routes = await loadRouteManifest(outDir);
+                const routes = await _loadRoutesForRequests();
                 const resolvedCheck = resolveRequestRoute(targetUrl, routes);
                 if (!resolvedCheck.matched || !resolvedCheck.route) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -584,14 +635,14 @@ export async function createDevServer(options) {
                 const assetPath = join(outDir, pathname);
                 resolvedPathFor404 = assetPath;
                 staticRootFor404 = outDir;
-                const asset = await readFile(assetPath);
+                const asset = await _readFileForRequest(assetPath);
                 const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
                 res.writeHead(200, { 'Content-Type': mime });
                 res.end(asset);
                 return;
             }
 
-            const routes = await loadRouteManifest(outDir);
+            const routes = await _loadRoutesForRequests();
             const resolved = resolveRequestRoute(url, routes);
             let filePath = null;
 
@@ -661,7 +712,7 @@ export async function createDevServer(options) {
                 if (result && result.kind === 'deny') {
                     const status = Number.isInteger(result.status) ? result.status : 403;
                     res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-                    res.end(result.message || (status === 401 ? 'Unauthorized' : 'Forbidden'));
+                    res.end(result.message || defaultRouteDenyMessage(status));
                     return;
                 }
                 if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
@@ -669,7 +720,7 @@ export async function createDevServer(options) {
                 }
             }
 
-            let content = await readFile(filePath, 'utf8');
+            let content = await _readFileForRequest(filePath, 'utf8');
             if (ssrPayload) {
                 content = injectSsrPayload(content, ssrPayload);
             }
@@ -800,6 +851,7 @@ export async function createDevServer(options) {
             try {
                 const buildResult = await build({ pagesDir, outDir, config, logger });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
+                currentRoutes = await loadRouteManifest(outDir);
                 const cssChanged = cssReady && (
                     currentCssAssetPath !== previousCssAssetPath ||
                     currentCssContent !== previousCssContent

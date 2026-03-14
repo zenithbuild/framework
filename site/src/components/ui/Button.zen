@@ -14,17 +14,23 @@ export interface Props {
   ariaControls?: string;
   ariaExpanded?: string;
   ariaPressed?: string;
+  dataActive?: string;
   onPress?: (event: MouseEvent) => void;
   onClick?: (event: MouseEvent) => void;
+  onHoverIn?: (event: PointerEvent) => void;
+  onHoverOut?: (event: PointerEvent) => void;
+  onFocus?: (event: FocusEvent) => void;
+  onBlur?: (event: FocusEvent) => void;
   elementRef?: any;
   class?: string;
+  contentClass?: string;
 }
 
 const incoming = props as Props;
-const hrefValue = typeof incoming.href === "string" ? incoming.href.trim() : "";
-const targetValue = typeof incoming.target === "string" ? incoming.target : "";
-const relValue = typeof incoming.rel === "string" ? incoming.rel : "";
-const variant =
+const buttonHrefValue = typeof incoming.href === "string" ? incoming.href.trim() : "";
+const buttonTargetValue = typeof incoming.target === "string" ? incoming.target : "";
+const buttonRelValue = typeof incoming.rel === "string" ? incoming.rel : "";
+const buttonVariant =
   incoming.variant === "secondary"
     ? "secondary"
     : incoming.variant === "outline"
@@ -32,20 +38,22 @@ const variant =
     : incoming.variant === "ghost"
     ? "ghost"
     : "primary";
-const size = incoming.size === "sm" ? "sm" : incoming.size === "lg" ? "lg" : "md";
-const className = typeof incoming.class === "string" ? incoming.class : "";
-const disabledValue = incoming.disabled === true;
-const buttonType = typeof incoming.type === "string" && incoming.type.length > 0 ? incoming.type : "button";
-const ariaLabelValue = typeof incoming.ariaLabel === "string" ? incoming.ariaLabel : undefined;
-const ariaControlsValue = typeof incoming.ariaControls === "string" ? incoming.ariaControls : undefined;
-const ariaExpandedValue = typeof incoming.ariaExpanded === "string" ? incoming.ariaExpanded : undefined;
-const ariaPressedValue = typeof incoming.ariaPressed === "string" ? incoming.ariaPressed : undefined;
-const hasHref = hrefValue.length > 0;
-const ariaDisabled = disabledValue ? "true" : undefined;
+const buttonSize = incoming.size === "sm" ? "sm" : incoming.size === "lg" ? "lg" : "md";
+const buttonClassName = typeof incoming.class === "string" ? incoming.class : "";
+const buttonContentClassName = typeof incoming.contentClass === "string" ? incoming.contentClass : "";
+const buttonDisabledValue = incoming.disabled === true;
+const buttonControlType = typeof incoming.type === "string" && incoming.type.length > 0 ? incoming.type : "button";
+const buttonAriaLabelValue = typeof incoming.ariaLabel === "string" ? incoming.ariaLabel : undefined;
+const buttonAriaControlsValue = typeof incoming.ariaControls === "string" ? incoming.ariaControls : undefined;
+const buttonAriaExpandedValue = typeof incoming.ariaExpanded === "string" ? incoming.ariaExpanded : undefined;
+const buttonAriaPressedValue = typeof incoming.ariaPressed === "string" ? incoming.ariaPressed : undefined;
+const buttonDataActiveValue = typeof incoming.dataActive === "string" ? incoming.dataActive : undefined;
+const buttonHasHref = buttonHrefValue.length > 0;
+const buttonAriaDisabled = buttonDisabledValue ? "true" : undefined;
 
 const forwardedElementRef = incoming.elementRef;
 const rootRef = ref<HTMLButtonElement>();
-const overlayRef = ref<HTMLSpanElement>();
+const buttonOverlayRef = ref<HTMLSpanElement>();
 
 const baseClass = "group relative isolate overflow-hidden inline-flex items-center justify-center rounded-full border font-mono uppercase tracking-[0.18em] transition-colors duration-200";
 const variantClassesMap: Record<string, string> = {
@@ -66,21 +74,24 @@ const overlayClassesMap: Record<string, string> = {
   ghost: "bg-primary/10 dark:bg-primary/15",
 };
 
-const resolvedClass = twMerge(
+const buttonResolvedClass = twMerge(
   baseClass,
-  variantClassesMap[variant] ? variantClassesMap[variant] : variantClassesMap.primary,
-  sizeClassesMap[size] ? sizeClassesMap[size] : sizeClassesMap.md,
-  className
+  variantClassesMap[buttonVariant] ? variantClassesMap[buttonVariant] : variantClassesMap.primary,
+  sizeClassesMap[buttonSize] ? sizeClassesMap[buttonSize] : sizeClassesMap.md,
+  buttonClassName
 );
-const overlayClass = overlayClassesMap[variant] ? overlayClassesMap[variant] : overlayClassesMap.primary;
-const clickHandler =
+const buttonOverlayClass = overlayClassesMap[buttonVariant] ? overlayClassesMap[buttonVariant] : overlayClassesMap.primary;
+const buttonClickHandler =
   typeof incoming.onPress === "function"
     ? incoming.onPress
     : typeof incoming.onClick === "function"
     ? incoming.onClick
     : undefined;
-const rootRefValue = forwardedElementRef ? forwardedElementRef : rootRef;
-const roleValue = hasHref ? "link" : undefined;
+const buttonHoverInHandler = typeof incoming.onHoverIn === "function" ? incoming.onHoverIn : undefined;
+const buttonHoverOutHandler = typeof incoming.onHoverOut === "function" ? incoming.onHoverOut : undefined;
+const buttonFocusHandler = typeof incoming.onFocus === "function" ? incoming.onFocus : undefined;
+const buttonBlurHandler = typeof incoming.onBlur === "function" ? incoming.onBlur : undefined;
+const buttonRoleValue = buttonHasHref ? "link" : undefined;
 
 function getRootElement() {
   if (forwardedElementRef && forwardedElementRef.current) {
@@ -115,8 +126,8 @@ function edgeState(direction: string) {
 }
 
 function animateOverlayIn(event: PointerEvent) {
-  if (disabledValue) return;
-  const overlay = overlayRef.current;
+  if (buttonDisabledValue) return;
+  const overlay = buttonOverlayRef.current;
   const root = getRootElement();
   if (!overlay || !root) return;
   const nextState = edgeState(resolveDirection(event, root));
@@ -132,8 +143,8 @@ function animateOverlayIn(event: PointerEvent) {
 }
 
 function animateOverlayOut(event: PointerEvent) {
-  if (disabledValue) return;
-  const overlay = overlayRef.current;
+  if (buttonDisabledValue) return;
+  const overlay = buttonOverlayRef.current;
   const root = getRootElement();
   if (!overlay || !root) return;
   const nextState = edgeState(resolveDirection(event, root));
@@ -148,53 +159,93 @@ function animateOverlayOut(event: PointerEvent) {
   });
 }
 
+function handleHoverIn(event: PointerEvent) {
+  animateOverlayIn(event);
+  if (typeof buttonHoverInHandler === "function") {
+    buttonHoverInHandler(event);
+  }
+}
+
+function handleHoverOut(event: PointerEvent) {
+  animateOverlayOut(event);
+  if (typeof buttonHoverOutHandler === "function") {
+    buttonHoverOutHandler(event);
+  }
+}
+
+function handleFocus(event: FocusEvent) {
+  if (typeof buttonFocusHandler === "function") {
+    buttonFocusHandler(event);
+  }
+}
+
+function handleBlur(event: FocusEvent) {
+  if (typeof buttonBlurHandler === "function") {
+    buttonBlurHandler(event);
+  }
+}
+
 function navigateToHref(event: MouseEvent) {
-  if (!hasHref || event.defaultPrevented) return;
+  if (!buttonHasHref || event.defaultPrevented) return;
   const win = zenWindow();
   if (!win) return;
-  const openInNewTab = targetValue === "_blank" || event.metaKey || event.ctrlKey;
+  const openInNewTab = buttonTargetValue === "_blank" || event.metaKey || event.ctrlKey;
   if (openInNewTab) {
-    win.open(hrefValue, "_blank", relValue.includes("noreferrer") ? "noreferrer" : "noopener");
+    win.open(buttonHrefValue, "_blank", buttonRelValue.includes("noreferrer") ? "noreferrer" : "noopener");
     return;
   }
-  win.location.href = hrefValue;
+  win.location.href = buttonHrefValue;
 }
 
 function handleClick(event: MouseEvent) {
-  if (disabledValue) {
+  if (buttonDisabledValue) {
     event.preventDefault();
     return;
   }
-  if (typeof clickHandler === "function") {
-    clickHandler(event);
+  if (typeof buttonClickHandler === "function") {
+    buttonClickHandler(event);
   }
   navigateToHref(event);
 }
+
+zenMount((ctx) => {
+  if (forwardedElementRef) {
+    forwardedElementRef.current = rootRef.current;
+  }
+
+  ctx.cleanup(() => {
+    if (forwardedElementRef) {
+      forwardedElementRef.current = null;
+    }
+  });
+});
 </script>
 
 <button
-  ref={rootRefValue}
+  ref={rootRef}
   data-zen-btn
-  data-zen-link={hasHref ? "true" : undefined}
-  type={buttonType}
-  role={roleValue}
-  disabled={disabledValue ? true : undefined}
-  class={resolvedClass}
-  aria-label={ariaLabelValue}
-  aria-controls={ariaControlsValue}
-  aria-expanded={ariaExpandedValue}
-  aria-pressed={ariaPressedValue}
-  aria-disabled={ariaDisabled}
+  data-active={buttonDataActiveValue}
+  type={buttonControlType}
+  role={buttonRoleValue}
+  disabled={buttonDisabledValue ? true : undefined}
+  class={buttonResolvedClass}
+  aria-label={buttonAriaLabelValue}
+  aria-controls={buttonAriaControlsValue}
+  aria-expanded={buttonAriaExpandedValue}
+  aria-pressed={buttonAriaPressedValue}
+  aria-disabled={buttonAriaDisabled}
   on:click={handleClick}
-  on:hoverin={animateOverlayIn}
-  on:hoverout={animateOverlayOut}
+  on:hoverin={handleHoverIn}
+  on:hoverout={handleHoverOut}
+  on:focus={handleFocus}
+  on:blur={handleBlur}
 >
   <span
-    ref={overlayRef}
+    ref={buttonOverlayRef}
     aria-hidden="true"
     data-zen-btn-overlay
-    class={"pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform " + overlayClass}
+    class={"pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform " + buttonOverlayClass}
     style="transform: scaleY(0); transform-origin: 50% 100%;"
   ></span>
-  <span class="relative z-10"><slot /></span>
+  <span class={`relative z-10 ${buttonContentClassName}`.trim()}><slot /></span>
 </button>

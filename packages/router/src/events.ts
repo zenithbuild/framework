@@ -17,11 +17,13 @@ type RouteChangeDetail = {
 };
 
 type RouteProtectionPolicy = {
-    beforeResolve?: boolean;
-    emitRedirects?: boolean;
+    onDeny?: 'stay' | 'redirect' | 'render403' | ((ctx: any) => void);
+    defaultLoginPath?: string;
+    deny401RedirectToLogin?: boolean;
+    forbiddenPath?: string;
 };
 
-type RouteEventHandler = (payload: unknown) => void;
+type RouteEventHandler = (payload: unknown) => void | Promise<void>;
 type RouteEventListeners = Record<string, Set<RouteEventHandler>>;
 type RouteProtectionScope = typeof globalThis & {
     __zenith_route_protection_policy?: RouteProtectionPolicy;
@@ -61,7 +63,17 @@ const ROUTE_EVENT_NAMES = [
     'route-check:end',
     'route-check:error',
     'route:deny',
-    'route:redirect'
+    'route:redirect',
+    'navigation:request',
+    'navigation:before-leave',
+    'navigation:leave-complete',
+    'navigation:data-ready',
+    'navigation:before-swap',
+    'navigation:content-swapped',
+    'navigation:before-enter',
+    'navigation:enter-complete',
+    'navigation:abort',
+    'navigation:error'
 ] as const;
 
 function getRouteProtectionScope(): RouteProtectionScope {
@@ -118,6 +130,31 @@ export function off(eventName: string, handler: RouteEventHandler): void {
     }
 }
 
+function dispatchRouteEventError(eventName: string, payload: unknown, error: unknown): void {
+    console.error(`[Zenith Router] Error in ${eventName} listener:`, error);
+    if (
+        eventName === 'navigation:error' ||
+        !payload ||
+        typeof payload !== 'object' ||
+        typeof (payload as Record<string, unknown>).navigationId !== 'number'
+    ) {
+        return;
+    }
+
+    _dispatchRouteEvent('navigation:error', {
+        navigationId: (payload as Record<string, unknown>).navigationId,
+        navigationType: (payload as Record<string, unknown>).navigationType,
+        to: (payload as Record<string, unknown>).to,
+        from: (payload as Record<string, unknown>).from,
+        routeId: (payload as Record<string, unknown>).routeId,
+        params: (payload as Record<string, unknown>).params,
+        stage: (payload as Record<string, unknown>).stage ?? 'listener',
+        reason: 'listener-error',
+        hook: eventName,
+        error
+    });
+}
+
 export function _dispatchRouteEvent(eventName: string, payload: unknown): void {
     const eventListeners = ensureRouteProtectionState().listeners[eventName];
     if (!(eventListeners instanceof Set)) {
@@ -126,9 +163,39 @@ export function _dispatchRouteEvent(eventName: string, payload: unknown): void {
 
     for (const handler of eventListeners) {
         try {
-            handler(payload);
+            const result = handler(payload);
+            if (result && typeof (result as Promise<unknown>).catch === 'function') {
+                (result as Promise<unknown>).catch((error) => {
+                    dispatchRouteEventError(eventName, payload, error);
+                });
+            }
         } catch (error) {
-            console.error(`[Zenith Router] Error in ${eventName} listener:`, error);
+            dispatchRouteEventError(eventName, payload, error);
+        }
+    }
+}
+
+export async function _dispatchRouteEventAsync(eventName: string, payload: unknown): Promise<void> {
+    const eventListeners = ensureRouteProtectionState().listeners[eventName];
+    if (!(eventListeners instanceof Set)) {
+        return;
+    }
+
+    const handlers = Array.from(eventListeners);
+    for (const handler of handlers) {
+        try {
+            await handler(payload);
+        } catch (error) {
+            dispatchRouteEventError(eventName, payload, error);
+        }
+    }
+}
+
+export function _clearRouteEventListeners(): void {
+    const listeners = ensureRouteProtectionState().listeners;
+    for (const eventName of Object.keys(listeners)) {
+        if (listeners[eventName] instanceof Set) {
+            listeners[eventName].clear();
         }
     }
 }

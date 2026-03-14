@@ -160,27 +160,71 @@ fn emitted_router_and_runtime_follow_template_contract() {
     let runtime_source = fs::read_to_string(&runtime_path).expect("read runtime asset");
 
     let click_start = router_source
-        .find("document.addEventListener('click'")
+        .find("document.addEventListener(\"click\"")
         .expect("router click handler missing");
     let prevent_default = router_source
         .find("event.preventDefault();")
         .expect("preventDefault missing in click flow");
-    let evaluate_guard = router_source
-        .find("evaluateServerGuard(nextPath, url,")
-        .expect("evaluateServerGuard missing in click flow");
-    let navigate = router_source
-        .find("navigate(nextPath, url)")
-        .expect("navigate call missing in click flow");
+    let perform_navigation = router_source
+        .find("performNavigation(targetUrl, \"push\", null)")
+        .expect("performNavigation missing in click flow");
+    let fetch_document = router_source
+        .find("fetch(targetUrl.href")
+        .expect("fresh document fetch missing in router");
+    let before_leave = router_source
+        .find("await emitNavigationEvent(context, \"navigation:before-leave\"")
+        .expect("navigation:before-leave missing in router");
+    let before_swap = router_source
+        .find("await emitNavigationEvent(context, \"navigation:before-swap\"")
+        .expect("navigation:before-swap missing in router");
+    let before_enter = router_source
+        .find("await emitNavigationEvent(context, \"navigation:before-enter\"")
+        .expect("navigation:before-enter missing in router");
+    let enter_complete = router_source
+        .find("emitNavigationEvent(context, \"navigation:enter-complete\"")
+        .expect("navigation:enter-complete missing in router");
+    let mount_idx = router_source
+        .find("const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);")
+        .expect("mountRoute missing in router");
+    let scroll_apply = router_source
+        .find("dispatchScrollEvent(\"apply\"")
+        .expect("scroll apply missing in router");
 
     assert!(
-        click_start <= evaluate_guard
-            && evaluate_guard < prevent_default
-            && prevent_default < navigate,
+        click_start < prevent_default && prevent_default < perform_navigation,
         "router click contract ordering violated"
+    );
+    assert!(
+        router_source.contains("history.pushState("),
+        "router must push history on successful forward navigation"
+    );
+    assert!(
+        router_source.contains("history.replaceState("),
+        "router must replace history state for initial/popstate bookkeeping"
+    );
+    assert!(
+        router_source.contains("encodeURIComponent(toNavigationPath(targetUrl))"),
+        "route-check requests must include pathname plus query string"
+    );
+    assert!(
+        router_source.contains("const __ZENITH_RUNTIME_ROUTE_HTML_KEY = \"__zenith_route_html\";"),
+        "router must expose the runtime route HTML override channel"
+    );
+    assert!(
+        fetch_document != usize::MAX,
+        "router must fetch the target document inside the emitted runtime"
     );
     assert!(
         router_source.contains("import(__ZENITH_MANIFEST__.chunks[route])"),
         "router must use manifest-driven dynamic import shape"
+    );
+    assert!(
+        before_leave < before_swap &&
+        before_swap < mount_idx &&
+        mount_idx < scroll_apply &&
+        scroll_apply < before_enter &&
+        before_enter < enter_complete,
+        "router lifecycle ordering violated"
     );
 
     for (label, source) in [("router", &router_source), ("runtime", &runtime_source)] {

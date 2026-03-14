@@ -1,0 +1,86 @@
+<script lang="ts">
+import SectionShell from "../SectionShell.zen";
+import ScrollEnterGroup from "../ScrollEnterGroup.zen";
+
+interface Props {
+  content: any;
+}
+
+const aboutPhilosophyContent = (props as Props).content;
+</script>
+
+<SectionShell tone="muted" height="auto" runway="normal">
+  <div class="flex flex-col gap-14 md:gap-18 lg:gap-24">
+    <ScrollEnterGroup variant="list" class="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:items-end xl:gap-14">
+      <div class="min-w-0">
+        <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">{aboutPhilosophyContent.intro.eyebrow}</p>
+        <h2 class="mt-6 font-display text-[clamp(3rem,6vw,5.4rem)] font-semibold uppercase leading-[0.88] tracking-tight text-foreground">{aboutPhilosophyContent.intro.title}</h2>
+      </div>
+
+      <div class="min-w-0 rounded-[1.9rem] border border-border/80 bg-card/55 p-6 md:p-7">
+        <p class="text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{aboutPhilosophyContent.intro.description}</p>
+      </div>
+    </ScrollEnterGroup>
+
+    <ScrollEnterGroup variant="frame" class="relative isolate overflow-hidden rounded-[2.25rem] border border-border bg-card/70">
+      <div data-enter-skip="true" class="pointer-events-none absolute right-8 top-8 hidden h-px w-24 bg-brand-purple/70 xl:block"></div>
+      <div data-enter-skip="true" class="pointer-events-none absolute -left-14 bottom-10 hidden h-36 w-36 rounded-full border border-surface-border-purple/60 xl:block"></div>
+
+      <div class="grid gap-10 px-6 py-8 md:px-8 md:py-10 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] xl:gap-14 xl:px-10">
+        <div class="min-w-0">
+          <p class="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground">{aboutPhilosophyContent.manifesto.label}</p>
+          <h3 class="mt-5 font-display text-[clamp(2rem,4.2vw,3.25rem)] leading-[0.9] tracking-tight text-foreground">{aboutPhilosophyContent.manifesto.title}</h3>
+          <p class="mt-5 max-w-xl text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.manifesto.text}</p>
+          <p class="mt-6 max-w-lg text-sm leading-7 text-muted-foreground/85 md:text-[15px]">{aboutPhilosophyContent.manifesto.support}</p>
+        </div>
+
+        <div class="min-w-0">
+          <article class="grid gap-4 border-t border-border/80 py-5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">01</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.55rem] leading-none tracking-tight text-foreground">{aboutPhilosophyContent.pillars[0].title}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.pillars[0].description}</p>
+              <p class="mt-4 text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutPhilosophyContent.pillars[0].support}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-4 border-t border-border/80 py-5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">02</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.55rem] leading-none tracking-tight text-foreground">{aboutPhilosophyContent.pillars[1].title}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.pillars[1].description}</p>
+              <p class="mt-4 text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutPhilosophyContent.pillars[1].support}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-4 border-t border-border/80 py-5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">03</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.55rem] leading-none tracking-tight text-foreground">{aboutPhilosophyContent.pillars[2].title}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.pillars[2].description}</p>
+              <p class="mt-4 text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutPhilosophyContent.pillars[2].support}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-4 border-t border-border/80 py-5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">04</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.55rem] leading-none tracking-tight text-foreground">{aboutPhilosophyContent.pillars[3].title}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.pillars[3].description}</p>
+              <p class="mt-4 text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutPhilosophyContent.pillars[3].support}</p>
+            </div>
+          </article>
+
+          <article class="grid gap-4 border-y border-border/80 py-5 md:grid-cols-[3rem_minmax(0,1fr)] md:gap-5">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">05</p>
+            <div class="min-w-0">
+              <h3 class="font-display text-[1.55rem] leading-none tracking-tight text-foreground">{aboutPhilosophyContent.pillars[4].title}</h3>
+              <p class="mt-3 text-sm leading-7 text-muted-foreground md:text-[15px]">{aboutPhilosophyContent.pillars[4].description}</p>
+              <p class="mt-4 text-xs leading-6 uppercase tracking-[0.16em] text-muted-foreground/80">{aboutPhilosophyContent.pillars[4].support}</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </ScrollEnterGroup>
+  </div>
+</SectionShell>

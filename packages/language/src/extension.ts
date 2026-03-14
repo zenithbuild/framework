@@ -1,6 +1,6 @@
 import path from 'node:path';
 import * as vscode from 'vscode';
-import { LanguageClient, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
+import { LanguageClient, TransportKind, type LanguageClientOptions, type ServerOptions } from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
 
@@ -26,14 +26,13 @@ async function startLanguageClient(context: vscode.ExtensionContext): Promise<vo
   const serverPath = getConfiguredServerPath(context);
   const serverOptions: ServerOptions = {
     run: {
-      command: process.execPath,
-      args: [serverPath, '--stdio'],
-      options: { env: process.env }
+      module: serverPath,
+      transport: TransportKind.stdio
     },
     debug: {
-      command: process.execPath,
-      args: ['--inspect=6010', serverPath, '--stdio'],
-      options: { env: process.env }
+      module: serverPath,
+      transport: TransportKind.stdio,
+      options: { execArgv: ['--inspect=6010'] }
     }
   };
 
@@ -58,11 +57,7 @@ async function restartLanguageClient(context: vscode.ExtensionContext): Promise<
   await startLanguageClient(context);
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-  void startLanguageClient(context).catch((error: unknown) => {
-    void vscode.window.showErrorMessage(`Zenith: failed to start language server: ${String(error)}`);
-  });
-
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   context.subscriptions.push(
     vscode.commands.registerCommand('zenith.restartServer', async () => {
       await restartLanguageClient(context);
@@ -78,6 +73,13 @@ export function activate(context: vscode.ExtensionContext): void {
       await restartLanguageClient(context);
     })
   );
+
+  try {
+    await startLanguageClient(context);
+  } catch (error: unknown) {
+    void vscode.window.showErrorMessage(`Zenith: failed to start language server: ${String(error)}`);
+    throw error;
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {

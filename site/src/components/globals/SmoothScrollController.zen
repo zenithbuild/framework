@@ -1,0 +1,171 @@
+<script lang="ts">
+import Lenis from "lenis";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+type SmoothScrollProfile = "default" | "focus";
+type RouterScrollPhase = "before" | "apply" | "after";
+const SMOOTH_SCROLL_PROFILE_EVENT = "zx-smooth-scroll-profile";
+const ROUTER_SCROLL_EVENT = "zx-router-scroll";
+
+let activeLenis: Lenis | null = null;
+let activeCleanup: (() => void) | null = null;
+
+function isTouchViewport(win: Window) {
+  if (typeof win.matchMedia !== "function") {
+    return false;
+  }
+
+  return win.matchMedia("(pointer: coarse)").matches || win.matchMedia("(hover: none)").matches;
+}
+
+function resolveProfile(event: Event): SmoothScrollProfile {
+  if (!(event instanceof CustomEvent)) return "default";
+  return event.detail?.profile === "focus" ? "focus" : "default";
+}
+
+function resolveRouterScrollPhase(event: Event): RouterScrollPhase | "" {
+  if (!(event instanceof CustomEvent)) return "";
+  const phase = event.detail?.phase;
+  if (phase === "before" || phase === "apply" || phase === "after") {
+    return phase;
+  }
+  return "";
+}
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const doc = zenDocument();
+  if (!win || !doc) return;
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  const reducedMotionQuery = typeof win.matchMedia === "function"
+    ? win.matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
+  let destroyed = false;
+
+  function clearActiveInstance() {
+    activeCleanup?.();
+    activeCleanup = null;
+    activeLenis = null;
+  }
+
+  function createLenisInstance() {
+    clearActiveInstance();
+
+    if (reducedMotionQuery?.matches) {
+      ScrollTrigger.refresh();
+      return;
+    }
+
+    if (destroyed) return;
+
+    const touchViewport = isTouchViewport(win);
+    const defaultLerp = touchViewport ? 0.085 : 0.082;
+    const defaultWheelMultiplier = touchViewport ? 1 : 0.82;
+    const focusLerp = touchViewport ? 0.085 : 0.062;
+    const focusWheelMultiplier = touchViewport ? 1 : 0.68;
+    const lenis = new Lenis({
+      autoRaf: false,
+      smoothWheel: true,
+      syncTouch: false,
+      lerp: defaultLerp,
+      wheelMultiplier: defaultWheelMultiplier,
+      touchMultiplier: 1,
+      overscroll: true,
+      autoResize: true,
+      allowNestedScroll: true,
+      virtualScroll: () => {
+        const body = doc.body;
+        if (body?.style.overflow === "hidden") return false;
+        return true;
+      },
+    });
+
+    const setProfile = (profile: SmoothScrollProfile) => {
+      lenis.options.lerp = profile === "focus" ? focusLerp : defaultLerp;
+      lenis.options.wheelMultiplier = profile === "focus" ? focusWheelMultiplier : defaultWheelMultiplier;
+    };
+
+    const offScroll = lenis.on("scroll", () => ScrollTrigger.update());
+    const offProfile = zenOn(doc, SMOOTH_SCROLL_PROFILE_EVENT, ((event: Event) => {
+      setProfile(resolveProfile(event));
+    }) as EventListener);
+    const offRouterScroll = zenOn(doc, ROUTER_SCROLL_EVENT, ((event: Event) => {
+      const phase = resolveRouterScrollPhase(event);
+      if (!phase) return;
+
+      if (phase === "before") {
+        if (typeof lenis.stop === "function") {
+          lenis.stop();
+        }
+        return;
+      }
+
+      if (phase === "apply") {
+        if (!(event instanceof CustomEvent)) return;
+        const detail = event.detail || {};
+        const nextX = typeof detail.x === "number" ? detail.x : 0;
+        const nextY = typeof detail.y === "number" ? detail.y : 0;
+        if (typeof lenis.scrollTo === "function") {
+          lenis.scrollTo(nextY, { immediate: true, force: true });
+          if (typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+        } else if (typeof win.scrollTo === "function") {
+          win.scrollTo(nextX, nextY);
+          if (typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+        }
+        return;
+      }
+
+      if (typeof lenis.resize === "function") {
+        lenis.resize();
+      }
+      ScrollTrigger.refresh();
+      if (typeof lenis.start === "function") {
+        lenis.start();
+      }
+    }) as EventListener);
+    const tick = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+
+    gsap.ticker.add(tick);
+    gsap.ticker.lagSmoothing(0);
+    ScrollTrigger.refresh();
+
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      offScroll();
+      offProfile();
+      offRouterScroll();
+      gsap.ticker.remove(tick);
+      lenis.destroy();
+      ScrollTrigger.update();
+    };
+
+    activeLenis = lenis;
+    activeCleanup = dispose;
+  }
+
+  createLenisInstance();
+
+  const offReducedMotion = reducedMotionQuery
+    ? zenOn(reducedMotionQuery, "change", () => {
+        createLenisInstance();
+      })
+    : () => {};
+
+  ctx.cleanup(() => {
+    destroyed = true;
+    offReducedMotion();
+    clearActiveInstance();
+  });
+});
+</script>

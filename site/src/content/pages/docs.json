@@ -1,0 +1,83 @@
+{
+  "pageTitle": "Docs",
+  "description": "Canonical Zenith documentation, install flow, editor tooling, and release surfaces.",
+  "intro": {
+    "eyebrow": "Documentation",
+    "title": "COMPILER TRUTH. PUBLIC SURFACES.",
+    "description": "The public site now reflects the merged editor and runtime work directly: canonical docs links, visible release notes, verified editor support, and install paths that stay aligned with the current train line."
+  },
+  "chips": [
+    "VS Code packaged flow verified",
+    "Neovim LSP verified",
+    "ZEN-DOM quick fixes live"
+  ],
+  "surfaceCards": [
+    {
+      "id": "editor-contract",
+      "eyebrow": "@zenithbuild/language + @zenithbuild/language-server",
+      "title": "Editor Integration Contract",
+      "description": "Compiler-backed diagnostics, first ZEN-DOM quick fixes, canonical hovers, completions, and the verified VS Code and Neovim paths.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/documentation/contracts/editor-integration.md",
+      "actionLabel": "Open source doc"
+    },
+    {
+      "id": "install-compatibility",
+      "eyebrow": "Stable install path",
+      "title": "Install Compatibility",
+      "description": "Stable and beta install guarantees, scaffolding expectations, and the clean-room contract for create-zenith.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/documentation/install-compatibility.md",
+      "actionLabel": "Open source doc"
+    },
+    {
+      "id": "dom-environment",
+      "eyebrow": "Runtime authoring contract",
+      "title": "DOM and Environment",
+      "description": "Canonical refs, zenWindow, zenDocument, zenOn, zenResize, and collectRefs guidance for authored .zen code.",
+      "href": "https://github.com/zenithbuild/framework/blob/master/docs/documentation/reactivity/dom-and-environment.md",
+      "actionLabel": "Open source doc"
+    },
+    {
+      "id": "release-notes",
+      "eyebrow": "Docs changelog surfaced here",
+      "title": "Release Notes",
+      "description": "Site-facing release notes for the merged framework and language-tooling work through v0.6.18.",
+      "href": "/blog",
+      "actionLabel": "Open site page"
+    }
+  ],
+  "verifiedSurface": {
+    "eyebrow": "Verified editor surface",
+    "items": [
+      {
+        "label": "01",
+        "description": "Compiler-backed script-boundary and event diagnostics now flow through the language server instead of collapsing into a generic error bucket."
+      },
+      {
+        "label": "02",
+        "description": "ZEN-DOM-QUERY, ZEN-DOM-LISTENER, and ZEN-DOM-WRAPPER ship first-party quick fixes keyed off stable compiler codes."
+      },
+      {
+        "label": "03",
+        "description": "Canonical hover and completion entries now cover Zenith primitives plus documented on:* aliases and event attributes."
+      },
+      {
+        "label": "04",
+        "description": "The bundled VS Code-compatible extension path and direct Neovim LSP path were both verified against the same server behavior."
+      }
+    ]
+  },
+  "startPaths": {
+    "eyebrow": "Canonical start paths",
+    "commands": [
+      "npx create-zenith@latest my-app",
+      "npm i -g @zenithbuild/language-server",
+      "bun run --cwd packages/language build",
+      "bun run --cwd packages/language package:vsix"
+    ],
+    "note": {
+      "code": "@latest",
+      "before": "",
+      "after": " remains the public scaffold entry. The docs changelog below records the merged framework and editor batches independently of that install shorthand."
+    }
+  }
+}

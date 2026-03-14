@@ -1,9 +1,14 @@
 <script lang="ts">
 import Button from "./Button.zen";
+import Links from "./Links.zen";
 import ZenithLogo from "./ZenithLogo.zen";
 import ThemeToggle from "./ThemeToggle.zen";
 import { gsap } from "gsap";
 import { SplitText } from "gsap/SplitText";
+
+interface Props {
+  content: any;
+}
 
 const isOpen = signal(false);
 let isAnimating = false;
@@ -18,6 +23,7 @@ const toggleBtn = ref<HTMLButtonElement>();
 const toggleLabel = ref<HTMLSpanElement>();
 
 const linkHome = ref<HTMLAnchorElement>();
+const linkAbout = ref<HTMLAnchorElement>();
 const linkDocs = ref<HTMLAnchorElement>();
 const linkBlog = ref<HTMLAnchorElement>();
 const linkGitHub = ref<HTMLAnchorElement>();
@@ -35,6 +41,30 @@ let splitFooter: SplitText | null = null;
 
 let linkChars: HTMLElement[] | Element[] = [];
 let footerLines: HTMLElement[] | Element[] = [];
+const navigationContent = (props as Props).content;
+const navigationMainLinks = Array.isArray(navigationContent.mainLinks) ? navigationContent.mainLinks : [];
+const navigationFooterLinks = Array.isArray(navigationContent.footerLinks) ? navigationContent.footerLinks : [];
+
+function findLinkByHref(links: any[], href: string, fallbackLabel: string) {
+  const foundLink = links.find((link) => link && link.href === href);
+  if (foundLink) {
+    return foundLink;
+  }
+
+  return {
+    label: fallbackLabel,
+    href,
+  };
+}
+
+const navHomeLink = findLinkByHref(navigationMainLinks, "/", "Home");
+const navAboutLink = findLinkByHref(navigationMainLinks, "/about", "About");
+const navDocsLink = findLinkByHref(navigationMainLinks, "/docs", "Docs");
+const navBlogLink = findLinkByHref(navigationMainLinks, "/blog", "Blog");
+const navGitHubLink = findLinkByHref(navigationMainLinks, "https://github.com/zenithbuild/framework", "GitHub");
+const navTwitterLink = findLinkByHref(navigationFooterLinks, "https://twitter.com/zenithbuild", "Twitter");
+const navFooterGitHubLink = findLinkByHref(navigationFooterLinks, "https://github.com/zenithbuild/framework", "GitHub");
+const navContractLink = findLinkByHref(navigationFooterLinks, "/docs#editor-contract", "Contract");
 
 function setExpanded(expanded: boolean) {
   const btn = toggleBtn.current || (toggleLabel.current ? (toggleLabel.current.closest("button") as HTMLButtonElement) : null);
@@ -183,7 +213,7 @@ function animateOpen() {
     borderRadius: m.open.r,
   });
 
-  const links = collectRefs(linkHome, linkDocs, linkBlog, linkGitHub);
+  const links = collectRefs(linkHome, linkAbout, linkDocs, linkBlog, linkGitHub);
   const footer = collectRefs(footerTwitter, footerGitHub, footerContract, footerYear);
 
   splitLinks?.revert();
@@ -310,6 +340,11 @@ function handleEscape() {
   isOpen.set(false);
 }
 
+function handleMenuLinkPress() {
+  if (!isOpen.get()) return;
+  isOpen.set(false);
+}
+
 zenMount((ctx) => {
   gsap.registerPlugin(SplitText);
   if (!shell.current || !backdrop.current || !content.current) return;
@@ -376,11 +411,11 @@ zeneffect([isOpen], () => {
     style="top: 24px; width: 50%; height: 64px; border-radius: 32px;"
   >
     <div ref={header} class="absolute top-0 left-0 flex h-16 w-full items-center justify-between px-6 z-20">
-      <a href="/" class="flex flex-shrink-0 items-center drop-shadow-sm transition-transform hover:scale-105" aria-label="Home">
+      <Links href="/" class="flex flex-shrink-0 items-center drop-shadow-sm transition-transform hover:scale-105" ariaLabel="Home">
         <div class="h-7 w-7 text-foreground">
           <ZenithLogo />
         </div>
-      </a>
+      </Links>
 
       <div class="flex items-center gap-2">
         <Button
@@ -404,20 +439,21 @@ zeneffect([isOpen], () => {
     </div>
 
     <div id="site-menu-panel" ref={content} class="absolute inset-0 pt-32 px-8 md:px-16 flex flex-col pointer-events-none" style="display: none;">
-      <div ref={linksContainer} class="flex-1 flex flex-col justify-center" style="pointer-events: none;">
+      <div ref={linksContainer} class="pointer-events-auto flex-1 flex flex-col justify-center">
         <nav class="flex flex-col space-y-4 md:space-y-6">
-          <a ref={linkHome} href="/" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Home<span class="text-primary">.</span></a>
-          <a ref={linkDocs} href="/docs" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Docs<span class="text-primary">.</span></a>
-          <a ref={linkBlog} href="/blog" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">Blog<span class="text-primary">.</span></a>
-          <a ref={linkGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">GitHub<span class="text-primary">.</span></a>
+          <Links elementRef={linkHome} href={navHomeLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navHomeLink.label}<span class="text-primary">.</span></Links>
+          <Links elementRef={linkAbout} href={navAboutLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navAboutLink.label}<span class="text-primary">.</span></Links>
+          <Links elementRef={linkDocs} href={navDocsLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navDocsLink.label}<span class="text-primary">.</span></Links>
+          <Links elementRef={linkBlog} href={navBlogLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navBlogLink.label}<span class="text-primary">.</span></Links>
+          <Links elementRef={linkGitHub} href={navGitHubLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navGitHubLink.label}<span class="text-primary">.</span></Links>
         </nav>
       </div>
 
       <div class="pb-10 md:pb-16 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
         <div class="flex flex-wrap gap-x-8 gap-y-4">
-          <a ref={footerTwitter} href="https://twitter.com/zenithbuild" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">Twitter</a>
-          <a ref={footerGitHub} href="https://github.com/zenithbuild/zenith" target="_blank" rel="noopener" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">GitHub</a>
-          <a ref={footerContract} href="/docs/zenith-contract" class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">Contract</a>
+          <Links elementRef={footerTwitter} href={navTwitterLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navTwitterLink.label}</Links>
+          <Links elementRef={footerGitHub} href={navFooterGitHubLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navFooterGitHubLink.label}</Links>
+          <Links elementRef={footerContract} href={navContractLink.href} onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navContractLink.label}</Links>
         </div>
 
         <div ref={footerYear} class="text-[10px] md:text-xs font-mono text-muted-foreground uppercase tracking-[0.15em]">

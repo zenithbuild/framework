@@ -2,32 +2,69 @@ name: Promote latest dist-tags
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Framework version to promote to latest (for example 0.6.13)
-        required: true
-        type: string
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: promote-latest
+  cancel-in-progress: false
 
 jobs:
   promote-latest:
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
-      - name: Explain npm dist-tag auth limitation
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+
+      - name: Assert master tip and read target version
         shell: bash
-        env:
-          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          echo "npm Trusted Publishing currently supports OIDC for npm publish only." >&2
-          echo "npm dist-tag add still requires traditional npm authentication, so this workflow is an approval-gated stub." >&2
-          echo "Requested version: ${VERSION}" >&2
-          echo >&2
-          echo "Run these commands manually with authenticated npm credentials after the train -> master merge is validated:" >&2
-          echo "  npm dist-tag add @zenithbuild/core@${VERSION} latest" >&2
-          echo "  npm dist-tag add @zenithbuild/cli@${VERSION} latest" >&2
-          exit 1
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "promote-latest must be run from master; got ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+          git fetch origin master train --tags
+
+          head_sha="$(git rev-parse HEAD)"
+          master_sha="$(git rev-parse origin/master)"
+
+          if [[ "$head_sha" != "$master_sha" ]]; then
+            echo "promote-latest must run against the current origin/master tip." >&2
+            echo "HEAD=${head_sha}" >&2
+            echo "origin/master=${master_sha}" >&2
+            exit 1
+          fi
+
+          train_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
+          if [[ -z "$train_version" ]]; then
+            echo "TRAIN_VERSION is empty." >&2
+            exit 1
+          fi
+
+          echo "TRAIN_VERSION=${train_version}" >> "$GITHUB_ENV"
+
+      - name: Configure npm dist-tag auth
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_DIST_TAG_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Missing required secret: NPM_DIST_TAG_TOKEN" >&2
+            exit 1
+          fi
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
+
+      - name: Promote train version to latest
+        shell: bash
+        run: ./scripts/promote-latest.sh

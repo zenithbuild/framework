@@ -1,0 +1,402 @@
+{
+  "pageTitle": "About Zenith",
+  "description": "Why Zenith exists, how its architecture and tooling fit together, who is shaping it, and how to support the work.",
+  "sections": {
+    "hero": {
+      "intro": {
+        "eyebrow": "About Zenith",
+        "title": "Built for compile-time clarity.",
+        "description": "Zenith is a compiler-first UI framework focused on predictable output, structural composition, and minimal runtime cost.",
+        "noteLabel": "Position",
+        "noteText": "Zenith is not trying to be another runtime-first framework. It is built to move more complexity into the compiler so browser output stays closer to authored intent."
+      },
+      "chips": [
+        "Compiler-first",
+        "Structural components",
+        "Predictable output"
+      ],
+      "actions": [
+        {
+          "label": "Read the docs",
+          "href": "/docs",
+          "variant": "primary"
+        },
+        {
+          "label": "Explore releases",
+          "href": "/blog",
+          "variant": "secondary"
+        }
+      ]
+    },
+    "why": {
+      "intro": {
+        "eyebrow": "Why Zenith Exists",
+        "title": "We built it because too much UI work drifts into runtime fog.",
+        "description": "Zenith exists to keep ownership, output, and browser behavior legible. The goal is not novelty. It is to remove accidental framework machinery from the critical path."
+      },
+      "items": [
+        {
+          "id": "runtime-complexity",
+          "number": "01",
+          "title": "Accidental runtime complexity",
+          "summary": "Too much work gets deferred into the browser long after the authoring decision was made.",
+          "detail": "Zenith resolves more structure and binding intent at compile time so runtime work stays narrow, explicit, and easier to reason about."
+        },
+        {
+          "id": "framework-magic",
+          "number": "02",
+          "title": "Too much framework magic",
+          "summary": "Indirection can make composition feel productive while making emitted output harder to trust.",
+          "detail": "Zenith keeps the compiler honest about what each component contributes. It does not rely on hidden component-owned runtime islands to make composition work."
+        },
+        {
+          "id": "ownership",
+          "number": "03",
+          "title": "Ownership should survive composition",
+          "summary": "Reactive ownership and slot scope should not become ambiguous when structure gets deeper.",
+          "detail": "Zenith treats components as structural composition boundaries. Slot content retains parent ownership, and compiler/runtime contracts are enforced around that rule."
+        },
+        {
+          "id": "output",
+          "number": "04",
+          "title": "Browsers should receive clear output",
+          "summary": "What authors write should stay legible in the final HTML, bindings, and runtime surface.",
+          "detail": "That means deterministic marker emission, explicit hydration payloads, and a runtime that operates on shipped contracts instead of discovery passes."
+        }
+      ]
+    },
+    "philosophy": {
+      "intro": {
+        "eyebrow": "Core Philosophy",
+        "title": "A small set of principles drives the whole system.",
+        "description": "Zenith does not treat compiler, runtime, router, bundler, and editor tooling as separate philosophies. The same contract discipline should carry through all of them."
+      },
+      "manifesto": {
+        "label": "Framework posture",
+        "title": "Every layer should agree on the same contract.",
+        "text": "Zenith works best when authored structure, compiler guarantees, runtime behavior, and tooling feedback all reinforce one another instead of quietly disagreeing behind the scenes.",
+        "support": "That alignment is what keeps the framework from feeling like one philosophy in the docs and another in the shipped output."
+      },
+      "pillars": [
+        {
+          "title": "Compile-Time First",
+          "description": "Resolve structure, contracts, and more binding work before the browser ever boots.",
+          "support": "The compiler is the first place Zenith tries to remove accidental complexity."
+        },
+        {
+          "title": "Structural Components",
+          "description": "Components are composition surfaces, not miniature runtime ownership containers.",
+          "support": "They shape output and preserve parent scope instead of silently taking control of it."
+        },
+        {
+          "title": "Preserved Reactivity",
+          "description": "Reactive ownership should remain explicit across slots, refs, and component boundaries.",
+          "support": "What updates the DOM should stay attributable to the authoring scope that owns it."
+        },
+        {
+          "title": "Predictable Output",
+          "description": "The emitted HTML, bindings, and runtime markers should stay deterministic and inspectable.",
+          "support": "Zenith treats browser output as a contract surface, not an opaque implementation detail."
+        },
+        {
+          "title": "Explicit Runtime Surface",
+          "description": "Runtime work stays narrow and intentional through primitives like hydrate(payload), zenMount(), and zenOn().",
+          "support": "The goal is not no runtime. The goal is runtime without framework fog."
+        }
+      ]
+    },
+    "model": {
+      "intro": {
+        "eyebrow": "How Zenith Thinks About UI",
+        "title": "A different model for composition.",
+        "description": "Zenith separates concerns with more discipline: structure from behavior, compiler from runtime, ownership from convenience, and output from abstraction."
+      },
+      "differenceIntro": {
+        "label": "Why it feels different",
+        "title": "Zenith tries to make composition more auditable instead of more magical.",
+        "text": "The goal is not to add another clever abstraction layer. It is to keep the relationship between authored templates, compiler decisions, and browser work easier to inspect."
+      },
+      "comparisons": [
+        {
+          "label": "Structure vs Behavior",
+          "leftTitle": "Structure stays visible",
+          "leftText": "Components describe how output is assembled and how composition is preserved.",
+          "rightTitle": "Behavior stays explicit",
+          "rightText": "Runtime behavior is attached through signals, refs, events, and explicit hydration contracts."
+        },
+        {
+          "label": "Compiler vs Runtime",
+          "leftTitle": "The compiler resolves more first",
+          "leftText": "Zenith prefers compile-time guarantees where they improve determinism and reduce browser work.",
+          "rightTitle": "The runtime stays narrow",
+          "rightText": "The browser gets the smallest necessary execution surface, not a general framework engine."
+        },
+        {
+          "label": "Ownership vs Hidden Boundaries",
+          "leftTitle": "Ownership is preserved",
+          "leftText": "Slot content and local state do not quietly rebind to the nearest component boundary.",
+          "rightTitle": "Boundaries are explicit",
+          "rightText": "Zenith avoids hidden ownership transfer that makes reactivity and composition harder to audit."
+        },
+        {
+          "label": "Output vs Indirection",
+          "leftTitle": "Output stays close to intent",
+          "leftText": "SSR HTML, markers, and payloads are meant to remain understandable from the authored template.",
+          "rightTitle": "Indirection stays constrained",
+          "rightText": "Zenith does not treat browser output as a disposable byproduct of framework internals."
+        }
+      ],
+      "differenceCards": [
+        {
+          "title": "More work resolves before boot",
+          "text": "Zenith tries to remove work from runtime when that work can be determined safely during compilation."
+        },
+        {
+          "title": "Components stay structural",
+          "text": "Component boundaries are there to shape output and preserve scope, not to generate hidden runtime ownership islands."
+        },
+        {
+          "title": "Reactive contracts stay explicit",
+          "text": "Refs, signals, state, and event handlers remain visible parts of the authoring model instead of being inferred later."
+        },
+        {
+          "title": "Browser output stays inspectable",
+          "text": "Zenith treats emitted HTML and marker tables as part of the framework contract, not as implementation debris."
+        }
+      ]
+    },
+    "architecture": {
+      "intro": {
+        "eyebrow": "Architecture In Practice",
+        "title": "One public surface. A deliberately aligned stack.",
+        "description": "Projects import @zenithbuild/core. The inner packages stay implementation-side so the framework can evolve under one contract instead of many loosely related ones.",
+        "noteLabel": "Public Boundary",
+        "noteText": "The architecture is meant to feel unified from compiler to editor tooling. That is why the public surface stays smaller than the internal package graph."
+      },
+      "summary": {
+        "label": "Shipped surfaces",
+        "title": "The architecture is broad, but the public story is intentionally simple.",
+        "text": "Zenith ships a compiler, runtime, router, bundler, CLI, language package, and language server. The framework treats them as one system because authors experience them as one system."
+      },
+      "parts": [
+        {
+          "name": "@zenithbuild/core",
+          "description": "The single public import surface projects rely on."
+        },
+        {
+          "name": "Compiler",
+          "description": "Resolves templates, markers, contracts, and deterministic output before the browser boots."
+        },
+        {
+          "name": "Runtime",
+          "description": "Hydrates explicit payloads and applies narrow browser-side work through shipped markers and primitives."
+        },
+        {
+          "name": "Router",
+          "description": "Owns route structure, guard/load boundaries, and page-level data contracts."
+        },
+        {
+          "name": "Bundler",
+          "description": "Packages emitted HTML, JS, and CSS into the build output Zenith actually ships."
+        },
+        {
+          "name": "CLI",
+          "description": "Coordinates scaffold, dev, build, and release-train workflows around compiler truth."
+        },
+        {
+          "name": "Language",
+          "description": "Packages the VS Code-compatible extension path and bundled language server delivery."
+        },
+        {
+          "name": "Language Server",
+          "description": "Delivers compiler-backed diagnostics, quick fixes, hover, and completion parity to LSP consumers."
+        }
+      ],
+      "tooling": {
+        "label": "Editor Experience",
+        "title": "Tooling follows the same contract discipline.",
+        "description": "Zenith’s editor story is not a separate approximation layer. The language server now surfaces compiler-backed diagnostics and the first stable quick fixes through the same rules the compiler already enforces.",
+        "features": [
+          {
+            "title": "Compiler-backed diagnostics",
+            "text": "Script-boundary failures, invalid event handlers, unknown events, and DOM lint rules all flow from compiler truth."
+          },
+          {
+            "title": "ZEN-DOM quick fixes",
+            "text": "The first stable code actions now cover DOM query, listener, and wrapper guidance without inventing editor-only rules."
+          },
+          {
+            "title": "Canonical hover and completion",
+            "text": "Documented on:* events and core Zenith APIs surface through the same manifest-backed language server path."
+          },
+          {
+            "title": "Verified editor delivery",
+            "text": "The packaged VS Code-compatible flow and direct Neovim LSP path were both validated against the shipped language server."
+          }
+        ],
+        "verified": [
+          "VS Code packaged flow verified",
+          "Cursor-compatible extension path aligned",
+          "Neovim LSP verified",
+          "Compiler truth stays central"
+        ]
+      }
+    },
+    "status": {
+      "intro": {
+        "eyebrow": "Current Status",
+        "title": "Active, honest, and getting sharper.",
+        "description": "Zenith is far enough along to communicate a real architecture, real tooling, and real release discipline. It is also still evolving in public."
+      },
+      "snapshot": {
+        "label": "Current line",
+        "title": "Stable should stay dependable while the next release train earns its place.",
+        "text": "Zenith is still being sharpened in public, but the release story is meant to stay clear: dependable stable installs, a train lane for validation, and beta only when it serves a deliberate experiment."
+      },
+      "tracks": [
+        {
+          "label": "Latest",
+          "title": "The stable line is for dependable installs.",
+          "text": "Stable releases are the line users should reach for when they want the current dependable public version."
+        },
+        {
+          "label": "Train",
+          "title": "Train is the validation lane.",
+          "text": "Train is where upcoming stable work is published, verified, and promoted only after it proves itself coherently across the package set."
+        },
+        {
+          "label": "Beta",
+          "title": "Beta stays intentional and opt-in.",
+          "text": "Prerelease experimentation remains a deliberate maintainer action instead of an automatic side effect of every merge."
+        }
+      ],
+      "roadmapLabel": "Road Ahead",
+      "roadmap": [
+        {
+          "title": "Stronger compiler guarantees",
+          "text": "Keep tightening emission, marker, slot-scope, and ownership guarantees so the output contract stays trustworthy."
+        },
+        {
+          "title": "Better editor tooling",
+          "text": "Extend diagnostics, quick fixes, and canonical language support without duplicating rules away from compiler truth."
+        },
+        {
+          "title": "Cleaner app and content architecture",
+          "text": "Keep moving site and framework surfaces toward explicit content boundaries, deterministic build paths, and clearer ownership."
+        },
+        {
+          "title": "Ecosystem maturity",
+          "text": "Grow the surrounding tooling and docs without diluting the compiler-first model that makes Zenith distinct."
+        }
+      ]
+    },
+    "contributors": {
+      "githubOrg": "zenithbuild",
+      "maxContributors": 6,
+      "intro": {
+        "eyebrow": "Contributors",
+        "title": "Zenith is being shaped in the open by people pulling at the contracts.",
+        "description": "The framework gets better when more than one perspective tests the compiler rules, runtime behavior, docs, and editor experience. This section is ready to grow into a fuller public roster as named credits land.",
+        "noteLabel": "Contribution style",
+        "noteText": "The goal is not a decorative team strip. It is to show the real work that sharpens Zenith: building, testing, refining, and challenging the details."
+      },
+      "roster": {
+        "label": "Current roster",
+        "title": "A live GitHub-backed roster instead of a hardcoded credits block.",
+        "text": "Contributor avatars, profiles, and aggregate contribution totals are loaded from the Zenith GitHub organization so this section can stay current as the public work expands."
+      },
+      "community": {
+        "label": "Where help matters most",
+        "items": [
+          "Compiler edge cases",
+          "Editor verification",
+          "Docs clarity",
+          "Ecosystem testing"
+        ]
+      },
+      "metricLabels": {
+        "contributions": "contributions",
+        "repositories": "repositories",
+        "activeRepositories": "active repos"
+      },
+      "summaryLabels": {
+        "source": "GitHub organization",
+        "contributors": "live contributors",
+        "repositories": "active repositories"
+      },
+      "emptyState": {
+        "title": "Contributor data is temporarily unavailable.",
+        "text": "This roster is loaded from the Zenith GitHub organization at request time and will repopulate when GitHub data is reachable again."
+      }
+    },
+    "sponsor": {
+      "intro": {
+        "eyebrow": "Sponsor Us",
+        "title": "Help fund the next layer of Zenith.",
+        "description": "Sponsorship helps keep the framework moving with the same discipline it asks from authored code: careful compiler work, strong tooling, clearer docs, and ecosystem maintenance that does not get treated as an afterthought."
+      },
+      "pitch": {
+        "label": "Why sponsorship matters",
+        "text": "Zenith is being built as one aligned system. Funding helps keep the core framework, editor work, documentation, release verification, and surrounding ecosystem effort moving forward together instead of in bursts."
+      },
+      "reasons": [
+        {
+          "title": "Framework development",
+          "text": "Compiler, runtime, router, and release-train work all need sustained maintenance."
+        },
+        {
+          "title": "Tooling",
+          "text": "Language server work, diagnostics, and quick fixes need time to stay aligned with compiler truth."
+        },
+        {
+          "title": "Docs",
+          "text": "Clearer documentation, examples, and migration guidance turn good architecture into usable practice."
+        },
+        {
+          "title": "Ecosystem work",
+          "text": "Templates, starter flows, validation, and surrounding support work are what make a framework feel complete."
+        }
+      ],
+      "actions": [
+        {
+          "label": "Sponsor Zenith",
+          "href": "",
+          "variant": "primary"
+        },
+        {
+          "label": "Follow development",
+          "href": "https://github.com/zenithbuild/framework",
+          "variant": "outline"
+        },
+        {
+          "label": "Explore releases",
+          "href": "/blog",
+          "variant": "secondary"
+        }
+      ],
+      "supportNote": "Direct sponsorship links are being finalized. The primary funding CTA is wired so a real sponsor URL can drop into content cleanly when it is ready."
+    },
+    "finalCta": {
+      "eyebrow": "Final CTA",
+      "title": "Start with the contracts, then follow the releases.",
+      "text": "If Zenith is useful to you, the best path is still the same: read the docs, inspect the changelog, and watch the framework sharpen in public.",
+      "actions": [
+        {
+          "label": "Read the docs",
+          "href": "/docs",
+          "variant": "primary"
+        },
+        {
+          "label": "Explore the changelog",
+          "href": "/blog",
+          "variant": "secondary"
+        },
+        {
+          "label": "Follow development",
+          "href": "https://github.com/zenithbuild/framework",
+          "variant": "outline"
+        }
+      ]
+    }
+  }
+}

@@ -801,7 +801,9 @@ function _resolveComponentProps(propTable, signalMap, context = {}) {
 }
 
 function _resolveNodes(root, selector, index, kind, source = undefined) {
-    const nodes = root.querySelectorAll(selector);
+    const nodes = selector.startsWith('comment:')
+        ? _resolveCommentNodes(root, selector.slice('comment:'.length))
+        : root.querySelectorAll(selector);
     if (!nodes || nodes.length === 0) {
         const isRef = kind === 'ref';
         throwZenithRuntimeError({
@@ -816,6 +818,25 @@ function _resolveNodes(root, selector, index, kind, source = undefined) {
             docsLink: isRef ? DOCS_LINKS.refs : DOCS_LINKS.markerTable,
             source
         });
+    }
+    return nodes;
+}
+
+function _resolveCommentNodes(root, markerText) {
+    const walkerRoot = root && root.nodeType === 9 && root.documentElement ? root.documentElement : root;
+    const doc = walkerRoot && walkerRoot.ownerDocument ? walkerRoot.ownerDocument : walkerRoot;
+    if (!walkerRoot || !doc || typeof doc.createTreeWalker !== 'function') {
+        return [];
+    }
+
+    const nodes = [];
+    const walker = doc.createTreeWalker(walkerRoot, NodeFilter.SHOW_COMMENT);
+    let current = walker.nextNode();
+    while (current) {
+        if (current.data === markerText) {
+            nodes.push(current);
+        }
+        current = walker.nextNode();
     }
     return nodes;
 }
@@ -1704,6 +1725,10 @@ function _applyMarkerValue(nodes, marker, value) {
         try {
             const node = nodes[i];
             if (marker.kind === 'text') {
+                if (node && node.nodeType === 8) {
+                    _applyCommentMarkerValue(node, value, `${markerPath}.text`);
+                    continue;
+                }
                 if (_isStructuralFragment(value)) {
                     _mountStructuralFragment(node, value, `${markerPath}.text`);
                     continue;
@@ -1741,6 +1766,38 @@ function _applyMarkerValue(nodes, marker, value) {
     }
 }
 
+function _applyCommentMarkerValue(anchor, value, rootPath) {
+    if (_isStructuralFragment(value)) {
+        _mountStructuralFragmentIntoCommentRange(anchor, value, rootPath);
+        return;
+    }
+
+    const end = _clearCommentPlaceholderContent(anchor);
+    const parent = end.parentNode;
+    if (!parent) {
+        return;
+    }
+
+    const html = _renderFragmentValue(value, rootPath);
+    if (html !== null) {
+        parent.insertBefore(_createContextualFragment(parent, html), end);
+        return;
+    }
+
+    const textNode = (parent.ownerDocument || document).createTextNode(_coerceText(value, rootPath));
+    parent.insertBefore(textNode, end);
+}
+
+function _createContextualFragment(parent, html) {
+    const doc = parent.ownerDocument || document;
+    if (!doc || typeof doc.createRange !== 'function') {
+        throw new Error('[Zenith Runtime] comment placeholder HTML rendering requires Range#createContextualFragment');
+    }
+    const range = doc.createRange();
+    range.selectNode(parent);
+    return range.createContextualFragment(html);
+}
+
 function _isStructuralFragment(value) {
     if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) {
@@ -1749,6 +1806,120 @@ function _isStructuralFragment(value) {
         return false;
     }
     return value && typeof value === 'object' && value.__zenith_fragment === true && typeof value.mount === 'function';
+}
+
+function _ensureCommentPlaceholderEnd(anchor) {
+    let end = anchor.__z_range_end || null;
+    if (end && end.parentNode === anchor.parentNode) {
+        return end;
+    }
+
+    const parent = anchor.parentNode;
+    if (!parent) {
+        return null;
+    }
+
+    end = (anchor.ownerDocument || document).createComment(`/ ${anchor.data}`);
+    parent.insertBefore(end, anchor.nextSibling);
+    anchor.__z_range_end = end;
+    return end;
+}
+
+function _clearCommentPlaceholderContent(anchor) {
+    if (anchor.__z_unmounts) {
+        for (let i = 0; i < anchor.__z_unmounts.length; i++) {
+            try { anchor.__z_unmounts[i](); } catch (e) { }
+        }
+    }
+    anchor.__z_unmounts = [];
+
+    const end = _ensureCommentPlaceholderEnd(anchor);
+    if (!end) {
+        return anchor;
+    }
+
+    let current = anchor.nextSibling;
+    while (current && current !== end) {
+        const next = current.nextSibling;
+        if (current.parentNode) {
+            current.parentNode.removeChild(current);
+        }
+        current = next;
+    }
+    return end;
+}
+
+function _mountStructuralFragmentIntoCommentRange(anchor, value, rootPath = 'renderable') {
+    const end = _clearCommentPlaceholderContent(anchor);
+    const parent = end.parentNode;
+    if (!parent) {
+        return;
+    }
+
+    const doc = parent.ownerDocument || document;
+    const newUnmounts = [];
+
+    function insertHtml(html) {
+        const fragment = _createContextualFragment(parent, html);
+        const nodes = Array.from(fragment.childNodes);
+        parent.insertBefore(fragment, end);
+        for (let i = 0; i < nodes.length; i++) {
+            const inserted = nodes[i];
+            newUnmounts.push(() => {
+                if (inserted.parentNode) inserted.parentNode.removeChild(inserted);
+            });
+        }
+    }
+
+    function mountItem(item, path) {
+        if (Array.isArray(item)) {
+            for (let i = 0; i < item.length; i++) mountItem(item[i], `${path}[${i}]`);
+            return;
+        }
+        if (item && item.__zenith_fragment === true && typeof item.mount === 'function') {
+            const fragment = doc.createDocumentFragment();
+            item.mount(fragment);
+            const nodes = Array.from(fragment.childNodes);
+            parent.insertBefore(fragment, end);
+            for (let i = 0; i < nodes.length; i++) {
+                const inserted = nodes[i];
+                newUnmounts.push(() => {
+                    if (inserted.parentNode) inserted.parentNode.removeChild(inserted);
+                });
+            }
+            if (typeof item.unmount === 'function') {
+                newUnmounts.push(item.unmount.bind(item));
+            }
+            return;
+        }
+        if (item && item.__zenith_fragment === true && typeof item.html === 'string') {
+            insertHtml(item.html);
+            return;
+        }
+
+        const text = _coerceText(item, path);
+        if (text || text === '') {
+            const textNode = doc.createTextNode(text);
+            parent.insertBefore(textNode, end);
+            newUnmounts.push(() => {
+                if (textNode.parentNode) textNode.parentNode.removeChild(textNode);
+            });
+        }
+    }
+
+    try {
+        mountItem(value, rootPath);
+    } catch (error) {
+        rethrowZenithRuntimeError(error, {
+            phase: 'render',
+            code: 'FRAGMENT_MOUNT_FAILED',
+            message: 'Fragment mount failed',
+            path: rootPath,
+            hint: 'Verify fragment values and nested renderable arrays.',
+            docsLink: DOCS_LINKS.markerTable
+        });
+    }
+    anchor.__z_unmounts = newUnmounts;
 }
 
 function _mountStructuralFragment(container, value, rootPath = 'renderable') {

@@ -7,9 +7,11 @@ import { join } from 'node:path';
 
 const CWD = process.cwd();
 const CLI_BIN = [
+    join(CWD, 'target/debug/zenith-bundler'),
+    join(CWD, 'target/release/zenith-bundler'),
     join(CWD, '../zenith-bundler/target/debug/zenith-bundler'),
     join(CWD, '../zenith-bundler/target/release/zenith-bundler')
-].find((candidate) => existsSync(candidate)) || join(CWD, '../zenith-bundler/target/debug/zenith-bundler');
+].find((candidate) => existsSync(candidate)) || join(CWD, 'target/debug/zenith-bundler');
 const TEST_DIR = join(CWD, 'tests/tmp_vendor_emission');
 
 function cleanup() {
