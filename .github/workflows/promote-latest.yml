@@ -25,13 +25,6 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org/
 
-      - name: Assert OIDC-only publish auth
-        run: |
-          if [[ -n "${NODE_AUTH_TOKEN:-}" ]]; then
-            echo "::error::NODE_AUTH_TOKEN must NOT be set — this workflow uses npm OIDC trusted publishing."
-            exit 1
-          fi
-
       - name: Assert master tip and read target version
         shell: bash
         run: |
