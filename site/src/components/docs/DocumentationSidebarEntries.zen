@@ -1,0 +1,24 @@
+<script lang="ts">
+export interface Props {
+  html: string;
+  class?: string;
+}
+
+const incoming = props as Props;
+const htmlContent = typeof incoming.html === "string" ? incoming.html : "";
+const className = typeof incoming.class === "string" ? incoming.class : "";
+const containerRef = ref<HTMLDivElement>();
+
+zenEffect(() => {
+  const container = containerRef.current;
+  if (!container) {
+    return;
+  }
+
+  if (container.innerHTML !== htmlContent) {
+    container.innerHTML = htmlContent;
+  }
+});
+</script>
+
+<div ref={containerRef} class={className}></div>

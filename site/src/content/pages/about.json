@@ -23,7 +23,7 @@
         },
         {
           "label": "Explore releases",
-          "href": "/blog",
+          "href": "/changelog",
           "variant": "secondary"
         }
       ]
@@ -370,7 +370,7 @@
         },
         {
           "label": "Explore releases",
-          "href": "/blog",
+          "href": "/changelog",
           "variant": "secondary"
         }
       ],
@@ -388,7 +388,7 @@
         },
         {
           "label": "Explore the changelog",
-          "href": "/blog",
+          "href": "/changelog",
           "variant": "secondary"
         },
         {

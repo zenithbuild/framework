@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Changed
+- Rebuilt the public site surfaces around Directus-backed content, editorial landing/detail layouts, and the new documentation navigation and reading experience.
 - Added the native `Image` v1 surface plus build/dev/preview image handling, and hardened the compiler/dev build pipeline around typed embedded markup, hoisted expression rewriting, and narrower rebuild behavior.
 - Added benchmark harness, rebuild measurement caveats, and performance documentation for the current cross-framework results.
 - Added the Directus editorial workspace, extension build tooling, and repo-sync content flows for CMS deployment testing.

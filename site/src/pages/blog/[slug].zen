@@ -1,0 +1,38 @@
+<script server lang="ts">
+import { pageContent, siteContent } from "../../content/index";
+import { loadBlogDetailSource } from "../../server/postSource";
+
+export const load = async (ctx) => {
+    const { blogPost, relatedPosts, sourceMode } = await loadBlogDetailSource(ctx.params.slug);
+
+    if (!blogPost) {
+        if (/^v\d+-\d+-\d+$/.test(ctx.params.slug || "")) {
+            return ctx.redirect(`/changelog/${ctx.params.slug}`);
+        }
+
+        return ctx.deny(404, "Post not found");
+    }
+
+    return {
+        pageTitle: blogPost.title,
+        pageDescription: blogPost.description,
+        pageContent: pageContent.blog,
+        blogPost,
+        relatedPosts,
+        sourceMode,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        }
+    };
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import BlogDetailSurface from "@/components/surfaces/BlogDetailSurface.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <BlogDetailSurface content={data.pageContent} post={data.blogPost} relatedPosts={data.relatedPosts} sourceMode={data.sourceMode} />
+</DefaultLayout>
