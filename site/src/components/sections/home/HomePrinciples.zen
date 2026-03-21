@@ -1,0 +1,29 @@
+<script setup="ts">
+</script>
+
+<div class="col-span-4 lg:col-span-12 grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 py-24 lg:py-48">
+    <div class="col-span-4 lg:col-span-3 flex flex-col pb-12 lg:pb-0">
+        <span class="text-sm font-mono tracking-widest uppercase text-muted-foreground">Core Philosophy</span>
+    </div>
+
+    <div class="col-span-4 lg:col-span-3 flex flex-col gap-8 pt-12 lg:pt-0 lg:pl-8">
+        <h3 class="text-4xl lg:text-5xl font-heading font-semibold uppercase tracking-tighter text-foreground leading-none">01.<br/>Signals</h3>
+        <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+            Reactivity is opted into, not guessed. Signals enforce stable identity and explicit read/write cycles, eliminating unpredictable render loops.
+        </p>
+    </div>
+
+    <div class="col-span-4 lg:col-span-3 flex flex-col gap-8 pt-12 lg:pt-0 mt-12 lg:mt-0 lg:pl-8">
+        <h3 class="text-4xl lg:text-5xl font-heading font-semibold uppercase tracking-tighter text-foreground leading-none">02.<br/>References</h3>
+        <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+            Embrace the browser. Zenith binds directly to elements using deterministic refs, eschewing virtual diffs for precise, targeted mutations.
+        </p>
+    </div>
+
+    <div class="col-span-4 lg:col-span-3 flex flex-col gap-8 pt-12 lg:pt-0 mt-12 lg:mt-0 lg:pl-8">
+        <h3 class="text-4xl lg:text-5xl font-heading font-semibold uppercase tracking-tighter text-foreground leading-none">03.<br/>Security</h3>
+        <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+            Guards and loaders run securely outside the client reach. The compiler enforces these boundaries, treating the server as the absolute authority.
+        </p>
+    </div>
+</div>

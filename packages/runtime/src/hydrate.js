@@ -202,21 +202,25 @@ export function hydrate(payload) {
 
             const nodes = _resolveNodes(root, marker.selector, marker.index, marker.kind, marker.source);
             markerNodesByIndex.set(marker.index, nodes);
-            const value = _evaluateExpression(
-                expressions[marker.index],
-                stateValues,
-                stateKeys,
-                signalMap,
-                componentBindings,
-                params,
-                ssrData,
-                marker.kind,
-                props,
-                exprFns,
-                marker,
-                null
-            );
-            _applyMarkerValue(nodes, marker, value);
+            try {
+                const value = _evaluateExpression(
+                    expressions[marker.index],
+                    stateValues,
+                    stateKeys,
+                    signalMap,
+                    componentBindings,
+                    params,
+                    ssrData,
+                    marker.kind,
+                    props,
+                    exprFns,
+                    marker,
+                    null
+                );
+                _applyMarkerValue(nodes, marker, value);
+            } catch (evalErr) {
+                throw evalErr;
+            }
         }
 
         for (let i = 0; i < expressions.length; i++) {
@@ -872,20 +876,24 @@ function _evaluateExpression(
         const fns = Array.isArray(exprFns) ? exprFns : [];
         const fn = fns[binding.fn_index];
         if (typeof fn === 'function') {
-            return fn({
-                signalMap,
-                params,
-                ssrData,
-                props: props || {},
-                componentBindings,
-                zenhtml: _zenhtml,
-                fragment(html) {
-                    return {
-                        __zenith_fragment: true,
-                        html: html === null || html === undefined || html === false ? '' : String(html)
-                    };
-                }
-            });
+            try {
+                return fn({
+                    signalMap,
+                    params,
+                    ssrData,
+                    props: props || {},
+                    componentBindings,
+                    zenhtml: _zenhtml,
+                    fragment(html) {
+                        return {
+                            __zenith_fragment: true,
+                            html: html === null || html === undefined || html === false ? '' : String(html)
+                        };
+                    }
+                });
+            } catch (fnErr) {
+                throw fnErr;
+            }
         }
     }
     if (binding.signal_index !== null && binding.signal_index !== undefined) {

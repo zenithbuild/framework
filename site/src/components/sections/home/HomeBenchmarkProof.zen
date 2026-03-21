@@ -1,0 +1,110 @@
+<script lang="ts">
+interface BenchmarkMeasurement {
+  label?: string;
+  detail?: string;
+}
+
+interface BenchmarkMethodology {
+  label?: string;
+  title?: string;
+  text?: string;
+}
+
+export interface Props {
+  content: {
+    eyebrow?: string;
+    title?: string;
+    body?: string[];
+    measurements?: BenchmarkMeasurement[];
+    methodology?: BenchmarkMethodology;
+  };
+}
+
+const benchmarkContent = (props as Props).content || {};
+const benchmarkBody = Array.isArray(benchmarkContent.body) ? benchmarkContent.body : [];
+const benchmarkMeasurements = Array.isArray(benchmarkContent.measurements) ? benchmarkContent.measurements : [];
+const benchmarkMethodology = benchmarkContent.methodology || {};
+const emptyMeasurement = { label: "", detail: "" };
+
+const benchmarkParagraphOne = typeof benchmarkBody[0] === "string" ? benchmarkBody[0] : "";
+const benchmarkParagraphTwo = typeof benchmarkBody[1] === "string" ? benchmarkBody[1] : "";
+const benchmarkParagraphThree = typeof benchmarkBody[2] === "string" ? benchmarkBody[2] : "";
+
+const measurementOne = benchmarkMeasurements[0] || emptyMeasurement;
+const measurementTwo = benchmarkMeasurements[1] || emptyMeasurement;
+const measurementThree = benchmarkMeasurements[2] || emptyMeasurement;
+const measurementFour = benchmarkMeasurements[3] || emptyMeasurement;
+const measurementFive = benchmarkMeasurements[4] || emptyMeasurement;
+const measurementSix = benchmarkMeasurements[5] || emptyMeasurement;
+const measurementSeven = benchmarkMeasurements[6] || emptyMeasurement;
+</script>
+
+<div class="col-span-4 lg:col-span-12 grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 py-24 lg:py-40 text-foreground">
+  <div class="col-span-4 lg:col-span-5 flex flex-col gap-8">
+    <span class="text-sm font-mono tracking-widest uppercase text-muted-foreground">
+      {benchmarkContent.eyebrow}
+    </span>
+    <h2 class="text-5xl lg:text-8xl font-heading font-semibold uppercase tracking-tighter leading-none text-foreground">
+      {benchmarkContent.title}
+    </h2>
+  </div>
+
+  <div class="col-span-4 lg:col-start-8 lg:col-span-5 flex flex-col gap-6 pt-12 lg:pt-2">
+    <p class="text-lg lg:text-2xl text-foreground font-light leading-relaxed">
+      {benchmarkParagraphOne}
+    </p>
+    <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+      {benchmarkParagraphTwo}
+    </p>
+    <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+      {benchmarkParagraphThree}
+    </p>
+  </div>
+
+  <div class="col-span-4 lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-6 pt-16 lg:pt-24 mt-16 lg:mt-24">
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementOne.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementOne.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementTwo.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementTwo.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementThree.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementThree.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementFour.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementFour.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementFive.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementFive.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementSix.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground">{measurementSix.detail}</p>
+    </article>
+    <article class="flex flex-col gap-4 p-6 md:col-span-2">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">{measurementSeven.label}</span>
+      <p class="text-sm lg:text-base leading-relaxed text-foreground max-w-3xl">{measurementSeven.detail}</p>
+    </article>
+  </div>
+
+  <div class="col-span-4 lg:col-span-5 pt-16 lg:pt-24 mt-16 lg:mt-24 lg:pl-12">
+    <div class="flex h-full flex-col justify-between gap-8 p-8 lg:p-10">
+      <span class="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">
+        {benchmarkMethodology.label}
+      </span>
+      <div class="flex flex-col gap-6">
+        <h3 class="text-3xl lg:text-5xl font-heading font-semibold uppercase tracking-tighter leading-none text-foreground">
+          {benchmarkMethodology.title}
+        </h3>
+        <p class="text-base lg:text-lg leading-relaxed text-muted-foreground">
+          {benchmarkMethodology.text}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -12,7 +12,7 @@ import {
 
 describe("site link policy", () => {
   test("keeps the proven soft-nav route-entry set explicit", () => {
-    expect(PROVEN_SOFT_NAV_ROUTE_ENTRIES).toEqual(["/", "/about", "/blog", "/docs"]);
+    expect(PROVEN_SOFT_NAV_ROUTE_ENTRIES).toEqual(["/", "/about", "/blog", "/changelog", "/docs"]);
   });
 
   test("normalizes route-entry hrefs deterministically", () => {
@@ -32,7 +32,7 @@ describe("site link policy", () => {
     expect(classifySiteHref("mailto:hi@zenithbuild.dev")).toBe("external");
   });
 
-  test("keeps same-page and deep-hash links out of ZenLink", () => {
+  test("keeps same-page and deep-hash links out of soft-nav", () => {
     expect(isHashHref("#routing")).toBe(true);
     expect(isHashHref("/docs#routing")).toBe(true);
     expect(classifySiteHref("#routing")).toBe("hash");
@@ -43,10 +43,12 @@ describe("site link policy", () => {
     expect(isProvenSoftNavRouteEntry("/")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/about")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/blog")).toBe(true);
+    expect(isProvenSoftNavRouteEntry("/changelog")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/docs")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/docs#routing")).toBe(false);
     expect(isProvenSoftNavRouteEntry("/docs?tab=api")).toBe(false);
     expect(isProvenSoftNavRouteEntry("/pricing")).toBe(false);
+    expect(classifySiteHref("/changelog")).toBe("proven-route-entry");
     expect(classifySiteHref("/docs")).toBe("proven-route-entry");
     expect(classifySiteHref("/pricing")).toBe("internal-fallback");
   });

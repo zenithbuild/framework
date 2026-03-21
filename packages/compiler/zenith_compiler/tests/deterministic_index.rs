@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // 6.2 DETERMINISTIC INDEX LOCK
 // Expression indexing must ALWAYS be:

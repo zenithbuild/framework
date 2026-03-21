@@ -39,6 +39,10 @@
             "href": "/blog"
           },
           {
+            "label": "Changelog",
+            "href": "/changelog"
+          },
+          {
             "label": "Editor Contract",
             "href": "/docs#editor-contract"
           }
@@ -53,7 +57,7 @@
           },
           {
             "label": "Release Notes",
-            "href": "/blog"
+            "href": "/changelog"
           },
           {
             "label": "Editor Tooling",

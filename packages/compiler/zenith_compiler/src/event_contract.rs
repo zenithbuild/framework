@@ -293,6 +293,8 @@ mod tests {
         assert!(!is_direct_call_expression("handleClick"));
         assert!(!is_direct_call_expression("() => handleClick()"));
         assert!(!is_direct_call_expression("(event) => submit(event)"));
-        assert!(!is_direct_call_expression("function (event) { submit(event); }"));
+        assert!(!is_direct_call_expression(
+            "function (event) { submit(event); }"
+        ));
     }
 }

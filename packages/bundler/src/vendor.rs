@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use zenith_compiler::deterministic::sha256_hex;
 
+use crate::output_mode::{write_file_for_mode, OutputMode};
 use crate::BundlerInput;
 use zenith_bundler::utils::{EXPECTED_ROLLDOWN_COMMIT, VIRTUAL_PREFIX};
 
@@ -29,6 +30,7 @@ pub struct VendorBuildResult {
 pub async fn bundle_vendor(
     inputs: &[BundlerInput],
     out_dir: &Path,
+    output_mode: OutputMode,
 ) -> Result<Option<VendorBuildResult>, String> {
     // 1. Collect and deduplicate external specifiers
     let mut externals = BTreeSet::new();
@@ -128,12 +130,12 @@ pub async fn bundle_vendor(
         let content = std::fs::read_to_string(&cached_file).map_err(|e| e.to_string())?;
 
         let content_hash = compute_vendor_content_hash(&lockfile_hash, &sorted_externals, &content);
-        let final_filename = format!("vendor.{}.js", content_hash);
+        let final_filename = output_mode.vendor_rel(&content_hash);
 
         // Write to assets
         let assets_dir = out_dir.join("assets");
         std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-        std::fs::write(assets_dir.join(&final_filename), &content).map_err(|e| e.to_string())?;
+        write_file_for_mode(&assets_dir.join(&final_filename), &content, output_mode)?;
 
         return Ok(Some(VendorBuildResult {
             specifiers: sorted_externals,
@@ -199,12 +201,12 @@ pub async fn bundle_vendor(
 
     // 6. Compute Final Metadata
     let content_hash = compute_vendor_content_hash(&lockfile_hash, &sorted_externals, content);
-    let final_filename = format!("vendor.{}.js", content_hash);
+    let final_filename = output_mode.vendor_rel(&content_hash);
 
     // 7. Write to Output & Cache
     let assets_dir = out_dir.join("assets");
     std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    std::fs::write(assets_dir.join(&final_filename), content).map_err(|e| e.to_string())?;
+    write_file_for_mode(&assets_dir.join(&final_filename), content, output_mode)?;
 
     // Write to cache
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;

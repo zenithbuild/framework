@@ -1,0 +1,42 @@
+<script setup="ts">
+import type { Contributor } from "@/server/github";
+
+export interface Props {
+    contributors: Contributor[];
+}
+
+const contributors = ((props as any).contributors as Contributor[]) || [];
+</script>
+
+<div class="col-span-4 lg:col-span-12 grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 pt-32 lg:pt-48 pb-32 lg:pb-64 mt-24 lg:mt-40">
+    <!-- Section Eyebrow -->
+    <div class="col-span-4 lg:col-span-3 pb-12 lg:pb-0">
+        <h3 class="text-sm font-mono uppercase tracking-[0.2em] text-muted-foreground mb-8">
+            Community Collective
+        </h3>
+        <p class="text-base text-foreground font-light leading-relaxed pr-8">
+            Zenith is an open architecture. It is built, hardened, and expanded by an international collective of structural engineers.
+        </p>
+        <div class="mt-8 flex">
+            <a href="https://discord.gg/zenithbuild" class="inline-flex items-center justify-between w-full px-4 py-3 text-xs font-mono tracking-widest uppercase text-foreground bg-secondary/20 hover:bg-foreground hover:text-background transition-colors group">
+                <span>Join Discord</span>
+                <svg class="h-3 w-3 transform transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+            </a>
+        </div>
+    </div>
+
+    <!-- Avatar Matrix (Borderless) -->
+    <div class="col-span-4 lg:col-span-9 flex flex-wrap gap-2 lg:gap-4 mt-8 lg:mt-0 lg:pl-12">
+        {contributors.map((c, i) => (
+            <a 
+               id={i}
+               href={c.html_url} 
+               target="_blank" 
+               rel="noopener noreferrer" 
+               class="h-16 w-16 lg:h-20 lg:w-20 relative hover:scale-105 transition-transform flex items-center justify-center p-2 group grayscale hover:grayscale-0"
+            >
+                <img src={c.avatar_url} alt={c.login} class="w-full h-full object-cover rounded-full opacity-60 group-hover:opacity-100 transition-opacity" loading="lazy" />
+            </a>
+        ))}
+    </div>
+</div>

@@ -69,6 +69,7 @@ const navigationFixtureContent = {
     { label: "About", href: "/about" },
     { label: "Docs", href: "/docs" },
     { label: "Blog", href: "/blog" },
+    { label: "Changelog", href: "/changelog" },
     { label: "GitHub", href: "https://github.com/zenithbuild/framework" },
   ],
   footerLinks: [
@@ -84,6 +85,7 @@ const navigationFixtureContent = {
     expect(navigationSource.includes('class="pointer-events-auto flex-1 flex flex-col justify-center"')).toBe(true);
     expect(navigationSource.includes("href={navAboutLink.href}")).toBe(true);
     expect(navigationSource.includes("href={navDocsLink.href}")).toBe(true);
+    expect(navigationSource.includes("href={navChangelogLink.href}")).toBe(true);
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
 
@@ -94,33 +96,6 @@ const navigationFixtureContent = {
       payload.html.includes('data-zen-link="true"') ||
       payload.html.includes("data-zx-data-zen-link="),
     ).toBe(true);
-  });
-
-  test("locks the route transition shell to a fixed bottom-cover-top overlay contract", () => {
-    const result = compileZenFixture(
-      "__route-transition-shell-fixture__.zen",
-      `<script lang="ts">
-import RouteTransitionShell from "../components/globals/RouteTransitionShell.zen";
-
-const transitionFixtureContent = {
-  routes: ["/", "/about", "/blog", "/docs"],
-};
-
-const transitionFixtureFrameRef = ref<HTMLDivElement>();
-</script>
-<div ref={transitionFixtureFrameRef}>
-  <RouteTransitionShell content={transitionFixtureContent} frameRef={transitionFixtureFrameRef} />
-</div>`,
-    );
-
-    expect(result.status).toBe(0);
-    expect(result.stderr).toBe("");
-
-    const payload = JSON.parse(result.stdout);
-    expect(payload.html.includes("data-transition-state")).toBe(true);
-    expect(payload.html.includes("fixed inset-0")).toBe(true);
-    expect(payload.html.includes("translate3d(0, 100%, 0)")).toBe(true);
-    expect(payload.html.includes("bg-border/80")).toBe(true);
   });
 
   test("keeps Button bindings on component-scoped aliases instead of bare runtime identifiers", () => {

@@ -169,11 +169,9 @@ pub async fn execute_bundle(
                     && compiled.style_blocks.is_empty()
                     && err.starts_with("Expected exactly one ZENITH_STYLES_ANCHOR, found") =>
             {
-                let (css_only, _) = utils::process_css(
-                    &effective_style_blocks,
-                    "<!-- ZENITH_STYLES_ANCHOR -->",
-                )
-                .map_err(BundleError::ValidationError)?;
+                let (css_only, _) =
+                    utils::process_css(&effective_style_blocks, "<!-- ZENITH_STYLES_ANCHOR -->")
+                        .map_err(BundleError::ValidationError)?;
                 (css_only, compiled.html.clone())
             }
             Err(err) => return Err(BundleError::ValidationError(err)),

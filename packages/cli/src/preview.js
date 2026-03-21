@@ -14,6 +14,10 @@ import { createServer } from 'node:http';
 import { access, readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadConfig } from './config.js';
+import { materializeImageMarkup } from './images/materialize.js';
+import { createImageRuntimePayload, injectImageRuntimePayload } from './images/payload.js';
+import { handleImageRequest } from './images/service.js';
 import { createSilentLogger } from './ui/logger.js';
 import {
   compareRouteSpecificity,
@@ -29,8 +33,12 @@ const MIME_TYPES = {
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.gif': 'image/gif'
 };
 
 const SERVER_SCRIPT_RUNNER = String.raw`
@@ -387,14 +395,35 @@ try {
 /**
  * Create and start a preview server.
  *
- * @param {{ distDir: string, port?: number, host?: string, logger?: object | null }} options
+ * @param {{ distDir: string, port?: number, host?: string, logger?: object | null, config?: object, projectRoot?: string }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createPreviewServer(options) {
-  const { distDir, port = 4000, host = '127.0.0.1', logger: providedLogger = null } = options;
+  const resolvedProjectRoot = options?.projectRoot ? resolve(options.projectRoot) : resolve(options.distDir, '..');
+  const resolvedConfig = options?.config && typeof options.config === 'object'
+    ? options.config
+    : await loadConfig(resolvedProjectRoot);
+  const {
+    distDir,
+    port = 4000,
+    host = '127.0.0.1',
+    logger: providedLogger = null
+  } = options;
+  const projectRoot = resolvedProjectRoot;
+  const config = resolvedConfig;
   const logger = providedLogger || createSilentLogger();
   const verboseLogging = logger.mode?.logLevel === 'verbose';
   let actualPort = port;
+
+  async function loadImageManifest() {
+    try {
+      const manifestRaw = await readFile(join(distDir, '_zenith', 'image', 'manifest.json'), 'utf8');
+      const parsed = JSON.parse(manifestRaw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
 
   function publicHost() {
     if (host === '0.0.0.0' || host === '::') {
@@ -488,6 +517,15 @@ export async function createPreviewServer(options) {
         return;
       }
 
+      if (url.pathname === '/_zenith/image') {
+        await handleImageRequest(req, res, {
+          requestUrl: url,
+          projectRoot,
+          config: config.images
+        });
+        return;
+      }
+
       if (extname(url.pathname) && extname(url.pathname) !== '.html') {
         const staticPath = resolveWithinDist(distDir, url.pathname);
         if (!staticPath || !(await fileExists(staticPath))) {
@@ -574,9 +612,23 @@ export async function createPreviewServer(options) {
       }
 
       let html = await readFile(htmlPath, 'utf8');
+      if (resolved.matched && resolved.route?.page_asset) {
+        const pageAssetPath = resolveWithinDist(distDir, resolved.route.page_asset);
+        html = await materializeImageMarkup({
+          html,
+          pageAssetPath,
+          payload: createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint'),
+          ssrData: ssrPayload,
+          routePathname: resolved.route.path || url.pathname
+        });
+      }
       if (ssrPayload) {
         html = injectSsrPayload(html, ssrPayload);
       }
+      html = injectImageRuntimePayload(
+        html,
+        createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint')
+      );
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(html);

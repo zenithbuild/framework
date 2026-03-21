@@ -219,11 +219,11 @@ fn emitted_router_and_runtime_follow_template_contract() {
         "router must use manifest-driven dynamic import shape"
     );
     assert!(
-        before_leave < before_swap &&
-        before_swap < mount_idx &&
-        mount_idx < scroll_apply &&
-        scroll_apply < before_enter &&
-        before_enter < enter_complete,
+        before_leave < before_swap
+            && before_swap < mount_idx
+            && mount_idx < scroll_apply
+            && scroll_apply < before_enter
+            && before_enter < enter_complete,
         "router lifecycle ordering violated"
     );
 

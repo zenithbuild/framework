@@ -1,9 +1,9 @@
 use crate::ast::SourceSpan;
 use crate::codegen::generate;
-use crate::parser::Parser;
+use crate::parser::{Parser, ParserProfileMetrics};
 use crate::script::{
-    extract_script_blocks, ComponentInstanceBinding, ComponentScriptAsset, ExtractedStyleBlock,
-    HoistedOutput, HoistedStateBinding,
+    extract_script_blocks_with_profile, ComponentInstanceBinding, ComponentScriptAsset,
+    ExtractedStyleBlock, HoistedOutput, HoistedStateBinding, ScriptProfileMetrics,
 };
 use crate::transform::{
     transform, EventBinding, MarkerBinding, MarkerKind, RefBinding, TransformWarning,
@@ -11,8 +11,225 @@ use crate::transform::{
 use regex::Regex;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
+use std::time::Instant;
 
 pub const IR_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Default)]
+struct CompileInternalTimings {
+    extract_script_blocks_ms: f64,
+    strip_html_comments_ms: f64,
+    parse_ms: f64,
+    transform_ms: f64,
+    parser_profile: Option<ParserProfileMetrics>,
+    script_profile: Option<ScriptProfileMetrics>,
+}
+
+fn round_ms(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
+fn identifier_match_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^[A-Za-z_$][A-Za-z0-9_$]*$").expect("valid identifier regex"))
+}
+
+fn primitive_number_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$").expect("valid primitive number regex")
+    })
+}
+
+fn safe_member_chain_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^(?:params|data|ssr|props)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$")
+            .expect("valid member chain regex")
+    })
+}
+
+fn identifier_capture_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b").expect("valid identifier capture regex")
+    })
+}
+
+fn compiler_profile_enabled() -> bool {
+    matches!(std::env::var("ZENITH_COMPILER_PROFILE").as_deref(), Ok("1"))
+}
+
+fn emit_compiler_profile(
+    source_path: &str,
+    internal: &CompileInternalTimings,
+    compile_internal_ms: f64,
+    html_ms: f64,
+    map_signals_ms: f64,
+    map_marker_bindings_ms: f64,
+    map_expression_bindings_ms: f64,
+    map_hoisted_ms: f64,
+    map_component_scripts_ms: f64,
+    map_component_instances_ms: f64,
+    map_event_bindings_ms: f64,
+    map_ref_bindings_ms: f64,
+    map_warnings_ms: f64,
+    total_ms: f64,
+) {
+    if !compiler_profile_enabled() {
+        return;
+    }
+
+    let payload = format!(
+        concat!(
+            "{{",
+            "\"sourcePath\":{},",
+            "\"totalMs\":{:.2},",
+            "\"compileInternalMs\":{:.2},",
+            "\"extractScriptBlocksMs\":{:.2},",
+            "\"stripHtmlCommentsMs\":{:.2},",
+            "\"parseMs\":{:.2},",
+            "\"transformMs\":{:.2},",
+            "\"generateHtmlMs\":{:.2},",
+            "\"mapSignalsMs\":{:.2},",
+            "\"mapMarkerBindingsMs\":{:.2},",
+            "\"mapExpressionBindingsMs\":{:.2},",
+            "\"mapHoistedMs\":{:.2},",
+            "\"mapComponentScriptsMs\":{:.2},",
+            "\"mapComponentInstancesMs\":{:.2},",
+            "\"mapEventBindingsMs\":{:.2},",
+            "\"mapRefBindingsMs\":{:.2},",
+            "\"mapWarningsMs\":{:.2}",
+            "}}"
+        ),
+        format!("{source_path:?}"),
+        round_ms(total_ms),
+        round_ms(compile_internal_ms),
+        round_ms(internal.extract_script_blocks_ms),
+        round_ms(internal.strip_html_comments_ms),
+        round_ms(internal.parse_ms),
+        round_ms(internal.transform_ms),
+        round_ms(html_ms),
+        round_ms(map_signals_ms),
+        round_ms(map_marker_bindings_ms),
+        round_ms(map_expression_bindings_ms),
+        round_ms(map_hoisted_ms),
+        round_ms(map_component_scripts_ms),
+        round_ms(map_component_instances_ms),
+        round_ms(map_event_bindings_ms),
+        round_ms(map_ref_bindings_ms),
+        round_ms(map_warnings_ms),
+    );
+
+    eprintln!("[zenith-compiler-profile] {}", payload);
+
+    if let Some(parser_profile) = &internal.parser_profile {
+        let parser_payload = format!(
+            concat!(
+                "{{",
+                "\"sourcePath\":{},",
+                "\"trimWhitespaceMs\":{:.2},",
+                "\"syncCurrentTokenMs\":{:.2},",
+                "\"locationLookupMs\":{:.2},",
+                "\"locationLookupCalls\":{},",
+                "\"spanConstructionMs\":{:.2},",
+                "\"parseNodeMs\":{:.2},",
+                "\"parseExpressionMs\":{:.2},",
+                "\"parseElementMs\":{:.2},",
+                "\"parseAttributesMs\":{:.2},",
+                "\"parseChildrenMs\":{:.2},",
+                "\"contractGateMs\":{:.2},",
+                "\"containsMarkupMs\":{:.2},",
+                "\"lowerEmbeddedMarkupMs\":{:.2},",
+                "\"lexerNextTokenMs\":{:.2},",
+                "\"lexerLexTextMs\":{:.2},",
+                "\"lexerLexTagMs\":{:.2},",
+                "\"lexerLexStringMs\":{:.2},",
+                "\"lexerLexIdentifierMs\":{:.2},",
+                "\"lexerSkipWhitespaceMs\":{:.2},",
+                "\"lexerLexExpressionContentMs\":{:.2}",
+                "}}"
+            ),
+            format!("{source_path:?}"),
+            round_ms(parser_profile.trim_whitespace_ms),
+            round_ms(parser_profile.sync_current_token_ms),
+            round_ms(parser_profile.location_lookup_ms),
+            parser_profile.location_lookup_calls,
+            round_ms(parser_profile.span_construction_ms),
+            round_ms(parser_profile.parse_node_ms),
+            round_ms(parser_profile.parse_expression_ms),
+            round_ms(parser_profile.parse_element_ms),
+            round_ms(parser_profile.parse_attributes_ms),
+            round_ms(parser_profile.parse_children_ms),
+            round_ms(parser_profile.contract_gate_ms),
+            round_ms(parser_profile.contains_markup_ms),
+            round_ms(parser_profile.lower_embedded_markup_ms),
+            round_ms(parser_profile.lexer.next_token_ms),
+            round_ms(parser_profile.lexer.lex_text_ms),
+            round_ms(parser_profile.lexer.lex_tag_ms),
+            round_ms(parser_profile.lexer.lex_string_ms),
+            round_ms(parser_profile.lexer.lex_identifier_ms),
+            round_ms(parser_profile.lexer.skip_whitespace_ms),
+            round_ms(parser_profile.lexer.lex_expression_content_ms),
+        );
+        eprintln!("[zenith-parser-profile] {}", parser_payload);
+    }
+
+    if let Some(script_profile) = &internal.script_profile {
+        let script_payload = format!(
+            concat!(
+                "{{",
+                "\"sourcePath\":{},",
+                "\"openTagScanMs\":{:.2},",
+                "\"openTagCloseSearchMs\":{:.2},",
+                "\"updateTagDepthMs\":{:.2},",
+                "\"validateTagMs\":{:.2},",
+                "\"validateAttrExtractMs\":{:.2},",
+                "\"validateAttrCountMs\":{:.2},",
+                "\"closeTagSearchMs\":{:.2},",
+                "\"analyzeScriptMs\":{:.2},",
+                "\"analyzeSetupRegexMs\":{:.2},",
+                "\"analyzeImportWorkMs\":{:.2},",
+                "\"analyzeDeclScanMs\":{:.2},",
+                "\"analyzeBindingKindMs\":{:.2},",
+                "\"analyzeFunctionScanMs\":{:.2},",
+                "\"analyzeStateDeclScanMs\":{:.2},",
+                "\"analyzeRenameRewriteMs\":{:.2},",
+                "\"analyzeStateLowerMs\":{:.2},",
+                "\"analyzeLowerStateReadsMs\":{:.2},",
+                "\"analyzeDeclarationCollectMs\":{:.2},",
+                "\"analyzeFactoryCodeMs\":{:.2},",
+                "\"lineOffsetMs\":{:.2},",
+                "\"domLintMs\":{:.2}",
+                "}}"
+            ),
+            format!("{source_path:?}"),
+            round_ms(script_profile.open_tag_scan_ms),
+            round_ms(script_profile.open_tag_close_search_ms),
+            round_ms(script_profile.update_tag_depth_ms),
+            round_ms(script_profile.validate_tag_ms),
+            round_ms(script_profile.validate_attr_extract_ms),
+            round_ms(script_profile.validate_attr_count_ms),
+            round_ms(script_profile.close_tag_search_ms),
+            round_ms(script_profile.analyze_script_ms),
+            round_ms(script_profile.analyze_setup_regex_ms),
+            round_ms(script_profile.analyze_import_work_ms),
+            round_ms(script_profile.analyze_decl_scan_ms),
+            round_ms(script_profile.analyze_binding_kind_ms),
+            round_ms(script_profile.analyze_function_scan_ms),
+            round_ms(script_profile.analyze_state_decl_scan_ms),
+            round_ms(script_profile.analyze_rename_rewrite_ms),
+            round_ms(script_profile.analyze_state_lower_ms),
+            round_ms(script_profile.analyze_lower_state_reads_ms),
+            round_ms(script_profile.analyze_declaration_collect_ms),
+            round_ms(script_profile.analyze_factory_code_ms),
+            round_ms(script_profile.line_offset_ms),
+            round_ms(script_profile.dom_lint_ms),
+        );
+        eprintln!("[zenith-script-profile] {}", script_payload);
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CompileOptions {
@@ -354,7 +571,7 @@ pub fn compile(input: &str) -> Result<String, String> {
             _events,
             _ref_bindings,
             _warnings,
-        ) = compile_internal_result(input, "<inline>", options)?;
+        ) = compile_internal_result(input, "<inline>", options, None)?;
         Ok(generate(ast, expressions))
     });
 
@@ -378,6 +595,7 @@ fn compile_internal_result(
     input: &str,
     source_path: &str,
     options: CompileOptions,
+    mut timings: Option<&mut CompileInternalTimings>,
 ) -> Result<
     (
         crate::ast::Node,
@@ -392,12 +610,36 @@ fn compile_internal_result(
     ),
     String,
 > {
-    let (preprocessed, scripts, dom_lints) =
-        extract_script_blocks(input, source_path).map_err(|err| err.message)?;
-    let normalized = strip_html_comments(&preprocessed);
+    let extract_script_blocks_started_at = Instant::now();
+    let (preprocessed, scripts, dom_lints, script_profile) =
+        extract_script_blocks_with_profile(input, source_path, compiler_profile_enabled())
+            .map_err(|err| err.message)?;
+    if let Some(timings) = timings.as_deref_mut() {
+        timings.extract_script_blocks_ms =
+            extract_script_blocks_started_at.elapsed().as_secs_f64() * 1000.0;
+        timings.script_profile = Some(script_profile);
+    }
 
-    let mut parser = Parser::new_with_options(&normalized, options.embedded_markup_expressions);
+    let strip_html_comments_started_at = Instant::now();
+    let normalized = strip_html_comments(&preprocessed);
+    if let Some(timings) = timings.as_deref_mut() {
+        timings.strip_html_comments_ms =
+            strip_html_comments_started_at.elapsed().as_secs_f64() * 1000.0;
+    }
+
+    let parse_started_at = Instant::now();
+    let mut parser = Parser::new_with_profile_options(
+        &normalized,
+        options.embedded_markup_expressions,
+        compiler_profile_enabled(),
+    );
     let ast = parser.parse();
+    if let Some(timings) = timings.as_deref_mut() {
+        timings.parse_ms = parse_started_at.elapsed().as_secs_f64() * 1000.0;
+        timings.parser_profile = Some(parser.profile_metrics());
+    }
+
+    let transform_started_at = Instant::now();
     let (
         ast,
         expressions,
@@ -409,6 +651,9 @@ fn compile_internal_result(
         ref_bindings,
         mut warnings,
     ) = transform(ast, &scripts);
+    if let Some(timings) = timings.as_deref_mut() {
+        timings.transform_ms = transform_started_at.elapsed().as_secs_f64() * 1000.0;
+    }
     warnings.extend(dom_lints.into_iter().map(|l| TransformWarning {
         code: l.code,
         message: l.message,
@@ -445,25 +690,125 @@ fn compile_capture(
 ) -> Result<(CompilerOutput, Vec<CompileWarning>), String> {
     let result = std::panic::catch_unwind(|| {
         let (
-            ast,
+            html,
             expressions,
             hoisted,
             component_scripts,
             component_instances,
-            markers,
-            events,
+            signals,
+            marker_bindings,
+            expression_bindings,
+            event_bindings,
             ref_bindings,
             warnings,
-        ) = compile_internal_result(input, source_path, options)?;
-        let html = crate::codegen::generate_html(&ast);
-        let signals = map_signals(&hoisted);
-        let marker_bindings = map_markers(markers, source_path);
-        let marker_sources = marker_bindings
-            .iter()
-            .map(|marker| (marker.index, marker.source.clone()))
-            .collect::<BTreeMap<_, _>>();
-        let expression_bindings =
-            map_expression_bindings(&expressions, &hoisted, &signals, &marker_sources);
+        ) = {
+            let mut internal_timings = CompileInternalTimings::default();
+            let compile_internal_started_at = Instant::now();
+            let (
+                ast,
+                expressions,
+                hoisted,
+                component_scripts,
+                component_instances,
+                markers,
+                events,
+                ref_bindings,
+                warnings,
+            ) = compile_internal_result(input, source_path, options, Some(&mut internal_timings))?;
+            let compile_internal_ms = compile_internal_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let html_started_at = Instant::now();
+            let html = crate::codegen::generate_html(&ast);
+            let html_ms = html_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_signals_started_at = Instant::now();
+            let signals = map_signals(&hoisted);
+            let map_signals_ms = map_signals_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_marker_bindings_started_at = Instant::now();
+            let marker_bindings = map_markers(markers, source_path);
+            let map_marker_bindings_ms =
+                map_marker_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let marker_sources = marker_bindings
+                .iter()
+                .map(|marker| (marker.index, marker.source.clone()))
+                .collect::<BTreeMap<_, _>>();
+
+            let map_expression_bindings_started_at = Instant::now();
+            let expression_bindings =
+                map_expression_bindings(&expressions, &hoisted, &signals, &marker_sources);
+            let map_expression_bindings_ms =
+                map_expression_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_hoisted_started_at = Instant::now();
+            let hoisted_payload = map_hoisted(hoisted);
+            let map_hoisted_ms = map_hoisted_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_component_scripts_started_at = Instant::now();
+            let component_scripts_payload = map_component_scripts(component_scripts);
+            let map_component_scripts_ms =
+                map_component_scripts_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_component_instances_started_at = Instant::now();
+            let component_instances_payload = map_component_instances(component_instances);
+            let map_component_instances_ms =
+                map_component_instances_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_event_bindings_started_at = Instant::now();
+            let event_bindings_payload = map_events(events, source_path);
+            let map_event_bindings_ms =
+                map_event_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_ref_bindings_started_at = Instant::now();
+            let ref_bindings_payload = map_ref_bindings(ref_bindings, source_path);
+            let map_ref_bindings_ms = map_ref_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            let map_warnings_started_at = Instant::now();
+            let warnings_payload = map_warnings(warnings);
+            let map_warnings_ms = map_warnings_started_at.elapsed().as_secs_f64() * 1000.0;
+
+            emit_compiler_profile(
+                source_path,
+                &internal_timings,
+                compile_internal_ms,
+                html_ms,
+                map_signals_ms,
+                map_marker_bindings_ms,
+                map_expression_bindings_ms,
+                map_hoisted_ms,
+                map_component_scripts_ms,
+                map_component_instances_ms,
+                map_event_bindings_ms,
+                map_ref_bindings_ms,
+                map_warnings_ms,
+                compile_internal_ms
+                    + html_ms
+                    + map_signals_ms
+                    + map_marker_bindings_ms
+                    + map_expression_bindings_ms
+                    + map_hoisted_ms
+                    + map_component_scripts_ms
+                    + map_component_instances_ms
+                    + map_event_bindings_ms
+                    + map_ref_bindings_ms
+                    + map_warnings_ms,
+            );
+
+            (
+                html,
+                expressions,
+                hoisted_payload,
+                component_scripts_payload,
+                component_instances_payload,
+                signals,
+                marker_bindings,
+                expression_bindings,
+                event_bindings_payload,
+                ref_bindings_payload,
+                warnings_payload,
+            )
+        };
 
         let output = CompilerOutput {
             ir_version: IR_VERSION,
@@ -476,18 +821,18 @@ fn compile_capture(
             server_script: None,
             prerender: false,
             ssr_data: None,
-            hoisted: map_hoisted(hoisted),
-            components_scripts: map_component_scripts(component_scripts),
-            component_instances: map_component_instances(component_instances),
+            hoisted,
+            components_scripts: component_scripts,
+            component_instances,
             signals,
             expression_bindings,
             marker_bindings,
-            event_bindings: map_events(events, source_path),
-            ref_bindings: map_ref_bindings(ref_bindings, source_path),
+            event_bindings,
+            ref_bindings,
             style_blocks: Vec::new(),
         };
 
-        Ok((output, map_warnings(warnings)))
+        Ok((output, warnings))
     });
 
     match result {
@@ -598,6 +943,8 @@ fn map_expression_bindings(
         .iter()
         .map(|signal| (signal.state_index, signal.id))
         .collect::<BTreeMap<_, _>>();
+    let runtime_replacements =
+        build_runtime_expression_replacements(&hoisted.state_bindings, &signal_index_by_state);
 
     expressions
         .iter()
@@ -673,8 +1020,7 @@ fn map_expression_bindings(
                 literal: Some(expr.clone()),
                 compiled_expr: Some(compile_expression_for_runtime(
                     trimmed,
-                    &hoisted.state_bindings,
-                    &signal_index_by_state,
+                    &runtime_replacements,
                 )),
                 source: marker_sources.get(&index).cloned().unwrap_or(None),
             }
@@ -694,19 +1040,14 @@ fn is_safe_literal_binding(expr: &str) -> bool {
 }
 
 fn is_identifier(expr: &str) -> bool {
-    regex::Regex::new(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
-        .map(|re| re.is_match(expr))
-        .unwrap_or(false)
+    identifier_match_re().is_match(expr)
 }
 
 fn is_primitive_literal(expr: &str) -> bool {
     if matches!(expr, "true" | "false" | "null" | "undefined") {
         return true;
     }
-    if regex::Regex::new(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$")
-        .map(|re| re.is_match(expr))
-        .unwrap_or(false)
-    {
+    if primitive_number_re().is_match(expr) {
         return true;
     }
     if expr.len() >= 2 {
@@ -724,12 +1065,7 @@ fn is_primitive_literal(expr: &str) -> bool {
 }
 
 fn is_safe_member_chain_literal(expr: &str) -> bool {
-    let Ok(member_re) =
-        regex::Regex::new(r"^(?:params|data|ssr|props)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$")
-    else {
-        return false;
-    };
-    member_re.is_match(expr)
+    safe_member_chain_re().is_match(expr)
 }
 
 fn collect_signal_indices_from_expression(
@@ -737,14 +1073,15 @@ fn collect_signal_indices_from_expression(
     state_bindings: &[HoistedStateBinding],
     signal_index_by_state: &BTreeMap<usize, usize>,
 ) -> Vec<usize> {
-    let Ok(ident_re) = regex::Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b") else {
-        return Vec::new();
-    };
     let mut signal_indices = BTreeSet::new();
-    for capture in ident_re.captures_iter(expr) {
-        let Some(ident) = capture.get(1).map(|m| m.as_str()) else {
+    for capture in identifier_capture_re().captures_iter(expr) {
+        let Some(ident_match) = capture.get(1) else {
             continue;
         };
+        if ident_match.start() > 0 && expr.as_bytes().get(ident_match.start() - 1) == Some(&b'.') {
+            continue;
+        }
+        let ident = ident_match.as_str();
         let Some(state_index) = resolve_direct_state_index(ident, state_bindings) else {
             continue;
         };
@@ -756,21 +1093,40 @@ fn collect_signal_indices_from_expression(
     signal_indices.into_iter().collect()
 }
 
-fn compile_expression_for_runtime(
-    expr: &str,
+struct RuntimeExpressionReplacement {
+    access_pattern: String,
+    token_re: Regex,
+    replacement: String,
+}
+
+fn build_runtime_expression_replacements(
     state_bindings: &[HoistedStateBinding],
     signal_index_by_state: &BTreeMap<usize, usize>,
-) -> String {
-    let mut compiled = expr.to_string();
-    let mut replacements = Vec::new();
+) -> Vec<RuntimeExpressionReplacement> {
+    let mut alias_usage = BTreeMap::new();
+    for (state_index, binding) in state_bindings.iter().enumerate() {
+        let Some(alias) = derive_state_alias(&binding.key) else {
+            continue;
+        };
+        if alias == binding.key {
+            continue;
+        }
+        let entry = alias_usage.entry(alias).or_insert((0usize, 0usize));
+        if signal_index_by_state.contains_key(&state_index) {
+            entry.0 += 1;
+        } else {
+            entry.1 += 1;
+        }
+    }
 
+    let mut replacements = Vec::new();
     for (state_index, binding) in state_bindings.iter().enumerate() {
         let Some(signal_id) = signal_index_by_state.get(&state_index).copied() else {
             continue;
         };
         replacements.push((binding.key.clone(), signal_id));
         if let Some(alias) = derive_state_alias(&binding.key) {
-            if alias != binding.key {
+            if alias != binding.key && matches!(alias_usage.get(&alias), Some((1, 0))) {
                 replacements.push((alias, signal_id));
             }
         }
@@ -779,17 +1135,44 @@ fn compile_expression_for_runtime(
     replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0)));
     replacements.dedup_by(|a, b| a.0 == b.0);
 
-    for (ident, signal_id) in replacements {
-        let access_re = format!("{}.get()", ident);
-        let replacement = format!("signalMap.get({signal_id}).get()");
-        compiled = compiled.replace(&access_re, &replacement);
+    replacements
+        .into_iter()
+        .map(|(ident, signal_id)| RuntimeExpressionReplacement {
+            access_pattern: format!("{}.get()", ident),
+            token_re: Regex::new(&format!(r"\b{}\b", regex::escape(&ident)))
+                .expect("valid runtime expression replacement regex"),
+            replacement: format!("signalMap.get({signal_id}).get()"),
+        })
+        .collect()
+}
 
-        let Ok(re) = regex::Regex::new(&format!(r"\b{}\b", regex::escape(&ident))) else {
-            continue;
-        };
-        compiled = re.replace_all(&compiled, replacement.as_str()).into_owned();
+fn compile_expression_for_runtime(
+    expr: &str,
+    replacements: &[RuntimeExpressionReplacement],
+) -> String {
+    let mut compiled = expr.to_string();
+
+    for replacement in replacements {
+        compiled = compiled.replace(&replacement.access_pattern, &replacement.replacement);
+
+        let current_compiled = compiled.clone();
+        compiled = replacement
+            .token_re
+            .replace_all(&current_compiled, |caps: &regex::Captures| {
+                let m = caps.get(0).unwrap();
+                let start = m.start();
+
+                // Do not rewrite if it's a property access (preceded by '.')
+                if start > 0 && current_compiled.as_bytes().get(start - 1) == Some(&b'.') {
+                    return m.as_str().to_string();
+                }
+
+                replacement.replacement.clone()
+            })
+            .into_owned();
     }
 
+    compiled = compiled.replace("__zenith_fragment(", "__ctx.fragment(");
     compiled
 }
 
@@ -812,16 +1195,18 @@ fn resolve_state_index_from_expression(
     expr: &str,
     state_bindings: &[HoistedStateBinding],
 ) -> Option<usize> {
-    let ident_re = regex::Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b").ok()?;
     let mut matched_index: Option<usize> = None;
-    for cap in ident_re.captures_iter(expr) {
-        let ident = cap.get(1)?.as_str();
+    for cap in identifier_capture_re().captures_iter(expr) {
+        let ident_match = cap.get(1)?;
+        if ident_match.start() > 0 && expr.as_bytes().get(ident_match.start() - 1) == Some(&b'.') {
+            continue;
+        }
+        let ident = ident_match.as_str();
         if ident == "true" || ident == "false" || ident == "null" || ident == "undefined" {
             continue;
         }
-        let suffix = format!("_{}", ident);
         for (idx, binding) in state_bindings.iter().enumerate() {
-            if binding.key == ident || binding.key.ends_with(&suffix) {
+            if binding.key == ident || derive_state_alias(&binding.key).as_deref() == Some(ident) {
                 if matched_index.is_some() && matched_index != Some(idx) {
                     return None;
                 }

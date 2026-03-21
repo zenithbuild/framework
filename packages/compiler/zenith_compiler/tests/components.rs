@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 /// Precision Lock: Components are structurally identical to Elements.
 /// No resolution. No expansion. No special casing.
 /// Uppercase tag is convention only, NOT behavior.

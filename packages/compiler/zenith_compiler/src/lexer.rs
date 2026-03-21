@@ -1,5 +1,6 @@
 use std::iter::Peekable;
 use std::str::Chars;
+use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -21,24 +22,47 @@ enum LexMode {
     Tag,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct LexerProfileMetrics {
+    pub next_token_ms: f64,
+    pub lex_text_ms: f64,
+    pub lex_tag_ms: f64,
+    pub lex_string_ms: f64,
+    pub lex_identifier_ms: f64,
+    pub skip_whitespace_ms: f64,
+    pub lex_expression_content_ms: f64,
+    pub offset_to_line_col_ms: f64,
+    pub offset_to_line_col_calls: usize,
+}
+
 pub struct Lexer<'a> {
     _input: &'a str,
     chars: Peekable<Chars<'a>>,
+    line_starts: Vec<usize>,
     pos: usize,
     mode: LexMode,
     token_start: usize,
     token_end: usize,
+    profile_enabled: bool,
+    profile_metrics: LexerProfileMetrics,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
+        Self::new_with_profile(input, false)
+    }
+
+    pub fn new_with_profile(input: &'a str, profile_enabled: bool) -> Self {
         Self {
             _input: input,
             chars: input.chars().peekable(),
+            line_starts: build_line_starts(input),
             pos: 0,
             mode: LexMode::Text,
             token_start: 0,
             token_end: 0,
+            profile_enabled,
+            profile_metrics: LexerProfileMetrics::default(),
         }
     }
 
@@ -55,12 +79,16 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
+        let started_at = self.profile_enabled.then(Instant::now);
         self.token_start = self.pos;
         let token = match self.mode {
             LexMode::Text => self.lex_text(),
             LexMode::Tag => self.lex_tag(),
         };
         self.token_end = self.pos;
+        if let Some(started_at) = started_at {
+            self.profile_metrics.next_token_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
         token
     }
 
@@ -76,26 +104,25 @@ impl<'a> Lexer<'a> {
         self.pos
     }
 
-    pub fn offset_to_line_col(&self, offset: usize) -> (usize, usize) {
-        let mut line = 1usize;
-        let mut column = 1usize;
-        let mut seen = 0usize;
-        for ch in self._input.chars() {
-            if seen >= offset {
-                break;
-            }
-            if ch == '\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
-            seen += 1;
+    pub fn offset_to_line_col(&mut self, offset: usize) -> (usize, usize) {
+        let started_at = self.profile_enabled.then(Instant::now);
+        let line_index = self
+            .line_starts
+            .partition_point(|&line_start| line_start <= offset)
+            .saturating_sub(1);
+        let line_start = self.line_starts.get(line_index).copied().unwrap_or(0);
+        let line = line_index + 1;
+        let column = offset.saturating_sub(line_start) + 1;
+        if let Some(started_at) = started_at {
+            let elapsed_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+            self.profile_metrics.offset_to_line_col_ms += elapsed_ms;
+            self.profile_metrics.offset_to_line_col_calls += 1;
         }
         (line, column)
     }
 
     fn lex_text(&mut self) -> Token {
+        let started_at = self.profile_enabled.then(Instant::now);
         let mut text = String::new();
 
         while let Some(&c) = self.peek() {
@@ -104,17 +131,37 @@ impl<'a> Lexer<'a> {
                     if text.is_empty() {
                         self.advance(); // Eat '<'
                         self.mode = LexMode::Tag;
-                        return Token::Lt;
+                        let token = Token::Lt;
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     } else {
-                        return Token::Text(text);
+                        let token = Token::Text(text);
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     }
                 }
                 '{' => {
                     if text.is_empty() {
                         self.advance(); // Eat '{'
-                        return Token::LBrace;
+                        let token = Token::LBrace;
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     } else {
-                        return Token::Text(text);
+                        let token = Token::Text(text);
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     }
                 }
                 '}' => {
@@ -127,9 +174,19 @@ impl<'a> Lexer<'a> {
                     // Let's treating it as a distinct token so Parser can decide.
                     if text.is_empty() {
                         self.advance();
-                        return Token::RBrace;
+                        let token = Token::RBrace;
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     } else {
-                        return Token::Text(text);
+                        let token = Token::Text(text);
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_text_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return token;
                     }
                 }
                 _ => {
@@ -139,22 +196,36 @@ impl<'a> Lexer<'a> {
         }
 
         if !text.is_empty() {
-            Token::Text(text)
+            let token = Token::Text(text);
+            if let Some(started_at) = started_at {
+                self.profile_metrics.lex_text_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+            }
+            token
         } else {
-            Token::EOF
+            let token = Token::EOF;
+            if let Some(started_at) = started_at {
+                self.profile_metrics.lex_text_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+            }
+            token
         }
     }
 
     fn lex_tag(&mut self) -> Token {
+        let started_at = self.profile_enabled.then(Instant::now);
         self.skip_whitespace();
         self.token_start = self.pos;
 
         let c = match self.peek() {
             Some(&c) => c,
-            None => return Token::EOF,
+            None => {
+                if let Some(started_at) = started_at {
+                    self.profile_metrics.lex_tag_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+                }
+                return Token::EOF;
+            }
         };
 
-        match c {
+        let token = match c {
             '>' => {
                 self.advance();
                 self.mode = LexMode::Text;
@@ -197,16 +268,26 @@ impl<'a> Lexer<'a> {
                     panic!("Lexer error: unexpected char '{}' at pos {}", c, self.pos);
                 }
             }
+        };
+        if let Some(started_at) = started_at {
+            self.profile_metrics.lex_tag_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }
+        token
     }
 
     fn lex_string(&mut self) -> Token {
+        let started_at = self.profile_enabled.then(Instant::now);
         self.advance(); // Eat "
         let mut value = String::new();
         while let Some(&c) = self.peek() {
             if c == '"' {
                 self.advance(); // Eat closing "
-                return Token::StringLiteral(value);
+                let token = Token::StringLiteral(value);
+                if let Some(started_at) = started_at {
+                    self.profile_metrics.lex_string_ms +=
+                        started_at.elapsed().as_secs_f64() * 1000.0;
+                }
+                return token;
             }
             value.push(self.advance().unwrap());
         }
@@ -214,6 +295,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_identifier(&mut self) -> Token {
+        let started_at = self.profile_enabled.then(Instant::now);
         let mut name = String::new();
         while let Some(&c) = self.peek() {
             if is_ident_char(c) {
@@ -222,16 +304,24 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        Token::Identifier(name)
+        let token = Token::Identifier(name);
+        if let Some(started_at) = started_at {
+            self.profile_metrics.lex_identifier_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+        token
     }
 
     fn skip_whitespace(&mut self) {
+        let started_at = self.profile_enabled.then(Instant::now);
         while let Some(&c) = self.peek() {
             if c.is_whitespace() {
                 self.advance();
             } else {
                 break;
             }
+        }
+        if let Some(started_at) = started_at {
+            self.profile_metrics.skip_whitespace_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }
     }
 
@@ -244,6 +334,7 @@ impl<'a> Lexer<'a> {
     /// After returning, the lexer mode is restored to whatever it was before
     /// (Tag for attribute expressions, Text for text-node expressions).
     pub fn lex_expression_content(&mut self) -> String {
+        let started_at = self.profile_enabled.then(Instant::now);
         let saved_mode = self.mode;
         let mut content = String::new();
         let mut depth: usize = 1; // opening '{' already consumed
@@ -259,7 +350,12 @@ impl<'a> Lexer<'a> {
                     if depth == 0 {
                         // Matched closing brace — done.
                         self.mode = saved_mode;
-                        return content.trim().to_string();
+                        let value = content.trim().to_string();
+                        if let Some(started_at) = started_at {
+                            self.profile_metrics.lex_expression_content_ms +=
+                                started_at.elapsed().as_secs_f64() * 1000.0;
+                        }
+                        return value;
                     }
                     content.push(c);
                 }
@@ -363,6 +459,10 @@ impl<'a> Lexer<'a> {
             self.pos
         );
     }
+
+    pub fn profile_metrics(&self) -> LexerProfileMetrics {
+        self.profile_metrics.clone()
+    }
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -371,6 +471,16 @@ fn is_ident_start(c: char) -> bool {
 
 fn is_ident_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '-' || c == ':'
+}
+
+fn build_line_starts(input: &str) -> Vec<usize> {
+    let mut line_starts = vec![0];
+    for (index, ch) in input.chars().enumerate() {
+        if ch == '\n' {
+            line_starts.push(index + 1);
+        }
+    }
+    line_starts
 }
 
 #[cfg(test)]

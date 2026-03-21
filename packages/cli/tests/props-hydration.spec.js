@@ -280,7 +280,7 @@ describe('props hydration', () => {
         expect(pageJs).toMatch(/onPress:\s*___.*increment/);
         expect(pageJs).toMatch(/currentCount:\s*___.*count/);
         expect(pageJs).toMatch(/nextCount:\s*___.*count\.get\(\)\s*\+\s*1/);
-        expect(pageJs).toMatch(/memberHandler:\s*___.*handlers\.___.*increment/);
+        expect(pageJs).toMatch(/memberHandler:\s*___.*handlers\.increment/);
     });
 
     test('existing document-mode props test still works', async () => {

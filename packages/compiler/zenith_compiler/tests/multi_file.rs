@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // PHASE 7: MULTI-FILE STRUCTURAL ISOLATION
 // Each file produces isolated structural output.
