@@ -83,7 +83,7 @@ function runPublishTrain({ mode, dryRun = false }) {
   const logPath = path.join(tempDir, 'fake-npm.log');
 
   try {
-    const args = dryRun ? ['./scripts/publish-train.sh', '--dry-run'] : ['./scripts/publish-train.sh'];
+    const args = dryRun ? ['./scripts/publish-packages.sh', '--dry-run'] : ['./scripts/publish-packages.sh'];
     const result = spawnSync('bash', args, {
       cwd: ROOT,
       env: {

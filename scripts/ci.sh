@@ -21,9 +21,8 @@ bun run --cwd packages/language-server test
 bun run --cwd packages/language test
 bun run --cwd docs docs:gate
 node --test scripts/assert-tag-on-branch.spec.mjs
-node --test scripts/promote-latest.spec.mjs
-node --test scripts/publish-train-bootstrap.spec.mjs
-node --test scripts/publish-train-existing-package.spec.mjs
+node --test scripts/publish-packages-bootstrap.spec.mjs
+node --test scripts/publish-packages-existing-package.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
 
 cargo test --manifest-path packages/compiler/Cargo.toml

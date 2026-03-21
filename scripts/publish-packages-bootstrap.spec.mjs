@@ -56,7 +56,7 @@ test('publish-train aggregates missing bootstrap packages into one summary', () 
   const fakeNpm = createFakeNpm(tempDir, missingPackages);
 
   try {
-    const result = spawnSync('bash', ['./scripts/publish-train.sh'], {
+    const result = spawnSync('bash', ['./scripts/publish-packages.sh'], {
       cwd: root,
       env: {
         ...process.env,
