@@ -1,0 +1,32 @@
+{
+  "name": "my-studio",
+  "scripts": {
+    "fresh-start": "bun i && bun run rebuild",
+    "start": "docker compose up",
+    "drop": "docker compose down",
+    "build-extensions": "tsx ./scripts/build.ts",
+    "studio:apply-live-schema": "node ./scripts/apply-live-editorial-schema.mjs",
+    "studio:apply-taxonomy": "node ./scripts/apply-live-taxonomy.mjs",
+    "studio:apply-repo-sync": "node ./scripts/apply-repo-sync.mjs",
+    "refine:documentation": "python3 ./scripts/refine_documentation_ux.py",
+    "sync:docs": "node ./scripts/run-repo-sync.mjs documentation",
+    "sync:changelog": "node ./scripts/run-repo-sync.mjs changelogs",
+    "sync:posts": "node ./scripts/sync-live-posts.mjs",
+    "rebuild": "bun run build-extensions && docker build -t directus-cms-template . && docker compose up",
+    "dev": "docker compose up -d",
+    "docker:start-build": "docker compose up --build",
+    "restart": "bun run build && docker compose up --build"
+  },
+  "dependencies": {
+    "@directus/errors": "^2.0.1",
+    "@directus/extensions-sdk": "^13.0.4",
+    "@directus/sdk": "^19.1.0",
+    "@types/node": "^22.14.1",
+    "dotenv": "^16.5.0",
+    "esbuild": "^0.25.2",
+    "node-fetch": "^3.3.2",
+    "os": "^0.1.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
