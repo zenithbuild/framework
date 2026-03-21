@@ -30,7 +30,7 @@ export interface Props {
   onBlur?: (event: FocusEvent) => void;
 }
 
-const provenSoftNavRouteEntries = ["/", "/about", "/blog", "/docs"];
+const provenSoftNavRouteEntries = ["/", "/about", "/blog", "/changelog", "/docs"];
 const provenRouteEntrySet = new Set<string>(provenSoftNavRouteEntries);
 
 function normalizeRouteEntryHref(href: string | null | undefined): string {
@@ -220,8 +220,6 @@ const siteLinkContentClass =
   siteLinkSurface === "button"
     ? `relative z-10 ${siteLinkContentClassName}`.trim()
     : `contents ${siteLinkContentClassName}`.trim();
-const siteLinkAnchorClass = `${siteLinkResolvedClass}${siteLinkShouldRenderAnchor ? "" : " hidden"}`.trim();
-const siteLinkDisabledClass = `${siteLinkResolvedClass}${siteLinkShouldUseDisabledState ? "" : " hidden"}`.trim();
 
 function activeRootElement() {
   if (siteLinkShouldRenderAnchor) {
@@ -349,7 +347,8 @@ zenMount((ctx) => {
   <a
     ref={siteLinkAnchorRef}
     href={siteLinkHref || undefined}
-    class={siteLinkAnchorClass}
+    class={siteLinkResolvedClass}
+    style={siteLinkShouldRenderAnchor ? undefined : "display: none;"}
     data-zen-link={siteLinkShouldUseSoftNav ? "true" : undefined}
     target={siteLinkTarget || undefined}
     rel={siteLinkRel || undefined}
@@ -379,7 +378,8 @@ zenMount((ctx) => {
 
   <span
     ref={siteLinkDisabledRef}
-    class={siteLinkDisabledClass}
+    class={siteLinkResolvedClass}
+    style={siteLinkShouldUseDisabledState ? undefined : "display: none;"}
     id={siteLinkShouldUseDisabledState ? siteLinkId || undefined : undefined}
     title={siteLinkTitle || undefined}
     aria-label={siteLinkAriaLabel || undefined}

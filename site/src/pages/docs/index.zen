@@ -1,0 +1,29 @@
+<script server lang="ts">
+import { pageContent, siteContent } from "../../content/index";
+import { loadDocumentationLandingSource } from "../../server/documentationPageSource";
+
+export const load = async (_ctx) => {
+    const docsPageContent = pageContent.docs;
+    const docsSource = await loadDocumentationLandingSource();
+
+    return {
+        pageTitle: docsPageContent.pageTitle,
+        pageDescription: docsPageContent.description,
+        pageContent: docsPageContent,
+        docsSource,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        }
+    };
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import DocsLandingSurface from "@/components/surfaces/DocsLandingSurface.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <DocsLandingSurface content={data.pageContent} sections={data.docsSource.sections} sourceMode={data.docsSource.sourceMode} />
+</DefaultLayout>
