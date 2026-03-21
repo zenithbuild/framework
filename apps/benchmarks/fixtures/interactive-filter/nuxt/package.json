@@ -1,0 +1,12 @@
+{
+  "name": "bench-interactive-filter-nuxt",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "nuxt": "4.4.2"
+  }
+}

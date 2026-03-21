@@ -1,0 +1,85 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const categories = [
+  { id: "all", label: "All" },
+  { id: "compiler", label: "Compiler" },
+  { id: "runtime", label: "Runtime" },
+  { id: "tooling", label: "Tooling" },
+];
+
+const workflows = [
+  { category: "compiler", title: "Lower expression graphs", body: "Compiler-focused workflow used to validate authored output." },
+  { category: "compiler", title: "Audit marker emission", body: "Checks that generated binding markers remain deterministic." },
+  { category: "runtime", title: "Validate hydration payloads", body: "Runtime workflow focused on activation cost and payload integrity." },
+  { category: "runtime", title: "Inspect route boot", body: "Runtime workflow that keeps browser-side work observable." },
+  { category: "tooling", title: "Boot local dev", body: "Tooling-focused workflow centered on development startup." },
+  { category: "tooling", title: "Re-run targeted builds", body: "Tooling workflow used to reason about repeated local change cycles." },
+];
+---
+
+<BaseLayout title="Astro Interactive Filter Fixture">
+  <section class="stack">
+    <p data-benchmark-copy="lead">Interactive filter benchmark fixture for Astro.</p>
+    <h1>Small interactive surface with equivalent category controls.</h1>
+    <p>This case introduces client-side behavior while staying narrow enough for fair framework comparison.</p>
+  </section>
+
+  <section class="section stack" id="filters">
+    <div class="filters">
+      {categories.map((category, index) => (
+        <button
+          class="filter-button"
+          type="button"
+          data-category-button
+          data-category={category.id}
+          data-active={index === 0 ? "true" : "false"}
+          aria-pressed={index === 0 ? "true" : "false"}
+        >
+          {category.label}
+        </button>
+      ))}
+    </div>
+
+    <p>Showing <span data-visible-count>{workflows.length}</span> workflows.</p>
+
+    <div class="panel-grid">
+      {workflows.map((workflow) => (
+        <article class="panel" data-workflow-card data-category={workflow.category}>
+          <h2>{workflow.title}</h2>
+          <p>{workflow.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <script is:inline>
+    const buttons = Array.from(document.querySelectorAll("[data-category-button]"));
+    const cards = Array.from(document.querySelectorAll("[data-workflow-card]"));
+    const countNode = document.querySelector("[data-visible-count]");
+    let activeCategory = "all";
+
+    function syncFilters() {
+      let visibleCount = 0;
+      buttons.forEach((button) => {
+        button.dataset.active = button.dataset.category === activeCategory ? "true" : "false";
+        button.setAttribute("aria-pressed", button.dataset.category === activeCategory ? "true" : "false");
+      });
+      cards.forEach((card) => {
+        const visible = activeCategory === "all" || card.dataset.category === activeCategory;
+        card.hidden = !visible;
+        if (visible) visibleCount += 1;
+      });
+      if (countNode) countNode.textContent = String(visibleCount);
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        activeCategory = button.dataset.category || "all";
+        syncFilters();
+      });
+    });
+
+    syncFilters();
+  </script>
+</BaseLayout>

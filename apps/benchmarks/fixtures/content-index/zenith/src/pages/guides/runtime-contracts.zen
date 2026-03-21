@@ -1,0 +1,7 @@
+<DefaultLayout>
+  <section class="stack">
+    <p>Guide detail route.</p>
+    <h1>Runtime contracts</h1>
+    <p>This page gives the fixture a third detail route so route generation is not biased toward a single example.</p>
+  </section>
+</DefaultLayout>

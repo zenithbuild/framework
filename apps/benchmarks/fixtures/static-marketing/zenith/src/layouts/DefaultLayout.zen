@@ -1,0 +1,26 @@
+<script setup="ts">
+import "../styles/global.css";
+</script>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Benchmark Static Marketing</title>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <a href="/" class="brand">Static Marketing</a>
+      <nav class="site-nav">
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+    </header>
+    <main class="site-main">
+      <slot />
+    </main>
+  </div>
+</body>
+</html>
