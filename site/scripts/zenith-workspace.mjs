@@ -5,6 +5,7 @@ import { cp, mkdir, readdir } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createStartupProfiler } from "../../packages/cli/src/startup-profile.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,6 +18,7 @@ const bundlerWorkspaceRoot = resolve(repoRoot, "packages", "bundler");
 const bundlerWorkspaceSrcRoot = resolve(bundlerWorkspaceRoot, "src");
 const bundlerWorkspaceManifest = resolve(bundlerWorkspaceRoot, "Cargo.toml");
 let publicAssetSyncChain = Promise.resolve();
+const startupProfile = createStartupProfiler("site-wrapper");
 
 function compilerBinaryName() {
   return process.platform === "win32" ? "zenith-compiler.exe" : "zenith-compiler";
@@ -192,12 +194,21 @@ function ensureFreshWorkspaceBundlerBinary(expectedVersion = "") {
     return;
   }
 
-  const binaryMtimeMs = newestMtimeMs(env.ZENITH_BUNDLER_BIN);
-  const sourceMtimeMs = Math.max(
-    newestMtimeMs(bundlerWorkspaceSrcRoot),
-    newestMtimeMs(bundlerWorkspaceManifest),
+  const binaryMtimeMs = startupProfile.measureSync(
+    "bundler_binary_mtime_scan",
+    () => newestMtimeMs(env.ZENITH_BUNDLER_BIN),
   );
-  const actualVersion = readBinaryVersion(env.ZENITH_BUNDLER_BIN);
+  const sourceMtimeMs = startupProfile.measureSync(
+    "bundler_source_mtime_scan",
+    () => Math.max(
+      newestMtimeMs(bundlerWorkspaceSrcRoot),
+      newestMtimeMs(bundlerWorkspaceManifest),
+    ),
+  );
+  const actualVersion = startupProfile.measureSync(
+    "bundler_binary_version_read",
+    () => readBinaryVersion(env.ZENITH_BUNDLER_BIN),
+  );
   const hasVersionMismatch =
     typeof expectedVersion === "string" &&
     expectedVersion.length > 0 &&
@@ -206,17 +217,37 @@ function ensureFreshWorkspaceBundlerBinary(expectedVersion = "") {
     actualVersion !== expectedVersion;
 
   if (sourceMtimeMs <= binaryMtimeMs && !hasVersionMismatch) {
+    startupProfile.emit("bundler_freshness_check", {
+      action: "skip_rebuild",
+      sourceMtimeMs,
+      binaryMtimeMs,
+      hasVersionMismatch,
+      expectedVersion,
+      actualVersion,
+    });
     return;
   }
 
-  const rebuildResult = spawnSync(
-    "cargo",
-    ["build", "--manifest-path", bundlerWorkspaceManifest, "--release"],
-    {
-      cwd: repoRoot,
-      env,
-      stdio: "inherit",
-    },
+  startupProfile.emit("bundler_freshness_check", {
+    action: "rebuild",
+    sourceMtimeMs,
+    binaryMtimeMs,
+    hasVersionMismatch,
+    expectedVersion,
+    actualVersion,
+  });
+
+  const rebuildResult = startupProfile.measureSync(
+    "bundler_cargo_rebuild",
+    () => spawnSync(
+      "cargo",
+      ["build", "--manifest-path", bundlerWorkspaceManifest, "--release"],
+      {
+        cwd: repoRoot,
+        env,
+        stdio: "inherit",
+      },
+    ),
   );
 
   if (rebuildResult.error) {
@@ -389,29 +420,51 @@ function cliEntryCandidates() {
 }
 
 const env = { ...process.env };
-const expectedCliVersion = readExpectedCliVersion();
+const expectedCliVersion = startupProfile.measureSync(
+  "read_expected_cli_version",
+  () => readExpectedCliVersion(),
+);
 
 if (!env.ZENITH_COMPILER_BIN) {
   // The compiler binary reports its internal Rust crate version (`zenith_cli 0.2.0`)
   // instead of the npm package version, so select workspace compilers by their
   // package version hint before falling back to the reported binary version.
-  const compilerBin = matchingWorkspaceCompilerBinary(expectedCliVersion);
+  const compilerBin = startupProfile.measureSync(
+    "resolve_workspace_compiler_override",
+    () => matchingWorkspaceCompilerBinary(expectedCliVersion),
+    { expectedVersion: expectedCliVersion },
+  );
   if (compilerBin) {
     env.ZENITH_COMPILER_BIN = compilerBin;
   }
 }
 
 if (!env.ZENITH_BUNDLER_BIN) {
-  const bundlerBin = matchingWorkspaceBundlerBinary(expectedCliVersion);
+  const bundlerBin = startupProfile.measureSync(
+    "resolve_workspace_bundler_override",
+    () => matchingWorkspaceBundlerBinary(expectedCliVersion),
+    { expectedVersion: expectedCliVersion },
+  );
   if (bundlerBin) {
     env.ZENITH_BUNDLER_BIN = bundlerBin;
   }
 }
 
-ensureFreshWorkspaceBundlerBinary(expectedCliVersion);
-ensureMatchingWorkspaceBundlerOverride(expectedCliVersion);
+startupProfile.measureSync(
+  "ensure_fresh_workspace_bundler_binary",
+  () => ensureFreshWorkspaceBundlerBinary(expectedCliVersion),
+  { usingWorkspaceBundler: Boolean(env.ZENITH_BUNDLER_BIN) },
+);
+startupProfile.measureSync(
+  "ensure_matching_workspace_bundler_override",
+  () => ensureMatchingWorkspaceBundlerOverride(expectedCliVersion),
+  { usingWorkspaceBundler: Boolean(env.ZENITH_BUNDLER_BIN) },
+);
 
-const zenithCliEntry = firstExisting(cliEntryCandidates());
+const zenithCliEntry = startupProfile.measureSync(
+  "resolve_cli_entry",
+  () => firstExisting(cliEntryCandidates()),
+);
 if (!zenithCliEntry) {
   throw new Error("[zenith] Unable to resolve CLI entry for site workspace build.");
 }
@@ -422,9 +475,16 @@ if (resolve(zenithCliEntry).startsWith(resolve(repoRoot, "packages", "cli"))) {
 
 async function main() {
   const command = process.argv[2];
+  startupProfile.emit("command_start", {
+    command,
+    argv: process.argv.slice(2),
+    compilerOverride: Boolean(env.ZENITH_COMPILER_BIN),
+    bundlerOverride: Boolean(env.ZENITH_BUNDLER_BIN),
+  });
 
   if (command === "dev") {
     const stopPublicAssetSync = startDevPublicAssetSync(resolveDevServerOrigin(process.argv.slice(3)));
+    startupProfile.emit("spawn_cli", { command, entry: zenithCliEntry });
     const child = spawn(process.execPath, [zenithCliEntry, ...process.argv.slice(2)], {
       cwd: siteRoot,
       env,
@@ -453,21 +513,25 @@ async function main() {
   }
 
   if (command === "preview") {
-    await schedulePublicAssetSync();
+    await startupProfile.measureAsync("preview_public_asset_sync", () => schedulePublicAssetSync());
   }
 
-  const result = spawnSync(process.execPath, [zenithCliEntry, ...process.argv.slice(2)], {
-    cwd: siteRoot,
-    env,
-    stdio: "inherit",
-  });
+  const result = startupProfile.measureSync(
+    "spawn_sync_cli",
+    () => spawnSync(process.execPath, [zenithCliEntry, ...process.argv.slice(2)], {
+      cwd: siteRoot,
+      env,
+      stdio: "inherit",
+    }),
+    { command },
+  );
 
   if (result.error) {
     throw result.error;
   }
 
   if (command === "build" && result.status === 0) {
-    await schedulePublicAssetSync();
+    await startupProfile.measureAsync("build_public_asset_sync", () => schedulePublicAssetSync());
   }
 
   process.exit(result.status ?? 1);

@@ -5,7 +5,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // PHASE 12: PERFORMANCE & MEMORY VALIDATION
 // No unnecessary allocations. Linear complexity.

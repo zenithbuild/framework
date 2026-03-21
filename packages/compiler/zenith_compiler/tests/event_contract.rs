@@ -52,9 +52,8 @@ fn rejects_direct_call_event_handlers() {
 
 #[test]
 fn allows_inline_arrow_function_handlers() {
-    let output =
-        compile_structured(r#"<button on:click={(event) => submit(event)}></button>"#)
-            .expect("compile");
+    let output = compile_structured(r#"<button on:click={(event) => submit(event)}></button>"#)
+        .expect("compile");
 
     assert_eq!(output.event_bindings.len(), 1);
     assert_eq!(output.event_bindings[0].event, "click");

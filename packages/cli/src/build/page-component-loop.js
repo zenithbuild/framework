@@ -1,0 +1,480 @@
+import { readFileSync } from 'node:fs';
+import { performance } from 'node:perf_hooks';
+
+import { cloneComponentIrForInstance } from '../component-instance-ir.js';
+import { extractTemplate, isDocumentMode } from '../resolve-components.js';
+import {
+    buildComponentExpressionRewrite,
+    mergeExpressionRewriteMaps,
+    resolveStateKeyFromBindings
+} from './expression-rewrites.js';
+import { mergeComponentIr } from './merge-component-ir.js';
+import { buildScopedIdentifierRewrite } from './scoped-identifier-rewrite.js';
+import { stripStyleBlocks } from './compiler-runtime.js';
+import { extractDeclaredIdentifiers } from './typescript-expression-utils.js';
+
+function createEmptyExpressionRewrite() {
+    return {
+        map: new Map(),
+        bindings: new Map(),
+        signals: [],
+        stateBindings: [],
+        ambiguous: new Set(),
+        sequence: []
+    };
+}
+
+function createEmptyScopeRewrite() {
+    return {
+        map: new Map(),
+        ambiguous: new Set()
+    };
+}
+
+async function resolveComponentIr({
+    compPath,
+    componentSource,
+    compilerOpts,
+    compilerBin,
+    timedRunCompiler,
+    cooperativeYield,
+    componentIrCache,
+    compilerTotals,
+    pageStats,
+    startupProfile,
+    emitCompilerWarning
+}) {
+    let compIr;
+    if (componentIrCache.has(compPath)) {
+        compIr = componentIrCache.get(compPath);
+        compilerTotals.componentCacheHits += 1;
+        pageStats.pageComponentCacheHits += 1;
+    } else {
+        await cooperativeYield();
+        const componentCompileStartedAt = performance.now();
+        compIr = timedRunCompiler(
+            'component',
+            compPath,
+            stripStyleBlocks(componentSource),
+            compilerOpts,
+            { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
+        );
+        pageStats.pageComponentCompileMs += startupProfile.roundMs(performance.now() - componentCompileStartedAt);
+        compilerTotals.componentCacheMisses += 1;
+        pageStats.pageComponentCacheMisses += 1;
+        componentIrCache.set(compPath, compIr);
+    }
+
+    return compIr;
+}
+
+function resolveDocumentMode({
+    compPath,
+    componentSource,
+    componentDocumentModeCache,
+    pageComponentLoopBreakdown,
+    startupProfile
+}) {
+    let docMode = componentDocumentModeCache.get(compPath);
+    if (docMode === undefined) {
+        const componentDocModeStartedAt = performance.now();
+        docMode = isDocumentMode(extractTemplate(componentSource));
+        pageComponentLoopBreakdown.componentDocModeDetectMs += startupProfile.roundMs(
+            performance.now() - componentDocModeStartedAt
+        );
+        componentDocumentModeCache.set(compPath, docMode);
+    }
+    return docMode;
+}
+
+function resolveComponentExpressionRewrite({
+    compPath,
+    componentSource,
+    compIr,
+    compilerOpts,
+    compilerBin,
+    templateExpressionCache,
+    expressionRewriteMetrics,
+    componentExpressionRewriteCache,
+    pageComponentLoopBreakdown,
+    startupProfile
+}) {
+    let expressionRewrite = componentExpressionRewriteCache.get(compPath);
+    if (!expressionRewrite) {
+        const startedAt = performance.now();
+        expressionRewrite = buildComponentExpressionRewrite(
+            compPath,
+            componentSource,
+            compIr,
+            compilerOpts,
+            compilerBin,
+            templateExpressionCache,
+            expressionRewriteMetrics
+        );
+        pageComponentLoopBreakdown.componentExpressionRewriteBuildMs += startupProfile.roundMs(
+            performance.now() - startedAt
+        );
+        componentExpressionRewriteCache.set(compPath, expressionRewrite);
+    }
+    return expressionRewrite;
+}
+
+async function resolveOwnerRewriteContext({
+    occurrence,
+    sourceFile,
+    compilerOpts,
+    compilerBin,
+    timedRunCompiler,
+    cooperativeYield,
+    componentIrCache,
+    componentExpressionRewriteCache,
+    componentScopeRewriteCache,
+    templateExpressionCache,
+    expressionRewriteMetrics,
+    startupProfile,
+    compilerTotals,
+    emitCompilerWarning,
+    pageComponentLoopBreakdown,
+    pageStats,
+    pageOwnerExpressionRewrite,
+    pageOwnerScopeRewrite
+}) {
+    const ownerPath = typeof occurrence.ownerPath === 'string' && occurrence.ownerPath.length > 0
+        ? occurrence.ownerPath
+        : sourceFile;
+
+    if (ownerPath === sourceFile) {
+        return {
+            attrExpressionRewrite: pageOwnerExpressionRewrite,
+            attrScopeRewrite: pageOwnerScopeRewrite
+        };
+    }
+
+    let ownerIr = componentIrCache.get(ownerPath);
+    let ownerSource = null;
+
+    if (!ownerIr) {
+        const ownerSourceReadStartedAt = performance.now();
+        ownerSource = readFileSync(ownerPath, 'utf8');
+        pageComponentLoopBreakdown.ownerSourceReadMs += startupProfile.roundMs(
+            performance.now() - ownerSourceReadStartedAt
+        );
+        await cooperativeYield();
+        const ownerCompileStartedAt = performance.now();
+        ownerIr = timedRunCompiler(
+            'component',
+            ownerPath,
+            stripStyleBlocks(ownerSource),
+            compilerOpts,
+            { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
+        );
+        pageStats.pageComponentCompileMs += startupProfile.roundMs(performance.now() - ownerCompileStartedAt);
+        compilerTotals.componentCacheMisses += 1;
+        pageStats.pageComponentCacheMisses += 1;
+        componentIrCache.set(ownerPath, ownerIr);
+    } else {
+        compilerTotals.componentCacheHits += 1;
+        pageStats.pageComponentCacheHits += 1;
+    }
+
+    let attrExpressionRewrite = componentExpressionRewriteCache.get(ownerPath);
+    if (!attrExpressionRewrite) {
+        if (!ownerSource) {
+            const ownerSourceReadStartedAt = performance.now();
+            ownerSource = readFileSync(ownerPath, 'utf8');
+            pageComponentLoopBreakdown.ownerSourceReadMs += startupProfile.roundMs(
+                performance.now() - ownerSourceReadStartedAt
+            );
+        }
+        const startedAt = performance.now();
+        attrExpressionRewrite = buildComponentExpressionRewrite(
+            ownerPath,
+            ownerSource,
+            ownerIr,
+            compilerOpts,
+            compilerBin,
+            templateExpressionCache,
+            expressionRewriteMetrics
+        );
+        pageComponentLoopBreakdown.ownerExpressionRewriteBuildMs += startupProfile.roundMs(
+            performance.now() - startedAt
+        );
+        componentExpressionRewriteCache.set(ownerPath, attrExpressionRewrite);
+    }
+
+    let attrScopeRewrite = componentScopeRewriteCache.get(ownerPath);
+    if (!attrScopeRewrite) {
+        const startedAt = performance.now();
+        attrScopeRewrite = buildScopedIdentifierRewrite(ownerIr);
+        pageComponentLoopBreakdown.ownerScopeRewriteBuildMs += startupProfile.roundMs(
+            performance.now() - startedAt
+        );
+        componentScopeRewriteCache.set(ownerPath, attrScopeRewrite);
+    }
+
+    return { attrExpressionRewrite, attrScopeRewrite };
+}
+
+function resolveInstanceState({
+    useIsolatedInstance,
+    compIr,
+    compPath,
+    componentSource,
+    compilerOpts,
+    compilerBin,
+    templateExpressionCache,
+    expressionRewriteMetrics,
+    expressionRewrite,
+    startupProfile,
+    pagePhase,
+    componentInstanceCounter
+}) {
+    if (!useIsolatedInstance) {
+        return {
+            instanceIr: compIr,
+            refIdentifierPairs: [],
+            instanceRewrite: expressionRewrite,
+            componentInstanceCounter
+        };
+    }
+
+    const cloneStartedAt = performance.now();
+    const cloned = cloneComponentIrForInstance(
+        compIr,
+        componentInstanceCounter,
+        extractDeclaredIdentifiers,
+        resolveStateKeyFromBindings
+    );
+    pagePhase.cloneMs += startupProfile.roundMs(performance.now() - cloneStartedAt);
+
+    const instanceRewriteStartedAt = performance.now();
+    const instanceRewrite = buildComponentExpressionRewrite(
+        compPath,
+        componentSource,
+        cloned.ir,
+        compilerOpts,
+        compilerBin,
+        templateExpressionCache,
+        expressionRewriteMetrics
+    );
+    pagePhase.instanceRewriteMs += startupProfile.roundMs(performance.now() - instanceRewriteStartedAt);
+
+    return {
+        instanceIr: cloned.ir,
+        refIdentifierPairs: cloned.refIdentifierPairs,
+        instanceRewrite,
+        componentInstanceCounter: componentInstanceCounter + 1
+    };
+}
+
+export async function buildPageOwnerContext({
+    componentOccurrences,
+    sourceFile,
+    pageOwnerSource,
+    compilerOpts,
+    compilerBin,
+    timedRunCompiler,
+    cooperativeYield,
+    templateExpressionCache,
+    expressionRewriteMetrics,
+    startupProfile
+}) {
+    if (componentOccurrences.length === 0) {
+        return {
+            pageOwnerCompileMs: 0,
+            pageOwnerExpressionRewrite: createEmptyExpressionRewrite(),
+            pageOwnerScopeRewrite: createEmptyScopeRewrite()
+        };
+    }
+
+    await cooperativeYield();
+    const ownerStartedAt = performance.now();
+    const pageOwnerIr = timedRunCompiler(
+        'owner',
+        sourceFile,
+        pageOwnerSource,
+        compilerOpts,
+        { suppressWarnings: true, compilerToolchain: compilerBin }
+    );
+    const pageOwnerCompileMs = startupProfile.roundMs(performance.now() - ownerStartedAt);
+
+    return {
+        pageOwnerCompileMs,
+        pageOwnerExpressionRewrite: buildComponentExpressionRewrite(
+            sourceFile,
+            pageOwnerSource,
+            pageOwnerIr,
+            compilerOpts,
+            compilerBin,
+            templateExpressionCache,
+            expressionRewriteMetrics
+        ),
+        pageOwnerScopeRewrite: buildScopedIdentifierRewrite(pageOwnerIr)
+    };
+}
+
+export async function runPageComponentLoop({
+    componentOccurrences,
+    occurrenceCountByPath,
+    sourceFile,
+    registry,
+    compilerOpts,
+    compilerBin,
+    timedRunCompiler,
+    cooperativeYield,
+    startupProfile,
+    compilerTotals,
+    emitCompilerWarning,
+    componentIrCache,
+    componentDocumentModeCache,
+    componentExpressionRewriteCache,
+    templateExpressionCache,
+    expressionRewriteMetrics,
+    pageOwnerExpressionRewrite,
+    pageOwnerScopeRewrite,
+    pageIr,
+    pageIrMergeCache,
+    seenStaticImports,
+    pageExpressionRewriteMap,
+    pageExpressionBindingMap,
+    pageAmbiguousExpressionMap,
+    knownRefKeys,
+    componentOccurrencePlans,
+    pagePhase,
+    pageBindingResolutionBreakdown,
+    pageMergeBreakdown,
+    pageComponentLoopBreakdown,
+    hoistedCodeTransformCache,
+    pageStats
+}) {
+    const componentScopeRewriteCache = new Map();
+    let componentInstanceCounter = 0;
+
+    for (const occurrence of componentOccurrences) {
+        await cooperativeYield();
+        const compName = occurrence.name;
+        const compPath = occurrence.componentPath || registry.get(compName);
+        if (!compPath) {
+            continue;
+        }
+
+        const componentSourceReadStartedAt = performance.now();
+        const componentSource = readFileSync(compPath, 'utf8');
+        pageComponentLoopBreakdown.componentSourceReadMs += startupProfile.roundMs(
+            performance.now() - componentSourceReadStartedAt
+        );
+        const occurrenceCount = occurrenceCountByPath.get(compPath) || 0;
+
+        const compIr = await resolveComponentIr({
+            compPath,
+            componentSource,
+            compilerOpts,
+            compilerBin,
+            timedRunCompiler,
+            cooperativeYield,
+            componentIrCache,
+            compilerTotals,
+            pageStats,
+            startupProfile,
+            emitCompilerWarning
+        });
+        const isDocMode = resolveDocumentMode({
+            compPath,
+            componentSource,
+            componentDocumentModeCache,
+            pageComponentLoopBreakdown,
+            startupProfile
+        });
+        const expressionRewrite = resolveComponentExpressionRewrite({
+            compPath,
+            componentSource,
+            compIr,
+            compilerOpts,
+            compilerBin,
+            templateExpressionCache,
+            expressionRewriteMetrics,
+            componentExpressionRewriteCache,
+            pageComponentLoopBreakdown,
+            startupProfile
+        });
+        const { attrExpressionRewrite, attrScopeRewrite } = await resolveOwnerRewriteContext({
+            occurrence,
+            sourceFile,
+            compilerOpts,
+            compilerBin,
+            timedRunCompiler,
+            cooperativeYield,
+            componentIrCache,
+            componentExpressionRewriteCache,
+            componentScopeRewriteCache,
+            templateExpressionCache,
+            expressionRewriteMetrics,
+            startupProfile,
+            compilerTotals,
+            emitCompilerWarning,
+            pageComponentLoopBreakdown,
+            pageStats,
+            pageOwnerExpressionRewrite,
+            pageOwnerScopeRewrite
+        });
+
+        const useIsolatedInstance = occurrenceCount > 1;
+        const instanceState = resolveInstanceState({
+            useIsolatedInstance,
+            compIr,
+            compPath,
+            componentSource,
+            compilerOpts,
+            compilerBin,
+            templateExpressionCache,
+            expressionRewriteMetrics,
+            expressionRewrite,
+            startupProfile,
+            pagePhase,
+            componentInstanceCounter
+        });
+        componentInstanceCounter = instanceState.componentInstanceCounter;
+
+        const mergeStartedAt = performance.now();
+        mergeComponentIr(
+            pageIr,
+            instanceState.instanceIr,
+            compPath,
+            sourceFile,
+            {
+                includeCode: true,
+                cssImportsOnly: isDocMode,
+                documentMode: isDocMode,
+                componentAttrs: typeof occurrence.attrs === 'string' ? occurrence.attrs : '',
+                componentAttrsRewrite: {
+                    expressionRewrite: attrExpressionRewrite,
+                    scopeRewrite: attrScopeRewrite
+                }
+            },
+            seenStaticImports,
+            knownRefKeys,
+            pageIrMergeCache,
+            pageMergeBreakdown,
+            hoistedCodeTransformCache
+        );
+        pagePhase.mergeMs += startupProfile.roundMs(performance.now() - mergeStartedAt);
+
+        if (useIsolatedInstance) {
+            componentOccurrencePlans.push({
+                rewrite: instanceState.instanceRewrite,
+                expressionSequence: instanceState.instanceRewrite.sequence,
+                refSequence: instanceState.refIdentifierPairs
+            });
+            continue;
+        }
+
+        mergeExpressionRewriteMaps(
+            pageExpressionRewriteMap,
+            pageExpressionBindingMap,
+            pageAmbiguousExpressionMap,
+            expressionRewrite,
+            pageIrMergeCache,
+            pageBindingResolutionBreakdown
+        );
+    }
+}

@@ -1,0 +1,20 @@
+<script lang="ts">
+import Heading from "@/components/ui/Heading.zen";
+
+export interface Props {
+  title: string;
+}
+
+const pageTitleBaselineTitle = (props as Props).title;
+</script>
+
+<section class="w-full border-t border-border bg-background text-foreground">
+  <div class="grid min-h-[62svh] grid-cols-1 items-end gap-10 px-6 py-20 md:min-h-[68svh] md:grid-cols-12 md:px-12 md:py-28 xl:min-h-[72svh]">
+    <div class="hidden md:block md:col-span-2"></div>
+    <div class="md:col-span-10 xl:col-span-8 2xl:col-span-7">
+      <Heading size="section" class="text-[clamp(3.5rem,9.5vw,8rem)] leading-[0.8]">
+        {pageTitleBaselineTitle}
+      </Heading>
+    </div>
+  </div>
+</section>

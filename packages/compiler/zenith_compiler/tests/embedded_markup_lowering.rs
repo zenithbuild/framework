@@ -26,11 +26,7 @@ fn lowers_component_tags_inside_expression_to_fragments() {
 "##;
 
     let output = compile_with_embedded_markup(input).expect("compile should succeed");
-    let expr = output
-        .expressions
-        .first()
-        .cloned()
-        .unwrap_or_default();
+    let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
         expr.contains("__zenith_fragment("),
@@ -62,11 +58,7 @@ fn lowers_nested_markup_inside_markup_interpolations() {
 "#;
 
     let output = compile_with_embedded_markup(input).expect("compile should succeed");
-    let expr = output
-        .expressions
-        .first()
-        .cloned()
-        .unwrap_or_default();
+    let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
         expr.matches("__zenith_fragment(").count() >= 3,

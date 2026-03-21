@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // 6.1 STRUCTURAL INVARIANT TESTS
 // These are hard guarantees. If any fail, the compiler is broken.

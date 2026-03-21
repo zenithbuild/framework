@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Changelog",
+  "description": "Repo-synced Zenith release notes, version-by-version, through the narrow Directus read path.",
+  "intro": {
+    "eyebrow": "Changelog",
+    "title": "RELEASES. IN ORDER. NO DRIFT.",
+    "description": "The changelog keeps the release line explicit: published versions, repo-synced notes, and adjacent releases that stay tied to the real train instead of marketing copy."
+  },
+  "chips": [
+    "Repo markdown canonical",
+    "Directus read path narrow",
+    "Published releases only"
+  ],
+  "archive": {
+    "eyebrow": "Release archive",
+    "title": "Published notes from the train line.",
+    "description": "Release notes stay markdown-first in the repo, sync into Directus, and publish here as the narrow public release surface."
+  },
+  "labels": {
+    "trainPrefix": "Current train",
+    "featuredEyebrow": "Latest release",
+    "featuredActionLabel": "Read latest release",
+    "archiveEyebrow": "Archive",
+    "archiveTitle": "Earlier releases and adjacent notes.",
+    "archiveDescription": "Versioned notes stay ordered, public, and easy to scan without widening the rest of the site content boundary.",
+    "postActionLabel": "Read release",
+    "publishedLabel": "Published",
+    "updatedLabel": "Updated",
+    "authorLabel": "Author",
+    "relatedLabel": "Adjacent releases",
+    "backLabel": "All releases"
+  },
+  "cta": {
+    "eyebrow": "Next reading",
+    "title": "Read the release, then open the contract.",
+    "description": "The changelog records what shipped. The docs hold the stable public contract the release is expected to honor.",
+    "href": "/docs",
+    "label": "Open docs"
+  }
+}
