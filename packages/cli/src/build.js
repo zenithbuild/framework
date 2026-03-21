@@ -23,6 +23,8 @@ import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
 export { createCompilerWarningEmitter };
 
+const RUNTIME_MARKUP_BINDING = '__ZENITH_INTERNAL_ZENHTML';
+
 function createCompilerTotals() {
     return {
         pageMs: 0,
@@ -77,15 +79,7 @@ export async function build(options) {
     }
 
     const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
-    if (registry.size > 0) {
-        if (logger && typeof logger.build === 'function') {
-            logger.build(`registry=${registry.size} components`, {
-                onceKey: `component-registry:${registry.size}`
-            });
-        } else {
-            console.log(`[zenith] Component registry: ${registry.size} components`);
-        }
-    }
+    void RUNTIME_MARKUP_BINDING;
 
     const manifest = await startupProfile.measureAsync('generate_manifest', () => generateManifest(pagesDir));
     await startupProfile.measureAsync('ensure_zenith_type_declarations', () => ensureZenithTypeDeclarations({

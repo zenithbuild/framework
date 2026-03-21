@@ -1,5 +1,9 @@
 import { rewritePropsExpression } from './scoped-identifier-rewrite.js';
 import { resolveStateKeyFromBindings } from './expression-rewrites.js';
+import {
+    expandScopedShorthandPropertiesInSource,
+    normalizeTypeScriptExpression
+} from './typescript-expression-utils.js';
 
 /**
  * @param {object} pageIr
@@ -338,6 +342,51 @@ export function normalizeExpressionBindingDependencies(pageIr) {
                 `signalMap.get(${signalIndices[0]})`
             );
         }
+    }
+}
+
+export function normalizeExpressionPayload(pageIr) {
+    if (!Array.isArray(pageIr?.expressions) || pageIr.expressions.length === 0) {
+        return;
+    }
+    const bindings = Array.isArray(pageIr.expression_bindings) ? pageIr.expression_bindings : [];
+
+    for (let index = 0; index < pageIr.expressions.length; index++) {
+        if (typeof pageIr.expressions[index] === 'string') {
+            pageIr.expressions[index] = normalizeTypeScriptExpression(pageIr.expressions[index]);
+        }
+        const binding = bindings[index];
+        if (!binding || typeof binding !== 'object') {
+            continue;
+        }
+        if (typeof binding.literal === 'string') {
+            binding.literal = normalizeTypeScriptExpression(binding.literal);
+        }
+        if (typeof binding.compiled_expr === 'string') {
+            binding.compiled_expr = normalizeTypeScriptExpression(binding.compiled_expr);
+        }
+    }
+}
+
+export function normalizeHoistedSourcePayload(pageIr) {
+    const declarations = Array.isArray(pageIr?.hoisted?.declarations) ? pageIr.hoisted.declarations : null;
+    if (declarations) {
+        pageIr.hoisted.declarations = declarations.map((entry) => {
+            if (typeof entry !== 'string') {
+                return entry;
+            }
+            return expandScopedShorthandPropertiesInSource(entry);
+        });
+    }
+
+    const codeBlocks = Array.isArray(pageIr?.hoisted?.code) ? pageIr.hoisted.code : null;
+    if (codeBlocks) {
+        pageIr.hoisted.code = codeBlocks.map((entry) => {
+            if (typeof entry !== 'string') {
+                return entry;
+            }
+            return expandScopedShorthandPropertiesInSource(entry);
+        });
     }
 }
 

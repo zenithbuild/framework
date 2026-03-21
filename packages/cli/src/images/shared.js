@@ -1,14 +1,14 @@
-const DEFAULT_DEVICE_SIZES = Object.freeze([640, 750, 828, 1080, 1200, 1920, 2048, 3840]);
-const DEFAULT_IMAGE_SIZES = Object.freeze([16, 32, 48, 64, 96, 128, 256, 384]);
-const DEFAULT_FORMATS = Object.freeze(['webp', 'avif']);
-const DEFAULT_REMOTE_PATTERNS = Object.freeze([]);
+const DEFAULT_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
+const DEFAULT_IMAGE_SIZES = [16, 32, 48, 64, 96, 128, 256, 384];
+const DEFAULT_FORMATS = ['webp', 'avif'];
+const DEFAULT_REMOTE_PATTERNS = [];
 const DEFAULT_MAX_REMOTE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_PIXELS = 40_000_000;
 const DEFAULT_MINIMUM_CACHE_TTL = 60;
 const DEFAULT_QUALITY = 75;
 const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
 
-export const DEFAULT_IMAGE_CONFIG = Object.freeze({
+export const DEFAULT_IMAGE_CONFIG = {
     formats: DEFAULT_FORMATS,
     quality: DEFAULT_QUALITY,
     deviceSizes: DEFAULT_DEVICE_SIZES,
@@ -19,7 +19,7 @@ export const DEFAULT_IMAGE_CONFIG = Object.freeze({
     maxPixels: DEFAULT_MAX_PIXELS,
     minimumCacheTTL: DEFAULT_MINIMUM_CACHE_TTL,
     dangerouslyAllowLocalNetwork: false
-});
+};
 
 const TOP_LEVEL_KEYS = new Set([
     'formats',
@@ -97,9 +97,21 @@ function normalizeRemotePattern(pattern) {
     };
 }
 
+function cloneImageConfig(config = DEFAULT_IMAGE_CONFIG) {
+    return {
+        ...config,
+        formats: [...(config.formats || [])],
+        deviceSizes: [...(config.deviceSizes || [])],
+        imageSizes: [...(config.imageSizes || [])],
+        remotePatterns: Array.isArray(config.remotePatterns)
+            ? config.remotePatterns.map((pattern) => ({ ...pattern }))
+            : []
+    };
+}
+
 export function normalizeImageConfig(input) {
     if (input === undefined || input === null) {
-        return { ...DEFAULT_IMAGE_CONFIG };
+        return cloneImageConfig(DEFAULT_IMAGE_CONFIG);
     }
     if (!isPlainObject(input)) {
         throw new Error('[Zenith:Config] images must be a plain object');
@@ -111,9 +123,7 @@ export function normalizeImageConfig(input) {
         }
     }
 
-    const config = {
-        ...DEFAULT_IMAGE_CONFIG
-    };
+    const config = cloneImageConfig(DEFAULT_IMAGE_CONFIG);
 
     if ('formats' in input) {
         config.formats = normalizeStringArray(input.formats, 'formats');

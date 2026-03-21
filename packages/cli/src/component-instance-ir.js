@@ -1,3 +1,5 @@
+import { loadTypeScriptApi } from './build/compiler-runtime.js';
+
 function deepClone(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
@@ -14,6 +16,85 @@ function replaceIdentifierRefs(input, renamePlan) {
         output = output.replace(entry.pattern, entry.to);
     }
     return output;
+}
+
+function replaceIdentifierRefsInStatementSource(input, renameEntries, renamePlan) {
+    const source = String(input || '');
+    if (!source.trim()) {
+        return source;
+    }
+
+    const ts = loadTypeScriptApi();
+    if (!ts) {
+        return replaceIdentifierRefs(source, renamePlan);
+    }
+
+    let sourceFile;
+    try {
+        sourceFile = ts.createSourceFile(
+            'zenith-instance-clone.ts',
+            source,
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TS
+        );
+    } catch {
+        return replaceIdentifierRefs(source, renamePlan);
+    }
+
+    const renameMap = new Map(renameEntries);
+    const shouldRenameIdentifier = (node) => {
+        const parent = node.parent;
+        if (!parent) {
+            return true;
+        }
+        if (ts.isPropertyAccessExpression(parent) && parent.name === node) {
+            return false;
+        }
+        if (ts.isPropertyAssignment(parent) && parent.name === node) {
+            return false;
+        }
+        if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
+            return false;
+        }
+        if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) {
+            return false;
+        }
+        return true;
+    };
+
+    const transformer = (context) => {
+        const visit = (node) => {
+            if (ts.isShorthandPropertyAssignment(node)) {
+                const rewritten = renameMap.get(node.name.text);
+                if (typeof rewritten === 'string' && rewritten.length > 0) {
+                    return ts.factory.createPropertyAssignment(
+                        ts.factory.createIdentifier(node.name.text),
+                        ts.factory.createIdentifier(rewritten)
+                    );
+                }
+            }
+            if (ts.isIdentifier(node) && shouldRenameIdentifier(node)) {
+                const rewritten = renameMap.get(node.text);
+                if (typeof rewritten === 'string' && rewritten.length > 0 && rewritten !== node.text) {
+                    return ts.factory.createIdentifier(rewritten);
+                }
+            }
+            return ts.visitEachChild(node, visit, context);
+        };
+        return (node) => ts.visitNode(node, visit);
+    };
+
+    const result = ts.transform(sourceFile, [transformer]);
+    try {
+        return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+            .printFile(result.transformed[0])
+            .trimEnd();
+    } catch {
+        return replaceIdentifierRefs(source, renamePlan);
+    } finally {
+        result.dispose();
+    }
 }
 
 function collectRenameTargets(compIr, extractDeclaredIdentifiers) {
@@ -120,6 +201,7 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
     const renamePlan = renameEntries
         .sort((left, right) => right[0].length - left[0].length)
         .map(([from, to]) => ({
+            from,
             pattern: new RegExp(`\\b${escapeIdentifier(from)}\\b`, 'g'),
             to
         }));
@@ -151,7 +233,7 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
 
     if (cloned?.hoisted) {
         if (Array.isArray(cloned.hoisted.declarations)) {
-            cloned.hoisted.declarations = cloned.hoisted.declarations.map((line) => replaceIdentifierRefs(line, renamePlan));
+            cloned.hoisted.declarations = cloned.hoisted.declarations.map((line) => replaceIdentifierRefsInStatementSource(line, renameEntries, renamePlan));
         }
         if (Array.isArray(cloned.hoisted.functions)) {
             cloned.hoisted.functions = cloned.hoisted.functions.map((name) => renameMap.get(name) || name);
@@ -170,7 +252,7 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
             });
         }
         if (Array.isArray(cloned.hoisted.code)) {
-            cloned.hoisted.code = cloned.hoisted.code.map((line) => replaceIdentifierRefs(line, renamePlan));
+            cloned.hoisted.code = cloned.hoisted.code.map((line) => replaceIdentifierRefsInStatementSource(line, renameEntries, renamePlan));
         }
     }
 

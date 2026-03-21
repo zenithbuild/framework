@@ -156,11 +156,32 @@ function collectEnvelopeAssetContract(envelope) {
     };
 }
 
+function collectTemplateClassSignature(envelope) {
+    const html = typeof envelope?.ir?.html === 'string' ? envelope.ir.html : '';
+    if (!html) {
+        return [];
+    }
+    const classes = new Set();
+    const classAttrRe = /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+    let match;
+    while ((match = classAttrRe.exec(html)) !== null) {
+        const rawValue = String(match[1] || match[2] || '');
+        for (const token of rawValue.split(/\s+/)) {
+            const value = token.trim();
+            if (value.length > 0) {
+                classes.add(value);
+            }
+        }
+    }
+    return [...classes].sort();
+}
+
 function buildPageOnlyFastPathSignature(envelope) {
     return stableJson({
         route: envelope.route,
         router: envelope.router === true,
         assetContract: collectEnvelopeAssetContract(envelope),
+        templateClassSignature: collectTemplateClassSignature(envelope),
         styleBlocks: envelope.ir.style_blocks || [],
         serverScript: envelope.ir.server_script || null,
         prerender: envelope.ir.prerender === true,

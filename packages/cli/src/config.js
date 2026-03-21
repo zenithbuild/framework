@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { normalizeImageConfig } from './images/shared.js';
 
-export const DEFAULT_CONFIG = Object.freeze({
+export const DEFAULT_CONFIG = {
     router: false,
     embeddedMarkupExpressions: false,
     types: true,
@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     experimental: {},
     strictDomLints: false,
     images: normalizeImageConfig()
-});
+};
 
 const TOP_LEVEL_SCHEMA = {
     router: 'boolean',
@@ -93,4 +93,3 @@ export async function loadConfig(projectRoot) {
         throw error;
     }
 }
-

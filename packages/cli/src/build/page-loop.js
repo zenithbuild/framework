@@ -17,6 +17,8 @@ import {
     applyExpressionRewrites,
     applyScopedIdentifierRewrites,
     normalizeExpressionBindingDependencies,
+    normalizeExpressionPayload,
+    normalizeHoistedSourcePayload,
     rewriteLegacyMarkupIdentifiers,
     rewriteRefBindingIdentifiers,
     synthesizeSignalBackedCompiledExpressions
@@ -277,6 +279,8 @@ export async function buildPageEnvelopes(input) {
         pagePhase.scopedRewriteMs = startupProfile.roundMs(performance.now() - scopedRewriteStartedAt);
         const normalizeStartedAt = performance.now();
         synthesizeSignalBackedCompiledExpressions(pageIr);
+        normalizeExpressionPayload(pageIr);
+        normalizeHoistedSourcePayload(pageIr);
         normalizeExpressionBindingDependencies(pageIr);
         rewriteLegacyMarkupIdentifiers(pageIr);
         rewriteRefBindingIdentifiers(pageIr, knownRefKeys);

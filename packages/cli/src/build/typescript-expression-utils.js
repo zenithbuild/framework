@@ -11,6 +11,16 @@ export function renderObjectKey(key) {
     return JSON.stringify(key);
 }
 
+function deriveScopedIdentifierAlias(value) {
+    const ident = String(value || '').trim();
+    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ident)) {
+        return null;
+    }
+    const parts = ident.split('_').filter(Boolean);
+    const candidate = parts.length > 1 ? parts[parts.length - 1] : ident;
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(candidate) ? candidate : ident;
+}
+
 /**
  * @param {string} source
  * @returns {string[]}
@@ -129,6 +139,52 @@ export function normalizeTypeScriptExpression(expr) {
     }
 
     return source;
+}
+
+export function expandScopedShorthandPropertiesInSource(source) {
+    const text = String(source || '');
+    if (!text.trim()) {
+        return text;
+    }
+
+    const ts = loadTypeScriptApi();
+    if (!ts) {
+        return text;
+    }
+
+    let sourceFile;
+    try {
+        sourceFile = ts.createSourceFile('zenith-shorthand-fix.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    } catch {
+        return text;
+    }
+
+    const transformer = (context) => {
+        const visit = (node) => {
+            if (ts.isShorthandPropertyAssignment(node)) {
+                const alias = deriveScopedIdentifierAlias(node.name.text);
+                if (typeof alias === 'string' && alias.length > 0 && alias !== node.name.text) {
+                    return ts.factory.createPropertyAssignment(
+                        ts.factory.createIdentifier(alias),
+                        ts.factory.createIdentifier(node.name.text)
+                    );
+                }
+            }
+            return ts.visitEachChild(node, visit, context);
+        };
+        return (node) => ts.visitNode(node, visit);
+    };
+
+    const result = ts.transform(sourceFile, [transformer]);
+    try {
+        return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+            .printFile(result.transformed[0])
+            .trimEnd();
+    } catch {
+        return text;
+    } finally {
+        result.dispose();
+    }
 }
 
 /**

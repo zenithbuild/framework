@@ -8,16 +8,16 @@ const CLI_ENTRY = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 const SPINNER_REGEX = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g;
 
 function makeInvalidProject() {
-    const root = mkdtempSync(join(tmpdir(), 'zenith-cli-ui-errors-'));
-    mkdirSync(join(root, 'pages'), { recursive: true });
-    writeFileSync(
-        join(root, 'pages', 'index.zen'),
-        [
-            '<script server>',
-            'export const data = { bad: true };',
-            '</script>',
-            '<main>Broken</main>'
-        ].join('\n'),
+        const root = mkdtempSync(join(tmpdir(), 'zenith-cli-ui-errors-'));
+        mkdirSync(join(root, 'pages'), { recursive: true });
+        writeFileSync(
+            join(root, 'pages', 'index.zen'),
+            [
+                '<script server lang="js">',
+                'export const data = { bad: true };',
+                '</script>',
+                '<main>Broken</main>'
+            ].join('\n'),
         'utf8'
     );
     return root;
