@@ -1,0 +1,61 @@
+{
+	"name": "@directus-labs/liquidjs-operation",
+	"type": "module",
+	"version": "1.1.0",
+	"description": "Render Liquid templates within Directus flows.",
+	"license": "MIT",
+	"keywords": [
+		"directus",
+		"directus-extension",
+		"directus-extension-operation"
+	],
+	"icon": "extension",
+	"files": [
+		"dist"
+	],
+	"directus:extension": {
+		"type": "operation",
+		"path": {
+			"app": "dist/app.js",
+			"api": "dist/api.js"
+		},
+		"source": {
+			"app": "src/app.ts",
+			"api": "src/api.ts"
+		},
+		"host": "^10.10.0",
+		"sandbox": {
+			"enabled": true,
+			"requestedScopes": {
+				"log": {},
+				"request": {
+					"methods": [
+						"GET"
+					],
+					"urls": [
+						"http://*",
+						"https://*"
+					]
+				}
+			}
+		}
+	},
+	"scripts": {
+		"build": "directus-extension build",
+		"dev": "directus-extension build -w --no-minify",
+		"link": "directus-extension link",
+		"validate": "directus-extension validate"
+	},
+	"peerDependencies": {
+		"liquidjs": "10.20.1"
+	},
+	"dependencies": {
+		"liquidjs": "10.20.1"
+	},
+	"devDependencies": {
+		"@directus/extensions-sdk": "13.0.1",
+		"@types/node": "^22.13.1",
+		"typescript": "^5.7.3",
+		"vue": "^3.5.13"
+	}
+}

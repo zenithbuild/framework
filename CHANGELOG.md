@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+- Added the Directus editorial workspace, extension build tooling, and repo-sync content flows for CMS deployment testing.
+
 ## [0.6.18] - 2026-03-13
 
 ### Changed
