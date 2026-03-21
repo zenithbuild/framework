@@ -1,0 +1,13 @@
+{
+  "name": "benchmark-interactive-filter-zenith",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../../../../packages/cli/dist/index.js dev",
+    "build": "node ../../../../../packages/cli/dist/index.js build",
+    "preview": "node ../../../../../packages/cli/dist/index.js preview"
+  },
+  "dependencies": {
+    "@zenithbuild/core": "file:../../../../../packages/core"
+  }
+}

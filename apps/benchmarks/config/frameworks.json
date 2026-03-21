@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "frameworks": [
+    {
+      "id": "zenith",
+      "label": "Zenith Workspace Head",
+      "fixtureSubdir": "zenith",
+      "packageManager": "npm",
+      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "rebuildSettle": {
+        "mode": "dev-state"
+      },
+      "cleanPaths": ["dist", ".zenith"],
+      "buildArtifacts": ["dist"],
+      "env": {
+        "ZENITH_STARTUP_PROFILE": "1"
+      },
+      "commands": {
+        "install": ["npm", "install", "--silent"],
+        "build": ["npm", "run", "build", "--silent"],
+        "dev": ["npm", "run", "dev", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"]
+      },
+      "readyProbe": {
+        "mode": "json-status",
+        "path": "/__zenith_dev/state",
+        "expectStatus": 200,
+        "expectStateStatus": "ok"
+      }
+    },
+    {
+      "id": "astro",
+      "label": "Astro",
+      "fixtureSubdir": "astro",
+      "packageManager": "npm",
+      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "rebuildSettle": {
+        "mode": "browser-probe"
+      },
+      "cleanPaths": ["dist", ".astro"],
+      "buildArtifacts": ["dist"],
+      "env": {
+        "ASTRO_TELEMETRY_DISABLED": "1"
+      },
+      "commands": {
+        "install": ["npm", "install", "--silent"],
+        "build": ["npm", "run", "build", "--silent"],
+        "dev": ["npm", "run", "dev", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"]
+      },
+      "readyProbe": {
+        "mode": "http-status",
+        "path": "/",
+        "expectStatus": 200,
+        "expectStateStatus": "ok"
+      }
+    },
+    {
+      "id": "next-app-router",
+      "label": "Next App Router",
+      "fixtureSubdir": "next-app-router",
+      "packageManager": "npm",
+      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "rebuildSettle": {
+        "mode": "browser-probe"
+      },
+      "cleanPaths": [".next"],
+      "buildArtifacts": [".next"],
+      "env": {
+        "NEXT_TELEMETRY_DISABLED": "1"
+      },
+      "commands": {
+        "install": ["npm", "install", "--silent"],
+        "build": ["npm", "run", "build", "--silent"],
+        "dev": ["npm", "run", "dev", "--silent", "--", "--hostname", "127.0.0.1", "--port", "$PORT"]
+      },
+      "readyProbe": {
+        "mode": "http-status",
+        "path": "/",
+        "expectStatus": 200,
+        "expectStateStatus": "ok"
+      }
+    },
+    {
+      "id": "nuxt",
+      "label": "Nuxt",
+      "fixtureSubdir": "nuxt",
+      "packageManager": "npm",
+      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "rebuildSettle": {
+        "mode": "browser-probe"
+      },
+      "cleanPaths": [".output", ".nuxt"],
+      "buildArtifacts": [".output"],
+      "env": {
+        "NUXT_TELEMETRY_DISABLED": "1"
+      },
+      "commands": {
+        "install": ["npm", "install", "--silent"],
+        "build": ["npm", "run", "build", "--silent"],
+        "dev": ["npm", "run", "dev", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"]
+      },
+      "readyProbe": {
+        "mode": "http-status",
+        "path": "/",
+        "expectStatus": 200,
+        "expectStateStatus": "ok"
+      }
+    }
+  ]
+}

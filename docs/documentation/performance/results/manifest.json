@@ -1,0 +1,128 @@
+{
+  "index": {
+    "title": "Benchmark Results",
+    "description": "Generated draft run and comparison pages derived from validated benchmark result JSON.",
+    "intro": [
+      "This area is generated from validated benchmark result JSON and a results manifest.",
+      "It keeps recorded numbers, methodology caveats, and artifact pointers visible without adding ranking language."
+    ]
+  },
+  "pages": [
+    {
+      "id": "framework-build-startup-comparison-march-19",
+      "kind": "comparison",
+      "section": "Comparisons",
+      "output": "framework-build-startup-comparison-march-19.md",
+      "title": "Framework Cold Build and Dev Startup Comparison (March 19, 2026)",
+      "description": "Validated cold-build and dev-startup runs across Zenith, Astro, Next App Router, and Nuxt using the shared benchmark fixtures.",
+      "trackIds": [
+        "cold-build",
+        "dev-startup"
+      ],
+      "resolutionMode": "snapshot",
+      "preset": "latest-build-startup-per-framework",
+      "snapshotInputs": [
+        {
+          "path": "apps/benchmarks/results/20260319T152955Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T074653Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T074901Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T075112Z-matrix/matrix.json"
+        }
+      ],
+      "snapshotPinnedAt": "2026-03-19T17:16:02.374Z"
+    },
+    {
+      "id": "framework-browser-runtime-comparison-march-19",
+      "kind": "comparison",
+      "section": "Comparisons",
+      "output": "framework-browser-runtime-comparison-march-19.md",
+      "title": "Framework Browser Runtime Comparison (March 19, 2026)",
+      "description": "Validated browser runtime capture across Zenith, Astro, Next App Router, and Nuxt using the shared benchmark fixtures.",
+      "trackIds": [
+        "hydration-runtime"
+      ],
+      "resolutionMode": "snapshot",
+      "preset": "latest-browser-runtime-per-framework",
+      "snapshotInputs": [
+        {
+          "path": "apps/benchmarks/results/20260319T152955Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T152712Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T152739Z-matrix/matrix.json"
+        },
+        {
+          "path": "apps/benchmarks/results/20260319T152816Z-matrix/matrix.json"
+        }
+      ],
+      "snapshotPinnedAt": "2026-03-19T17:16:02.374Z"
+    },
+    {
+      "id": "latest-zenith-run",
+      "kind": "run",
+      "section": "Individual Runs",
+      "output": "latest-zenith-run.md",
+      "title": "Latest Zenith Validated Run",
+      "description": "Latest validated run resolved by selector for Zenith.",
+      "input": {
+        "selector": {
+          "type": "latest",
+          "frameworkId": "zenith"
+        }
+      }
+    },
+    {
+      "id": "latest-astro-run",
+      "kind": "run",
+      "section": "Individual Runs",
+      "output": "latest-astro-run.md",
+      "title": "Latest Astro Validated Run",
+      "description": "Latest validated run resolved by selector for Astro.",
+      "input": {
+        "selector": {
+          "type": "latest",
+          "frameworkId": "astro",
+          "runner": "matrix"
+        }
+      }
+    },
+    {
+      "id": "latest-next-run",
+      "kind": "run",
+      "section": "Individual Runs",
+      "output": "latest-next-app-router-run.md",
+      "title": "Latest Next App Router Validated Run",
+      "description": "Latest validated matrix run resolved by selector for Next App Router.",
+      "input": {
+        "selector": {
+          "type": "latest",
+          "frameworkId": "next-app-router",
+          "runner": "matrix"
+        }
+      }
+    },
+    {
+      "id": "latest-nuxt-run",
+      "kind": "run",
+      "section": "Individual Runs",
+      "output": "latest-nuxt-run.md",
+      "title": "Latest Nuxt Validated Run",
+      "description": "Latest validated run resolved by selector for Nuxt.",
+      "input": {
+        "selector": {
+          "type": "latest",
+          "frameworkId": "nuxt",
+          "runner": "matrix"
+        }
+      }
+    }
+  ]
+}
