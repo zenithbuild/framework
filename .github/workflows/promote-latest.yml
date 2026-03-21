@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: promote-latest
@@ -53,6 +52,18 @@ jobs:
           fi
 
           echo "TRAIN_VERSION=${train_version}" >> "$GITHUB_ENV"
+
+      - name: Configure npm dist-tag auth
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_DIST_TAG_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "Missing required secret: NPM_DIST_TAG_TOKEN" >&2
+            exit 1
+          fi
+          printf "//registry.npmjs.org/:_authToken=%s\n" "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
 
       - name: Promote train version to latest
         shell: bash
