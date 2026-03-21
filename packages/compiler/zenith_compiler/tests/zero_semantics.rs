@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // 6.3 ZERO SEMANTIC AWARENESS TESTS
 // The compiler does NOT:

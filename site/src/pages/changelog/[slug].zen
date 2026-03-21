@@ -1,0 +1,34 @@
+<script server lang="ts">
+import { pageContent, siteContent } from "../../content/index";
+import { loadChangelogDetailSource } from "../../server/changelogSource";
+
+export const load = async (ctx) => {
+    const { changelogEntry, relatedEntries, sourceMode } = await loadChangelogDetailSource(ctx.params.slug);
+
+    if (!changelogEntry) {
+        return ctx.deny(404, "Changelog not found");
+    }
+
+    return {
+        pageTitle: changelogEntry.title,
+        pageDescription: changelogEntry.description,
+        pageContent: pageContent.changelog,
+        changelogEntry,
+        relatedEntries,
+        sourceMode,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        }
+    };
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import ChangelogDetailSurface from "@/components/surfaces/ChangelogDetailSurface.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <ChangelogDetailSurface content={data.pageContent} entry={data.changelogEntry} relatedEntries={data.relatedEntries} sourceMode={data.sourceMode} />
+</DefaultLayout>

@@ -1,0 +1,7 @@
+<DefaultLayout>
+  <section class="hero stack">
+    <p>Contact route for the static marketing case.</p>
+    <h1>Route breadth without client logic.</h1>
+    <p>The benchmark should capture route output cost without mixing in interactive behavior.</p>
+  </section>
+</DefaultLayout>

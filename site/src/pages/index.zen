@@ -1,51 +1,50 @@
 <script server lang="ts">
-import { pageContent, repoContent, sectionContent, siteContent } from "../content/index";
+import { pageContent, siteContent } from "../content/index";
+import { getContributors, type Contributor } from "../server/github";
 
 interface PageProps {
-    title: string;
-    description: string;
-    coreVersion: string;
+    page: typeof pageContent.index;
     site: {
         navigation: typeof siteContent.navigation;
         footer: typeof siteContent.footer;
-        hero: typeof siteContent.hero;
     };
-    sections: typeof sectionContent;
+    contributors: Contributor[];
 }
 
-export const data: PageProps = {
-    title: pageContent.index.title,
-    description: pageContent.index.description,
-    coreVersion: repoContent.trainVersion,
-    site: {
-        navigation: siteContent.navigation,
-        footer: siteContent.footer,
-        hero: siteContent.hero,
-    },
-    sections: sectionContent,
+export const load = async (_ctx) => {
+    const contributors = await getContributors();
+    
+    return {
+        page: pageContent.index,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        },
+        contributors,
+    };
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import Hero from "@/components/ui/Hero.zen";
-import ContractSection from "@/components/sections/ContractSection.zen";
-import CompilerPipelineSection from "@/components/sections/CompilerPipelineSection.zen";
-import DeterminismConsoleSection from "@/components/sections/DeterminismConsoleSection.zen";
-import ReactivityModelSection from "@/components/sections/ReactivityModelSection.zen";
-import RuntimePrinciplesSection from "@/components/sections/RuntimePrinciplesSection.zen";
-import EcosystemOrbitSection from "@/components/sections/EcosystemOrbitSection.zen";
-import GettingStartedSection from "@/components/sections/GettingStartedSection.zen";
-
+import HomeBenchmarkProof from "@/components/sections/home/HomeBenchmarkProof.zen";
+import HomeHero from "@/components/sections/home/HomeHero.zen";
+import HomeIdentity from "@/components/sections/home/HomeIdentity.zen";
+import HomePrinciples from "@/components/sections/home/HomePrinciples.zen";
+import HomeProof from "@/components/sections/home/HomeProof.zen";
+import HomeContributors from "@/components/sections/home/HomeContributors.zen";
+import HomeSponsors from "@/components/sections/home/HomeSponsors.zen";
 </script>
 
-<DefaultLayout title={data.title} description={data.description} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <Hero version={data.coreVersion} content={data.site.hero} />
-    <ContractSection content={data.sections.contractSection} />
-    <CompilerPipelineSection content={data.sections.compilerPipeline} />
-    <DeterminismConsoleSection content={data.sections.determinismConsole} />
-    <ReactivityModelSection content={data.sections.reactivityModel} />
-    <RuntimePrinciplesSection content={data.sections.runtimePrinciples} />
-    <EcosystemOrbitSection content={data.sections.ecosystemOrbit} />
-    <GettingStartedSection content={data.sections.gettingStarted} />
+<DefaultLayout title={data.page.title} description={data.page.description} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <!-- Content Grid -->
+    <div class="relative z-10 grid w-full grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 px-6 lg:px-12 py-12 lg:py-24">
+        <HomeHero />
+        <HomeBenchmarkProof content={data.page.benchmarking} />
+        <HomeIdentity />
+        <HomePrinciples />
+        <HomeProof />
+        <HomeContributors contributors={data.contributors} />
+        <HomeSponsors />
+    </div>
 </DefaultLayout>

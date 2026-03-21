@@ -4,15 +4,16 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
 
+use output_mode::{finalize_output_root, prepare_output_root, write_file_for_mode, OutputMode};
 use serde::{Deserialize, Serialize};
 use zenith_bundler::CompilerOutput;
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
+mod output_mode;
 mod page_runtime;
 mod template_bridge;
 mod vendor;
@@ -345,16 +346,17 @@ fn resolve_bundler_version() -> String {
 }
 
 fn run() -> Result<(), String> {
-    let out_dir = parse_out_dir()?;
-    let out_dir_tmp = out_dir.with_extension("tmp"); // dist_tmp
-
-    // Clean temp dir if exists
-    if out_dir_tmp.exists() {
-        fs::remove_dir_all(&out_dir_tmp)
-            .map_err(|e| format!("failed to clean temp dir '{}': {e}", out_dir_tmp.display()))?;
-    }
-    fs::create_dir_all(&out_dir_tmp)
-        .map_err(|e| format!("failed to create temp dir '{}': {e}", out_dir_tmp.display()))?;
+    let cli_options = parse_cli_options()?;
+    let out_dir = cli_options.out_dir;
+    let output_mode = cli_options.output_mode;
+    let rebuild_strategy = cli_options.rebuild_strategy;
+    let changed_routes = cli_options.changed_routes;
+    let global_graph_hash_override = cli_options.global_graph_hash_override;
+    let fast_path = cli_options.fast_path
+        && output_mode.is_dev_stable()
+        && rebuild_strategy.is_page_only()
+        && !changed_routes.is_empty();
+    let emitted_root = prepare_output_root(&out_dir, output_mode)?;
 
     let mut stdin_payload = String::new();
     io::stdin()
@@ -396,7 +398,11 @@ fn run() -> Result<(), String> {
     // 2. Build Global Graph (In-Memory)
     // We must deduplicate modules and edges across all pages to form a single authority.
     let global_graph = build_global_graph(&inputs)?;
-    let global_graph_hash = compute_global_graph_hash(&global_graph);
+    let global_graph_hash = if fast_path {
+        global_graph_hash_override.unwrap_or_else(|| compute_global_graph_hash(&global_graph))
+    } else {
+        compute_global_graph_hash(&global_graph)
+    };
     let project_root = env::current_dir()
         .map_err(|e| format!("failed to resolve current working directory: {e}"))?;
     let project_root = fs::canonicalize(&project_root).map_err(|e| {
@@ -421,13 +427,19 @@ fn run() -> Result<(), String> {
         };
         processed_htmls.push(html_for_emission);
     }
-    let final_css_content = build_css_bundle(&inputs, &project_root)?;
+    let final_css_content = if fast_path {
+        None
+    } else {
+        Some(build_css_bundle(&inputs, &project_root)?)
+    };
 
     // 3b. Vendor Bundling (Rolldown)
     // We must run this before emitting JS assets so we can rewrite imports.
-    let vendor_result = {
+    let vendor_result = if fast_path {
+        None
+    } else {
         let rt = tokio::runtime::Runtime::new().expect("failed to init tokio runtime");
-        rt.block_on(vendor::bundle_vendor(&inputs, &out_dir_tmp))
+        rt.block_on(vendor::bundle_vendor(&inputs, &emitted_root, output_mode))
             .map_err(|e| format!("Vendor bundling failed: {}", e))?
     };
 
@@ -442,6 +454,8 @@ fn run() -> Result<(), String> {
             .iter()
             .map(|s| (s.clone(), replacement.clone()))
             .collect::<BTreeMap<_, _>>()
+    } else if fast_path {
+        collect_fast_path_vendor_map(&inputs, output_mode)
     } else {
         BTreeMap::new()
     };
@@ -516,39 +530,83 @@ fn run() -> Result<(), String> {
     }
 
     // Emit Global CSS
-    let css_hash = stable_hash_8(&final_css_content);
-    let css_rel = format!("assets/styles.{}.css", css_hash);
-    let css_path = out_dir_tmp.join(&css_rel);
-    write_file(&css_path, &final_css_content)?;
+    let css_rel = if let Some(css_content) = &final_css_content {
+        let css_hash = stable_hash_8(css_content);
+        let css_rel = output_mode.css_rel(&css_hash);
+        let css_path = emitted_root.join(&css_rel);
+        write_file(&css_path, css_content, output_mode)?;
+        css_rel
+    } else {
+        output_mode.css_rel("")
+    };
     let mut expected_asset_contents = BTreeMap::<String, String>::new();
-    expected_asset_contents.insert(css_rel.clone(), final_css_content.clone());
+    let mut known_emitted_assets = BTreeSet::<String>::new();
+    known_emitted_assets.insert(css_rel.clone());
+    if fast_path && !vendor_map.is_empty() {
+        known_emitted_assets.insert(format!("assets/{}", output_mode.vendor_rel("")));
+    }
+    if let Some(css_content) = &final_css_content {
+        expected_asset_contents.insert(css_rel.clone(), css_content.clone());
+    }
+
+    if output_mode.is_dev_stable() && rebuild_strategy.is_bundle_only() {
+        finalize_output_root(&out_dir, &emitted_root, output_mode)?;
+        return Ok(());
+    }
 
     // 4. Generate Runtime & Assets
-    let runtime_rel = ensure_runtime_asset(&out_dir_tmp, &template_assets.runtime_source)?;
+    let runtime_rel = if fast_path {
+        output_mode.runtime_rel("")
+    } else {
+        ensure_runtime_asset(&emitted_root, &template_assets.runtime_source, output_mode)?
+    };
     let runtime_import_spec = runtime_import_specifier(&runtime_rel)?;
-    expected_asset_contents.insert(runtime_rel.clone(), template_assets.runtime_source.clone());
+    known_emitted_assets.insert(runtime_rel.clone());
+    if !fast_path {
+        expected_asset_contents.insert(runtime_rel.clone(), template_assets.runtime_source.clone());
+    }
     let core_js = generate_core_module_js(&runtime_import_spec);
-    let (core_rel, core_hash) = ensure_core_asset(&out_dir_tmp, &runtime_rel)?;
-    expected_asset_contents.insert(core_rel.clone(), core_js);
+    let (core_rel, core_hash) = if fast_path {
+        (output_mode.core_rel(""), stable_hash_8(&core_js))
+    } else {
+        ensure_core_asset(&emitted_root, &runtime_rel, output_mode)?
+    };
+    known_emitted_assets.insert(core_rel.clone());
+    if !fast_path {
+        expected_asset_contents.insert(core_rel.clone(), core_js);
+    }
     let core_import_spec = format!("/{}", core_rel);
 
-    // Collect all component scripts from inputs
-    let mut all_component_scripts = BTreeMap::new();
-    for input in &inputs {
-        for (id, script) in &input.ir.components_scripts {
-            all_component_scripts.insert(id.clone(), script.clone());
+    let component_assets = if fast_path {
+        let derived = derive_fast_path_component_assets(&inputs, &changed_routes, output_mode);
+        for rel in derived.values() {
+            known_emitted_assets.insert(rel.clone());
         }
-    }
-    let module_registry = build_module_registry(&inputs)?;
+        derived
+    } else {
+        // Collect all component scripts from inputs
+        let mut all_component_scripts = BTreeMap::new();
+        for input in &inputs {
+            for (id, script) in &input.ir.components_scripts {
+                all_component_scripts.insert(id.clone(), script.clone());
+            }
+        }
+        let module_registry = build_module_registry(&inputs)?;
 
-    // Emit Components
-    let component_assets = emit_component_assets(
-        &out_dir_tmp,
-        &all_component_scripts,
-        &runtime_import_spec,
-        &module_registry,
-        &core_import_spec,
-    )?;
+        // Emit Components
+        let emitted = emit_component_assets(
+            &emitted_root,
+            &all_component_scripts,
+            &runtime_import_spec,
+            &module_registry,
+            &core_import_spec,
+            output_mode,
+        )?;
+        for rel in emitted.values() {
+            known_emitted_assets.insert(rel.clone());
+        }
+        emitted
+    };
 
     // 5. Generate Manifest Struct (In-Memory)
     let mut manifest_chunks = BTreeMap::new();
@@ -557,6 +615,13 @@ fn run() -> Result<(), String> {
 
     // Process each page
     for (input, html_stripped) in inputs.iter().zip(processed_htmls) {
+        if fast_path && !changed_routes.contains(&input.route) {
+            continue;
+        }
+        let route_token = sanitize_route_to_token(&input.route);
+        let should_emit_page_bundle = !(output_mode.is_dev_stable()
+            && rebuild_strategy.is_page_only()
+            && !changed_routes.contains(&input.route));
         let (markers, events) = if input.ir.marker_bindings.is_empty() {
             derive_binding_tables(&input.ir)?
         } else {
@@ -577,36 +642,37 @@ fn run() -> Result<(), String> {
             input.ir.ssr_data.clone()
         };
 
-        let js = generate_entry_js(
-            &input.ir,
-            &runtime_import_spec,
-            &markers,
-            &events,
-            &component_assets,
-            &input.route,
-            prerender_ssr_data.as_ref(),
-            &global_graph_hash,
-            router_enabled,
-        )?;
+        let js_rel = if should_emit_page_bundle {
+            let js = generate_entry_js(
+                &input.ir,
+                &runtime_import_spec,
+                &markers,
+                &events,
+                &component_assets,
+                &input.route,
+                prerender_ssr_data.as_ref(),
+                &global_graph_hash,
+                router_enabled,
+            )?;
 
-        // Hash depends on Global Graph Hash + Content
-        let js_hash = stable_hash_8(&js);
-        let js_rel = format!(
-            "assets/{}.{}.js",
-            sanitize_route_to_token(&input.route),
-            js_hash
-        );
+            let js_hash = stable_hash_8(&js);
+            let js_rel = output_mode.page_rel(&route_token, &js_hash);
 
-        if has_runtime_zen_reference(&js) {
-            return Err(format!(
-                "Runtime graph purity violation: page bundle for route '{}' contains a .zen module specifier",
-                input.route
-            ));
-        }
+            if has_runtime_zen_reference(&js) {
+                return Err(format!(
+                    "Runtime graph purity violation: page bundle for route '{}' contains a .zen module specifier",
+                    input.route
+                ));
+            }
 
-        let js_path = out_dir_tmp.join(&js_rel);
-        write_file(&js_path, &js)?;
-        expected_asset_contents.insert(js_rel.clone(), js.clone());
+            let js_path = emitted_root.join(&js_rel);
+            write_file(&js_path, &js, output_mode)?;
+            expected_asset_contents.insert(js_rel.clone(), js.clone());
+            known_emitted_assets.insert(js_rel.clone());
+            js_rel
+        } else {
+            output_mode.page_rel(&route_token, "")
+        };
 
         manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
         if input.ir.server_script.is_some() && !input.ir.prerender {
@@ -637,148 +703,148 @@ fn run() -> Result<(), String> {
     }
 
     // 6. Generate Router & Manifest
-    let mut router_rel_path = None;
+    let mut router_rel_path = if fast_path && router_enabled {
+        Some(format!("/{}", output_mode.router_rel("")))
+    } else {
+        None
+    };
+    if let Some(router_path) = &router_rel_path {
+        known_emitted_assets.insert(router_path.trim_start_matches('/').to_string());
+    }
     let manifest_hash = compute_manifest_hash(&global_graph_hash, &core_hash, &manifest_chunks);
-    let manifest_json_str = {
-        let manifest = Manifest {
+    if !fast_path {
+        let manifest_json_str = {
+            let manifest = Manifest {
+                entry: format!("/{}", runtime_rel),
+                vendor: vendor_result
+                    .as_ref()
+                    .map(|m| format!("/assets/{}", m.filename)),
+                css: format!("/{}", css_rel),
+                core: format!("/{}", core_rel),
+                chunks: manifest_chunks.clone(),
+                server_routes: server_runtime_routes.clone(),
+                hash: manifest_hash.clone(),
+                router: None,
+            };
+            serde_json::to_string(&manifest).expect("failed to serialize partial manifest")
+        };
+
+        if router_enabled {
+            let rendered_assets =
+                template_bridge::render_assets(&template_bridge::RenderAssetsRequest {
+                    manifest_json: manifest_json_str.clone(),
+                    runtime_import: format!("/{}", runtime_rel),
+                    core_import: format!("/{}", core_rel),
+                })?;
+            let router_source = rendered_assets.router_source;
+
+            if has_runtime_zen_reference(&router_source) {
+                return Err(
+                    "Runtime graph purity violation: router bundle contains a .zen module specifier"
+                        .into(),
+                );
+            }
+            if router_source.contains("zenith:") {
+                return Err(
+                    "Runtime graph purity violation: router bundle contains a zenith:* specifier"
+                        .into(),
+                );
+            }
+
+            let router_hash = stable_hash_8(&router_source);
+            let r_rel = output_mode.router_rel(&router_hash);
+            router_rel_path = Some(format!("/{}", r_rel));
+            write_file(&emitted_root.join(&r_rel), &router_source, output_mode)?;
+            expected_asset_contents.insert(r_rel.clone(), router_source);
+            known_emitted_assets.insert(r_rel);
+        }
+    }
+
+    if let Some(meta) = &vendor_result {
+        let vendor_path = emitted_root.join("assets").join(&meta.filename);
+        expected_asset_contents.insert(format!("assets/{}", meta.filename), meta.content.clone());
+        if !vendor_path.exists() {
+            write_file(&vendor_path, &meta.content, output_mode)?;
+        }
+    }
+
+    for (rel, content) in &expected_asset_contents {
+        let path = emitted_root.join(rel);
+        if !path.exists() {
+            write_file(&path, content, output_mode)?;
+        }
+    }
+
+    verify_emitted_js_imports(&emitted_root, &known_emitted_assets)?;
+
+    if !fast_path {
+        let final_manifest = Manifest {
             entry: format!("/{}", runtime_rel),
             vendor: vendor_result
                 .as_ref()
                 .map(|m| format!("/assets/{}", m.filename)),
             css: format!("/{}", css_rel),
             core: format!("/{}", core_rel),
-            chunks: manifest_chunks.clone(),
-            server_routes: server_runtime_routes.clone(),
-            hash: manifest_hash.clone(),
-            router: None, // Circular dependency if we hash router here. Router needs manifest.
+            chunks: manifest_chunks,
+            server_routes: server_runtime_routes,
+            hash: manifest_hash,
+            router: router_rel_path.clone(),
         };
-        // We serialize WITHOUT router first to generate the manifest for injection.
-        // Wait, the router needs the manifest.
-        // The manifest contains the chunks.
-        // The router script is part of the bundle.
-        // The MANIFEST file should contain the router path.
-        // This is a cycle: Router -> needs Manifest -> needs Router Path -> needs Router Hash -> needs Router Content -> needs Manifest.
-        // BREAK THE CYCLE:
-        // 1. Generate Manifest (chunks, css, entry).
-        // 2. Inject Manifest into Router.
-        // 3. Hash Router.
-        // 4. Update Manifest with Router Path.
-        // 5. Write Manifest.
-        serde_json::to_string(&manifest).expect("failed to serialize partial manifest")
-    };
+        let final_manifest_json = serde_json::to_string_pretty(&final_manifest)
+            .map_err(|e| format!("failed to serialize manifest: {e}"))?;
+        write_file(
+            &emitted_root.join("manifest.json"),
+            &final_manifest_json,
+            output_mode,
+        )?;
 
-    if router_enabled {
-        let rendered_assets =
-            template_bridge::render_assets(&template_bridge::RenderAssetsRequest {
-                manifest_json: manifest_json_str.clone(),
-                runtime_import: format!("/{}", runtime_rel),
-                core_import: format!("/{}", core_rel),
-            })?;
-        let router_source = rendered_assets.router_source;
-
-        if has_runtime_zen_reference(&router_source) {
-            return Err(
-                "Runtime graph purity violation: router bundle contains a .zen module specifier"
-                    .into(),
+        let mut router_manifest = RouterManifest::default();
+        for (
+            route,
+            _html_tpl,
+            js_rel,
+            expressions,
+            server_script,
+            server_script_path,
+            prerender,
+            ssr_data,
+            has_guard,
+            has_load,
+            guard_module_ref,
+            load_module_ref,
+        ) in &page_assets
+        {
+            let output = format!(
+                "/{}",
+                route_to_output_path(route)
+                    .to_string_lossy()
+                    .replace('\\', "/")
             );
+            router_manifest.routes.push(RouterRouteEntry {
+                path: route.clone(),
+                output,
+                html: route.clone(),
+                expressions: expressions.clone(),
+                page_asset: Some(js_rel.clone()),
+                server_script: server_script.clone(),
+                server_script_path: server_script_path.clone(),
+                prerender: *prerender,
+                ssr_data: ssr_data.clone(),
+                has_guard: *has_guard,
+                has_load: *has_load,
+                guard_module_ref: guard_module_ref.clone(),
+                load_module_ref: load_module_ref.clone(),
+            });
         }
-        if router_source.contains("zenith:") {
-            return Err(
-                "Runtime graph purity violation: router bundle contains a zenith:* specifier"
-                    .into(),
-            );
-        }
-
-        let router_hash = stable_hash_8(&router_source);
-        let r_rel = format!("assets/router.{}.js", router_hash);
-        router_rel_path = Some(format!("/{}", r_rel));
-        write_file(&out_dir_tmp.join(&r_rel), &router_source)?;
-        expected_asset_contents.insert(r_rel, router_source);
+        router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
+        let router_manifest_json = serde_json::to_string(&router_manifest)
+            .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
+        write_file(
+            &emitted_root.join("assets/router-manifest.json"),
+            &router_manifest_json,
+            output_mode,
+        )?;
     }
-
-    if let Some(meta) = &vendor_result {
-        let vendor_path = out_dir_tmp.join("assets").join(&meta.filename);
-        expected_asset_contents.insert(format!("assets/{}", meta.filename), meta.content.clone());
-        if !vendor_path.exists() {
-            write_file(&vendor_path, &meta.content)?;
-        }
-    }
-
-    for (rel, content) in &expected_asset_contents {
-        let path = out_dir_tmp.join(rel);
-        if !path.exists() {
-            write_file(&path, content)?;
-        }
-    }
-
-    let known_emitted_assets = expected_asset_contents
-        .keys()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    verify_emitted_js_imports(&out_dir_tmp, &known_emitted_assets)?;
-
-    // Final Manifest with Router
-    let final_manifest = Manifest {
-        entry: format!("/{}", runtime_rel),
-        vendor: vendor_result
-            .as_ref()
-            .map(|m| format!("/assets/{}", m.filename)),
-        css: format!("/{}", css_rel),
-        core: format!("/{}", core_rel),
-        chunks: manifest_chunks,
-        server_routes: server_runtime_routes,
-        hash: manifest_hash,
-        router: router_rel_path.clone(),
-    };
-    let final_manifest_json = serde_json::to_string_pretty(&final_manifest)
-        .map_err(|e| format!("failed to serialize manifest: {e}"))?;
-    write_file(&out_dir_tmp.join("manifest.json"), &final_manifest_json)?;
-
-    let mut router_manifest = RouterManifest::default();
-    for (
-        route,
-        _html_tpl,
-        js_rel,
-        expressions,
-        server_script,
-        server_script_path,
-        prerender,
-        ssr_data,
-        has_guard,
-        has_load,
-        guard_module_ref,
-        load_module_ref,
-    ) in &page_assets
-    {
-        let output = format!(
-            "/{}",
-            route_to_output_path(route)
-                .to_string_lossy()
-                .replace('\\', "/")
-        );
-        router_manifest.routes.push(RouterRouteEntry {
-            path: route.clone(),
-            output,
-            html: route.clone(),
-            expressions: expressions.clone(),
-            page_asset: Some(js_rel.clone()),
-            server_script: server_script.clone(),
-            server_script_path: server_script_path.clone(),
-            prerender: *prerender,
-            ssr_data: ssr_data.clone(),
-            has_guard: *has_guard,
-            has_load: *has_load,
-            guard_module_ref: guard_module_ref.clone(),
-            load_module_ref: load_module_ref.clone(),
-        });
-    }
-    router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
-    let router_manifest_json = serde_json::to_string(&router_manifest)
-        .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
-    write_file(
-        &out_dir_tmp.join("assets/router-manifest.json"),
-        &router_manifest_json,
-    )?;
 
     // 7. Write HTML Files (Injecting Manifest Paths)
     for (
@@ -796,6 +862,12 @@ fn run() -> Result<(), String> {
         _load_module_ref,
     ) in page_assets
     {
+        if output_mode.is_dev_stable()
+            && rebuild_strategy.is_page_only()
+            && !changed_routes.contains(&route)
+        {
+            continue;
+        }
         let mut html = inject_stylesheet_link_once(&html_tpl, &css_rel, &route)?;
 
         if let Some(r_path) = &router_rel_path {
@@ -823,44 +895,10 @@ fn run() -> Result<(), String> {
 
         // Output HTML
         let html_rel = route_to_output_path(&route);
-        let html_path = out_dir_tmp.join(html_rel);
-        write_file(&html_path, &html)?;
+        let html_path = emitted_root.join(html_rel);
+        write_file(&html_path, &html, output_mode)?;
     }
-
-    // 8. Atomic Swap
-    // Move the current dist aside first so the live output is not blocked on a
-    // recursive delete. This keeps the serving gap to a narrow rename handoff.
-    let legacy_out_dir_prev = out_dir.with_extension("prev");
-    if legacy_out_dir_prev.exists() {
-        let _ = fs::remove_dir_all(&legacy_out_dir_prev);
-    }
-    let backup_token = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    let out_dir_prev = out_dir.with_extension(format!("prev.{}.{}", process::id(), backup_token));
-    if out_dir.exists() {
-        fs::rename(&out_dir, &out_dir_prev).map_err(|e| {
-            format!(
-                "failed to move existing out_dir to backup '{}': {e}",
-                out_dir_prev.display()
-            )
-        })?;
-    }
-    if let Err(error) = fs::rename(&out_dir_tmp, &out_dir) {
-        if out_dir_prev.exists() && !out_dir.exists() {
-            let _ = fs::rename(&out_dir_prev, &out_dir);
-        }
-        return Err(format!(
-            "failed to rename temp dir '{}' to output dir '{}': {error}",
-            out_dir_tmp.display(),
-            out_dir.display()
-        ));
-    }
-    if out_dir_prev.exists() {
-        let _ = fs::remove_dir_all(&out_dir_prev);
-    }
-
+    finalize_output_root(&out_dir, &emitted_root, output_mode)?;
     Ok(())
 }
 
@@ -948,11 +986,89 @@ fn build_module_registry(
     Ok(modules)
 }
 
-fn write_file(path: &PathBuf, content: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("failed to create dir: {e}"))?;
+fn is_external_runtime_specifier(spec: &str) -> bool {
+    !spec.starts_with('.')
+        && !spec.starts_with('/')
+        && !spec.starts_with("@/")
+        && !spec.starts_with(zenith_bundler::utils::VIRTUAL_PREFIX)
+        && !spec.contains("zenith:")
+}
+
+fn collect_fast_path_vendor_map(
+    inputs: &[BundlerInput],
+    output_mode: OutputMode,
+) -> BTreeMap<String, String> {
+    let replacement = format!("/assets/{}", output_mode.vendor_rel(""));
+    let mut out = BTreeMap::new();
+
+    for input in inputs {
+        for import in &input.ir.imports {
+            if is_external_runtime_specifier(&import.spec) {
+                out.insert(import.spec.clone(), replacement.clone());
+            }
+        }
+        for entry in &input.ir.hoisted.imports {
+            let specs = collect_js_import_specifiers(entry);
+            if specs.is_empty() {
+                if is_external_runtime_specifier(entry) {
+                    out.insert(entry.clone(), replacement.clone());
+                }
+                continue;
+            }
+            for spec in specs {
+                if is_external_runtime_specifier(&spec) {
+                    out.insert(spec, replacement.clone());
+                }
+            }
+        }
+        for module in &input.ir.modules {
+            for spec in collect_js_import_specifiers(&module.source) {
+                if is_external_runtime_specifier(&spec) {
+                    out.insert(spec, replacement.clone());
+                }
+            }
+        }
+        for script in input.ir.components_scripts.values() {
+            for spec in collect_js_import_specifiers(&script.code) {
+                if is_external_runtime_specifier(&spec) {
+                    out.insert(spec, replacement.clone());
+                }
+            }
+            for import_stmt in &script.imports {
+                for spec in collect_js_import_specifiers(import_stmt) {
+                    if is_external_runtime_specifier(&spec) {
+                        out.insert(spec, replacement.clone());
+                    }
+                }
+            }
+        }
     }
-    fs::write(path, content).map_err(|e| format!("failed to write file '{}': {e}", path.display()))
+
+    out
+}
+
+fn derive_fast_path_component_assets(
+    inputs: &[BundlerInput],
+    changed_routes: &BTreeSet<String>,
+    output_mode: OutputMode,
+) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    for input in inputs {
+        if !changed_routes.contains(&input.route) {
+            continue;
+        }
+        for hoist_id in input.ir.components_scripts.keys() {
+            out.insert(
+                hoist_id.clone(),
+                output_mode.component_rel(&sanitize_asset_token(hoist_id), ""),
+            );
+        }
+    }
+    out
+}
+
+fn write_file(path: &PathBuf, content: &str, output_mode: OutputMode) -> Result<(), String> {
+    write_file_for_mode(path, content, output_mode).map(|_| ())
 }
 
 fn sanitize_route_to_token(route: &str) -> String {
@@ -991,8 +1107,50 @@ fn sanitize_route_to_token(route: &str) -> String {
     }
 }
 
-fn parse_out_dir() -> Result<PathBuf, String> {
+struct BundlerCliOptions {
+    out_dir: PathBuf,
+    output_mode: OutputMode,
+    rebuild_strategy: RebuildStrategy,
+    changed_routes: BTreeSet<String>,
+    fast_path: bool,
+    global_graph_hash_override: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RebuildStrategy {
+    Full,
+    BundleOnly,
+    PageOnly,
+}
+
+impl RebuildStrategy {
+    fn from_flag(value: &str) -> Result<Self, String> {
+        match value {
+            "full" => Ok(Self::Full),
+            "bundle-only" => Ok(Self::BundleOnly),
+            "page-only" => Ok(Self::PageOnly),
+            _ => Err(format!(
+                "unknown value for --rebuild-strategy '{value}'. expected one of: full, bundle-only, page-only"
+            )),
+        }
+    }
+
+    fn is_bundle_only(self) -> bool {
+        matches!(self, Self::BundleOnly)
+    }
+
+    fn is_page_only(self) -> bool {
+        matches!(self, Self::PageOnly)
+    }
+}
+
+fn parse_cli_options() -> Result<BundlerCliOptions, String> {
     let mut out_dir: Option<PathBuf> = None;
+    let mut dev_stable_assets = false;
+    let mut rebuild_strategy = RebuildStrategy::Full;
+    let mut changed_routes = BTreeSet::new();
+    let mut fast_path = false;
+    let mut global_graph_hash_override = None;
     let mut args = env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -1003,15 +1161,46 @@ fn parse_out_dir() -> Result<PathBuf, String> {
                     .ok_or_else(|| "missing value for --out-dir".to_string())?;
                 out_dir = Some(PathBuf::from(value));
             }
+            "--dev-stable-assets" => {
+                dev_stable_assets = true;
+            }
+            "--rebuild-strategy" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| "missing value for --rebuild-strategy".to_string())?;
+                rebuild_strategy = RebuildStrategy::from_flag(&value)?;
+            }
+            "--changed-route" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| "missing value for --changed-route".to_string())?;
+                changed_routes.insert(value);
+            }
+            "--fast-path" => {
+                fast_path = true;
+            }
+            "--global-graph-hash" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| "missing value for --global-graph-hash".to_string())?;
+                global_graph_hash_override = Some(value);
+            }
             _ => {
                 return Err(format!(
-                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path>"
+                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path> [--dev-stable-assets] [--rebuild-strategy <full|bundle-only|page-only>] [--changed-route <route>] [--fast-path] [--global-graph-hash <sha256>]"
                 ));
             }
         }
     }
 
-    out_dir.ok_or_else(|| "required flag missing: --out-dir <path>".to_string())
+    Ok(BundlerCliOptions {
+        out_dir: out_dir.ok_or_else(|| "required flag missing: --out-dir <path>".to_string())?,
+        output_mode: OutputMode::from_dev_stable_flag(dev_stable_assets),
+        rebuild_strategy,
+        changed_routes,
+        fast_path,
+        global_graph_hash_override,
+    })
 }
 
 fn validate_payload(payload: &BundlerInput, expected_ir_version: u32) -> Result<(), String> {
@@ -1485,12 +1674,14 @@ fn verify_emitted_js_imports(
     out_dir: &PathBuf,
     known_emitted_assets: &BTreeSet<String>,
 ) -> Result<(), String> {
-    let assets_dir = out_dir.join("assets");
-    if !assets_dir.exists() {
-        return Ok(());
-    }
-
-    for file in list_js_assets(&assets_dir)? {
+    for rel in known_emitted_assets
+        .iter()
+        .filter(|asset| asset.ends_with(".js"))
+    {
+        let file = out_dir.join(rel);
+        if !file.exists() {
+            continue;
+        }
         let source = fs::read_to_string(&file)
             .map_err(|e| format!("failed to read emitted asset '{}': {e}", file.display()))?;
 
@@ -1555,40 +1746,6 @@ fn verify_emitted_js_imports(
     }
 
     Ok(())
-}
-
-fn list_js_assets(dir: &PathBuf) -> Result<Vec<PathBuf>, String> {
-    let mut out = Vec::new();
-    let mut stack = vec![dir.clone()];
-
-    while let Some(current) = stack.pop() {
-        let entries = fs::read_dir(&current)
-            .map_err(|e| format!("failed to read assets dir '{}': {e}", current.display()))?;
-        for entry in entries {
-            let entry = entry.map_err(|e| {
-                format!(
-                    "failed to read assets entry in '{}': {e}",
-                    current.display()
-                )
-            })?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-                continue;
-            }
-            if path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("js"))
-                .unwrap_or(false)
-            {
-                out.push(path);
-            }
-        }
-    }
-
-    out.sort();
-    Ok(out)
 }
 
 fn recompute_graph_hash(payload: &BundlerInput) -> String {
@@ -2061,7 +2218,11 @@ fn runtime_import_specifier(runtime_rel: &str) -> Result<String, String> {
     Ok(format!("./{file_name}"))
 }
 
-fn ensure_runtime_asset(out_dir: &PathBuf, runtime_js: &str) -> Result<String, String> {
+fn ensure_runtime_asset(
+    out_dir: &PathBuf,
+    runtime_js: &str,
+    output_mode: OutputMode,
+) -> Result<String, String> {
     if has_runtime_zen_reference(runtime_js) {
         return Err(
             "Runtime graph purity violation: runtime bundle contains a .zen module specifier"
@@ -2078,48 +2239,32 @@ fn ensure_runtime_asset(out_dir: &PathBuf, runtime_js: &str) -> Result<String, S
     }
 
     let runtime_hash = stable_hash_8(&runtime_js);
-    let runtime_rel = format!("assets/runtime.{runtime_hash}.js");
+    let runtime_rel = output_mode.runtime_rel(&runtime_hash);
     let runtime_path = out_dir.join(&runtime_rel);
 
-    if !runtime_path.exists() {
-        if let Some(parent) = runtime_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!(
-                    "failed to create runtime asset dir '{}': {e}",
-                    parent.display()
-                )
-            })?;
-        }
-        fs::write(&runtime_path, runtime_js).map_err(|e| {
-            format!(
-                "failed to write runtime asset '{}': {e}",
-                runtime_path.display()
-            )
-        })?;
-    }
+    write_file_for_mode(&runtime_path, runtime_js, output_mode).map_err(|e| {
+        format!(
+            "failed to write runtime asset '{}': {e}",
+            runtime_path.display()
+        )
+    })?;
 
     Ok(runtime_rel)
 }
 
-fn ensure_core_asset(out_dir: &PathBuf, runtime_rel: &str) -> Result<(String, String), String> {
+fn ensure_core_asset(
+    out_dir: &PathBuf,
+    runtime_rel: &str,
+    output_mode: OutputMode,
+) -> Result<(String, String), String> {
     let runtime_spec = runtime_import_specifier(runtime_rel)?;
     let core_js = generate_core_module_js(&runtime_spec);
     let core_hash = stable_hash_8(&core_js);
-    let core_rel = format!("assets/core.{core_hash}.js");
+    let core_rel = output_mode.core_rel(&core_hash);
     let core_path = out_dir.join(&core_rel);
 
-    if !core_path.exists() {
-        if let Some(parent) = core_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!(
-                    "failed to create core asset dir '{}': {e}",
-                    parent.display()
-                )
-            })?;
-        }
-        fs::write(&core_path, core_js)
-            .map_err(|e| format!("failed to write core asset '{}': {e}", core_path.display()))?;
-    }
+    write_file_for_mode(&core_path, &core_js, output_mode)
+        .map_err(|e| format!("failed to write core asset '{}': {e}", core_path.display()))?;
 
     Ok((core_rel, core_hash))
 }
@@ -2130,6 +2275,7 @@ fn emit_component_assets(
     runtime_import_spec: &str,
     module_registry: &BTreeMap<String, CompilerModule>,
     core_import_spec: &str,
+    output_mode: OutputMode,
 ) -> Result<BTreeMap<String, String>, String> {
     let mut out = BTreeMap::new();
     let mut emitted_helper_assets = BTreeMap::<String, String>::new();
@@ -2200,6 +2346,7 @@ fn emit_component_assets(
                 &mut emitted_helper_assets,
                 &mut vec![component.module_id.clone()],
                 core_import_spec,
+                output_mode,
             )?;
 
             let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
@@ -2255,6 +2402,7 @@ fn emit_component_assets(
                 &mut emitted_helper_assets,
                 &mut vec![component.module_id.clone()],
                 core_import_spec,
+                output_mode,
             )?;
             let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
             rewritten_component_code =
@@ -2275,21 +2423,9 @@ fn emit_component_assets(
         module_source.push('\n');
 
         let module_hash = stable_hash_8(&module_source);
-        let rel = format!(
-            "assets/component.{}.{}.js",
-            sanitize_asset_token(hoist_id),
-            module_hash
-        );
+        let rel = output_mode.component_rel(&sanitize_asset_token(hoist_id), &module_hash);
         let path = out_dir.join(&rel);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                format!(
-                    "failed to create component asset dir '{}': {e}",
-                    parent.display()
-                )
-            })?;
-        }
-        fs::write(&path, module_source)
+        write_file_for_mode(&path, &module_source, output_mode)
             .map_err(|e| format!("failed to write component asset '{}': {e}", path.display()))?;
 
         out.insert(hoist_id.clone(), rel);
@@ -2304,6 +2440,7 @@ fn emit_helper_module_recursive(
     emitted_helper_assets: &mut BTreeMap<String, String>,
     stack: &mut Vec<String>,
     core_import_spec: &str,
+    output_mode: OutputMode,
 ) -> Result<String, String> {
     if let Some(existing) = emitted_helper_assets.get(module_id) {
         return Ok(existing.clone());
@@ -2375,6 +2512,7 @@ fn emit_helper_module_recursive(
             emitted_helper_assets,
             stack,
             core_import_spec,
+            output_mode,
         )?;
 
         let dep_rel = helper_asset_rel_path(&dep_id)?;
@@ -2385,15 +2523,7 @@ fn emit_helper_module_recursive(
 
     let rel = helper_asset_rel_path(module_id)?;
     let path = out_dir.join(&rel);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            format!(
-                "failed to create helper asset dir '{}': {e}",
-                parent.display()
-            )
-        })?;
-    }
-    fs::write(&path, &rewritten_source)
+    write_file_for_mode(&path, &rewritten_source, output_mode)
         .map_err(|e| format!("failed to write helper asset '{}': {e}", path.display()))?;
     emitted_helper_assets.insert(module_id.to_string(), rel.clone());
     Ok(rel)
@@ -2913,7 +3043,7 @@ fn collect_css_imports_from_source(
             )
         })?;
         let content =
-            zenith_bundler::utils::compile_tailwind_entry(project_root, &canonical_path, &content)
+            zenith_bundler::tailwind::compile_tailwind_entry(project_root, &canonical_path, &content)
                 .map_err(|err| {
                     format!(
                         "{err}\n  importing_module: {owner_module_id}\n  specifier: {specifier}\n  resolved_path: {}",
@@ -3306,7 +3436,7 @@ fn build_expression_fns_and_bindings(
             .iter()
             .map(|e| {
                 format!(
-                    "function(__ctx) {{ const signalMap = __ctx.signalMap; const params = __ctx.params; const props = __ctx.props; const ssrData = __ctx.ssrData; const data = ssrData; const ssr = ssrData; const componentBindings = __ctx.componentBindings; const __ZENITH_INTERNAL_ZENHTML = __ctx.zenhtml; const html = __ctx.zenhtml; return {}; }}",
+                    "function(__ctx) {{ const signalMap = __ctx.signalMap; const params = __ctx.params; const props = __ctx.props; const ssrData = __ctx.ssrData; const data = ssrData; const ssr = ssrData; const componentBindings = __ctx.componentBindings; const __ZENITH_INTERNAL_ZENHTML = __ctx.zenhtml; const html = __ctx.zenhtml; const __zenith_fragment = __ctx.fragment; const fragment = __ctx.fragment; return {}; }}",
                     e
                 )
             })
@@ -3342,8 +3472,8 @@ fn build_expression_fns_and_bindings(
 #[cfg(test)]
 mod tests {
     use super::{
-        CompilerExpressionBinding, CompilerIr, CompilerSourcePosition, CompilerSourceSpan,
-        MarkerKind, build_expression_fns_and_bindings, derive_binding_tables,
+        build_expression_fns_and_bindings, derive_binding_tables, CompilerExpressionBinding,
+        CompilerIr, CompilerSourcePosition, CompilerSourceSpan, MarkerKind,
     };
 
     #[test]

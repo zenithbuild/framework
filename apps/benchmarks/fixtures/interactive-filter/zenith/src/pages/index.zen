@@ -1,0 +1,81 @@
+<script setup="ts">
+state activeCategory = "all";
+
+function selectAll() {
+  activeCategory = "all";
+}
+
+function selectCompiler() {
+  activeCategory = "compiler";
+}
+
+function selectRuntime() {
+  activeCategory = "runtime";
+}
+
+function selectTooling() {
+  activeCategory = "tooling";
+}
+
+function pressed(category: string) {
+  return activeCategory === category ? "true" : "false";
+}
+
+function visibilityClass(category: string) {
+  return activeCategory === "all" || activeCategory === category ? "" : "card-hidden";
+}
+
+function visibleCount() {
+  let count = 0;
+  if (activeCategory === "all" || activeCategory === "compiler") count += 2;
+  if (activeCategory === "all" || activeCategory === "runtime") count += 2;
+  if (activeCategory === "all" || activeCategory === "tooling") count += 2;
+  return count;
+}
+</script>
+
+<DefaultLayout>
+  <section class="stack">
+    <p data-benchmark-copy="lead">Interactive filter benchmark fixture for Zenith.</p>
+    <h1>Small hydrated surface with equivalent category controls.</h1>
+    <p>This case introduces real client state while staying narrow enough for fair framework comparison.</p>
+  </section>
+
+  <section class="section stack">
+    <div class="filters">
+      <button class="filter-button" data-category-button data-category="all" data-active={pressed("all")} aria-pressed={pressed("all")} on:click={selectAll}>All</button>
+      <button class="filter-button" data-category-button data-category="compiler" data-active={pressed("compiler")} aria-pressed={pressed("compiler")} on:click={selectCompiler}>Compiler</button>
+      <button class="filter-button" data-category-button data-category="runtime" data-active={pressed("runtime")} aria-pressed={pressed("runtime")} on:click={selectRuntime}>Runtime</button>
+      <button class="filter-button" data-category-button data-category="tooling" data-active={pressed("tooling")} aria-pressed={pressed("tooling")} on:click={selectTooling}>Tooling</button>
+    </div>
+
+    <p>Showing <span data-visible-count>{visibleCount()}</span> workflows.</p>
+
+    <div class="panel-grid">
+      <article class={`panel ${visibilityClass("compiler")}`.trim()}>
+        <h2>Lower expression graphs</h2>
+        <p>Compiler-focused workflow used to validate authored output.</p>
+      </article>
+      <article class={`panel ${visibilityClass("compiler")}`.trim()}>
+        <h2>Audit marker emission</h2>
+        <p>Checks that generated binding markers remain deterministic.</p>
+      </article>
+      <article class={`panel ${visibilityClass("runtime")}`.trim()}>
+        <h2>Validate hydration payloads</h2>
+        <p>Runtime workflow focused on activation cost and payload integrity.</p>
+      </article>
+      <article class={`panel ${visibilityClass("runtime")}`.trim()}>
+        <h2>Inspect route boot</h2>
+        <p>Runtime workflow that keeps browser-side work observable.</p>
+      </article>
+      <article class={`panel ${visibilityClass("tooling")}`.trim()}>
+        <h2>Boot local dev</h2>
+        <p>Tooling-focused workflow centered on development startup.</p>
+      </article>
+      <article class={`panel ${visibilityClass("tooling")}`.trim()}>
+        <h2>Re-run targeted builds</h2>
+        <p>Tooling workflow used to reason about repeated local change cycles.</p>
+      </article>
+    </div>
+  </section>
+</DefaultLayout>

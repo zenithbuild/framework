@@ -1,0 +1,312 @@
+{
+  "posts": [
+    {
+      "slug": "release-0-6-18",
+      "title": "0.6.18 lands core, routing, site, and tooling on one train.",
+      "excerpt": "The 0.6.18 train locks compiler/runtime fixes, server-authoritative routing, the controlled site transition prototype, and verified editor tooling into one coherent release.",
+      "description": "Release note for Zenith 0.6.18 covering compiler fixes, routing hardening, site transition work, and packaged language tooling.",
+      "publishedAt": "2026-03-12",
+      "updatedAt": "2026-03-13",
+      "readingTime": "7 min read",
+      "tags": ["Release", "Routing", "Tooling"],
+      "cover": {
+        "eyebrow": "Release 0.6.18",
+        "title": "One train. No split reality.",
+        "description": "Core contracts, site surfaces, and editor tooling finally ship on the same verified line.",
+        "tone": "gold"
+      },
+      "author": {
+        "name": "Zenith Team",
+        "role": "Framework release",
+        "href": "https://github.com/zenithbuild"
+      },
+      "summaryPoints": [
+        "Slot-scope owner, marker namespace, SVG class binding, and CLI rewrite regressions were closed without site workarounds.",
+        "Server routing became the authority, client routing became fetch-before-commit, and lifecycle hooks now mirror that truth.",
+        "Language package, language server, and VSIX packaging now verify on the same train instead of living in a separate tooling reality."
+      ],
+      "sections": [
+        {
+          "type": "prose",
+          "id": "train-line",
+          "eyebrow": "Release line",
+          "title": "The release mattered because the surfaces moved together.",
+          "paragraphs": [
+            "Zenith already had strong isolated pieces, but the release train still had drift. Core packages, the site, and the editor stack were proving different things at different times. That made every ship decision weaker than it needed to be.",
+            "0.6.18 fixes that by forcing one coherent line: the compiler and runtime regressions are closed, the routing contract is documented and mirrored on the client, the site uses the same live link surface it documents, and the language stack packages against the same verified compiler train."
+          ]
+        },
+        {
+          "type": "points",
+          "id": "what-shipped",
+          "eyebrow": "What shipped",
+          "title": "Four layers were tightened instead of patched around.",
+          "intro": "The release is deliberately broad, but the shape is simple.",
+          "items": [
+            {
+              "title": "Core correctness",
+              "description": "Compiler and runtime mismatches around slot ownership, marker namespaces, and expression rewrites were fixed at the source."
+            },
+            {
+              "title": "Routing contract",
+              "description": "Server routing became the explicit authority, then client routing was hardened to mirror it with fresh fetch-before-commit behavior."
+            },
+            {
+              "title": "Site proof",
+              "description": "The site now exercises the link surface, route-entry transition prototype, and content-boundary pattern the framework is trying to standardize."
+            },
+            {
+              "title": "Editor packaging",
+              "description": "The language package, server, and VSIX build path were aligned to the same train so the downloadable tooling story is no longer aspirational."
+            }
+          ]
+        },
+        {
+          "type": "quote",
+          "id": "release-principle",
+          "quote": "Server truth first. Verified surfaces second. Marketing language last.",
+          "attribution": "Zenith release rule"
+        }
+      ],
+      "relatedSlugs": [
+        "server-routing-defines-truth",
+        "language-tooling-ships-on-the-train"
+      ],
+      "cta": {
+        "eyebrow": "Open the contract",
+        "title": "Read the docs that back the release.",
+        "description": "The journal explains the move. The docs lock the public contract for the next turn of work.",
+        "href": "/docs",
+        "label": "Open docs"
+      }
+    },
+    {
+      "slug": "server-routing-defines-truth",
+      "title": "Server routing defines truth. Client routing only mirrors it.",
+      "excerpt": "Before transitions and richer soft-nav behavior, Zenith hardened the server routing contract first, then forced the client router to become an optimization layer instead of a second source of truth.",
+      "description": "Deep dive on Zenith’s server-first routing contract, client fetch-before-commit behavior, and navigation lifecycle alignment.",
+      "publishedAt": "2026-03-11",
+      "updatedAt": "2026-03-12",
+      "readingTime": "6 min read",
+      "tags": ["Routing", "Server", "Client"],
+      "cover": {
+        "eyebrow": "Routing contract",
+        "title": "Authority first. Optimization second.",
+        "description": "The router only became animation-ready after the server rules were explicit, deterministic, and tested.",
+        "tone": "red"
+      },
+      "author": {
+        "name": "Zenith Team",
+        "role": "Routing work",
+        "href": "https://github.com/zenithbuild"
+      },
+      "summaryPoints": [
+        "Static, param, catch-all, and optional catch-all precedence is deterministic and documented in one place.",
+        "Client navigation now fetches fresh server-authored content before commit instead of trusting stale SSR state.",
+        "Abort, scroll, focus, and lifecycle timing only make sense once route authority is locked down."
+      ],
+      "sections": [
+        {
+          "type": "prose",
+          "id": "phase-zero",
+          "eyebrow": "Phase 0",
+          "title": "The server contract had to be hardened before the client got smarter.",
+          "paragraphs": [
+            "Zenith’s routing work started by treating the server as the only authority that mattered. That meant documenting real precedence rules, real guard and load ordering, and the actual difference between redirects, matched-route denies, and unmatched 404s.",
+            "Once that was explicit, the client router could stop inventing behavior. Soft navigation became a fetch-before-commit optimization over the direct-load contract, not a side system with its own ideas about truth."
+          ]
+        },
+        {
+          "type": "points",
+          "id": "mirror-rules",
+          "eyebrow": "Mirror rules",
+          "title": "The client only gets to mirror these guarantees.",
+          "intro": "That constraint is what keeps transitions from becoming architecture drift.",
+          "items": [
+            {
+              "title": "Route identity",
+              "description": "Pathname selects the route. Query is data input. Hash is post-commit navigation, not route selection."
+            },
+            {
+              "title": "Fresh data",
+              "description": "If the client cannot fetch fresh server-authored HTML or payload safely, it must fall back to hard navigation."
+            },
+            {
+              "title": "Outcome fidelity",
+              "description": "Redirects, denies, unmatched 404s, and failures keep their server meaning. The client does not reinterpret them for UX convenience."
+            }
+          ]
+        },
+        {
+          "type": "quote",
+          "id": "routing-principle",
+          "quote": "The client router is allowed to move faster. It is not allowed to become more authoritative.",
+          "attribution": "Zenith routing contract"
+        }
+      ],
+      "relatedSlugs": [
+        "release-0-6-18",
+        "document-transitions-without-spa-drift"
+      ],
+      "cta": {
+        "eyebrow": "Read the canonical contract",
+        "title": "Open the routing docs.",
+        "description": "The contract page records the exact precedence, guard/load ordering, and not-found behavior the client router mirrors.",
+        "href": "/docs#routing-contract",
+        "label": "Open routing docs"
+      }
+    },
+    {
+      "slug": "language-tooling-ships-on-the-train",
+      "title": "Language tooling now ships on the same train as the framework.",
+      "excerpt": "The language package, language server, and VSIX packaging path are no longer an adjacent experiment. They now align to the same verified compiler train and release workflow as the framework itself.",
+      "description": "Journal entry covering structured compiler diagnostics, code actions, hover/completion work, and valid VSIX packaging on the release train.",
+      "publishedAt": "2026-03-10",
+      "updatedAt": "2026-03-12",
+      "readingTime": "5 min read",
+      "tags": ["Tooling", "Editor", "VSIX"],
+      "cover": {
+        "eyebrow": "Editor tooling",
+        "title": "One compiler. One extension story.",
+        "description": "Diagnostics, code actions, hover docs, and packaging now verify against the same version line.",
+        "tone": "blue"
+      },
+      "author": {
+        "name": "Zenith Team",
+        "role": "Language tooling",
+        "href": "https://github.com/zenithbuild"
+      },
+      "summaryPoints": [
+        "Structured compiler diagnostics now bridge cleanly into the language server instead of being reinterpreted by editor glue.",
+        "Code actions and doc-backed hover/completion behavior are verified against real framework files, not placeholder samples.",
+        "The VSIX packaging path now produces a real artifact on the same train version the framework publishes."
+      ],
+      "sections": [
+        {
+          "type": "prose",
+          "id": "tooling-boundary",
+          "eyebrow": "Tooling boundary",
+          "title": "The editor stack stopped pretending it could float above framework truth.",
+          "paragraphs": [
+            "A language server is only as trustworthy as the compiler contract it reflects. Zenith’s editor work now treats the compiler diagnostics and metadata as the authority, then layers hover, completion, and quick fixes directly on top of that source.",
+            "That also changed packaging. A VSIX build is only meaningful if it packages the real server and real compiler dependency path for the release train that users can actually install."
+          ]
+        },
+        {
+          "type": "points",
+          "id": "verified-surface",
+          "eyebrow": "Verified surface",
+          "title": "What the editor flow now proves",
+          "intro": "The goal was not to ship more editor features. It was to make the current ones defensible.",
+          "items": [
+            {
+              "title": "Diagnostics",
+              "description": "Compiler warnings and errors now cross the bridge with their structure intact, so the editor is not guessing at severity or origin."
+            },
+            {
+              "title": "Code actions",
+              "description": "ZEN-DOM quick fixes and related actions stay grounded in compiler-backed diagnostics instead of ad hoc string matching."
+            },
+            {
+              "title": "Packaging",
+              "description": "The packaged extension now verifies against the same version line as the framework, so npm publish and downloadable tooling are no longer separate truths."
+            }
+          ]
+        },
+        {
+          "type": "quote",
+          "id": "tooling-principle",
+          "quote": "Editor tooling is only useful when it is boringly correct.",
+          "attribution": "Zenith language tooling"
+        }
+      ],
+      "relatedSlugs": [
+        "release-0-6-18",
+        "document-transitions-without-spa-drift"
+      ],
+      "cta": {
+        "eyebrow": "See the verified commands",
+        "title": "Open the docs surface.",
+        "description": "The docs page links to the verified install commands, editor package surfaces, and the repo-backed release line.",
+        "href": "/docs",
+        "label": "Open docs"
+      }
+    },
+    {
+      "slug": "document-transitions-without-spa-drift",
+      "title": "Document-style transitions can work without drifting into SPA architecture.",
+      "excerpt": "The current site transition prototype proves a narrow route-entry animation shell can sit on top of router truth without turning the site into a second runtime architecture.",
+      "description": "Journal entry on Zenith’s narrow route-entry transition prototype, lifecycle timing, and why the overlay stays subordinate to router truth.",
+      "publishedAt": "2026-03-09",
+      "updatedAt": "2026-03-11",
+      "readingTime": "5 min read",
+      "tags": ["Site", "Transitions", "Navigation"],
+      "cover": {
+        "eyebrow": "Site prototype",
+        "title": "Transitions without SPA drift.",
+        "description": "The shell only owns visual orchestration. The router still owns truth, data, history, and scroll.",
+        "tone": "magenta"
+      },
+      "author": {
+        "name": "Zenith Team",
+        "role": "Site system",
+        "href": "https://github.com/zenithbuild"
+      },
+      "summaryPoints": [
+        "Soft navigation stays explicit opt-in, and only a narrow route-entry set is currently proven.",
+        "The transition shell listens to router lifecycle hooks but never replaces routing or content ownership.",
+        "Docs deep-hash links, broad header/footer rollout, and unrelated internal links stay outside the soft-nav surface until they are proven."
+      ],
+      "sections": [
+        {
+          "type": "prose",
+          "id": "transition-shell",
+          "eyebrow": "Transition shell",
+          "title": "The prototype is intentionally narrow because that is what keeps it honest.",
+          "paragraphs": [
+            "The site only proves route-entry transitions for a small set of pages right now. That is not a limitation hiding as strategy. It is the actual method used to keep the shell subordinate to router truth instead of letting animation demands redefine navigation behavior.",
+            "The overlay choreography, latest-navigation-wins behavior, and reduced-motion fallback all sit on top of the hardened lifecycle. If the route outcome is a redirect, deny, 404, or failure, the shell stands down."
+          ]
+        },
+        {
+          "type": "points",
+          "id": "prototype-rules",
+          "eyebrow": "Prototype rules",
+          "title": "The current boundary stays small on purpose.",
+          "intro": "The site prototype only scales when each surface is proven first.",
+          "items": [
+            {
+              "title": "Opt-in links only",
+              "description": "Hard navigation remains the default, and the canonical site link surface chooses soft navigation only for the proven route-entry set."
+            },
+            {
+              "title": "Lifecycle-driven timing",
+              "description": "Leave, cover, swap, reveal, and enter timing all hang off the router lifecycle instead of inventing a parallel transition engine."
+            },
+            {
+              "title": "No header/footer drift",
+              "description": "Broader navigation rollout still waits on surface-specific audits instead of happening implicitly because the shell exists."
+            }
+          ]
+        },
+        {
+          "type": "quote",
+          "id": "transition-principle",
+          "quote": "A good transition shell should make the page feel better, not make the router harder to reason about.",
+          "attribution": "Zenith site system"
+        }
+      ],
+      "relatedSlugs": [
+        "server-routing-defines-truth",
+        "release-0-6-18"
+      ],
+      "cta": {
+        "eyebrow": "Meet the site system",
+        "title": "See how the public site fits together.",
+        "description": "The About page explains why the site system stays aligned with the framework’s architecture instead of becoming a separate product.",
+        "href": "/about",
+        "label": "Open About"
+      }
+    }
+  ]
+}

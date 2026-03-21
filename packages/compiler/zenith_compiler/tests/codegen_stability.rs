@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // PHASE 9: CODEGEN STABILITY LOCK
 // Codegen output must be byte-stable.

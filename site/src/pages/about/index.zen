@@ -1,0 +1,24 @@
+<script server lang="ts">
+import { pageContent, siteContent } from "../../content/index";
+
+export const load = async (_ctx) => {
+    return {
+        pageTitle: pageContent.about.pageTitle,
+        pageDescription: pageContent.about.description,
+        pageContent: pageContent.about,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        }
+    };
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import AboutSurface from "@/components/surfaces/AboutSurface.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <AboutSurface content={data.pageContent} />
+</DefaultLayout>

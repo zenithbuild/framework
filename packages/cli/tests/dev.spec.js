@@ -109,6 +109,24 @@ function localOrigin(port) {
     return `http://127.0.0.1:${port}`;
 }
 
+async function getAvailablePort() {
+    return new Promise((resolve, reject) => {
+        const server = http.createServer();
+        server.listen(0, '127.0.0.1', () => {
+            const address = server.address();
+            const port = address && typeof address === 'object' ? address.port : 0;
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve(port);
+            });
+        });
+        server.on('error', reject);
+    });
+}
+
 describe('Dev Server', () => {
     let project;
     let dev;
@@ -132,6 +150,58 @@ describe('Dev Server', () => {
         expect(res.body).toContain('<!DOCTYPE html>');
         // Note: CLI no longer injects __zenith_hmr; only the runtime does this
         expect(res.body).not.toContain('__zenith_hmr');
+    });
+
+    test('binds before initial build completes and reports build-pending state', async () => {
+        const files = ['index.zen'];
+        for (let index = 0; index < 120; index += 1) {
+            files.push(`pages-${index}.zen`);
+        }
+        project = await createTestProject(files);
+
+        const port = await getAvailablePort();
+        let devReady = false;
+        const devPromise = createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port
+        }).then((instance) => {
+            devReady = true;
+            return instance;
+        });
+
+        const pendingState = await waitFor(async () => {
+            try {
+                const response = await httpGet(`${localOrigin(port)}/__zenith_dev/state`);
+                if (response.status !== 200) {
+                    return null;
+                }
+                const payload = JSON.parse(response.body);
+                if (payload.status !== 'building') {
+                    return null;
+                }
+                return payload;
+            } catch {
+                return null;
+            }
+        }, { timeoutMs: 5000, intervalMs: 50 });
+
+        expect(devReady).toBe(false);
+        expect(pendingState.buildId).toBe(0);
+        expect(pendingState.status).toBe('building');
+
+        const pendingPage = await httpGet(`${localOrigin(port)}/`);
+        expect(pendingPage.status).toBe(503);
+        expect(pendingPage.body).toContain('Zenith Dev Building');
+
+        dev = await devPromise;
+
+        const settledState = JSON.parse((await httpGet(`${localOrigin(dev.port)}/__zenith_dev/state`)).body);
+        expect(settledState.status).toBe('ok');
+
+        const res = await httpGet(`${localOrigin(dev.port)}/`);
+        expect(res.status).toBe(200);
+        expect(res.body).toContain('<!DOCTYPE html>');
     });
 
     test('serves nested routes', async () => {

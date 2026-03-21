@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [[ "$OS" == "Windows_NT" ]]; then
+  echo "🪟 Detected Windows - Running start.bat"
+  ./scripts/start.bat
+else
+  echo "🐧 Detected Unix - Running start.sh"
+  bash ./scripts/start.sh
+fi
+

@@ -1,0 +1,29 @@
+---
+import "../styles/global.css";
+
+const { title = "Astro Interactive Fixture" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <strong>Astro Fixture</strong>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="/">Home</a>
+          <a href="#filters">Filters</a>
+        </nav>
+      </header>
+      <main class="site-main">
+        <slot />
+      </main>
+      <footer class="site-footer">Benchmark fixture footer.</footer>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,316 @@
+<script setup="ts">
+const rawProps = props as any;
+const IMAGE_RUNTIME_GLOBAL = "__zenith_image_runtime";
+const DEFAULT_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
+const DEFAULT_IMAGE_SIZES = [16, 32, 48, 64, 96, 128, 256, 384];
+
+function safeString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildAttr(name: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+  return ` ${name}="${escapeHtml(value)}"`;
+}
+
+function normalizeFormat(value: unknown): string {
+  return String(value || "").trim().toLowerCase().replace(/^\./, "");
+}
+
+function isRemoteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function normalizeSource(input: unknown) {
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    if (isRemoteUrl(trimmed)) return { kind: "remote", url: trimmed, width: null, height: null, alt: "" };
+    if (trimmed.startsWith("/")) return { kind: "local", path: trimmed, width: null, height: null, alt: "" };
+    return null;
+  }
+  if (!isPlainObject(input)) return null;
+  const rawUrl = typeof input.url === "string"
+    ? input.url
+    : typeof input.src === "string"
+    ? input.src
+    : typeof input.path === "string"
+    ? input.path
+    : "";
+  const normalized = normalizeSource(rawUrl);
+  if (!normalized) return null;
+  return {
+    ...normalized,
+    width: Number.isInteger(input.width) && input.width > 0 ? input.width : null,
+    height: Number.isInteger(input.height) && input.height > 0 ? input.height : null,
+    alt: typeof input.alt === "string" ? input.alt : ""
+  };
+}
+
+function buildLocalImageKey(publicPath: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < publicPath.length; index += 1) {
+    hash ^= publicPath.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function buildLocalVariantPath(publicPath: string, width: number, quality: number, format: string): string {
+  return `/_zenith/image/local/${buildLocalImageKey(publicPath)}/w${width}-q${quality}.${normalizeFormat(format)}`;
+}
+
+function buildRemoteVariantPath(remoteUrl: string, width: number, quality: number, format: string): string {
+  const query = new URLSearchParams();
+  query.set("url", remoteUrl);
+  query.set("w", String(width));
+  query.set("q", String(quality));
+  if (format) query.set("f", normalizeFormat(format));
+  return `/_zenith/image?${query.toString()}`;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+?.*]/g, "\\$&");
+}
+
+function globToRegExp(glob: string, isHostname = false): RegExp {
+  let pattern = escapeRegex(glob);
+  pattern = pattern.replaceAll("\\*\\*", "__DOUBLE_STAR__");
+  pattern = pattern.replaceAll("\\*", isHostname ? "[^.]*" : "[^/]*");
+  pattern = pattern.replaceAll("__DOUBLE_STAR__", ".*");
+  return new RegExp(`^${pattern}$`, "i");
+}
+
+function hostnameMatches(hostname: string, pattern: string): boolean {
+  if (pattern.startsWith("*.")) {
+    const suffix = pattern.slice(1);
+    return hostname.endsWith(suffix) && hostname.length > suffix.length;
+  }
+  return globToRegExp(pattern, true).test(hostname);
+}
+
+function matchRemotePattern(inputUrl: string, patterns: any[]): boolean {
+  if (!inputUrl || !Array.isArray(patterns) || patterns.length === 0) return false;
+  const url = new URL(inputUrl);
+  const protocol = url.protocol.replace(/:$/, "").toLowerCase();
+  const hostname = url.hostname.toLowerCase();
+  const port = url.port || "";
+  const pathname = url.pathname || "/";
+  const search = url.search || "";
+  return patterns.some((pattern) => {
+    if (pattern.protocol && pattern.protocol !== protocol) return false;
+    if (!hostnameMatches(hostname, String(pattern.hostname || ""))) return false;
+    if (pattern.port && pattern.port !== port) return false;
+    if (pattern.search && pattern.search !== search) return false;
+    return globToRegExp(String(pattern.pathname || "/**")).test(pathname);
+  });
+}
+
+function resolveWidthCandidates(width: number | null, sizes: string, config: any, manifestEntry: any): number[] {
+  const base = new Set<number>([
+    ...((config?.deviceSizes as number[]) || DEFAULT_DEVICE_SIZES),
+    ...((config?.imageSizes as number[]) || DEFAULT_IMAGE_SIZES)
+  ]);
+  if (Number.isInteger(width) && width > 0) {
+    base.add(width);
+    base.add(width * 2);
+  }
+  if (!width && sizes) {
+    for (const candidate of (config?.deviceSizes as number[]) || DEFAULT_DEVICE_SIZES) {
+      base.add(candidate);
+    }
+  }
+  let widths = [...base].filter((entry) => Number.isInteger(entry) && entry > 0).sort((a, b) => a - b);
+  const available = Array.isArray(manifestEntry?.availableWidths) ? manifestEntry.availableWidths : null;
+  if (Array.isArray(available) && available.length > 0) {
+    widths = widths.filter((entry) => available.includes(entry));
+    if (widths.length === 0) widths = [...available];
+  }
+  return widths;
+}
+
+function mimeTypeForFormat(format: string): string {
+  switch (normalizeFormat(format)) {
+    case "avif": return "image/avif";
+    case "webp": return "image/webp";
+    case "png": return "image/png";
+    case "jpg":
+    case "jpeg": return "image/jpeg";
+    default: return "";
+  }
+}
+
+function pickNumeric(value: unknown, fallback: number | null): number | null {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : fallback;
+}
+
+function mergeStyle(style: unknown, fit: unknown, position: unknown): string {
+  const segments: string[] = [];
+  const incoming = safeString(style);
+  if (incoming) segments.push(incoming.replace(/;+\s*$/, ""));
+  const fitValue = safeString(fit);
+  const positionValue = safeString(position);
+  if (fitValue) segments.push(`object-fit: ${fitValue}`);
+  if (positionValue) segments.push(`object-position: ${positionValue}`);
+  return segments.join("; ");
+}
+
+function buildSourceTags(sources: Array<{ type: string; srcset: string; sizes: string }>): string {
+  return sources.map((entry) => {
+    const attrs = [
+      buildAttr("type", entry.type),
+      buildAttr("srcset", entry.srcset),
+      buildAttr("sizes", entry.sizes)
+    ].join("");
+    return `<source${attrs}>`;
+  }).join("");
+}
+
+function readPayload() {
+  if (typeof globalThis !== "object" || !globalThis) return null;
+  const payload = (globalThis as any)[IMAGE_RUNTIME_GLOBAL];
+  return isPlainObject(payload) ? payload : null;
+}
+
+function encodeBase64(value: string): string {
+  if (typeof Buffer !== "undefined") return Buffer.from(value, "utf8").toString("base64");
+  if (typeof btoa === "function" && typeof TextEncoder === "function") {
+    const bytes = new TextEncoder().encode(value);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }
+  return "";
+}
+
+function buildSerializableProps(): Record<string, unknown> {
+  return {
+    src: rawProps.src,
+    alt: rawProps.alt,
+    width: rawProps.width,
+    height: rawProps.height,
+    sizes: rawProps.sizes,
+    quality: rawProps.quality,
+    priority: rawProps.priority,
+    loading: rawProps.loading,
+    decoding: rawProps.decoding,
+    fit: rawProps.fit,
+    position: rawProps.position,
+    placeholder: rawProps.placeholder,
+    unoptimized: rawProps.unoptimized,
+    class: rawProps.class,
+    style: rawProps.style
+  };
+}
+
+function renderImage(): string {
+  const payload = readPayload();
+  if (!payload) return "";
+
+  const source = normalizeSource(rawProps.src);
+  const alt = safeString(rawProps.alt) || safeString(source?.alt);
+  if (!source || !alt) return "";
+
+  const config = isPlainObject(payload.config) ? payload.config : {};
+  const className = safeString(rawProps.class);
+  const style = mergeStyle(rawProps.style, rawProps.fit, rawProps.position);
+  const loading = rawProps.priority === true ? "eager" : safeString(rawProps.loading) || "lazy";
+  const decoding = safeString(rawProps.decoding) || "async";
+  const fetchPriority = rawProps.priority === true ? "high" : "";
+
+  let model: any = null;
+  if (source.kind === "local") {
+    const manifestEntry = isPlainObject(payload.localImages) ? payload.localImages[source.path] : null;
+    const width = pickNumeric(rawProps.width, pickNumeric(source.width, pickNumeric(manifestEntry?.width, null)));
+    const height = pickNumeric(rawProps.height, pickNumeric(source.height, pickNumeric(manifestEntry?.height, null)));
+    const quality = pickNumeric(rawProps.quality, pickNumeric(config.quality, 75)) || 75;
+    const sizes = safeString(rawProps.sizes);
+    const widths = resolveWidthCandidates(width, sizes, config, manifestEntry);
+    const fallbackFormat = safeString(manifestEntry?.originalFormat) || "jpg";
+    const sourceFormats = ((config.formats as string[]) || []).filter((format) =>
+      Array.isArray(manifestEntry?.availableFormats) ? manifestEntry.availableFormats.includes(format) : true
+    );
+    const fallbackWidth = widths.length > 0 ? widths[widths.length - 1] : (width || manifestEntry?.width || 0);
+    model = {
+      src: rawProps.unoptimized === true
+        ? source.path
+        : buildLocalVariantPath(source.path, fallbackWidth, quality, fallbackFormat),
+      width,
+      height,
+      sizes,
+      sources: rawProps.unoptimized === true
+        ? []
+        : sourceFormats.map((format) => ({
+            type: mimeTypeForFormat(format),
+            sizes,
+            srcset: widths.map((candidate) => `${buildLocalVariantPath(source.path, candidate, quality, format)} ${candidate}w`).join(", ")
+          })).filter((entry) => entry.type && entry.srcset)
+    };
+  } else {
+    const width = pickNumeric(rawProps.width, pickNumeric(source.width, null));
+    const height = pickNumeric(rawProps.height, pickNumeric(source.height, null));
+    const quality = pickNumeric(rawProps.quality, pickNumeric(config.quality, 75)) || 75;
+    const sizes = safeString(rawProps.sizes);
+    const widths = resolveWidthCandidates(width, sizes, config, null);
+    if (!matchRemotePattern(source.url, Array.isArray(config.remotePatterns) ? config.remotePatterns : [])) return "";
+    if (payload.mode !== "endpoint" || rawProps.unoptimized === true || !width) {
+      model = { src: source.url, width, height, sizes, sources: [] };
+    } else {
+      model = {
+        src: buildRemoteVariantPath(source.url, widths[widths.length - 1] || width, quality, ""),
+        width,
+        height,
+        sizes,
+        sources: ((config.formats as string[]) || []).map((format) => ({
+          type: mimeTypeForFormat(format),
+          sizes,
+          srcset: widths.map((candidate) => `${buildRemoteVariantPath(source.url, candidate, quality, format)} ${candidate}w`).join(", ")
+        })).filter((entry) => entry.type && entry.srcset)
+      };
+    }
+  }
+
+  if (!model?.src) return "";
+  const imgAttrs = [
+    buildAttr("src", model.src),
+    buildAttr("alt", alt),
+    buildAttr("class", className),
+    buildAttr("style", style),
+    buildAttr("loading", loading),
+    buildAttr("decoding", decoding),
+    buildAttr("fetchpriority", fetchPriority),
+    buildAttr("sizes", model.sizes),
+    buildAttr("width", model.width),
+    buildAttr("height", model.height)
+  ].join("");
+  const sourcesHtml = buildSourceTags(model.sources || []);
+  return sourcesHtml ? `<picture>${sourcesHtml}<img${imgAttrs} /></picture>` : `<img${imgAttrs} />`;
+}
+
+function serializeImageProps(): string {
+  const source = normalizeSource(rawProps.src);
+  const alt = safeString(rawProps.alt) || safeString(source?.alt);
+  if (!source || !alt) return "";
+  return encodeBase64(JSON.stringify(buildSerializableProps()));
+}
+
+const imageHtml = renderImage();
+const imagePayload = serializeImageProps();
+</script>
+
+<span class="contents" data-zenith-image={imagePayload} innerHTML={imageHtml}></span>
