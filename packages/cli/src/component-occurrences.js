@@ -55,13 +55,7 @@ function walkSource(source, registry, context, chain, occurrences) {
         });
 
         const compSource = readFileSync(compPath, 'utf8');
-        const fragments = materializeFragments(
-            compSource,
-            tag.name,
-            children,
-            compPath,
-            context
-        );
+        const fragments = materializeFragments(compSource, tag.name, children, compPath, context);
         for (const fragment of fragments) {
             if (!fragment.source) {
                 continue;

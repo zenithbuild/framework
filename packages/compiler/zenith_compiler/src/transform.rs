@@ -163,12 +163,10 @@ impl Transformer {
     fn transform_node(&mut self, node: Node) -> Node {
         match node {
             Node::Element(elem) => self.transform_element(elem),
-            Node::Expression { value, span } => {
-                Node::Expression {
-                    value: self.rewrite_expression(&value, RewriteContext::Text),
-                    span,
-                }
-            }
+            Node::Expression { value, span } => Node::Expression {
+                value: self.rewrite_expression(&value, RewriteContext::Text),
+                span,
+            },
             Node::Text(text) => Node::Text(text),
         }
     }
@@ -345,7 +343,8 @@ impl Transformer {
             _ => true,
         });
         let materialize_text_placeholders = !raw_text_container
-            && (expression_child_count > 1 || (expression_child_count > 0 && has_non_expression_children));
+            && (expression_child_count > 1
+                || (expression_child_count > 0 && has_non_expression_children));
 
         if raw_text_container && raw_text_only_children && expression_child_count > 0 {
             let mut combined_parts = Vec::new();
@@ -518,9 +517,17 @@ impl Transformer {
         let mut rewritten = trimmed.to_string();
         for (original, replacement) in &bindings {
             let pattern = Regex::new(&format!(r"\b{}\b", regex::escape(original))).unwrap();
-
+            let current_rewritten = rewritten.clone();
             rewritten = pattern
-                .replace_all(&rewritten, replacement.as_str())
+                .replace_all(&current_rewritten, |caps: &regex::Captures| {
+                    let matched = caps.get(0).expect("rewrite match");
+                    if matched.start() > 0
+                        && current_rewritten.as_bytes().get(matched.start() - 1) == Some(&b'.')
+                    {
+                        return matched.as_str().to_string();
+                    }
+                    replacement.clone()
+                })
                 .into_owned();
         }
 

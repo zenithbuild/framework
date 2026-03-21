@@ -15,7 +15,19 @@ const DEFAULT_CONFIG = {
     outDir: 'dist',
     pagesDir: 'pages',
     experimental: {},
-    strictDomLints: false
+    strictDomLints: false,
+    images: {
+        formats: ['webp', 'avif'],
+        quality: 75,
+        deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+        imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+        remotePatterns: [],
+        allowSvg: false,
+        maxRemoteBytes: 10 * 1024 * 1024,
+        maxPixels: 40_000_000,
+        minimumCacheTTL: 60,
+        dangerouslyAllowLocalNetwork: false
+    }
 };
 
 describe('validateConfig', () => {
@@ -69,6 +81,35 @@ describe('validateConfig', () => {
             pagesDir: 'src/pages'
         });
     });
+
+    test('normalizes images config', () => {
+        const config = validateConfig({
+            images: {
+                remotePatterns: [
+                    {
+                        hostname: 'images.example.com',
+                        pathname: '/blog/**'
+                    }
+                ],
+                quality: 80
+            }
+        });
+        expect(config.images.quality).toBe(80);
+        expect(config.images.remotePatterns).toEqual([
+            {
+                protocol: 'https',
+                hostname: 'images.example.com',
+                port: '',
+                pathname: '/blog/**',
+                search: ''
+            }
+        ]);
+    });
+
+    test('throws on malformed images config', () => {
+        expect(() => validateConfig({ images: { remotePatterns: [{ pathname: '/blog/**' }] } })).toThrow('hostname is required');
+        expect(() => validateConfig({ images: { quality: 0 } })).toThrow('positive integer');
+    });
 });
 
 describe('getDefaults', () => {
@@ -77,6 +118,7 @@ describe('getDefaults', () => {
         const d2 = getDefaults();
         expect(d1).toEqual(d2);
         expect(d1).not.toBe(d2); // not the same reference
+        expect(d1.images).not.toBe(d2.images);
     });
 });
 

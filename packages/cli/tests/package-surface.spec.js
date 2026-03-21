@@ -15,6 +15,7 @@ describe('cli package surface', () => {
     test('build emits dist entry JS and declarations', () => {
         expect(existsSync(join(DIST_ROOT, 'index.js'))).toBe(true);
         expect(existsSync(join(DIST_ROOT, 'index.d.ts'))).toBe(true);
+        expect(existsSync(join(DIST_ROOT, 'framework-components', 'Image.zen'))).toBe(true);
         expect(readFileSync(join(DIST_ROOT, 'index.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
     });
 

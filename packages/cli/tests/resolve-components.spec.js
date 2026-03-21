@@ -131,12 +131,13 @@ describe('resolve-components', () => {
         );
     });
 
-    test('does not auto-register framework components', async () => {
+    test('registers the built-in Image component without registering unrelated framework components', async () => {
         project = await makeSrc({
             'components/Foo.zen': '<div>Foo</div>',
         });
 
         const registry = buildComponentRegistry(project.srcDir);
+        expect(registry.has('Image')).toBe(true);
         expect(registry.has('ZenLink')).toBe(false);
     });
 });

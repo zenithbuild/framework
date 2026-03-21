@@ -1,0 +1,22 @@
+<script lang="ts">
+interface Props {
+  items: string[];
+  records: Array<{ title: string; description: string }>;
+}
+
+const tProps = props as Props;
+const tItems = tProps.items;
+const tRecords = tProps.records;
+</script>
+
+<div>
+  {tItems.map((item) => (
+    <span class="chip">{item}</span>
+  ))}
+  {tRecords.map((record) => (
+    <article>
+      <h3>{record.title}</h3>
+      <p>{record.description}</p>
+    </article>
+  ))}
+</div>

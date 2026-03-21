@@ -512,7 +512,7 @@ describe('build orchestration', () => {
         const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
         expect(pageAsset.includes('items.map((item)')).toBe(true);
-        expect(pageAsset.includes('__ZENITH_INTERNAL_ZENHTML`<li>${')).toBe(true);
+        expect(pageAsset).toMatch(/__ZENITH_INTERNAL_ZENHTML\s*`<li>\$\{/);
         expect(pageAsset.includes('___')).toBe(true);
         expect(pageAsset.includes('"literal":"items.map((item)')).toBe(false);
         expect(/const __zenith_state_keys = \[[^\]]+items/.test(pageAsset)).toBe(true);

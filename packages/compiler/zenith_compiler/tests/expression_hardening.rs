@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 // ============================================================
 // PHASE 8: EXPRESSION BOUNDARY HARDENING
 // The compiler must never:

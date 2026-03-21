@@ -8,10 +8,7 @@ use zenith_compiler::compiler::compile as compile_zen;
 // ============================================================
 
 fn must_fail(input: &str) -> String {
-    compile_zen(input).expect_err(&format!(
-        "Expected compile error for input `{}`",
-        input
-    ))
+    compile_zen(input).expect_err(&format!("Expected compile error for input `{}`", input))
 }
 
 #[test]

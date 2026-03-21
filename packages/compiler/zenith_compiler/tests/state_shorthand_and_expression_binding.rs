@@ -28,7 +28,12 @@ state isAnimating = false;
         "state shorthand must emit to hoisted state table"
     );
 
-    let keys: Vec<&str> = output.hoisted.state.iter().map(|s| s.key.as_str()).collect();
+    let keys: Vec<&str> = output
+        .hoisted
+        .state
+        .iter()
+        .map(|s| s.key.as_str())
+        .collect();
     assert!(
         keys.iter().any(|k: &&str| k.ends_with("_isOpen")),
         "state table must contain isOpen (key ends with _isOpen), got: {:?}",
