@@ -13,6 +13,9 @@ interface Props {
 const isOpen = signal(false);
 let isAnimating = false;
 
+const isHeaderVisible = signal(true);
+let lastScrollY = 0;
+
 const wrapper = ref<HTMLDivElement>();
 const shell = ref<HTMLDivElement>();
 const backdrop = ref<HTMLDivElement>();
@@ -26,6 +29,7 @@ const linkHome = ref<HTMLAnchorElement>();
 const linkAbout = ref<HTMLAnchorElement>();
 const linkDocs = ref<HTMLAnchorElement>();
 const linkBlog = ref<HTMLAnchorElement>();
+const linkChangelog = ref<HTMLAnchorElement>();
 const linkGitHub = ref<HTMLAnchorElement>();
 
 const footerYear = ref<HTMLDivElement>();
@@ -61,6 +65,7 @@ const navHomeLink = findLinkByHref(navigationMainLinks, "/", "Home");
 const navAboutLink = findLinkByHref(navigationMainLinks, "/about", "About");
 const navDocsLink = findLinkByHref(navigationMainLinks, "/docs", "Docs");
 const navBlogLink = findLinkByHref(navigationMainLinks, "/blog", "Blog");
+const navChangelogLink = findLinkByHref(navigationMainLinks, "/changelog", "Changelog");
 const navGitHubLink = findLinkByHref(navigationMainLinks, "https://github.com/zenithbuild/framework", "GitHub");
 const navTwitterLink = findLinkByHref(navigationFooterLinks, "https://twitter.com/zenithbuild", "Twitter");
 const navFooterGitHubLink = findLinkByHref(navigationFooterLinks, "https://github.com/zenithbuild/framework", "GitHub");
@@ -213,7 +218,7 @@ function animateOpen() {
     borderRadius: m.open.r,
   });
 
-  const links = collectRefs(linkHome, linkAbout, linkDocs, linkBlog, linkGitHub);
+  const links = collectRefs(linkHome, linkAbout, linkDocs, linkBlog, linkChangelog, linkGitHub);
   const footer = collectRefs(footerTwitter, footerGitHub, footerContract, footerYear);
 
   splitLinks?.revert();
@@ -353,6 +358,12 @@ zenMount((ctx) => {
   applyClosed(true);
   syncToggleLabel("menu", true);
 
+  const win = zenWindow();
+  const doc = zenDocument();
+  if (!win || !doc) return;
+
+  lastScrollY = win.scrollY;
+
   const offResize = zenResize(() => {
     if (!isOpen.get() && shell.current) {
       const m = measure();
@@ -365,7 +376,24 @@ zenMount((ctx) => {
     }
   });
 
+  const offScroll = zenOn(win, "scroll", () => {
+    if (isOpen.get()) return;
+    const currentScrollY = Math.max(0, win.scrollY || doc.documentElement.scrollTop);
+    const scrollDelta = currentScrollY - lastScrollY;
+
+    // Only hide if we've scrolled down past a reasonable threshold
+    if (scrollDelta > 10 && currentScrollY > 100) {
+      if (isHeaderVisible.get()) isHeaderVisible.set(false);
+    } else if (scrollDelta < -20 || currentScrollY < 20) {
+      // Show immediately on significant scroll up or if we're at the very top
+      if (!isHeaderVisible.get()) isHeaderVisible.set(true);
+    }
+
+    lastScrollY = currentScrollY;
+  }, { passive: true });
+
   ctx.cleanup(offResize);
+  ctx.cleanup(offScroll);
   ctx.cleanup(() => {
     tl?.kill();
     if (shell.current) gsap.killTweensOf(shell.current);
@@ -392,7 +420,23 @@ zeneffect([isOpen], () => {
   }
 
   syncToggleLabel("close");
+  isHeaderVisible.set(true); // Ensure visible when opening
   animateOpen();
+});
+
+zeneffect([isHeaderVisible, isOpen], () => {
+  if (!shell.current) return;
+
+  // When menu is open, it MUST be visible
+  const shouldShow = isOpen.get() || isHeaderVisible.get();
+
+  gsap.to(shell.current, {
+    y: shouldShow ? 0 : -100,
+    xPercent: -50,
+    duration: 0.45,
+    ease: "power2.out",
+    overwrite: "auto"
+  });
 });
 </script>
 
@@ -445,6 +489,7 @@ zeneffect([isOpen], () => {
           <Links elementRef={linkAbout} href={navAboutLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navAboutLink.label}<span class="text-primary">.</span></Links>
           <Links elementRef={linkDocs} href={navDocsLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navDocsLink.label}<span class="text-primary">.</span></Links>
           <Links elementRef={linkBlog} href={navBlogLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navBlogLink.label}<span class="text-primary">.</span></Links>
+          <Links elementRef={linkChangelog} href={navChangelogLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navChangelogLink.label}<span class="text-primary">.</span></Links>
           <Links elementRef={linkGitHub} href={navGitHubLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navGitHubLink.label}<span class="text-primary">.</span></Links>
         </nav>
       </div>

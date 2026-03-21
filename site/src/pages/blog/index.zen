@@ -1,0 +1,34 @@
+<script server lang="ts">
+import { pageContent, siteContent } from "../../content/index";
+import { loadBlogIndexSource } from "../../server/postSource";
+
+export const load = async (_ctx) => {
+    const blogPageContent = pageContent.blog;
+    const blogSource = await loadBlogIndexSource();
+
+    return {
+        pageTitle: blogPageContent.pageTitle,
+        pageDescription: blogPageContent.description,
+        pageContent: blogPageContent,
+        blogSource,
+        site: {
+            navigation: siteContent.navigation,
+            footer: siteContent.footer,
+        }
+    };
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import BlogLandingSurface from "@/components/surfaces/BlogLandingSurface.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
+    <BlogLandingSurface
+        content={data.pageContent}
+        featuredPost={data.blogSource.featuredPost}
+        archivePosts={data.blogSource.archivePosts}
+        sourceMode={data.blogSource.sourceMode}
+    />
+</DefaultLayout>

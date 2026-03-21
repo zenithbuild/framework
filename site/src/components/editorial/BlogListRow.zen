@@ -1,0 +1,62 @@
+<script lang="ts">
+import type { BlogPost } from "@/server/postSource";
+
+export interface Props {
+  post: BlogPost;
+  labels: Record<string, string>;
+  index: number;
+}
+
+const p = props as Props;
+const post = p.post;
+const labels = p.labels || {};
+const index = p.index || 0;
+
+// Narrow site-layer normalization for object-valued CMS fields
+function safeString(val: any): string {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    return val.title || val.name || val.label || val.slug || val.url || "";
+  }
+  return String(val);
+}
+
+const categoryDisplay = safeString(post.category);
+const titleDisplay = safeString(post.title);
+const excerptDisplay = safeString(post.excerpt);
+const dateDisplay = safeString(post.displayPublishedAt) || "Unpublished";
+const readingTimeDisplay = safeString(post.readingTime);
+</script>
+
+<article class="group relative flex flex-col md:grid md:grid-cols-[1fr,2fr,3fr,1fr] lg:grid-cols-[150px,250px,1fr,200px] gap-6 md:gap-8 items-start md:items-center py-8 md:py-10 border-b border-border hover:bg-muted/10 transition-colors -mx-6 px-6 lg:-mx-12 lg:px-12">
+  <div class="flex items-center gap-4 w-full text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+    <span class="hidden md:inline-block w-6 text-muted-foreground/40">{String(index + 1).padStart(2, "0")}</span>
+    <span>{dateDisplay}</span>
+  </div>
+  
+  <div class="w-full">
+    <span class="text-xs font-mono uppercase tracking-[0.18em] text-foreground/80">
+      {categoryDisplay}
+    </span>
+  </div>
+
+  <div class="flex flex-col gap-2 w-full pr-4 lg:pr-12">
+    <a href={post.path} class="absolute inset-0 z-10">
+      <span class="sr-only">Read {titleDisplay}</span>
+    </a>
+    <h3 class="text-xl md:text-2xl font-heading font-medium uppercase tracking-tight text-foreground group-hover:text-foreground/80 transition-colors">
+      {titleDisplay}
+    </h3>
+    <p class="text-sm md:text-base leading-relaxed text-muted-foreground line-clamp-2 md:line-clamp-1">
+      {excerptDisplay}
+    </p>
+  </div>
+  
+  <div class="hidden md:flex flex-col items-end w-full text-right text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+    <span>{readingTimeDisplay}</span>
+    <span class="mt-2 text-foreground/60 transition-colors group-hover:text-foreground inline-block border-b border-transparent group-hover:border-foreground/30">
+      {safeString(labels.postActionLabel) || "Read entry"}
+    </span>
+  </div>
+</article>
