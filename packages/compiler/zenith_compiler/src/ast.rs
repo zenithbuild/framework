@@ -6,10 +6,7 @@
 pub enum Node {
     Element(ElementNode),
     Text(String),
-    Expression {
-        value: String,
-        span: SourceSpan,
-    },
+    Expression { value: String, span: SourceSpan },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -41,7 +38,10 @@ pub struct ElementNode {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Attribute {
-    Static { name: String, value: String },
+    Static {
+        name: String,
+        value: String,
+    },
     Expression {
         name: String,
         value: String,

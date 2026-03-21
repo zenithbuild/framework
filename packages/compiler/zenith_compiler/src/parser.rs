@@ -1,29 +1,46 @@
 use crate::ast::{Attribute, ElementNode, Node, SourceLocation, SourceSpan};
 use crate::event_contract;
-use crate::lexer::{Lexer, Token};
+use crate::lexer::{Lexer, LexerProfileMetrics, Token};
+use std::time::Instant;
+
+#[derive(Debug, Clone, Default)]
+pub struct ParserProfileMetrics {
+    pub trim_whitespace_ms: f64,
+    pub sync_current_token_ms: f64,
+    pub location_lookup_ms: f64,
+    pub location_lookup_calls: usize,
+    pub span_construction_ms: f64,
+    pub parse_node_ms: f64,
+    pub parse_expression_ms: f64,
+    pub parse_element_ms: f64,
+    pub parse_attributes_ms: f64,
+    pub parse_children_ms: f64,
+    pub contract_gate_ms: f64,
+    pub contains_markup_ms: f64,
+    pub lower_embedded_markup_ms: f64,
+    pub lexer: LexerProfileMetrics,
+}
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     current_token_start: usize,
     embedded_markup_expressions: bool,
+    profile_enabled: bool,
+    profile_metrics: ParserProfileMetrics,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
-        let mut lexer = Lexer::new(input);
-        let current_token = lexer.next_token();
-        let current_token_start = lexer.last_token_start();
-        Self {
-            lexer,
-            current_token,
-            current_token_start,
-            embedded_markup_expressions: false,
-        }
+        Self::new_with_profile_options(input, false, false)
     }
 
-    pub fn new_with_options(input: &'a str, embedded_markup_expressions: bool) -> Self {
-        let mut lexer = Lexer::new(input);
+    pub fn new_with_profile_options(
+        input: &'a str,
+        embedded_markup_expressions: bool,
+        profile_enabled: bool,
+    ) -> Self {
+        let mut lexer = Lexer::new_with_profile(input, profile_enabled);
         let current_token = lexer.next_token();
         let current_token_start = lexer.last_token_start();
         Self {
@@ -31,7 +48,13 @@ impl<'a> Parser<'a> {
             current_token,
             current_token_start,
             embedded_markup_expressions,
+            profile_enabled,
+            profile_metrics: ParserProfileMetrics::default(),
         }
+    }
+
+    pub fn new_with_options(input: &'a str, embedded_markup_expressions: bool) -> Self {
+        Self::new_with_profile_options(input, embedded_markup_expressions, false)
     }
 
     fn advance(&mut self) {
@@ -39,25 +62,41 @@ impl<'a> Parser<'a> {
     }
 
     fn sync_current_token(&mut self) {
+        let started_at = self.profile_enabled.then(Instant::now);
         self.current_token = self.lexer.next_token();
         self.current_token_start = self.lexer.last_token_start();
+        if let Some(started_at) = started_at {
+            self.profile_metrics.sync_current_token_ms +=
+                started_at.elapsed().as_secs_f64() * 1000.0;
+        }
     }
 
-    fn location_for_offset(&self, offset: usize) -> SourceLocation {
+    fn location_for_offset(&mut self, offset: usize) -> SourceLocation {
+        let started_at = self.profile_enabled.then(Instant::now);
         let (line, column) = self.lexer.offset_to_line_col(offset);
+        if let Some(started_at) = started_at {
+            self.profile_metrics.location_lookup_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+            self.profile_metrics.location_lookup_calls += 1;
+        }
         SourceLocation { line, column }
     }
 
-    fn span_for_offsets(&self, start_offset: usize, end_offset_exclusive: usize) -> SourceSpan {
+    fn span_for_offsets(&mut self, start_offset: usize, end_offset_exclusive: usize) -> SourceSpan {
+        let started_at = self.profile_enabled.then(Instant::now);
         let end_offset = if end_offset_exclusive > start_offset {
             end_offset_exclusive.saturating_sub(1)
         } else {
             start_offset
         };
-        SourceSpan {
+        let span = SourceSpan {
             start: self.location_for_offset(start_offset),
             end: self.location_for_offset(end_offset),
+        };
+        if let Some(started_at) = started_at {
+            self.profile_metrics.span_construction_ms +=
+                started_at.elapsed().as_secs_f64() * 1000.0;
         }
+        span
     }
 
     fn expect(&mut self, token: Token) {
@@ -69,6 +108,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Node {
+        let trim_started_at = self.profile_enabled.then(Instant::now);
         while let Token::Text(ref t) = self.current_token {
             if t.trim().is_empty() {
                 self.advance();
@@ -76,16 +116,25 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
+        if let Some(trim_started_at) = trim_started_at {
+            self.profile_metrics.trim_whitespace_ms +=
+                trim_started_at.elapsed().as_secs_f64() * 1000.0;
+        }
 
         let root = self.parse_node();
 
         // Check for multiple roots or trailing garbage
+        let trim_started_at = self.profile_enabled.then(Instant::now);
         while let Token::Text(ref t) = self.current_token {
             if t.trim().is_empty() {
                 self.advance();
             } else {
                 break;
             }
+        }
+        if let Some(trim_started_at) = trim_started_at {
+            self.profile_metrics.trim_whitespace_ms +=
+                trim_started_at.elapsed().as_secs_f64() * 1000.0;
         }
 
         if self.current_token != Token::EOF {
@@ -99,7 +148,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_node(&mut self) -> Node {
-        match self.current_token {
+        let started_at = self.profile_enabled.then(Instant::now);
+        let node = match self.current_token {
             Token::Lt => self.parse_element(),
             Token::LBrace => self.parse_expression(),
             Token::Text(_) => {
@@ -112,10 +162,15 @@ impl<'a> Parser<'a> {
             }
             // EOF handling handled by caller or panic
             _ => panic!("Unexpected token at top level: {:?}", self.current_token),
+        };
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_node_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }
+        node
     }
 
     fn parse_expression(&mut self) -> Node {
+        let started_at = self.profile_enabled.then(Instant::now);
         // current_token is LBrace — the lexer already consumed the '{' char.
         // Do NOT call expect(Token::LBrace) / advance() because that would
         // call next_token() which in Text mode consumes the expression content.
@@ -132,19 +187,35 @@ impl<'a> Parser<'a> {
         // Re-sync current_token from the lexer.
         self.sync_current_token();
         let content = self.contract_gate_expression(&raw);
-        Node::Expression {
+        let node = Node::Expression {
             value: content,
             span: self.span_for_offsets(start_offset, end_offset_exclusive),
+        };
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_expression_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }
+        node
     }
 
     /// Contract gate: reject embedded markup tags inside expressions unless
     /// the `embeddedMarkupExpressions` flag is enabled.
-    fn contract_gate_expression(&self, raw: &str) -> String {
+    fn contract_gate_expression(&mut self, raw: &str) -> String {
+        let started_at = self.profile_enabled.then(Instant::now);
         if self.embedded_markup_expressions {
-            return lower_embedded_markup_expression(raw);
+            let lowered = lower_embedded_markup_expression(raw);
+            if let Some(started_at) = started_at {
+                self.profile_metrics.contract_gate_ms +=
+                    started_at.elapsed().as_secs_f64() * 1000.0;
+            }
+            return lowered;
         }
-        if contains_markup_tag(raw) {
+        let contains_markup_started_at = self.profile_enabled.then(Instant::now);
+        let contains_markup = contains_markup_tag(raw);
+        if let Some(contains_markup_started_at) = contains_markup_started_at {
+            self.profile_metrics.contains_markup_ms +=
+                contains_markup_started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+        if contains_markup {
             panic!(
                 "Embedded markup expressions are disabled.\n\
                  Expression contains HTML/component tags: {{{}}}\n\
@@ -153,10 +224,15 @@ impl<'a> Parser<'a> {
                 raw.chars().take(80).collect::<String>()
             );
         }
-        raw.to_string()
+        let value = raw.to_string();
+        if let Some(started_at) = started_at {
+            self.profile_metrics.contract_gate_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+        value
     }
 
     fn parse_element(&mut self) -> Node {
+        let started_at = self.profile_enabled.then(Instant::now);
         self.expect(Token::Lt); // Eat '<'
 
         // Handling closing tag edge case: `</` comes as Lt -> Text("/") -> Ident -> Gt
@@ -186,15 +262,20 @@ impl<'a> Parser<'a> {
 
         let children = self.parse_children(&tag_name);
 
-        Node::Element(ElementNode {
+        let node = Node::Element(ElementNode {
             tag: tag_name,
             attributes,
             children,
             self_closing: false,
-        })
+        });
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_element_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+        node
     }
 
     fn parse_attributes(&mut self) -> Vec<Attribute> {
+        let started_at = self.profile_enabled.then(Instant::now);
         let mut attributes = Vec::new();
         loop {
             match &self.current_token {
@@ -239,12 +320,14 @@ impl<'a> Parser<'a> {
                             let end_offset_exclusive = self.lexer.current_offset();
                             self.sync_current_token();
                             let value = self.contract_gate_expression(&value);
-                            let span = self.span_for_offsets(attr_name_offset, end_offset_exclusive);
+                            let span =
+                                self.span_for_offsets(attr_name_offset, end_offset_exclusive);
 
                             if name.starts_with("on:") {
                                 let handler = value.trim().to_string();
                                 if event_contract::is_direct_call_expression(&handler) {
-                                    let attr_name_location = self.location_for_offset(attr_name_offset);
+                                    let attr_name_location =
+                                        self.location_for_offset(attr_name_offset);
                                     panic!(
                                         "Event handlers must not be direct call expressions.\n\
                                          Found: on:{}={{ {} }} at line {}, column {}.\n\
@@ -265,15 +348,13 @@ impl<'a> Parser<'a> {
                             }
                         } else if let Token::StringLiteral(value) = &self.current_token {
                             if name.starts_with("on:") {
+                                let value = value.clone();
                                 let attr_name_location = self.location_for_offset(attr_name_offset);
                                 panic!(
                                     "Event attributes do not accept string handlers.\n\
                                      Found: {}=\"{}\" at line {}, column {}.\n\
                                      Use on:event={{handler}} with a function-valued expression.",
-                                    name,
-                                    value,
-                                    attr_name_location.line,
-                                    attr_name_location.column
+                                    name, value, attr_name_location.line, attr_name_location.column
                                 );
                             }
                             attributes.push(Attribute::Static {
@@ -296,12 +377,16 @@ impl<'a> Parser<'a> {
                 _ => panic!("Unexpected token in attributes: {:?}", self.current_token),
             }
         }
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_attributes_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
         attributes
     }
 
     fn parse_children(&mut self, parent_tag: &str) -> Vec<Node> {
+        let started_at = self.profile_enabled.then(Instant::now);
         let mut children = Vec::new();
-        loop {
+        let parsed_children = loop {
             match &self.current_token {
                 Token::Lt => {
                     // Could be new element OR closing tag.
@@ -349,7 +434,7 @@ impl<'a> Parser<'a> {
                                 if name == parent_tag {
                                     self.advance(); // Eat tag name
                                     self.expect(Token::Gt); // Eat >
-                                    return children;
+                                    break children;
                                 } else {
                                     panic!(
                                         "Mismatched closing tag: expected </{}>, found </{}>",
@@ -379,10 +464,15 @@ impl<'a> Parser<'a> {
                     children.push(self.parse_node());
                 }
             }
+        };
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_children_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }
+        parsed_children
     }
 
     fn parse_element_tail(&mut self) -> Node {
+        let started_at = self.profile_enabled.then(Instant::now);
         // Assumes '<' is already consumed.
         let tag_name = match &self.current_token {
             Token::Identifier(name) => name.clone(),
@@ -406,12 +496,22 @@ impl<'a> Parser<'a> {
 
         let children = self.parse_children(&tag_name);
 
-        Node::Element(ElementNode {
+        let node = Node::Element(ElementNode {
             tag: tag_name,
             attributes,
             children,
             self_closing: false,
-        })
+        });
+        if let Some(started_at) = started_at {
+            self.profile_metrics.parse_element_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+        node
+    }
+
+    pub fn profile_metrics(&self) -> ParserProfileMetrics {
+        let mut metrics = self.profile_metrics.clone();
+        metrics.lexer = self.lexer.profile_metrics();
+        metrics
     }
 }
 
@@ -473,7 +573,8 @@ fn contains_markup_tag(raw: &str) -> bool {
 
                 // A single uppercase letter followed by '>' is a generic: <T>.
                 // Allow that. Single-letter lowercase tags (<a>, <p>) are real markup.
-                let boundary = j >= len || chars[j].is_whitespace() || chars[j] == '>' || chars[j] == '/';
+                let boundary =
+                    j >= len || chars[j].is_whitespace() || chars[j] == '>' || chars[j] == '/';
                 if !boundary {
                     i += 1;
                     continue;
@@ -882,7 +983,8 @@ fn tag_contains_string_event_handler(tag_segment: &str) -> bool {
             let mut j = i + 2;
             while j < bytes.len() {
                 let ch = bytes[j];
-                let ok = (ch as char).is_ascii_alphanumeric() || ch == b':' || ch == b'_' || ch == b'-';
+                let ok =
+                    (ch as char).is_ascii_alphanumeric() || ch == b':' || ch == b'_' || ch == b'-';
                 if !ok {
                     break;
                 }

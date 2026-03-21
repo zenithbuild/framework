@@ -87,11 +87,17 @@ fn count_stylesheet_links(html: &str) -> usize {
 }
 
 fn compute_graph_hash(hoist_ids: &[&str], edges: &[&str]) -> String {
-    let mut ids = hoist_ids.iter().map(|id| (*id).to_string()).collect::<Vec<_>>();
+    let mut ids = hoist_ids
+        .iter()
+        .map(|id| (*id).to_string())
+        .collect::<Vec<_>>();
     ids.sort();
     ids.dedup();
 
-    let mut sorted_edges = edges.iter().map(|edge| (*edge).to_string()).collect::<Vec<_>>();
+    let mut sorted_edges = edges
+        .iter()
+        .map(|edge| (*edge).to_string())
+        .collect::<Vec<_>>();
     sorted_edges.sort();
     sorted_edges.dedup();
 
@@ -182,7 +188,11 @@ fn precompiled_local_css_import_is_bundled_and_injected_once() {
 
     let css_rel = manifest["css"].as_str().expect("manifest.css missing");
     let css_abs = out_dir.join(css_rel.trim_start_matches('/'));
-    assert!(css_abs.exists(), "emitted CSS asset missing: {}", css_abs.display());
+    assert!(
+        css_abs.exists(),
+        "emitted CSS asset missing: {}",
+        css_abs.display()
+    );
 
     let css = fs::read_to_string(&css_abs).expect("read css asset");
     assert!(
@@ -514,7 +524,10 @@ fn raw_tailwind_import_in_emitted_css_hard_fails() {
     ]);
 
     let output = run_bundler(payload, tmp.path(), &out_dir);
-    assert!(!output.status.success(), "bundler must reject raw tailwind imports in emitted CSS");
+    assert!(
+        !output.status.success(),
+        "bundler must reject raw tailwind imports in emitted CSS"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Tailwind CSS contract violation"),
@@ -608,10 +621,16 @@ fn css_merge_is_deterministic_when_input_order_changes() {
 
     let a_path = pages_dir.join("a.zen");
     let b_path = pages_dir.join("b.zen");
-    fs::write(&a_path, "<script>\nimport \"./styles/a.css\";\n</script>\n<main>A</main>\n")
-        .expect("write a.zen");
-    fs::write(&b_path, "<script>\nimport \"./styles/b.css\";\n</script>\n<main>B</main>\n")
-        .expect("write b.zen");
+    fs::write(
+        &a_path,
+        "<script>\nimport \"./styles/a.css\";\n</script>\n<main>A</main>\n",
+    )
+    .expect("write a.zen");
+    fs::write(
+        &b_path,
+        "<script>\nimport \"./styles/b.css\";\n</script>\n<main>B</main>\n",
+    )
+    .expect("write b.zen");
 
     let page_a = json!({
         "route": "/a",
@@ -679,9 +698,10 @@ fn css_merge_is_deterministic_when_input_order_changes() {
         "first build failed: {}",
         String::from_utf8_lossy(&first.stderr)
     );
-    let manifest_first: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(out_a.join("manifest.json")).expect("read manifest first"))
-            .expect("parse manifest first");
+    let manifest_first: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_a.join("manifest.json")).expect("read manifest first"),
+    )
+    .expect("parse manifest first");
     let css_first_rel = manifest_first["css"].as_str().expect("manifest.css first");
     let css_first = fs::read_to_string(out_a.join(css_first_rel.trim_start_matches('/')))
         .expect("read first css");
@@ -693,10 +713,13 @@ fn css_merge_is_deterministic_when_input_order_changes() {
         "second build failed: {}",
         String::from_utf8_lossy(&second.stderr)
     );
-    let manifest_second: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(out_b.join("manifest.json")).expect("read manifest second"))
-            .expect("parse manifest second");
-    let css_second_rel = manifest_second["css"].as_str().expect("manifest.css second");
+    let manifest_second: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_b.join("manifest.json")).expect("read manifest second"),
+    )
+    .expect("parse manifest second");
+    let css_second_rel = manifest_second["css"]
+        .as_str()
+        .expect("manifest.css second");
     let css_second = fs::read_to_string(out_b.join(css_second_rel.trim_start_matches('/')))
         .expect("read second css");
 
@@ -704,7 +727,10 @@ fn css_merge_is_deterministic_when_input_order_changes() {
         css_first_rel, css_second_rel,
         "CSS asset filename/hash must be deterministic regardless of input order"
     );
-    assert_eq!(css_first, css_second, "Merged CSS bytes must be identical across input order");
+    assert_eq!(
+        css_first, css_second,
+        "Merged CSS bytes must be identical across input order"
+    );
 }
 
 #[test]
@@ -720,11 +746,7 @@ fn css_import_cannot_escape_project_root() {
             .and_then(|name| name.to_str())
             .unwrap_or("fallback")
     );
-    let outside_css = tmp
-        .path()
-        .parent()
-        .expect("temp parent")
-        .join(&escape_name);
+    let outside_css = tmp.path().parent().expect("temp parent").join(&escape_name);
     fs::write(&outside_css, "/* escape */\n").expect("write outside css");
 
     let page_path = pages_dir.join("index.zen");

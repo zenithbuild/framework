@@ -14,6 +14,7 @@ import { resolve, join, dirname } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createZenithLogger } from './ui/logger.js';
+import { loadConfig } from './config.js';
 
 const COMMANDS = ['dev', 'build', 'preview'];
 const DEFAULT_VERSION = '0.0.0';
@@ -65,22 +66,6 @@ function resolvePort(args, fallback) {
     }
 
     return fallback;
-}
-
-/**
- * Load zenith.config.js from project root.
- *
- * @param {string} projectRoot
- * @returns {Promise<object>}
- */
-async function loadConfig(projectRoot) {
-    const configPath = join(projectRoot, 'zenith.config.js');
-    try {
-        const mod = await import(configPath);
-        return mod.default || {};
-    } catch {
-        return {};
-    }
 }
 
 /**
@@ -159,7 +144,7 @@ export async function cli(args, cwd) {
         const port = resolvePort(args.slice(1), 4000);
         const host = process.env.ZENITH_PREVIEW_HOST || '127.0.0.1';
         logger.dev('Starting preview server…');
-        const preview = await createPreviewServer({ distDir: outDir, port, host, logger });
+        const preview = await createPreviewServer({ distDir: outDir, port, host, logger, config, projectRoot });
         logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${preview.port}`);
 
         process.on('SIGINT', () => {
