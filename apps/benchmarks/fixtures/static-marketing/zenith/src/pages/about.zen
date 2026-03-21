@@ -1,0 +1,7 @@
+<DefaultLayout>
+  <section class="hero stack">
+    <p>About the static marketing case.</p>
+    <h1>Same shell, separate route.</h1>
+    <p>This page keeps the route graph non-trivial while remaining fully static.</p>
+  </section>
+</DefaultLayout>

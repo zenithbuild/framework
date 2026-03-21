@@ -1,0 +1,16 @@
+{
+  "name": "zenith-benchmarks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run:cold-build": "node ./scripts/run-cold-build.mjs",
+    "run:dev-startup": "node ./scripts/run-dev-startup.mjs",
+    "run:hydration": "node ./scripts/run-hydration.mjs",
+    "run:rebuild": "node ./scripts/run-rebuild.mjs",
+    "run:matrix": "node ./scripts/run-matrix.mjs",
+    "render:report": "node ./scripts/render-report.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.54.2"
+  }
+}
