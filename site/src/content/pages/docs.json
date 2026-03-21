@@ -40,7 +40,7 @@
       "id": "release-notes",
       "eyebrow": "Docs changelog surfaced here",
       "title": "Release Notes",
-      "description": "Site-facing release notes for the merged framework and language-tooling work through v0.6.18.",
+      "description": "Site-facing release notes for the merged framework, site, CMS, and benchmark work through v0.7.0.",
       "href": "/changelog",
       "actionLabel": "Open site page"
     }
