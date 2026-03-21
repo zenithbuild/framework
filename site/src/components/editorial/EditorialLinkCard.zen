@@ -1,0 +1,72 @@
+<script lang="ts">
+export interface Props {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  href: string;
+  actionLabel?: string;
+  meta?: string[];
+  tone?: "default" | "blue" | "gold" | "magenta" | "red";
+  target?: string;
+  rel?: string;
+  class?: string;
+}
+
+const incoming = props as Props;
+const cardEyebrow = typeof incoming.eyebrow === "string" ? incoming.eyebrow : "";
+const cardTitle = typeof incoming.title === "string" ? incoming.title : "";
+const cardDescription = typeof incoming.description === "string" ? incoming.description : "";
+const cardHref = typeof incoming.href === "string" ? incoming.href : "/";
+const cardActionLabel = typeof incoming.actionLabel === "string" ? incoming.actionLabel : "Open";
+const cardTone = incoming.tone || "default";
+const cardTarget = typeof incoming.target === "string" ? incoming.target : undefined;
+const cardRel = typeof incoming.rel === "string" ? incoming.rel : undefined;
+const cardClassName = typeof incoming.class === "string" ? incoming.class : "";
+const cardMeta = Array.isArray(incoming.meta)
+  ? incoming.meta.filter((item) => typeof item === "string" && item.trim().length > 0)
+  : [];
+
+const toneClassMap: Record<string, string> = {
+  default: "border-border bg-card/60",
+  blue: "border-surface-border-blue bg-surface-blue",
+  gold: "border-surface-border-gold bg-surface-gold",
+  magenta: "border-surface-border-magenta bg-surface-magenta",
+  red: "border-surface-border-red bg-surface-red",
+};
+
+const cardClass = [
+  "group flex h-full flex-col gap-6 border p-6 transition-colors duration-200 hover:border-foreground/30",
+  toneClassMap[cardTone] || toneClassMap.default,
+  cardClassName,
+].join(" ").trim();
+</script>
+
+<a href={cardHref} target={cardTarget} rel={cardRel} class={cardClass}>
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex min-w-0 flex-col gap-3">
+      {cardEyebrow ? (
+        <span class="text-[10px] font-mono uppercase tracking-[0.26em] text-muted-foreground">
+          {cardEyebrow}
+        </span>
+      ) : null}
+      <h3 class="text-2xl font-heading font-semibold uppercase tracking-tight text-foreground md:text-3xl">
+        {cardTitle}
+      </h3>
+    </div>
+    <span class="text-[10px] font-mono uppercase tracking-[0.24em] text-muted-foreground transition-colors group-hover:text-foreground">
+      {cardActionLabel}
+    </span>
+  </div>
+
+  <p class="text-base leading-8 text-muted-foreground">
+    {cardDescription}
+  </p>
+
+  {cardMeta.length > 0 ? (
+    <div class="mt-auto flex flex-wrap gap-x-4 gap-y-2 pt-2 text-[10px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
+      {cardMeta.map((item) => (
+        <span>{item}</span>
+      ))}
+    </div>
+  ) : null}
+</a>

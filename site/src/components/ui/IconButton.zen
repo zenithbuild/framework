@@ -28,6 +28,7 @@ const hasHref = hrefValue.length > 0;
 const buttonType = props.type || "button";
 const ariaDisabled = disabledValue ? "true" : undefined;
 const forwardedElementRef = props.elementRef;
+const linkRef = ref<HTMLAnchorElement>();
 const localRef = ref<HTMLButtonElement>();
 
 const baseClasses = "inline-flex items-center justify-center rounded-full border transition-colors duration-200";
@@ -52,13 +53,18 @@ const onClick =
     : typeof props.onClick === "function"
     ? props.onClick
     : (() => {});
-const linkClass = staticCls + (hasHref ? "" : " hidden");
-const buttonClass = staticCls + (hasHref ? " hidden" : "");
 const disabledAttr = disabledValue && !hasHref ? true : undefined;
+
+function activeRootElement() {
+  if (hasHref) {
+    return linkRef.current;
+  }
+  return localRef.current;
+}
 
 zenMount((ctx) => {
   if (forwardedElementRef) {
-    forwardedElementRef.current = localRef.current;
+    forwardedElementRef.current = activeRootElement();
   }
 
   ctx.cleanup(() => {
@@ -71,12 +77,14 @@ zenMount((ctx) => {
 
 <span class="contents">
   <a
+    ref={linkRef}
     data-zen-icon-btn
     data-zen-icon-btn-link
     href={hrefValue || undefined}
     target={targetValue || undefined}
     rel={relValue || undefined}
-    class={linkClass}
+    class={staticCls}
+    style={hasHref ? undefined : "display: none;"}
     aria-label={ariaLabelValue}
     aria-disabled={ariaDisabled}
     on:click={onClick}
@@ -88,7 +96,8 @@ zenMount((ctx) => {
     data-zen-icon-btn
     type={buttonType}
     disabled={disabledAttr}
-    class={buttonClass}
+    class={staticCls}
+    style={hasHref ? "display: none;" : undefined}
     aria-label={ariaLabelValue}
     aria-pressed={ariaPressedValue}
     aria-disabled={ariaDisabled}

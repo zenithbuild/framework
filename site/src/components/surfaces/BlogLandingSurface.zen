@@ -1,0 +1,418 @@
+<script lang="ts">
+import type { BlogPost } from "@/server/postSource";
+import Button from "@/components/ui/Button.zen";
+import Heading from "@/components/ui/Heading.zen";
+
+export interface Props {
+  content: any;
+  featuredPost: BlogPost | null;
+  archivePosts: BlogPost[];
+  sourceMode: string;
+}
+
+const blogContent = (props as Props).content || {};
+const blogIntro = blogContent.intro || {};
+const blogArchive = blogContent.archive || {};
+const blogCta = blogContent.cta || {};
+
+// Narrow site-layer normalization for object-valued CMS fields
+function safeString(val: any): string {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    return val.title || val.name || val.label || val.slug || val.url || "";
+  }
+  return String(val);
+}
+
+function safeImageUrl(val: any): string {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") {
+    return val.url || val.filename_download || val.id || "";
+  }
+  return "";
+}
+
+function safeImageAlt(val: any, fallback: string): string {
+  if (!val) return fallback;
+  if (typeof val === "object") return val.alt || val.title || fallback;
+  return fallback;
+}
+
+function postCategoryDisplay(post: BlogPost | null | undefined): string {
+  return safeString(post?.category?.title || post?.category);
+}
+
+function postTitleDisplay(post: BlogPost | null | undefined): string {
+  return safeString(post?.title);
+}
+
+function postExcerptDisplay(post: BlogPost | null | undefined): string {
+  return safeString(post?.excerpt);
+}
+
+function postDateDisplay(post: BlogPost | null | undefined): string {
+  return safeString(post?.displayPublishedAt) || safeString(labels.publishedLabel) || "Published";
+}
+
+function postReadingTimeDisplay(post: BlogPost | null | undefined): string {
+  return safeString(post?.readingTime);
+}
+
+function postImageRecord(post: BlogPost | BlogPost[] | null | undefined): any {
+  return (post as any)?.cover?.image || (post as any)?.image || (post as any)?.coverImage || null;
+}
+
+function postImageDisplayUrl(post: BlogPost | null | undefined): string {
+  return safeImageUrl(postImageRecord(post));
+}
+
+function postImageDisplayAlt(post: BlogPost | null | undefined): string {
+  return safeImageAlt(postImageRecord(post), postTitleDisplay(post));
+}
+
+const blogIntroEyebrow = safeString(blogIntro.eyebrow);
+const blogIntroTitle = safeString(blogIntro.title);
+const blogIntroDescription = safeString(blogIntro.description);
+const blogCtaEyebrow = safeString(blogCta.eyebrow);
+const blogCtaTitle = safeString(blogCta.title);
+const blogCtaDescription = safeString(blogCta.description);
+const blogCtaHref = safeString(blogCta.href) || "/changelog";
+const blogCtaLabel = safeString(blogCta.label) || "Open changelog";
+const archiveEyebrow = safeString(blogArchive.eyebrow) || "Archive";
+const archiveTitle = safeString(blogArchive.title) || "The Journal";
+const archiveDescription = safeString(blogArchive.description);
+
+const featuredPost = (props as Props).featuredPost || null;
+const archivePosts = Array.isArray((props as Props).archivePosts) ? (props as Props).archivePosts : [];
+const blogSourceMode = typeof (props as Props).sourceMode === "string" ? (props as Props).sourceMode : "local";
+const labels = blogContent.labels || {};
+const chips = Array.isArray(blogContent.chips) ? blogContent.chips.map(safeString).filter(Boolean) : [];
+const totalPosts = archivePosts.length + (featuredPost ? 1 : 0);
+const totalPostsLabel = `${String(totalPosts).padStart(2, "0")} public entries`;
+const sourceLabel = blogSourceMode === "directus" ? "Directus source" : "Local source";
+const blogSourceNote = blogSourceMode === "directus"
+  ? "Journal entries are currently being read through the Directus-backed publishing path."
+  : "Journal entries are currently being read from the repo-backed local source set.";
+const blogIntroNoteText = `${blogSourceNote} This surface stays explanatory while the changelog remains the versioned release record.`;
+
+const featuredCategoryDisplay = postCategoryDisplay(featuredPost);
+const featuredTitleDisplay = postTitleDisplay(featuredPost);
+const featuredCoverTitle = featuredPost ? safeString(featuredPost.cover?.title) || featuredTitleDisplay : "";
+const featuredImageDisplayUrl = postImageDisplayUrl(featuredPost);
+const featuredImageDisplayAlt = postImageDisplayAlt(featuredPost);
+const featuredDateDisplay = postDateDisplay(featuredPost);
+const featuredReadingTimeDisplay = postReadingTimeDisplay(featuredPost);
+const featuredExcerptDisplay = postExcerptDisplay(featuredPost);
+
+state viewMode = "grid";
+
+function setGridMode() {
+  viewMode = "grid";
+}
+
+function setTableMode() {
+  viewMode = "table";
+}
+</script>
+
+<div class="w-full">
+<!-- Hero (Publication Masthead Variant) -->
+<section class="w-full relative flex min-h-[100svh] lg:min-h-screen flex-col justify-between pt-28 lg:pt-44 pb-12 lg:pb-18 border-t border-border bg-background text-foreground overflow-hidden">
+  <div class="w-full flex relative z-10 px-6 md:px-12">
+    <Heading size="section" class="max-w-7xl text-[clamp(2.5rem,6vw,9rem)] leading-[0.84]">
+      {blogIntroTitle}
+    </Heading>
+  </div>
+
+  <div class="grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 w-full mt-24 lg:mt-32 relative z-10 px-6 md:px-12">
+    <div class="col-span-4 lg:col-span-4 flex flex-col gap-12 lg:gap-20">
+      <span class="text-sm font-mono tracking-widest uppercase text-muted-foreground">
+        {blogIntroEyebrow}
+      </span>
+
+      <div
+        class="flex flex-col gap-6"
+        style={chips.length > 0 ? "" : "display: none;"}
+      >
+        <span class="border-t border-border pt-4 text-[10px] font-mono uppercase tracking-[0.2em] text-foreground">
+          Topics
+        </span>
+        <div class="flex flex-col gap-2">
+          {chips.map((chip) => (
+            <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground/80">
+              {chip}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-3 border-t border-border pt-4">
+        <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-foreground">
+          Source truth
+        </span>
+        <div class="flex flex-col gap-1 text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          <span>{sourceLabel}</span>
+          <span>{totalPostsLabel}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-span-4 lg:col-start-9 lg:col-span-4 flex flex-col self-end gap-16 lg:gap-24 pt-24 lg:pt-28">
+      <p class="text-xl lg:text-3xl text-foreground font-light leading-snug lg:leading-tight">
+        {blogIntroDescription}
+      </p>
+      
+      <div class="flex flex-col gap-6 border-l-2 border-foreground/30 pl-8 max-w-xl">
+        <span class="text-[10px] font-mono uppercase tracking-[0.28em] text-foreground">
+          Editorial boundary
+        </span>
+        <p class="text-base leading-relaxed text-muted-foreground">
+          {blogIntroNoteText}
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Featured Post (Cover Story Array) -->
+{featuredPost ? (
+  <section class="w-full bg-background text-foreground pb-24 lg:pb-32">
+    <div class="px-6 md:px-12 flex flex-col gap-10 lg:gap-16">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+        <div class="flex flex-col gap-4 max-w-2xl">
+          <span class="text-xs font-mono uppercase tracking-[0.28em] text-muted-foreground">
+            {safeString(labels.featuredEyebrow) || "Featured"}
+          </span>
+          <Heading size="section" class="text-[clamp(3rem,6vw,7rem)] leading-[0.84]">
+            {featuredCoverTitle}
+          </Heading>
+        </div>
+        <div class="pb-2">
+          <Button href={featuredPost.path} variant="primary" size="lg">
+            {safeString(labels.featuredActionLabel) || "Read featured"}
+          </Button>
+        </div>
+      </div>
+      
+      <a href={featuredPost.path} class="group w-full block">
+        <div
+          class="w-full aspect-[16/9] lg:aspect-[21/9] overflow-hidden bg-muted/20 relative"
+          style={featuredImageDisplayUrl ? "" : "display: none;"}
+        >
+          <img
+            src={featuredImageDisplayUrl}
+            alt={featuredImageDisplayAlt}
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+            class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          />
+        </div>
+        <div
+          class="w-full aspect-[16/9] lg:aspect-[21/9] bg-muted/10 border border-border flex items-center justify-center p-8 lg:p-24 group-hover:bg-muted/20 transition-colors"
+          style={featuredImageDisplayUrl ? "display: none;" : ""}
+        >
+          <span class="text-xl lg:text-4xl font-heading font-medium uppercase tracking-tighter text-muted-foreground/30 text-center text-balance">
+            {featuredTitleDisplay}
+          </span>
+        </div>
+        
+        <div class="grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 mt-8 lg:mt-12">
+          <div class="col-span-4 lg:col-span-4 flex flex-wrap items-center gap-4 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+            <span>{featuredCategoryDisplay}</span>
+            <span class="w-1 h-1 rounded-full bg-border md:hidden lg:inline-block"></span>
+            <span>{featuredDateDisplay}</span>
+            <span class="w-1 h-1 rounded-full bg-border md:hidden lg:inline-block"></span>
+            <span>{featuredReadingTimeDisplay}</span>
+          </div>
+          
+          <div class="col-span-4 lg:col-span-6 lg:col-start-7 flex flex-col gap-6 pt-6 lg:pt-0">
+            <Heading size="base" class="text-[clamp(2rem,4vw,4.5rem)] leading-[0.9] group-hover:text-foreground/80 transition-colors">
+              {featuredTitleDisplay}
+            </Heading>
+            <p class="text-lg leading-relaxed text-muted-foreground md:text-2xl">
+              {featuredExcerptDisplay}
+            </p>
+          </div>
+        </div>
+      </a>
+    </div>
+  </section>
+) : null}
+
+<!-- Archive -->
+<section class="w-full border-t border-border bg-background text-foreground pt-24 lg:pt-32 pb-24 lg:pb-32">
+  <div class="px-6 md:px-12">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-24 lg:mb-40">
+      <div class="flex flex-col gap-10 lg:gap-16 max-w-3xl">
+        <span class="text-xs font-mono uppercase tracking-[0.28em] text-muted-foreground">
+          {archiveEyebrow}
+        </span>
+        <Heading size="section" class="text-[clamp(2.5rem,5vw,6.75rem)] leading-[0.84]">
+          {archiveTitle}
+        </Heading>
+        <p class="text-base leading-relaxed text-muted-foreground md:text-xl pr-4">
+          {archiveDescription}
+        </p>
+      </div>
+
+      <div class="flex items-center gap-1 border border-border p-1">
+        <button
+          type="button"
+          on:click={setGridMode}
+          class={viewMode === "grid" ? "px-4 py-2 text-[10px] font-mono uppercase tracking-[0.2em] bg-foreground text-background transition-colors" : "px-4 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-colors"}
+        >
+          Grid
+        </button>
+        <button
+          type="button"
+          on:click={setTableMode}
+          class={viewMode === "table" ? "px-4 py-2 text-[10px] font-mono uppercase tracking-[0.2em] bg-foreground text-background transition-colors" : "px-4 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-colors"}
+        >
+          List
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-x-8 lg:gap-x-12 gap-y-20 lg:gap-y-32"
+      style={viewMode === "grid" ? "" : "display: none;"}
+    >
+        {archivePosts.map((post) => (
+          <a href={post.path} class="group flex flex-col gap-6 w-full">
+            <div
+              class="w-full aspect-[16/10] overflow-hidden bg-muted/20 relative"
+              style={postImageDisplayUrl(post) ? "" : "display: none;"}
+            >
+              <img
+                src={postImageDisplayUrl(post)}
+                alt={postImageDisplayAlt(post)}
+                loading="lazy"
+                decoding="async"
+                class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+            </div>
+            <div
+              class="w-full aspect-[16/10] bg-muted/10 border border-border flex items-center justify-center p-8 group-hover:bg-muted/20 transition-colors"
+              style={postImageDisplayUrl(post) ? "display: none;" : ""}
+            >
+              <span class="text-sm font-mono tracking-widest uppercase text-muted-foreground/50 text-center text-balance">
+                {postTitleDisplay(post)}
+              </span>
+            </div>
+
+            <div class="flex flex-col gap-4 px-2">
+              <div class="flex items-center gap-4 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                <span>{postCategoryDisplay(post)}</span>
+                <span class="w-1 h-1 rounded-full bg-border"></span>
+                <span>{postDateDisplay(post)}</span>
+                <span class="w-1 h-1 rounded-full bg-border"></span>
+                <span>{postReadingTimeDisplay(post)}</span>
+              </div>
+
+              <h3 class="text-2xl font-heading font-medium uppercase tracking-tight text-foreground md:text-3xl lg:text-4xl group-hover:text-foreground/80 transition-colors">
+                {postTitleDisplay(post)}
+              </h3>
+
+              <p class="text-base leading-relaxed text-muted-foreground line-clamp-3">
+                {postExcerptDisplay(post)}
+              </p>
+
+              <div class="pt-2">
+                <span class="text-[10px] font-mono uppercase tracking-[0.2em] border-b border-foreground/30 pb-1 group-hover:border-foreground transition-colors inline-block">
+                  {safeString(labels.postActionLabel) || "View entry"}
+                </span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+      <div
+        class="flex flex-col border-t border-border"
+        style={viewMode === "table" ? "" : "display: none;"}
+      >
+        {archivePosts.map((post, index) => (
+          <article class="group relative flex flex-col md:grid md:grid-cols-[90px,180px,1fr,140px,120px] lg:grid-cols-[90px,220px,1fr,160px,160px] gap-6 md:gap-8 items-start md:items-center py-8 md:py-10 border-b border-border hover:bg-muted/10 transition-colors -mx-6 px-6 lg:-mx-12 lg:px-12">
+            <div class="flex items-center gap-4 w-full text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span class="hidden md:inline-block w-6 text-muted-foreground/40">{String(index + 1).padStart(2, "0")}</span>
+              <span>{postDateDisplay(post)}</span>
+            </div>
+
+            <div class="hidden md:block w-full">
+              <div
+                class="relative w-full aspect-[4/3] overflow-hidden bg-muted/15"
+                style={postImageDisplayUrl(post) ? "" : "display: none;"}
+              >
+                <img
+                  src={postImageDisplayUrl(post)}
+                  alt={postImageDisplayAlt(post)}
+                  loading="lazy"
+                  decoding="async"
+                  class="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              </div>
+              <div
+                class="flex aspect-[4/3] w-full items-end border border-border bg-muted/10 p-4"
+                style={postImageDisplayUrl(post) ? "display: none;" : ""}
+              >
+                <span class="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground/70">
+                  {postCategoryDisplay(post)}
+                </span>
+              </div>
+            </div>
+
+            <div class="w-full">
+              <span class="text-xs font-mono uppercase tracking-[0.18em] text-foreground/80">
+                {postCategoryDisplay(post)}
+              </span>
+            </div>
+
+            <div class="flex flex-col gap-2 w-full pr-4 lg:pr-12">
+              <a href={post.path} class="absolute inset-0 z-10">
+                <span class="sr-only">Read {postTitleDisplay(post)}</span>
+              </a>
+              <h3 class="text-xl md:text-2xl font-heading font-medium uppercase tracking-tight text-foreground group-hover:text-foreground/80 transition-colors">
+                {postTitleDisplay(post)}
+              </h3>
+              <p class="text-sm md:text-base leading-relaxed text-muted-foreground line-clamp-2 md:line-clamp-1">
+                {postExcerptDisplay(post)}
+              </p>
+            </div>
+
+            <div class="hidden md:flex flex-col items-end w-full text-right text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span>{postReadingTimeDisplay(post)}</span>
+              <span class="mt-2 text-foreground/60 transition-colors group-hover:text-foreground inline-block border-b border-transparent group-hover:border-foreground/30">
+                {safeString(labels.postActionLabel) || "Read entry"}
+              </span>
+            </div>
+          </article>
+        ))}
+      </div>
+  </div>
+</section>
+
+<!-- CTA Section (Continuous Flow Variant) -->
+<section class="w-full bg-background text-foreground pt-24 lg:pt-32 pb-32 lg:pb-48 border-t border-border">
+  <div class="grid grid-cols-4 gap-x-6 gap-y-12 lg:gap-y-16 px-6 md:grid-cols-12 md:px-12 lg:gap-x-12">
+    <div class="col-span-4 flex flex-col gap-12 lg:gap-16 md:col-span-5">
+      <span class="text-xs font-mono uppercase tracking-[0.28em] text-muted-foreground">
+        {blogCtaEyebrow}
+      </span>
+      <Heading size="section" class="text-[clamp(2.75rem,5vw,6rem)] leading-[0.86]">
+        {blogCtaTitle}
+      </Heading>
+      <p class="text-lg leading-relaxed text-muted-foreground md:text-xl lg:text-2xl max-w-2xl">
+        {blogCtaDescription}
+      </p>
+    </div>
+    
+    <div class="col-span-4 flex flex-col justify-end items-start md:col-start-9 md:col-span-4 pb-2 md:pb-12">
+      <Button href={blogCtaHref} variant="secondary" size="lg" class="w-full sm:w-auto">
+        {blogCtaLabel}
+      </Button>
+    </div>
+  </div>
+</section>
+</div>
