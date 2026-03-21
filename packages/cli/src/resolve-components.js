@@ -9,9 +9,16 @@
 //   buildComponentRegistry() → expandComponents() → expanded source string
 // ---------------------------------------------------------------------------
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { findMatchingComponentClose, findNextKnownComponentTag } from './component-tag-parser.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const FRAMEWORK_COMPONENTS = [
+    ['Image', join(__dirname, 'framework-components', 'Image.zen')]
+];
 
 // ---------------------------------------------------------------------------
 // Registry: Map<PascalCaseName, absolutePath>
@@ -39,6 +46,21 @@ export function buildComponentRegistry(srcDir) {
             continue; // Directory doesn't exist, skip
         }
         walkDir(dir, registry);
+    }
+
+    for (const [componentName, componentPath] of FRAMEWORK_COMPONENTS) {
+        if (!existsSync(componentPath)) {
+            continue;
+        }
+        if (registry.has(componentName)) {
+            throw new Error(
+                `Duplicate component name "${componentName}":\n` +
+                `  1) ${registry.get(componentName)}\n` +
+                `  2) ${componentPath}\n` +
+                'Rename the local component to avoid shadowing the Zenith framework component.'
+            );
+        }
+        registry.set(componentName, componentPath);
     }
 
     return registry;
@@ -256,8 +278,6 @@ function expandTag(name, children, registry, sourceFile, chain, usedComponents) 
 
     const compSource = readFileSync(compPath, 'utf8');
     let template = extractTemplate(compSource);
-
-    // Check Document Mode
     const docMode = isDocumentMode(template);
 
     if (docMode) {

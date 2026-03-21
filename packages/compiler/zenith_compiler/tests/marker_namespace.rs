@@ -20,12 +20,16 @@ state radius = 20;
     );
 
     assert!(
-        output.html.contains(r#"<circle data-zx-ref="0" cx="50" cy="50" data-zx-r="1" />"#),
+        output
+            .html
+            .contains(r#"<circle data-zx-ref="0" cx="50" cy="50" data-zx-r="1" />"#),
         "expected distinct ref/attr markers on the same SVG node, got html: {}",
         output.html
     );
     assert!(
-        !output.html.contains(r#"data-zx-r="0" cx="50" cy="50" data-zx-r="1""#),
+        !output
+            .html
+            .contains(r#"data-zx-r="0" cx="50" cy="50" data-zx-r="1""#),
         "ref and attr markers must not serialize to duplicate data-zx-r attrs: {}",
         output.html
     );
@@ -57,7 +61,9 @@ state radius = "wide";
     );
 
     assert!(
-        output.html.contains(r#"<div data-zx-ref="0" data-zx-r="1"></div>"#),
+        output
+            .html
+            .contains(r#"<div data-zx-ref="0" data-zx-r="1"></div>"#),
         "expected distinct ref/attr markers on the same HTML node, got html: {}",
         output.html
     );

@@ -4,7 +4,6 @@ fn compile(input: &str) -> String {
     compile_zen(input).expect("compile should succeed")
 }
 
-
 #[test]
 fn compiles_basic_expression() {
     let input = r#"<h1>{count}</h1>"#;

@@ -8,6 +8,7 @@
 
 pub mod bundle;
 pub mod plugin;
+pub mod tailwind;
 pub mod utils;
 
 use std::collections::HashMap;

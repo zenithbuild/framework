@@ -14,8 +14,10 @@
 import { createServer } from 'node:http';
 import { existsSync, watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
+import { performance } from 'node:perf_hooks';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
-import { build } from './build.js';
+import { createDevBuildSession } from './dev-build-session.js';
+import { createStartupProfiler } from './startup-profile.js';
 import { createSilentLogger } from './ui/logger.js';
 import { readChangeFingerprint } from './dev-watch.js';
 import {
@@ -26,6 +28,9 @@ import {
     resolveWithinDist,
     toStaticFilePath
 } from './preview.js';
+import { materializeImageMarkup } from './images/materialize.js';
+import { injectImageRuntimePayload } from './images/payload.js';
+import { handleImageRequest } from './images/service.js';
 import { resolveRequestRoute } from './server/resolve-request-route.js';
 
 const MIME_TYPES = {
@@ -34,8 +39,12 @@ const MIME_TYPES = {
     '.css': 'text/css',
     '.json': 'application/json',
     '.png': 'image/png',
+    '.jpeg': 'image/jpeg',
     '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.avif': 'image/avif',
+    '.gif': 'image/gif'
 };
 
 // Note: V0 HMR script injection has been moved to the runtime client.
@@ -48,6 +57,7 @@ const MIME_TYPES = {
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createDevServer(options) {
+    const startupProfile = createStartupProfiler('cli-dev-server');
     const {
         pagesDir,
         outDir,
@@ -57,6 +67,7 @@ export async function createDevServer(options) {
         logger: providedLogger = null
     } = options;
     const logger = providedLogger || createSilentLogger();
+    const buildSession = createDevBuildSession({ pagesDir, outDir, config, logger });
 
     const resolvedPagesDir = resolve(pagesDir);
     const resolvedOutDir = resolve(outDir);
@@ -83,10 +94,11 @@ export async function createDevServer(options) {
 
     let buildId = 0;
     let pendingBuildId = 0;
-    let buildStatus = 'ok'; // 'ok' | 'error' | 'building'
+    let buildStatus = 'building'; // 'ok' | 'error' | 'building'
     let lastBuildMs = Date.now();
     let durationMs = 0;
     let buildError = null;
+    let initialBuildSettled = false;
     const traceEnabled = config.devTrace === true || process.env.ZENITH_DEV_TRACE === '1';
     const verboseLogging = traceEnabled || logger.mode?.logLevel === 'verbose';
 
@@ -96,6 +108,8 @@ export async function createDevServer(options) {
     let currentCssContent = '';
     let actualPort = port;
     let currentRoutes = [];
+    const rebuildDebounceMs = 5;
+    const queuedRebuildDebounceMs = 5;
 
     function _publicHost() {
         if (host === '0.0.0.0' || host === '::') {
@@ -292,6 +306,10 @@ export async function createDevServer(options) {
         if (cssAssets.length === 0) {
             return '';
         }
+        const devStable = cssAssets.find((entry) => entry.endsWith('/styles.dev.css'));
+        if (devStable) {
+            return devStable;
+        }
         const preferred = cssAssets.find((entry) => /\/styles(\.|\/|$)/.test(entry));
         return preferred || cssAssets[0];
     }
@@ -413,22 +431,60 @@ export async function createDevServer(options) {
         }
     }
 
-    // Initial build
-    try {
-        logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
-        const initialBuild = await build({ pagesDir, outDir, config, logger });
-        await _syncCssStateFromBuild(initialBuild, buildId);
-        currentRoutes = await loadRouteManifest(outDir);
-        if (currentCssHref.length > 0) {
-            logger.css(`ready (${currentCssHref})`, { onceKey: `css-ready:${buildId}:${currentCssHref}` });
+    async function _runInitialBuild() {
+        buildStatus = 'building';
+        buildError = null;
+        const startTime = Date.now();
+        startupProfile.emit('initial_build_start', { buildId });
+        try {
+            logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
+            const initialBuild = await buildSession.build();
+            const cssReady = await _syncCssStateFromBuild(initialBuild, buildId);
+            currentRoutes = await loadRouteManifest(outDir);
+            buildStatus = 'ok';
+            buildError = null;
+            lastBuildMs = Date.now();
+            durationMs = lastBuildMs - startTime;
+            if (cssReady && currentCssHref.length > 0) {
+                logger.css(`ready (${currentCssHref})`, { onceKey: `css-ready:${buildId}:${currentCssHref}` });
+            }
+            _trace('state_snapshot', {
+                status: buildStatus,
+                buildId,
+                cssHref: currentCssHref,
+                durationMs
+            });
+            startupProfile.emit('initial_build_complete', {
+                buildId,
+                status: buildStatus,
+                durationMs,
+                cssReady,
+                routes: Array.isArray(currentRoutes) ? currentRoutes.length : 0
+            });
+        } catch (err) {
+            buildStatus = 'error';
+            buildError = { message: err instanceof Error ? err.message : String(err) };
+            lastBuildMs = Date.now();
+            durationMs = lastBuildMs - startTime;
+            logger.error('initial build failed', {
+                hint: 'fix the error and restart dev',
+                error: err
+            });
+            _trace('state_snapshot', {
+                status: buildStatus,
+                buildId,
+                durationMs,
+                error: buildError
+            });
+            startupProfile.emit('initial_build_complete', {
+                buildId,
+                status: buildStatus,
+                durationMs,
+                error: buildError?.message || ''
+            });
+        } finally {
+            initialBuildSettled = true;
         }
-    } catch (err) {
-        buildStatus = 'error';
-        buildError = { message: err instanceof Error ? err.message : String(err) };
-        logger.error('initial build failed', {
-            hint: 'fix the error and restart dev',
-            error: err
-        });
     }
 
     const server = createServer(async (req, res) => {
@@ -547,8 +603,26 @@ export async function createDevServer(options) {
             return;
         }
 
+        if (pathname === '/_zenith/image') {
+            await handleImageRequest(req, res, {
+                requestUrl: url,
+                projectRoot,
+                config: config.images
+            });
+            return;
+        }
+
         if (pathname === '/__zenith/route-check') {
             try {
+                if (!initialBuildSettled && buildStatus === 'building') {
+                    res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+                    res.end(JSON.stringify({
+                        error: 'initial_build_pending',
+                        message: 'initial build still in progress'
+                    }));
+                    return;
+                }
+
                 // Security: Require explicitly designated header to prevent public oracle probing
                 if (req.headers['x-zenith-route-check'] !== '1') {
                     res.writeHead(403, { 'Content-Type': 'application/json' });
@@ -630,6 +704,37 @@ export async function createDevServer(options) {
         let resolvedPathFor404 = null;
         let staticRootFor404 = null;
         try {
+            if (!initialBuildSettled && buildStatus === 'building') {
+                const pendingPayload = {
+                    kind: 'zenith_dev_build_pending',
+                    requestedPath: pathname,
+                    buildId,
+                    buildStatus,
+                    hint: 'Initial build is still running. Retry shortly or inspect /__zenith_dev/state.'
+                };
+                if (_looksLikeJsonRequest(req, pathname)) {
+                    res.writeHead(503, {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-store'
+                    });
+                    res.end(JSON.stringify(pendingPayload));
+                    return;
+                }
+                res.writeHead(503, {
+                    'Content-Type': 'text/html; charset=utf-8',
+                    'Cache-Control': 'no-store'
+                });
+                res.end([
+                    '<!DOCTYPE html>',
+                    '<html><head><meta charset="utf-8"><title>Zenith Dev Building</title></head>',
+                    '<body style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 20px; background: #101216; color: #e6edf3;">',
+                    '<h1 style="margin-top:0;">Zenith Dev Building</h1>',
+                    `<pre style="white-space: pre-wrap; line-height: 1.5;">Requested: ${pathname}\nStatus: initial build running\nHint: ${pendingPayload.hint}</pre>`,
+                    '</body></html>'
+                ].join(''));
+                return;
+            }
+
             const requestExt = extname(pathname);
             if (requestExt && requestExt !== '.html') {
                 const assetPath = join(outDir, pathname);
@@ -721,9 +826,20 @@ export async function createDevServer(options) {
             }
 
             let content = await _readFileForRequest(filePath, 'utf8');
+            if (resolved.matched && resolved.route?.page_asset) {
+                const pageAssetPath = resolveWithinDist(outDir, resolved.route.page_asset);
+                content = await materializeImageMarkup({
+                    html: content,
+                    pageAssetPath,
+                    payload: buildSession.getImageRuntimePayload(),
+                    ssrData: ssrPayload,
+                    routePathname: resolved.route.path || pathname
+                });
+            }
             if (ssrPayload) {
                 content = injectSsrPayload(content, ssrPayload);
             }
+            content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
         } catch (error) {
@@ -818,7 +934,8 @@ export async function createDevServer(options) {
      * Start watching source roots for changes.
      */
     function _startWatcher() {
-        const triggerBuildDrain = (delayMs = 50) => {
+        const watcherStartedAt = performance.now();
+        const triggerBuildDrain = (delayMs = rebuildDebounceMs) => {
             if (_buildDebounce !== null) {
                 clearTimeout(_buildDebounce);
             }
@@ -832,7 +949,8 @@ export async function createDevServer(options) {
             if (_buildInFlight) {
                 return;
             }
-            const changed = Array.from(_queuedFiles).map(_toDisplayPath).sort();
+            const changedFiles = Array.from(_queuedFiles);
+            const changed = changedFiles.map(_toDisplayPath).sort();
             if (changed.length === 0) {
                 return;
             }
@@ -848,10 +966,13 @@ export async function createDevServer(options) {
             const startTime = Date.now();
             const previousCssAssetPath = currentCssAssetPath;
             const previousCssContent = currentCssContent;
+            const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
             try {
-                const buildResult = await build({ pagesDir, outDir, config, logger });
+                const buildResult = await buildSession.build({ changedFiles, logger });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
-                currentRoutes = await loadRouteManifest(outDir);
+                if (!onlyCss) {
+                    currentRoutes = await loadRouteManifest(outDir);
+                }
                 const cssChanged = cssReady && (
                     currentCssAssetPath !== previousCssAssetPath ||
                     currentCssContent !== previousCssContent
@@ -885,7 +1006,6 @@ export async function createDevServer(options) {
                     _broadcastEvent('css_update', { href: currentCssHref, changedFiles: changed });
                 }
 
-                const onlyCss = changed.length > 0 && changed.every((f) => f.endsWith('.css'));
                 if (!onlyCss) {
                     logger.hmr(`reload (buildId=${cycleBuildId})`);
                     _broadcastEvent('reload', { changedFiles: changed });
@@ -919,7 +1039,7 @@ export async function createDevServer(options) {
             } finally {
                 _buildInFlight = false;
                 if (_queuedFiles.size > 0) {
-                    triggerBuildDrain(20);
+                    triggerBuildDrain(queuedRebuildDebounceMs);
                 }
             }
         };
@@ -951,33 +1071,70 @@ export async function createDevServer(options) {
                 // fs.watch recursive may not be supported on this platform/root
             }
         }
+        startupProfile.emit('watcher_ready', {
+            roots: roots.length,
+            activeWatchers: _watchers.length,
+            durationMs: startupProfile.roundMs(performance.now() - watcherStartedAt)
+        });
     }
 
-    return new Promise((resolve) => {
-        server.listen(port, host, () => {
-            actualPort = server.address().port;
-            _startWatcher();
+    const closeServer = () => {
+        clearInterval(sseHeartbeat);
+        for (const watcher of _watchers) {
+            try {
+                watcher.close();
+            } catch {
+                // ignore close errors
+            }
+        }
+        _watchers = [];
+        for (const client of hmrClients) {
+            try { client.end(); } catch { }
+        }
+        hmrClients.length = 0;
+        server.close();
+    };
 
-            resolve({
-                server,
+    return new Promise((resolve, reject) => {
+        let settled = false;
+
+        server.once('error', (error) => {
+            if (!settled) {
+                settled = true;
+                reject(error);
+            }
+        });
+
+        server.listen(port, host, async () => {
+            actualPort = server.address().port;
+            startupProfile.emit('server_bound', {
+                host: _publicHost(),
                 port: actualPort,
-                close: () => {
-                    clearInterval(sseHeartbeat);
-                    for (const watcher of _watchers) {
-                        try {
-                            watcher.close();
-                        } catch {
-                            // ignore close errors
-                        }
-                    }
-                    _watchers = [];
-                    for (const client of hmrClients) {
-                        try { client.end(); } catch { }
-                    }
-                    hmrClients.length = 0;
-                    server.close();
-                }
+                buildStatus
             });
+            _trace('server_bound', {
+                host: _publicHost(),
+                port: actualPort,
+                buildStatus
+            });
+
+            try {
+                await _runInitialBuild();
+                _startWatcher();
+                if (!settled) {
+                    settled = true;
+                    resolve({
+                        server,
+                        port: actualPort,
+                        close: closeServer
+                    });
+                }
+            } catch (error) {
+                if (!settled) {
+                    settled = true;
+                    reject(error);
+                }
+            }
         });
     });
 }

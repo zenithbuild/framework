@@ -101,7 +101,10 @@ const el = document.querySelector('.legacy')
         CompileOptions::default(),
     )
     .expect("compile");
-    let query_warnings: Vec<_> = warnings.iter().filter(|w| w.code == "ZEN-DOM-QUERY").collect();
+    let query_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.code == "ZEN-DOM-QUERY")
+        .collect();
     assert!(
         query_warnings.is_empty(),
         "zen-allow:dom-query should suppress ZEN-DOM-QUERY: {:?}",
