@@ -1,0 +1,7 @@
+<DefaultLayout>
+  <section class="stack">
+    <p>Guide detail route.</p>
+    <h1>Getting started</h1>
+    <p>This page represents a small documentation detail surface with no client-side state.</p>
+  </section>
+</DefaultLayout>

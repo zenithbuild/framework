@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Zenith Benchmark Result",
+  "type": "object",
+  "required": ["schemaVersion", "runner", "runId", "generatedAt", "environment", "results"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "runner": {
+      "type": "string",
+      "enum": ["cold-build", "dev-startup", "hydration-runtime", "rebuild", "matrix"]
+    },
+    "runId": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "environment": {
+      "type": "object"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "frameworkId",
+          "caseId",
+          "track",
+          "fixtureDir",
+          "install",
+          "warmupCount",
+          "sampleCount",
+          "samples",
+          "summary"
+        ],
+        "properties": {
+          "frameworkId": { "type": "string" },
+          "caseId": { "type": "string" },
+          "track": { "type": "string" },
+          "measurementContract": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "track",
+                  "contractVersion",
+                  "settleMethod",
+                  "signalSource",
+                  "freshnessProofType",
+                  "routeProbeRole",
+                  "directlyComparable",
+                  "requiredCaveat"
+                ],
+                "properties": {
+                  "track": { "type": "string" },
+                  "contractVersion": { "type": "string" },
+                  "settleMethod": { "type": "string" },
+                  "signalSource": { "type": "string" },
+                  "freshnessProofType": { "type": "string" },
+                  "routeProbeRole": { "type": "string" },
+                  "directlyComparable": { "type": "boolean" },
+                  "requiredCaveat": { "type": "string" },
+                  "comparisonBlockReason": { "type": "string" }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "phase",
+                  "viewport",
+                  "postLoadSettleWindowMs",
+                  "comparableMetrics",
+                  "frameworkSpecificSidecars"
+                ],
+                "properties": {
+                  "phase": { "type": "string" },
+                  "viewport": {
+                    "type": "object",
+                    "required": ["width", "height"],
+                    "properties": {
+                      "width": { "type": "integer" },
+                      "height": { "type": "integer" }
+                    }
+                  },
+                  "postLoadSettleWindowMs": { "type": "integer" },
+                  "comparableMetrics": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "frameworkSpecificSidecars": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            ]
+          },
+          "fixtureDir": { "type": "string" },
+          "install": { "type": "object" },
+          "warmupCount": { "type": "integer" },
+          "sampleCount": { "type": "integer" },
+          "samples": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "summary": { "type": "object" }
+        }
+      }
+    }
+  }
+}

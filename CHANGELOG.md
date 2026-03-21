@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+- Added benchmark harness, rebuild measurement caveats, and performance documentation for the current cross-framework results.
+
 ## [0.6.18] - 2026-03-13
 
 ### Changed
