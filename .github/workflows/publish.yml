@@ -374,14 +374,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
           RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
-          TRAIN_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           cat > framework-release.json <<JSON
           {
             "version": "${RELEASE_VERSION}",
             "tag": "${RELEASE_TAG}",
-            "sha": "${TRAIN_SHA}"
+            "sha": "${RELEASE_SHA}"
           }
           JSON
 
