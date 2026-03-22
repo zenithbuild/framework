@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-03-22
+
+### Changed
+
+- Finalized the OIDC-only trusted publishing contract so prerelease tags publish from `train`, stable tags publish from `master`, and the legacy latest-promotion flow is removed from the framework release path.
+- Aligned publish workflow naming, script paths, and internal release-policy docs around one direct-publish `beta` / `train` / `latest` model.
+
 ## [0.7.0] - 2026-03-21
 
 ### Changed
