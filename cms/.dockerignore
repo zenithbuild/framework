@@ -1,8 +1,0 @@
-.git
-.env
-data
-uploads
-node_modules
-**/node_modules
-**/dist
-**/.DS_Store

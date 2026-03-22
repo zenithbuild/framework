@@ -7,3 +7,4 @@ target/
 playwright-report/
 test-results/
 *.log
+/cms/

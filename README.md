@@ -15,6 +15,7 @@ Start with [`./docs/README.md`](./docs/README.md).
 ## What Stays Separate
 - Plugins live in separate repositories.
 - `zenith-language` and `zenith-language-server` remain separate repositories.
+- `zenith-cms` is a separate private deployable app boundary for the Directus editorial workspace and Render deployment surface.
 - Imported source refs are tracked in [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md).
 
 ## Repository Settings
