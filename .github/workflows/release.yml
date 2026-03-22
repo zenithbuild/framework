@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  release-train:
+  release_github:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -116,6 +116,6 @@ jobs:
           target_commitish: ${{ steps.metadata.outputs.sha }}
           body: |
             No matching section was found in `CHANGELOG.md` for `${{ steps.metadata.outputs.tag }}`.
-            Maintainers should add a matching train section before the next release.
+            Maintainers should add a matching version section before the next release.
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}

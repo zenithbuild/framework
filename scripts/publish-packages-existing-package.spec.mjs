@@ -77,8 +77,8 @@ function createFakeNpm(dir) {
   return scriptPath;
 }
 
-function runPublishTrain({ mode, dryRun = false }) {
-  const tempDir = makeTempDir('zenith-publish-train-existing-');
+function runPublishPackages({ mode, dryRun = false }) {
+  const tempDir = makeTempDir('zenith-publish-packages-existing-');
   const fakeNpm = createFakeNpm(tempDir);
   const logPath = path.join(tempDir, 'fake-npm.log');
 
@@ -104,7 +104,7 @@ function runPublishTrain({ mode, dryRun = false }) {
 }
 
 test('preflight ignores NPM_CONFIG_TAG and skips already published versions', () => {
-  const { result, log } = runPublishTrain({ mode: 'already-published' });
+  const { result, log } = runPublishPackages({ mode: 'already-published' });
 
   assert.equal(result.status, 0, `expected exit code 0, got ${result.status}\n${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, new RegExp(`Checking ${PACKAGE_NAME}@${TRAIN_VERSION.replaceAll('.', '\\.')}`));
@@ -117,7 +117,7 @@ test('preflight ignores NPM_CONFIG_TAG and skips already published versions', ()
 });
 
 test('preflight classifies missing versions as publish-needed, not bootstrap-needed', () => {
-  const { result, log } = runPublishTrain({ mode: 'version-missing' });
+  const { result, log } = runPublishPackages({ mode: 'version-missing' });
 
   assert.equal(result.status, 0, `expected exit code 0, got ${result.status}\n${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /published/);
@@ -129,7 +129,7 @@ test('preflight classifies missing versions as publish-needed, not bootstrap-nee
 });
 
 test('preflight still requires bootstrap when package name is missing', () => {
-  const { result, log } = runPublishTrain({ mode: 'name-missing' });
+  const { result, log } = runPublishPackages({ mode: 'name-missing' });
 
   assert.equal(result.status, 1, `expected exit code 1, got ${result.status}\n${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /bootstrap required: package name not yet published on npm/);

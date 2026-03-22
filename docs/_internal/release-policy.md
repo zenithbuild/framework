@@ -1,82 +1,58 @@
 # Release Policy
 
-Zenith uses a three-branch release train with shared package versions across `beta`, `train`, and `master`. Channel selection happens through npm dist-tags, not semver suffixes.
+Zenith uses three protected branches with branch-specific semver lines. Channel selection is determined by the tag shape and the branch that contains the tagged commit.
 
 ## Branches
 
-- `beta`: internal-only integration branch for maintainers. Optional `beta` publishes are internal-only.
-- `train`: public contribution and integration branch. All contributor PRs land here first.
-- `master`: stable branch. Only maintainers merge `train` into `master` after rigorous testing.
+- `beta`: internal integration branch for maintainers. Optional beta publishes are pre-release only.
+- `train`: public integration branch. Contributor PRs land here first.
+- `master`: stable branch. Only maintainers merge validated train work into `master`.
 
 ## Allowed Merges
 
 - External contributors: `feature/* -> train` by pull request.
 - Maintainers: `beta -> train` by pull request.
 - Maintainers: `train -> master` by pull request.
-- Direct pushes to `beta`, `train`, and `master` are disallowed by policy and should be blocked with GitHub branch protection.
+- Direct pushes to `beta`, `train`, and `master` should be blocked by branch protection.
+
+## Release Contract
+
+- `vX.Y.Z-beta.N` tags publish to npm dist-tag `beta` and must come from `beta`.
+- `vX.Y.Z-train.N` and `vX.Y.Z-rc.N` tags publish to npm dist-tag `train` and must come from `train`.
+- `vX.Y.Z` tags publish to npm dist-tag `latest` and must come from `master`.
+- Stable releases are distinct semver publishes. `v0.7.1-train.0` and `v0.7.1` are different releases; `latest` is never moved by re-tagging or by post-publish dist-tag promotion.
+
+## Versioning Rules
+
+- `TRAIN_VERSION` remains the source of truth for the version being cut from the current branch.
+- On `train`, `TRAIN_VERSION` must be a prerelease version such as `0.7.1-train.0` or `0.7.1-rc.0`.
+- On `master`, `TRAIN_VERSION` must be the stable version such as `0.7.1`.
+- The pushed git tag must exactly match `TRAIN_VERSION` with a leading `v`.
 
 ## Release Notes Contract
 
 - Every pull request into `train` must add at least one bullet to [CHANGELOG.md](../../CHANGELOG.md) under `## [Unreleased]`.
 - `Unreleased` is the source of truth for the next train cut.
-- Stable releases must have a matching version section in `CHANGELOG.md` before GitHub Release creation runs.
-- Stable releases must also add or update the matching docs-side markdown entry under [docs/changelog](../changelog/) before the release is considered done.
+- Before any tagged release, move the relevant `Unreleased` bullets into a versioned section matching `TRAIN_VERSION`.
+- Stable releases must also add or update the matching docs-side markdown entry under [docs/changelog](../changelog/) before the release is considered complete.
 
-## Release Cut
+## Release Flow
 
-1. Stabilize `train` and move `CHANGELOG.md` `Unreleased` entries into a new version section matching `TRAIN_VERSION`.
-2. Create and push tag `v<TRAIN_VERSION>` from a commit contained in `train`.
-3. GitHub Actions runs `CI`, then npm publish, then GitHub Release.
-4. The tag-driven publish workflow publishes the framework packages to npm dist-tag `train`.
-5. After publish succeeds and validation passes, open a maintainer PR from `train` to `master`.
-6. After the `train -> master` merge is validated, promote the already-published version from dist-tag `train` to dist-tag `latest`.
-
-## Dist-Tag Mapping
-
-- `v*` tag pushed from `train`: publish framework packages on dist-tag `train`.
-- `master`: never publishes a separate semver line; it promotes the same package version to dist-tag `latest` after the merge.
-- `beta`: optional internal-only publishes use dist-tag `beta`.
+1. Stabilize `train`.
+2. Bump `TRAIN_VERSION` on `train` to the next prerelease version and cut the matching changelog section.
+3. Push `vX.Y.Z-train.N` or `vX.Y.Z-rc.N` from a commit contained in `train`.
+4. [publish.yml](../../.github/workflows/publish.yml) runs CI, publishes package tarballs to npm dist-tag `train`, and then [release.yml](../../.github/workflows/release.yml) creates the GitHub release for that tag.
+5. After train validation, merge `train` into `master`.
+6. On `master`, bump `TRAIN_VERSION` to the stable version, finalize the stable changelog/docs release notes, and push `vX.Y.Z`.
+7. The stable tag publishes directly to npm dist-tag `latest` from `master` and creates the GitHub release for the stable version.
 
 ## Pipeline Policy
 
-- Normal framework publishing is OIDC-only via [publish.yml](../../.github/workflows/publish.yml) in the `npm-release` environment.
-- The standard publish path must not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or token-written `.npmrc` auth.
+- Publishing is OIDC-only via [publish.yml](../../.github/workflows/publish.yml) in the `npm-release` environment.
+- The standard publish path must not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, token-written `.npmrc` auth, or a separate latest-promotion token flow.
 - Tag publishing is guarded twice before npm publish begins:
   - the pushed tag must match `TRAIN_VERSION` after removing the leading `v`
-  - the tagged commit must be contained in `origin/train`
+  - the tagged commit must be contained in the correct branch for that tag kind (`beta`, `train`, or `master`)
 - The CI gate retries once (`bun run ci`) to reduce flaky failures. Publish never retries automatically.
-- GitHub Release creation runs only after publish succeeds.
-- `.github/workflows/bootstrap-platform-packages.yml` remains manual-only for bootstrapping brand-new package names.
-
-## Latest Promotion
-
-Promote `latest` only after the `train -> master` merge has been validated. The canonical path is [promote-latest.yml](../../.github/workflows/promote-latest.yml), run manually from `master`.
-
-Minimum promotion:
-
-```sh
-npm dist-tag add @zenithbuild/core@0.6.13 latest
-npm dist-tag add @zenithbuild/cli@0.6.13 latest
-```
-
-Recommended full alignment:
-
-```sh
-npm dist-tag add @zenithbuild/core@0.6.13 latest
-npm dist-tag add @zenithbuild/cli@0.6.13 latest
-npm dist-tag add @zenithbuild/runtime@0.6.13 latest
-npm dist-tag add @zenithbuild/router@0.6.13 latest
-npm dist-tag add @zenithbuild/bundler@0.6.13 latest
-npm dist-tag add @zenithbuild/compiler@0.6.13 latest
-npm dist-tag add @zenithbuild/language@0.6.13 latest
-npm dist-tag add @zenithbuild/language-server@0.6.13 latest
-```
-
-npm Trusted Publishing currently covers `npm publish`, not `npm dist-tag add`. `promote-latest.yml` therefore uses a protected `NPM_DIST_TAG_TOKEN` secret in the `npm-release` environment for dist-tag writes only. The workflow:
-
-- reads the target version from `TRAIN_VERSION` on `master`
-- verifies every framework package is already published at that version
-- verifies every package currently has `train=<TRAIN_VERSION>`
-- fails if any package is missing or if `latest` is already ahead of `train`
-- promotes the exact published version to `latest` without republishing tarballs
-- verifies `latest` and `train` both resolve to `TRAIN_VERSION` and that `beta` is unchanged
+- [release.yml](../../.github/workflows/release.yml) runs only after publish succeeds.
+- [bootstrap-platform-packages.yml](../../.github/workflows/bootstrap-platform-packages.yml) remains manual-only for bootstrapping brand-new npm package names before trusted publishing can take over.
