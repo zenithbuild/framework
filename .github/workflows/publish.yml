@@ -90,8 +90,9 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     outputs:
-      train_version: ${{ steps.train_version.outputs.train_version }}
-      train_tag: ${{ steps.train_version.outputs.train_tag }}
+      release_version: ${{ steps.release_version.outputs.release_version }}
+      release_tag: ${{ steps.release_version.outputs.release_tag }}
+      dist_tag: ${{ steps.release_version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,14 +102,14 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Assert tag matches TRAIN_VERSION
-        id: train_version
+      - name: Assert tag matches TRAIN_VERSION and resolve release version
+        id: release_version
         shell: bash
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          train_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
+          release_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
           tag_version="${TAG_NAME#v}"
 
           if [[ "$TAG_NAME" != v* ]]; then
@@ -116,19 +117,33 @@ jobs:
             exit 1
           fi
 
-          if [[ "$train_version" != "$tag_version" ]]; then
-            echo "TRAIN_VERSION=${train_version} but tag=${TAG_NAME}; bump TRAIN_VERSION first or retag correctly." >&2
+          if [[ "$release_version" != "$tag_version" ]]; then
+            echo "TRAIN_VERSION=${release_version} but tag=${TAG_NAME}; bump TRAIN_VERSION first or retag correctly." >&2
             exit 1
           fi
 
-          echo "train_version=${train_version}" >> "$GITHUB_OUTPUT"
-          echo "train_tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          if [[ "${TAG_NAME}" == *-beta.* ]]; then
+            dist_tag="beta"
+            target_branch="beta"
+          elif [[ "${TAG_NAME}" == *-train.* || "${TAG_NAME}" == *-rc.* ]]; then
+            dist_tag="train"
+            target_branch="train"
+          else
+            dist_tag="latest"
+            target_branch="master"
+          fi
 
-      - name: Assert tag is on train
+          echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
+          echo "target_branch=${target_branch}" >> "$GITHUB_OUTPUT"
+
+      - name: Assert tag is on correct branch
         env:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
-        run: node scripts/assert-tag-on-branch.mjs train
+          TARGET_BRANCH: ${{ steps.release_version.outputs.target_branch }}
+        run: node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
 
       - name: Verify platform package names are bootstrapped
         shell: bash
@@ -161,7 +176,7 @@ jobs:
           fi
 
   publish_platforms:
-    name: Platform Bootstrap
+    name: Publish Platform Packages
     needs: preflight
     strategy:
       fail-fast: false
@@ -227,7 +242,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Resolve train version
+      - name: Resolve release version
         shell: bash
         run: |
           set -euo pipefail
@@ -259,13 +274,13 @@ jobs:
         shell: bash
         env:
           NPM_CONFIG_PROVENANCE: "true"
-          NPM_CONFIG_TAG: train
-          PUBLISH_FALLBACK_TAG: train
+          NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
+          PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_PACKAGE_FILTER: ${{ matrix.package_dir }}
-        run: ./scripts/publish-train.sh
+        run: ./scripts/publish-packages.sh
 
   platform_stage:
-    name: Platform Stage Complete
+    name: Platform Publish Stage Complete
     needs: [preflight, publish_platforms]
     if: always() && needs.preflight.result == 'success'
     runs-on: ubuntu-latest
@@ -277,13 +292,13 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${PLATFORM_RESULT}" != "success" ]]; then
-            echo "Platform Bootstrap must succeed before publish jobs can run." >&2
+            echo "Platform package publishing must succeed before publish jobs can run." >&2
             exit 1
           fi
 
-          echo "Platform Bootstrap completed successfully."
+          echo "Platform package publishing completed successfully."
 
-  publish_train:
+  publish_release:
     needs: [preflight, platform_stage]
     if: needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
@@ -340,32 +355,32 @@ jobs:
           bun run --cwd packages/compiler build
           bun run --cwd packages/bundler build
 
-      - name: Publish train packages
+      - name: Publish target packages
         shell: bash
         env:
           NPM_CONFIG_PROVENANCE: "true"
-          NPM_CONFIG_TAG: train
-          PUBLISH_FALLBACK_TAG: train
+          NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
+          PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/language-server,packages/language
-        run: ./scripts/publish-train.sh
+        run: ./scripts/publish-packages.sh
 
   release_metadata:
-    needs: [preflight, publish_train]
-    if: needs.publish_train.result == 'success'
+    needs: [preflight, publish_release]
+    if: needs.publish_release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Write release metadata artifact
         shell: bash
         env:
-          TRAIN_VERSION: ${{ needs.preflight.outputs.train_version }}
-          TRAIN_TAG: ${{ needs.preflight.outputs.train_tag }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
           TRAIN_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           cat > framework-release.json <<JSON
           {
-            "version": "${TRAIN_VERSION}",
-            "tag": "${TRAIN_TAG}",
+            "version": "${RELEASE_VERSION}",
+            "tag": "${RELEASE_TAG}",
             "sha": "${TRAIN_SHA}"
           }
           JSON
