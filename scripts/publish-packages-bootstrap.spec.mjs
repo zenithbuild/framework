@@ -44,9 +44,9 @@ function createFakeNpm(dir, missingPackages) {
   return scriptPath;
 }
 
-test('publish-train aggregates missing bootstrap packages into one summary', () => {
+test('publish-packages aggregates missing bootstrap packages into one summary', () => {
   const trainVersion = readFileSync(path.join(root, 'TRAIN_VERSION'), 'utf8').trim();
-  const tempDir = makeTempDir('zenith-publish-train-bootstrap-');
+  const tempDir = makeTempDir('zenith-publish-packages-bootstrap-');
   const missingPackages = new Set([
     `@zenithbuild/bundler-darwin-arm64@${trainVersion}`,
     '@zenithbuild/bundler-darwin-arm64',
