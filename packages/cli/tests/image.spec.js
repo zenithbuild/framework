@@ -89,6 +89,7 @@ describe('native image optimization', () => {
             pagesDir: project.pagesDir,
             outDir: project.outDir,
             config: {
+                basePath: '/docs',
                 images: {
                     formats: ['webp'],
                     deviceSizes: [1],
@@ -117,7 +118,7 @@ describe('native image optimization', () => {
         expect(html).toContain('data-zenith-image=');
         expect(html).toContain('<picture>');
         expect(html).toContain('alt="Hero"');
-        expect(html).toContain('/_zenith/image/local/');
+        expect(html).toContain('/docs/_zenith/image/local/');
     });
 
     test('preview auto-loads image config and rewrites allowed remote images through the image endpoint', async () => {
@@ -128,6 +129,7 @@ describe('native image optimization', () => {
             'zenith.config.js': [
                 'module.exports = {',
                 "  pagesDir: 'src/pages',",
+                "  basePath: '/docs',",
                 '  images: {',
                 '    remotePatterns: [',
                 `      { protocol: 'http', hostname: '127.0.0.1', port: '${remote.port}', pathname: '/hero.png' }`,
@@ -143,6 +145,7 @@ describe('native image optimization', () => {
             outDir: project.outDir,
             config: {
                 pagesDir: 'src/pages',
+                basePath: '/docs',
                 images: {
                     remotePatterns: [
                         { protocol: 'http', hostname: '127.0.0.1', port: String(remote.port), pathname: '/hero.png' }
@@ -157,15 +160,16 @@ describe('native image optimization', () => {
 
         preview = await createPreviewServer({
             distDir: project.outDir,
-            port: 0
+            port: 0,
+            config: { basePath: '/docs' }
         });
 
         const baseUrl = `http://127.0.0.1:${preview.port}`;
-        const previewHtml = await fetch(`${baseUrl}/`).then((response) => response.text());
-        expect(previewHtml).toContain('/_zenith/image?');
+        const previewHtml = await fetch(`${baseUrl}/docs/`).then((response) => response.text());
+        expect(previewHtml).toContain('/docs/_zenith/image?');
         expect(previewHtml).not.toContain(`src="${remoteUrl}"`);
 
-        const match = previewHtml.match(/src="([^"]*\/_zenith\/image\?[^"]+)"/);
+        const match = previewHtml.match(/src="([^"]*\/docs\/_zenith\/image\?[^"]+)"/);
         expect(match).not.toBeNull();
         const imagePath = match[1].replaceAll('&amp;', '&');
 

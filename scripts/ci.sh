@@ -12,6 +12,7 @@ bun run --cwd packages/cli typecheck
 bun run --cwd packages/language-server typecheck
 bun run --cwd packages/language typecheck
 
+bun run --cwd packages/cli test:deployment-smoke
 bun run --cwd packages/cli test
 bun run --cwd packages/core test
 bun run --cwd packages/runtime test

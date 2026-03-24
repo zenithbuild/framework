@@ -32,7 +32,7 @@
         "title": "Guides",
         "summary": "Task-oriented implementation walkthroughs.",
         "order": 80,
-        "count": 5
+        "count": 6
       },
       {
         "slug": "contributing",
@@ -840,6 +840,32 @@
       ],
       "source_path": "documentation/guides/cms-unified-site.md",
       "url": "/docs/guides/cms-unified-site",
+      "category": "guides",
+      "category_title": "Guides",
+      "category_order": 80,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/deployment-targets",
+      "title": "Deployment Targets Guide",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "deployment",
+        "build"
+      ],
+      "source_path": "documentation/guides/deployment-targets.md",
+      "url": "/docs/guides/deployment-targets",
       "category": "guides",
       "category_title": "Guides",
       "category_order": 80,

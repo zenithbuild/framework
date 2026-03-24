@@ -5,7 +5,7 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 import sharp from 'sharp';
 import {
     buildLocalImageKey,
-    buildLocalVariantPath,
+    buildLocalVariantAssetPath,
     matchRemotePattern,
     normalizeImageConfig,
     normalizeImageFormat
@@ -109,7 +109,7 @@ async function writeIfStale(sourcePath, targetPath, buffer) {
 }
 
 function variantRelativePath(publicPath, width, quality, format) {
-    return buildLocalVariantPath(publicPath, width, quality, format).replace(/^\//, '');
+    return buildLocalVariantAssetPath(publicPath, width, quality, format).replace(/^\//, '');
 }
 
 function createRemoteCacheKey(url, width, quality, format) {

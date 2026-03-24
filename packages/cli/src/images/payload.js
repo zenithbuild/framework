@@ -6,9 +6,10 @@ import {
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export function createImageRuntimePayload(config, localImages, mode = 'passthrough') {
+export function createImageRuntimePayload(config, localImages, mode = 'passthrough', basePath = '/') {
     return normalizeImageRuntimePayload({
         mode,
+        basePath,
         config: normalizeImageConfig(config),
         localImages: localImages && typeof localImages === 'object' ? localImages : {}
     });
@@ -24,7 +25,12 @@ function serializeInlineScriptJson(payload) {
 }
 
 export function injectImageRuntimePayload(html, payload) {
-    const safePayload = createImageRuntimePayload(payload?.config || {}, payload?.localImages || {}, payload?.mode || 'passthrough');
+    const safePayload = createImageRuntimePayload(
+        payload?.config || {},
+        payload?.localImages || {},
+        payload?.mode || 'passthrough',
+        payload?.basePath || '/'
+    );
     const globalName = imageRuntimeGlobalName();
     const serialized = serializeInlineScriptJson(safePayload);
     const scriptTag = `<script id="zenith-image-runtime">window.${globalName} = ${serialized};</script>`;

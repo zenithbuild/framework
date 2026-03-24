@@ -4,6 +4,7 @@ import { renderRouterModule } from './template.js';
 const manifestJson = JSON.stringify(
   {
     entry: '/assets/runtime.11111111.js',
+    base_path: '/',
     css: '/assets/styles.22222222.css',
     core: '/assets/core.33333333.js',
     router: '/assets/router.44444444.js',

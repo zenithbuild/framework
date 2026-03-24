@@ -3,7 +3,7 @@ title: "Docs Inventory"
 description: "Classification and alignment status for legacy and canonical docs during migration to content collections."
 version: "0.3"
 status: "draft"
-last_updated: "2026-02-22"
+last_updated: "2026-03-24"
 tags: ["inventory", "migration", "docs"]
 ---
 
@@ -36,6 +36,7 @@ Definition of Done:
 | reference/markers | Marker Reference | reference | keep | Marker guarantees |
 | reference/server-data-api | Server Data API | reference | keep | Public API summary |
 | guides/cms-unified-site | CMS Unified Site Guide | guide | keep | Unified route view model |
+| guides/deployment-targets | Deployment Targets Guide | guide | keep | Canonical target matrix, preview behavior, and deployment limits |
 | guides/troubleshooting | Troubleshooting Guide | guide | keep | Operational diagnosis |
 | contributing/drift-gates | Drift Gates | contributing | keep | CI + docs integrity checks |
 | reactivity/dom-and-environment | DOM and Environment | reactivity | keep | Refs, zenWindow/zenDocument, zenOn, zenResize, collectRefs |

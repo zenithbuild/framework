@@ -190,7 +190,7 @@ export function createTimedCompilerRunner(startupProfile, compilerTotals) {
  * @param {object | null} [logger]
  * @param {boolean} [showInfo]
  * @param {string|object} [bundlerBin]
- * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string }} [bundlerOptions]
+ * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string, basePath?: string }} [bundlerOptions]
  * @returns {Promise<void>}
  */
 export function runBundler(
@@ -216,6 +216,9 @@ export function runBundler(
             '--out-dir',
             outDir
         ];
+        if (typeof bundlerOptions.basePath === 'string' && bundlerOptions.basePath.length > 0) {
+            bundlerArgs.push('--base-path', bundlerOptions.basePath);
+        }
         if (bundlerOptions.devStableAssets === true) {
             bundlerArgs.push('--dev-stable-assets');
         }

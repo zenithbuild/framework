@@ -4,6 +4,7 @@ export default {
     transform: {},
     testMatch: [
         '**/tests/config.spec.js',
+        '**/tests/define-config.spec.js',
         '**/tests/path.spec.js',
         '**/tests/order.spec.js',
         '**/tests/hash.spec.js',

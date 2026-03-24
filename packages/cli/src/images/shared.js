@@ -1,3 +1,5 @@
+import { imageEndpointPath, normalizeBasePath, prependBasePath } from '../base-path.js';
+
 const DEFAULT_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
 const DEFAULT_IMAGE_SIZES = [16, 32, 48, 64, 96, 128, 256, 384];
 const DEFAULT_FORMATS = ['webp', 'avif'];
@@ -278,12 +280,16 @@ export function buildLocalImageKey(publicPath) {
     return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-export function buildLocalVariantPath(publicPath, width, quality, format) {
+export function buildLocalVariantAssetPath(publicPath, width, quality, format) {
     const key = buildLocalImageKey(publicPath);
     return `/_zenith/image/local/${key}/w${width}-q${quality}.${normalizeImageFormat(format)}`;
 }
 
-export function buildRemoteVariantPath(remoteUrl, width, quality, format) {
+export function buildLocalVariantPath(publicPath, width, quality, format, basePath = '/') {
+    return prependBasePath(basePath, buildLocalVariantAssetPath(publicPath, width, quality, format));
+}
+
+export function buildRemoteVariantPath(remoteUrl, width, quality, format, basePath = '/') {
     const query = new URLSearchParams();
     query.set('url', String(remoteUrl || ''));
     query.set('w', String(width));
@@ -291,7 +297,7 @@ export function buildRemoteVariantPath(remoteUrl, width, quality, format) {
     if (format) {
         query.set('f', normalizeImageFormat(format));
     }
-    return `/_zenith/image?${query.toString()}`;
+    return `${imageEndpointPath(basePath)}?${query.toString()}`;
 }
 
 export function resolveWidthCandidates(width, sizes, config, manifestEntry) {
@@ -330,6 +336,7 @@ export function normalizeImageRuntimePayload(payload) {
     }
     return {
         mode: payload.mode === 'endpoint' ? 'endpoint' : 'passthrough',
+        basePath: normalizeBasePath(payload.basePath || '/'),
         config: normalizeImageConfig(payload.config || {}),
         localImages: isPlainObject(payload.localImages) ? payload.localImages : {}
     };

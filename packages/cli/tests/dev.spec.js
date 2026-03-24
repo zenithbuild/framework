@@ -231,14 +231,14 @@ describe('Dev Server', () => {
         expect(res.status).toBe(404);
     });
 
-    test('no SPA fallback even when softNavigation is enabled', async () => {
+    test('no SPA fallback even when router is enabled', async () => {
         project = await createTestProject(['index.zen']);
 
         dev = await createDevServer({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
             port: 0,
-            config: { softNavigation: true }
+            config: { router: true }
         });
 
         const res = await httpGet(`${localOrigin(dev.port)}/any-path`);
@@ -828,7 +828,7 @@ describe('Preview Server', () => {
         await build({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
-            config: { softNavigation: true }
+            config: { router: true }
         });
 
         const manifest = JSON.parse(

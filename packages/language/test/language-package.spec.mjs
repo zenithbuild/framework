@@ -80,7 +80,7 @@ test('extension package ships the bundled server runtime dependencies and VS Cod
   const pkg = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
   const extensionSource = await fs.readFile(path.join(packageRoot, 'src', 'extension.ts'), 'utf8');
 
-  assert.equal(pkg.dependencies['@zenithbuild/compiler'], '0.7.1');
+  assert.equal(pkg.dependencies['@zenithbuild/compiler'], pkg.version);
   assert.ok(pkg.dependencies['vscode-languageserver']);
   assert.ok(pkg.dependencies['vscode-languageserver-textdocument']);
   assert.match(extensionSource, /module:\s*serverPath/);

@@ -10,11 +10,12 @@ import { tmpdir } from 'node:os';
 const DEFAULT_CONFIG = {
     router: false,
     embeddedMarkupExpressions: false,
-    types: true,
     typescriptDefault: true,
     outDir: 'dist',
     pagesDir: 'pages',
-    experimental: {},
+    basePath: '/',
+    target: 'static',
+    adapter: null,
     strictDomLints: false,
     images: {
         formats: ['webp', 'avif'],
@@ -41,10 +42,13 @@ describe('validateConfig', () => {
     });
 
     test('valid config with overrides', () => {
-        const config = validateConfig({ router: true, outDir: 'build' });
+        const config = validateConfig({ router: true, outDir: 'build', basePath: '/docs' });
         expect(config.router).toBe(true);
         expect(config.outDir).toBe('build');
+        expect(config.basePath).toBe('/docs');
         expect(config.pagesDir).toBe('pages'); // default
+        expect(config.target).toBe('static');
+        expect(config.adapter).toBeNull();
     });
 
     test('throws on unknown keys', () => {
@@ -67,19 +71,55 @@ describe('validateConfig', () => {
         expect(() => validateConfig({ pagesDir: '' })).toThrow('non-empty string');
     });
 
+    test('normalizes and validates basePath', () => {
+        expect(validateConfig({ basePath: '/docs/' }).basePath).toBe('/docs');
+        expect(() => validateConfig({ basePath: 'docs' })).toThrow('must start with "/"');
+        expect(() => validateConfig({ basePath: '/docs?x=1' })).toThrow('must not include query or hash');
+    });
+
     test('throws on non-object config', () => {
         expect(() => validateConfig('string')).toThrow('must be a plain object');
         expect(() => validateConfig([1, 2])).toThrow('must be a plain object');
     });
 
     test('multiple overrides at once', () => {
-        const config = validateConfig({ router: true, outDir: 'out', pagesDir: 'src/pages' });
+        const config = validateConfig({
+            router: true,
+            outDir: 'out',
+            pagesDir: 'src/pages',
+            basePath: '/docs',
+            target: 'static'
+        });
         expect(config).toEqual({
             ...DEFAULT_CONFIG,
             router: true,
             outDir: 'out',
-            pagesDir: 'src/pages'
+            pagesDir: 'src/pages',
+            basePath: '/docs',
+            target: 'static'
         });
+    });
+
+    test('throws when target and adapter are both provided', () => {
+        const fakeAdapter = {
+            name: 'custom',
+            validateRoutes() {},
+            async adapt() {}
+        };
+
+        expect(() => validateConfig({ target: 'static', adapter: fakeAdapter })).toThrow('mutually exclusive');
+    });
+
+    test('throws on unsupported target values', () => {
+        expect(() => validateConfig({ target: 'edge' })).toThrow('Unsupported target');
+    });
+
+    test('accepts supported deployment targets', () => {
+        expect(validateConfig({ target: 'vercel-static' }).target).toBe('vercel-static');
+        expect(validateConfig({ target: 'netlify-static' }).target).toBe('netlify-static');
+        expect(validateConfig({ target: 'vercel' }).target).toBe('vercel');
+        expect(validateConfig({ target: 'netlify' }).target).toBe('netlify');
+        expect(validateConfig({ target: 'node' }).target).toBe('node');
     });
 
     test('normalizes images config', () => {
@@ -146,5 +186,19 @@ describe('loadConfig', () => {
         const config = await loadConfig(tmpDir);
         expect(config.router).toBe(true);
         expect(config.outDir).toBe('dist');
+        expect(config.basePath).toBe('/');
+        expect(config.target).toBe('static');
+    });
+
+    test('reloads updated CommonJS config files in the same process', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        const configPath = join(tmpDir, 'zenith.config.js');
+
+        await writeFile(configPath, 'module.exports = { target: "vercel", basePath: "/docs" }');
+        expect(await loadConfig(tmpDir)).toMatchObject({ target: 'vercel', basePath: '/docs' });
+
+        await writeFile(configPath, 'module.exports = { target: "netlify", basePath: "/app" }');
+        expect(await loadConfig(tmpDir)).toMatchObject({ target: 'netlify', basePath: '/app' });
     });
 });

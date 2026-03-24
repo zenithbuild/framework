@@ -6,6 +6,9 @@ void __zenithHydrate;
 void __zenithOnMount;
 
 const __ZENITH_MANIFEST__ = ${manifest};
+const __ZENITH_BASE_PATH__ = normalizeBasePath(
+  typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
+);
 const __ZENITH_ROUTE_EVENT_KEY = "__zenith_route_event_listeners";
 const __ZENITH_ROUTE_EVENT_NAMES = [
   "guard:start",
@@ -41,6 +44,48 @@ const scrollPositions = new Map();
 
 function splitPath(path) {
   return path.split('/').filter(Boolean);
+}
+
+function normalizeBasePath(basePath) {
+  const raw = typeof basePath === "string" ? basePath.trim() : "";
+  if (!raw || raw === "/") return "/";
+  if (!raw.startsWith("/")) return "/";
+  const normalized = raw.replace(/\\/{2,}/g, "/").replace(/\\/+$/g, "");
+  return normalized || "/";
+}
+
+function normalizePublicPath(pathname) {
+  const raw = typeof pathname === "string" && pathname ? pathname : "/";
+  const withLeadingSlash = raw.startsWith("/") ? raw : "/" + raw;
+  const normalized = withLeadingSlash.replace(/\\/{2,}/g, "/");
+  if (normalized.length > 1) {
+    return normalized.replace(/\\/+$/g, "");
+  }
+  return normalized;
+}
+
+function prependBasePath(pathname) {
+  const normalizedPath = normalizePublicPath(pathname);
+  if (__ZENITH_BASE_PATH__ === "/") return normalizedPath;
+  if (normalizedPath === "/") return __ZENITH_BASE_PATH__;
+  if (normalizedPath === __ZENITH_BASE_PATH__ || normalizedPath.startsWith(__ZENITH_BASE_PATH__ + "/")) {
+    return normalizedPath;
+  }
+  return __ZENITH_BASE_PATH__ + normalizedPath;
+}
+
+function stripBasePath(pathname) {
+  const normalizedPath = normalizePublicPath(pathname);
+  if (__ZENITH_BASE_PATH__ === "/") return normalizedPath;
+  if (normalizedPath === __ZENITH_BASE_PATH__) return "/";
+  if (normalizedPath.startsWith(__ZENITH_BASE_PATH__ + "/")) {
+    return normalizedPath.slice(__ZENITH_BASE_PATH__.length) || "/";
+  }
+  return null;
+}
+
+function routeCheckPath() {
+  return prependBasePath("/__zenith/route-check");
 }
 
 function copyParams(params) {
@@ -109,11 +154,16 @@ function compareRouteSpecificity(a, b) {
 }
 
 function resolveRoute(pathname) {
-  if (__ZENITH_MANIFEST__.chunks[pathname]) {
-    return { route: pathname, params: {} };
+  const canonicalPathname = stripBasePath(pathname);
+  if (canonicalPathname === null) {
+    return null;
   }
 
-  const pathnameSegments = splitPath(pathname);
+  if (__ZENITH_MANIFEST__.chunks[canonicalPathname]) {
+    return { route: canonicalPathname, params: {} };
+  }
+
+  const pathnameSegments = splitPath(canonicalPathname);
   const routes = Object.keys(__ZENITH_MANIFEST__.chunks).sort(compareRouteSpecificity);
   for (let i = 0; i < routes.length; i++) {
     const route = routes[i];

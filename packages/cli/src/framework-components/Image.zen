@@ -32,6 +32,24 @@ function normalizeFormat(value: unknown): string {
   return String(value || "").trim().toLowerCase().replace(/^\./, "");
 }
 
+function normalizeBasePath(value: unknown): string {
+  const raw = safeString(value);
+  if (!raw || raw === "/") return "/";
+  if (!raw.startsWith("/")) return "/";
+  const normalized = raw.replace(/\/{2,}/g, "/").replace(/\/+$/g, "");
+  return normalized || "/";
+}
+
+function prependBasePath(basePath: string, pathname: string): string {
+  const normalizedBasePath = normalizeBasePath(basePath);
+  if (normalizedBasePath === "/") return pathname;
+  if (pathname === "/") return normalizedBasePath;
+  if (pathname === normalizedBasePath || pathname.startsWith(normalizedBasePath + "/")) {
+    return pathname;
+  }
+  return `${normalizedBasePath}${pathname}`;
+}
+
 function isRemoteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
@@ -71,17 +89,20 @@ function buildLocalImageKey(publicPath: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function buildLocalVariantPath(publicPath: string, width: number, quality: number, format: string): string {
-  return `/_zenith/image/local/${buildLocalImageKey(publicPath)}/w${width}-q${quality}.${normalizeFormat(format)}`;
+function buildLocalVariantPath(publicPath: string, width: number, quality: number, format: string, basePath: string): string {
+  return prependBasePath(
+    basePath,
+    `/_zenith/image/local/${buildLocalImageKey(publicPath)}/w${width}-q${quality}.${normalizeFormat(format)}`
+  );
 }
 
-function buildRemoteVariantPath(remoteUrl: string, width: number, quality: number, format: string): string {
+function buildRemoteVariantPath(remoteUrl: string, width: number, quality: number, format: string, basePath: string): string {
   const query = new URLSearchParams();
   query.set("url", remoteUrl);
   query.set("w", String(width));
   query.set("q", String(quality));
   if (format) query.set("f", normalizeFormat(format));
-  return `/_zenith/image?${query.toString()}`;
+  return `${prependBasePath(basePath, "/_zenith/image")}?${query.toString()}`;
 }
 
 function escapeRegex(value: string): string {
@@ -227,6 +248,7 @@ function renderImage(): string {
   if (!source || !alt) return "";
 
   const config = isPlainObject(payload.config) ? payload.config : {};
+  const basePath = normalizeBasePath((payload as any).basePath);
   const className = safeString(rawProps.class);
   const style = mergeStyle(rawProps.style, rawProps.fit, rawProps.position);
   const loading = rawProps.priority === true ? "eager" : safeString(rawProps.loading) || "lazy";
@@ -248,8 +270,8 @@ function renderImage(): string {
     const fallbackWidth = widths.length > 0 ? widths[widths.length - 1] : (width || manifestEntry?.width || 0);
     model = {
       src: rawProps.unoptimized === true
-        ? source.path
-        : buildLocalVariantPath(source.path, fallbackWidth, quality, fallbackFormat),
+        ? prependBasePath(basePath, source.path)
+        : buildLocalVariantPath(source.path, fallbackWidth, quality, fallbackFormat, basePath),
       width,
       height,
       sizes,
@@ -258,7 +280,7 @@ function renderImage(): string {
         : sourceFormats.map((format) => ({
             type: mimeTypeForFormat(format),
             sizes,
-            srcset: widths.map((candidate) => `${buildLocalVariantPath(source.path, candidate, quality, format)} ${candidate}w`).join(", ")
+            srcset: widths.map((candidate) => `${buildLocalVariantPath(source.path, candidate, quality, format, basePath)} ${candidate}w`).join(", ")
           })).filter((entry) => entry.type && entry.srcset)
     };
   } else {
@@ -272,14 +294,14 @@ function renderImage(): string {
       model = { src: source.url, width, height, sizes, sources: [] };
     } else {
       model = {
-        src: buildRemoteVariantPath(source.url, widths[widths.length - 1] || width, quality, ""),
+        src: buildRemoteVariantPath(source.url, widths[widths.length - 1] || width, quality, "", basePath),
         width,
         height,
         sizes,
         sources: ((config.formats as string[]) || []).map((format) => ({
           type: mimeTypeForFormat(format),
           sizes,
-          srcset: widths.map((candidate) => `${buildRemoteVariantPath(source.url, candidate, quality, format)} ${candidate}w`).join(", ")
+          srcset: widths.map((candidate) => `${buildRemoteVariantPath(source.url, candidate, quality, format, basePath)} ${candidate}w`).join(", ")
         })).filter((entry) => entry.type && entry.srcset)
       };
     }

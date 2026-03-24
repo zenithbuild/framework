@@ -1,9 +1,3 @@
-<script server lang="ts">
-    export const data = {
-        pageTitle: "Zenith Basic Starter"
-    };
-</script>
-
 <script setup="ts">
 const count = signal(0);
 

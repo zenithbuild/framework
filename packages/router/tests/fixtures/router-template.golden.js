@@ -6,6 +6,7 @@ void __zenithOnMount;
 
 const __ZENITH_MANIFEST__ = {
   "entry": "/assets/runtime.11111111.js",
+  "base_path": "/",
   "css": "/assets/styles.22222222.css",
   "core": "/assets/core.33333333.js",
   "router": "/assets/router.44444444.js",
@@ -15,6 +16,9 @@ const __ZENITH_MANIFEST__ = {
     "/about": "/assets/about.bbbbbbb2.js"
   }
 };
+const __ZENITH_BASE_PATH__ = normalizeBasePath(
+  typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
+);
 const __ZENITH_ROUTE_EVENT_KEY = "__zenith_route_event_listeners";
 const __ZENITH_ROUTE_EVENT_NAMES = [
   "guard:start",
@@ -50,6 +54,48 @@ const scrollPositions = new Map();
 
 function splitPath(path) {
   return path.split('/').filter(Boolean);
+}
+
+function normalizeBasePath(basePath) {
+  const raw = typeof basePath === "string" ? basePath.trim() : "";
+  if (!raw || raw === "/") return "/";
+  if (!raw.startsWith("/")) return "/";
+  const normalized = raw.replace(/\/{2,}/g, "/").replace(/\/+$/g, "");
+  return normalized || "/";
+}
+
+function normalizePublicPath(pathname) {
+  const raw = typeof pathname === "string" && pathname ? pathname : "/";
+  const withLeadingSlash = raw.startsWith("/") ? raw : "/" + raw;
+  const normalized = withLeadingSlash.replace(/\/{2,}/g, "/");
+  if (normalized.length > 1) {
+    return normalized.replace(/\/+$/g, "");
+  }
+  return normalized;
+}
+
+function prependBasePath(pathname) {
+  const normalizedPath = normalizePublicPath(pathname);
+  if (__ZENITH_BASE_PATH__ === "/") return normalizedPath;
+  if (normalizedPath === "/") return __ZENITH_BASE_PATH__;
+  if (normalizedPath === __ZENITH_BASE_PATH__ || normalizedPath.startsWith(__ZENITH_BASE_PATH__ + "/")) {
+    return normalizedPath;
+  }
+  return __ZENITH_BASE_PATH__ + normalizedPath;
+}
+
+function stripBasePath(pathname) {
+  const normalizedPath = normalizePublicPath(pathname);
+  if (__ZENITH_BASE_PATH__ === "/") return normalizedPath;
+  if (normalizedPath === __ZENITH_BASE_PATH__) return "/";
+  if (normalizedPath.startsWith(__ZENITH_BASE_PATH__ + "/")) {
+    return normalizedPath.slice(__ZENITH_BASE_PATH__.length) || "/";
+  }
+  return null;
+}
+
+function routeCheckPath() {
+  return prependBasePath("/__zenith/route-check");
 }
 
 function copyParams(params) {
@@ -118,11 +164,16 @@ function compareRouteSpecificity(a, b) {
 }
 
 function resolveRoute(pathname) {
-  if (__ZENITH_MANIFEST__.chunks[pathname]) {
-    return { route: pathname, params: {} };
+  const canonicalPathname = stripBasePath(pathname);
+  if (canonicalPathname === null) {
+    return null;
   }
 
-  const pathnameSegments = splitPath(pathname);
+  if (__ZENITH_MANIFEST__.chunks[canonicalPathname]) {
+    return { route: canonicalPathname, params: {} };
+  }
+
+  const pathnameSegments = splitPath(canonicalPathname);
   const routes = Object.keys(__ZENITH_MANIFEST__.chunks).sort(compareRouteSpecificity);
   for (let i = 0; i < routes.length; i++) {
     const route = routes[i];
@@ -619,7 +670,7 @@ async function requestRouteCheck(context, resolved, targetUrl, signal) {
   });
 
   try {
-    const response = await fetch("/__zenith/route-check?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
+    const response = await fetch(routeCheckPath() + "?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
       headers: { "x-zenith-route-check": "1" },
       credentials: "include",
       signal
@@ -919,7 +970,7 @@ function isInternalLink(anchor) {
     return false;
   }
   const url = new URL(anchor.href, window.location.href);
-  return url.origin === window.location.origin;
+  return url.origin === window.location.origin && stripBasePath(url.pathname) !== null;
 }
 
 async function mountInitialRoute() {

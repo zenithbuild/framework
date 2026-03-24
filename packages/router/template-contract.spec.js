@@ -13,6 +13,7 @@ const goldenPath = path.join(__dirname, 'tests', 'fixtures', 'router-template.go
 const manifestJson = JSON.stringify(
     {
         entry: '/assets/runtime.11111111.js',
+        base_path: '/',
         css: '/assets/styles.22222222.css',
         core: '/assets/core.33333333.js',
         router: '/assets/router.44444444.js',
@@ -106,7 +107,14 @@ assert.ok(
     'router template must allow root required catch-all routes to match "/"'
 );
 
-assert.ok(sourceA.includes('fetch("/__zenith/route-check'), 'router template must query route protection fallback');
+assert.ok(
+    sourceA.includes('fetch(routeCheckPath() + "?path="'),
+    'router template must query route protection fallback through the normalized base path helper'
+);
+assert.ok(
+    sourceA.includes('const __ZENITH_BASE_PATH__ = normalizeBasePath('),
+    'router template must derive a normalized base path from the manifest contract'
+);
 assert.equal(
     sourceA.includes('routeId: resolved.route.route_id'),
     false,

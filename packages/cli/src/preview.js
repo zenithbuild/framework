@@ -14,7 +14,8 @@ import { createServer } from 'node:http';
 import { access, readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from './config.js';
+import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from './base-path.js';
+import { isConfigKeyExplicit, loadConfig, validateConfig } from './config.js';
 import { materializeImageMarkup } from './images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from './images/payload.js';
 import { handleImageRequest } from './images/service.js';
@@ -400,9 +401,19 @@ try {
  */
 export async function createPreviewServer(options) {
   const resolvedProjectRoot = options?.projectRoot ? resolve(options.projectRoot) : resolve(options.distDir, '..');
+  const loadedConfig = await loadConfig(resolvedProjectRoot);
   const resolvedConfig = options?.config && typeof options.config === 'object'
-    ? options.config
-    : await loadConfig(resolvedProjectRoot);
+    ? (() => {
+      const overrideConfig = validateConfig(options.config);
+      const mergedConfig = { ...loadedConfig };
+      for (const key of Object.keys(overrideConfig)) {
+        if (isConfigKeyExplicit(overrideConfig, key)) {
+          mergedConfig[key] = overrideConfig[key];
+        }
+      }
+      return mergedConfig;
+    })()
+    : loadedConfig;
   const {
     distDir,
     port = 4000,
@@ -413,6 +424,7 @@ export async function createPreviewServer(options) {
   const config = resolvedConfig;
   const logger = providedLogger || createSilentLogger();
   const verboseLogging = logger.mode?.logLevel === 'verbose';
+  const configuredBasePath = normalizeBasePath(config.basePath || '/');
   let actualPort = port;
 
   async function loadImageManifest() {
@@ -441,9 +453,11 @@ export async function createPreviewServer(options) {
       ? `http://${req.headers.host}`
       : serverOrigin();
     const url = new URL(req.url, requestBase);
+    const { basePath, routes } = await loadRouteManifestState(distDir, configuredBasePath);
+    const canonicalPath = stripBasePath(url.pathname, basePath);
 
     try {
-      if (url.pathname === '/__zenith/route-check') {
+      if (url.pathname === routeCheckPath(basePath)) {
         // Security: Require explicitly designated header to prevent public oracle probing
         if (req.headers['x-zenith-route-check'] !== '1') {
           res.writeHead(403, { 'Content-Type': 'application/json' });
@@ -466,9 +480,15 @@ export async function createPreviewServer(options) {
           res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
           return;
         }
-
-        const routes = await loadRouteManifest(distDir);
-        const resolvedCheck = resolveRequestRoute(targetUrl, routes);
+        const canonicalTargetPath = stripBasePath(targetUrl.pathname, basePath);
+        if (canonicalTargetPath === null) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'route_not_found' }));
+          return;
+        }
+        const canonicalTargetUrl = new URL(targetUrl.toString());
+        canonicalTargetUrl.pathname = canonicalTargetPath;
+        const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, routes);
         if (!resolvedCheck.matched || !resolvedCheck.route) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'route_not_found' }));
@@ -489,15 +509,16 @@ export async function createPreviewServer(options) {
         });
         // Security: Enforce relative or same-origin redirects
         if (checkResult && checkResult.result && checkResult.result.kind === 'redirect') {
-          const loc = String(checkResult.result.location || '/');
+          const loc = appLocalRedirectLocation(checkResult.result.location || '/', basePath);
+          checkResult.result.location = loc;
           if (loc.includes('://') || loc.startsWith('//')) {
             try {
               const parsedLoc = new URL(loc);
               if (parsedLoc.origin !== targetUrl.origin) {
-                checkResult.result.location = '/'; // Fallback to root for open redirect attempt
+                checkResult.result.location = appLocalRedirectLocation('/', basePath);
               }
             } catch {
-              checkResult.result.location = '/';
+              checkResult.result.location = appLocalRedirectLocation('/', basePath);
             }
           }
         }
@@ -517,7 +538,7 @@ export async function createPreviewServer(options) {
         return;
       }
 
-      if (url.pathname === '/_zenith/image') {
+      if (url.pathname === imageEndpointPath(basePath)) {
         await handleImageRequest(req, res, {
           requestUrl: url,
           projectRoot,
@@ -526,8 +547,12 @@ export async function createPreviewServer(options) {
         return;
       }
 
-      if (extname(url.pathname) && extname(url.pathname) !== '.html') {
-        const staticPath = resolveWithinDist(distDir, url.pathname);
+      if (canonicalPath === null) {
+        throw new Error('not found');
+      }
+
+      if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+        const staticPath = resolveWithinDist(distDir, canonicalPath);
         if (!staticPath || !(await fileExists(staticPath))) {
           throw new Error('not found');
         }
@@ -538,8 +563,9 @@ export async function createPreviewServer(options) {
         return;
       }
 
-      const routes = await loadRouteManifest(distDir);
-      const resolved = resolveRequestRoute(url, routes);
+      const canonicalUrl = new URL(url.toString());
+      canonicalUrl.pathname = canonicalPath;
+      const resolved = resolveRequestRoute(canonicalUrl, routes);
       let htmlPath = null;
 
       if (resolved.matched && resolved.route) {
@@ -594,7 +620,7 @@ export async function createPreviewServer(options) {
         if (result && result.kind === 'redirect') {
           const status = Number.isInteger(result.status) ? result.status : 302;
           res.writeHead(status, {
-            Location: result.location,
+            Location: appLocalRedirectLocation(result.location, basePath),
             'Cache-Control': 'no-store'
           });
           res.end('');
@@ -617,9 +643,9 @@ export async function createPreviewServer(options) {
         html = await materializeImageMarkup({
           html,
           pageAssetPath,
-          payload: createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint'),
+          payload: createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath),
           ssrData: ssrPayload,
-          routePathname: resolved.route.path || url.pathname
+          routePathname: url.pathname
         });
       }
       if (ssrPayload) {
@@ -627,7 +653,7 @@ export async function createPreviewServer(options) {
       }
       html = injectImageRuntimePayload(
         html,
-        createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint')
+        createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
       );
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -674,21 +700,32 @@ export async function createPreviewServer(options) {
  * @returns {Promise<PreviewRoute[]>}
  */
 export async function loadRouteManifest(distDir) {
+  const state = await loadRouteManifestState(distDir, '/');
+  return state.routes;
+}
+
+async function loadRouteManifestState(distDir, fallbackBasePath = '/') {
   const manifestPath = join(distDir, 'assets', 'router-manifest.json');
   try {
     const source = await readFile(manifestPath, 'utf8');
     const parsed = JSON.parse(source);
     const routes = Array.isArray(parsed?.routes) ? parsed.routes : [];
-    return routes
-      .filter((entry) =>
+    return {
+      basePath: normalizeBasePath(parsed?.base_path || fallbackBasePath || '/'),
+      routes: routes
+        .filter((entry) =>
         entry &&
         typeof entry === 'object' &&
         typeof entry.path === 'string' &&
         typeof entry.output === 'string'
       )
-      .sort((a, b) => compareRouteSpecificity(a.path, b.path));
+        .sort((a, b) => compareRouteSpecificity(a.path, b.path))
+    };
   } catch {
-    return [];
+    return {
+      basePath: normalizeBasePath(fallbackBasePath || '/'),
+      routes: []
+    };
   }
 }
 

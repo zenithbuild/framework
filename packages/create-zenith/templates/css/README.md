@@ -2,6 +2,9 @@
 
 Multi-page Zenith starter scaffolded from `create-zenith` with a small global CSS setup.
 
+Generated config defaults to `target: 'static'` with `pagesDir: 'src/pages'`.
+`npm run preview` uses Zenith's target-aware preview behavior for the built output.
+
 ## Scripts
 
 ```bash

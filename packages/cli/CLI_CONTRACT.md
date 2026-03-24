@@ -18,9 +18,10 @@ The CLI:
 - Generates deterministic `RouteManifest`
 - Calls the compiler
 - Calls the bundler
-- Writes output to `/dist`
+- Writes canonical output to `/.zenith-output`
+- Adapts output into the selected deployment target under `/dist`
 - Starts dev server
-- Serves static output in preview mode
+- Previews built target output without recompiling
 
 The CLI does **not**:
 - Own navigation, hydration, reactivity, mounting, or diffing
@@ -33,8 +34,8 @@ The CLI does **not**:
 | Command | Behavior |
 |---|---|
 | `zenith dev` | Dev server + HMR + in-memory compilation |
-| `zenith build` | SSG output to `/dist` |
-| `zenith preview` | Static server over `/dist` (no compile, no bundle) |
+| `zenith build` | Canonical build output plus target adaptation under `/dist` |
+| `zenith preview` | Target-aware preview over built output (no compile, no bundle) |
 
 ---
 
@@ -43,6 +44,8 @@ The CLI does **not**:
 ```js
 // zenith.config.js
 export default {
+  target: 'static',
+  basePath: '/',
   router: true  // opt-in only
 }
 ```
@@ -50,11 +53,19 @@ export default {
 | Key | Type | Default | Behavior |
 |---|---|---|---|
 | `router` | `boolean` | `false` | If `true`, CLI injects client router script and uses manifest at runtime |
+| `basePath` | `string` | `'/'` | Prefixes public app URLs, assets, router endpoints, and framework endpoints |
+| `target` | `string` | `'static'` | Selects the deployment adapter and final output layout |
 
 **Router is opt-in only.** If absent or `false`:
 - No router script injected
 - Native MPA navigation
 - No client-side route resolution
+
+**Base path is public URL state only.**
+- Canonical route identities remain base-path free
+- `.zenith-output/manifest.json` carries `base_path`
+- Adapters map public base-path URLs onto canonical emitted output
+- There is no separate `assetPrefix` knob
 
 ---
 
@@ -86,24 +97,19 @@ This keeps the router's first-match-wins predictable.
 
 ---
 
-## 5. SSG Output Structure
+## 5. Output Structure
 
 ```
-dist/
-├── index.html
-├── about/
-│   └── index.html
-├── assets/
-│   ├── [hash].js
-│   └── [hash].css
+.zenith-output/
+├── manifest.json
+├── static/
+└── server/
 ```
 
 **Rules:**
-- Each page produces one HTML file
-- No JS emitted for static-only pages (no expressions)
-- Runtime included only if page contains reactive expressions
-- JS/CSS filenames are content-hashed (bundler rule)
-- Rebuild must produce identical hashes for identical input
+- Canonical build output is written before any adapter packaging
+- Final emitted layout under `dist/` depends on the selected target
+- Rebuild must produce identical output for identical input and config
 
 ---
 
@@ -153,10 +159,12 @@ Each stage is a discrete function call. No implicit chaining.
 
 ## 9. Preview Server Contract
 
-- Serves `/dist` directory only
+- Uses the selected build target contract
 - No compilation
 - No bundling
-- Pure static HTTP server
+- Static targets serve built files
+- `node` boots the built Node artifact
+- Honors `basePath` for public app routes, asset URLs, and framework endpoints
 - Verifies build output is independent of dev mode
 
 ---

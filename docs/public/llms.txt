@@ -37,6 +37,7 @@ Start here (ordered):
   - /docs/guides/using-ai-with-zenith
   - /docs/guides/common-mistakes
   - /docs/guides/cms-unified-site
+  - /docs/guides/deployment-targets
   - /docs/guides/interactive-demos
   - /docs/guides/troubleshooting
 - Contributing:

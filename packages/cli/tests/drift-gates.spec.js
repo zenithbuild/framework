@@ -214,7 +214,7 @@ describe('drift gates', () => {
                 'utf8'
             );
 
-            await build({ pagesDir, outDir, config: { softNavigation: true } });
+            await build({ pagesDir, outDir, config: { router: true } });
 
             const files = collectFiles(outDir, ['.js']);
             const forbiddenHits = scanFiles(

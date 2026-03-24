@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Deterministic project orchestrator for Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -30,11 +30,12 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node ./scripts/copy-framework-components.mjs && node -e \"const fs=require('fs');if(fs.existsSync('dist/index.js')) fs.chmodSync('dist/index.js',0o755)\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:deployment-smoke": "bun run build && node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand tests/adapter-platform-static.spec.js tests/adapter-platform-server.spec.js tests/adapter-platform-node.spec.js tests/server-output-contract.spec.js tests/manifest-contract.spec.js",
     "test": "bun run build && node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.7.1",
+    "@zenithbuild/compiler": "0.7.2",
     "picocolors": "^1.1.1",
     "sharp": "^0.34.4"
   },

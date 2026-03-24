@@ -179,4 +179,42 @@ describe('Phase 0 server routing contract', () => {
         });
         expect(allowedPreview).toEqual(allowedDev);
     });
+
+    test('thrown server errors and implicit empty payloads stay aligned between dev and preview', async () => {
+        project = await makeProject({
+            'broken.zen': [
+                '<script server lang="ts">',
+                'export async function load(ctx) {',
+                '  void ctx;',
+                '  throw new Error("Route exploded");',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Broken</main></body></html>'
+            ].join('\n'),
+            'empty.zen': [
+                '<script server lang="ts">',
+                'const noop = 1;',
+                '</script>',
+                '<html><head></head><body><main>Empty</main></body></html>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        dev = await createDevServer({ pagesDir: project.pagesDir, outDir: project.outDir, port: 0 });
+        preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+
+        const brokenDev = await fetchText(origin(dev.port), '/broken');
+        const brokenPreview = await fetchText(origin(preview.port), '/broken');
+        expect(brokenDev.status).toBe(500);
+        expect(brokenPreview.status).toBe(500);
+        expect(brokenDev.body).toBe('Error: Route exploded');
+        expect(brokenPreview.body).toBe('Error: Route exploded');
+
+        const emptyDev = await fetchText(origin(dev.port), '/empty');
+        const emptyPreview = await fetchText(origin(preview.port), '/empty');
+        expect(emptyDev.status).toBe(200);
+        expect(emptyPreview.status).toBe(200);
+        expect(emptyDev.body).toContain('window.__zenith_ssr_data = {};');
+        expect(emptyPreview.body).toContain('window.__zenith_ssr_data = {};');
+    });
 });

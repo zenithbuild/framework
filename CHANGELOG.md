@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-03-24
+
+### Changed
+
+- Landed the deployment target system as a real framework contract across `static`, `vercel-static`, `netlify-static`, `vercel`, `netlify`, and `node`, with canonical `.zenith-output/manifest.json` and `.zenith-output/server/` layers consumed by adapters instead of host-specific route inference.
+- Hardened the server packaging and runtime contract around packaged `guard` / `load` execution, deterministic SSR payload injection, explicit redirect / deny / error response behavior, and target-aware `zenith preview` semantics.
+- Added deployment smoke coverage to CI, aligned starter templates and deployment docs to the truthful target model, and froze manifest/server contract coverage with dedicated fixture snapshots and platform smoke tests.
+- Added deployment-wide `basePath` support so public app URLs, bundled assets, router navigation, SSR URL reconstruction, `/_zenith/image`, `/__zenith/route-check`, preview, adapters, and the Node runtime now behave consistently under non-root deploy paths.
+- Moved the lockstep framework packages and their internal references from `0.7.1` to `0.7.2`.
+
 ## [0.7.1] - 2026-03-22
 
 ### Changed

@@ -1,3 +1,4 @@
+import { prependBasePath } from '../base-path.js';
 import {
     buildLocalVariantPath,
     buildRemoteVariantPath,
@@ -149,15 +150,27 @@ function buildLocalImageModel(props, payload, source) {
         : true);
     const fallbackWidth = widths.length > 0 ? widths[widths.length - 1] : width;
     const imgSrc = props.unoptimized === true
-        ? source.path
-        : buildLocalVariantPath(source.path, fallbackWidth || width || manifestEntry?.width || 0, quality, fallbackFormat);
+        ? prependBasePath(payload?.basePath || '/', source.path)
+        : buildLocalVariantPath(
+            source.path,
+            fallbackWidth || width || manifestEntry?.width || 0,
+            quality,
+            fallbackFormat,
+            payload?.basePath || '/'
+        );
 
     const sources = props.unoptimized === true
         ? []
         : sourceFormats.map((format) => ({
             type: mimeTypeForFormat(format),
             sizes,
-            srcset: widths.map((candidate) => `${buildLocalVariantPath(source.path, candidate, quality, format)} ${candidate}w`).join(', ')
+            srcset: widths.map((candidate) => `${buildLocalVariantPath(
+                source.path,
+                candidate,
+                quality,
+                format,
+                payload?.basePath || '/'
+            )} ${candidate}w`).join(', ')
         })).filter((entry) => entry.type && entry.srcset);
 
     return {
@@ -194,11 +207,23 @@ function buildRemoteImageModel(props, payload, source) {
     const sources = (config.formats || []).map((format) => ({
         type: mimeTypeForFormat(format),
         sizes,
-        srcset: widths.map((candidate) => `${buildRemoteVariantPath(source.url, candidate, quality, format)} ${candidate}w`).join(', ')
+        srcset: widths.map((candidate) => `${buildRemoteVariantPath(
+            source.url,
+            candidate,
+            quality,
+            format,
+            payload?.basePath || '/'
+        )} ${candidate}w`).join(', ')
     })).filter((entry) => entry.type && entry.srcset);
 
     return {
-        src: buildRemoteVariantPath(source.url, widths[widths.length - 1] || width, quality, ''),
+        src: buildRemoteVariantPath(
+            source.url,
+            widths[widths.length - 1] || width,
+            quality,
+            '',
+            payload?.basePath || '/'
+        ),
         width,
         height,
         sizes,

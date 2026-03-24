@@ -362,6 +362,17 @@
           "source_path": "documentation/guides/cms-unified-site.md"
         },
         {
+          "slug": "guides/deployment-targets",
+          "title": "Deployment Targets Guide",
+          "label": "Deployment Targets Guide",
+          "url": "/docs/guides/deployment-targets",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/guides/deployment-targets.md"
+        },
+        {
           "slug": "guides/interactive-demos",
           "title": "Interactive Demos",
           "label": "Interactive Demos",
@@ -570,6 +581,7 @@
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",
     "/docs/guides/cms-unified-site",
+    "/docs/guides/deployment-targets",
     "/docs/guides/interactive-demos",
     "/docs/guides/troubleshooting",
     "/docs/contributing/drift-gates",

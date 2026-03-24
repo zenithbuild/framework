@@ -244,6 +244,8 @@ struct CompilerSourceSpan {
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RouterManifest {
+    #[serde(default = "root_base_path")]
+    base_path: String,
     routes: Vec<RouterRouteEntry>,
 }
 
@@ -348,6 +350,7 @@ fn resolve_bundler_version() -> String {
 fn run() -> Result<(), String> {
     let cli_options = parse_cli_options()?;
     let out_dir = cli_options.out_dir;
+    let base_path = cli_options.base_path;
     let output_mode = cli_options.output_mode;
     let rebuild_strategy = cli_options.rebuild_strategy;
     let changed_routes = cli_options.changed_routes;
@@ -449,13 +452,13 @@ fn run() -> Result<(), String> {
             meta.filename,
             meta.specifiers.len()
         );
-        let replacement = format!("/assets/{}", meta.filename);
+        let replacement = public_asset_path(&base_path, &format!("assets/{}", meta.filename));
         meta.specifiers
             .iter()
             .map(|s| (s.clone(), replacement.clone()))
             .collect::<BTreeMap<_, _>>()
     } else if fast_path {
-        collect_fast_path_vendor_map(&inputs, output_mode)
+        collect_fast_path_vendor_map(&inputs, output_mode, &base_path)
     } else {
         BTreeMap::new()
     };
@@ -575,7 +578,7 @@ fn run() -> Result<(), String> {
     if !fast_path {
         expected_asset_contents.insert(core_rel.clone(), core_js);
     }
-    let core_import_spec = format!("/{}", core_rel);
+    let core_import_spec = public_asset_path(&base_path, &core_rel);
 
     let component_assets = if fast_path {
         let derived = derive_fast_path_component_assets(&inputs, &changed_routes, output_mode);
@@ -600,6 +603,7 @@ fn run() -> Result<(), String> {
             &runtime_import_spec,
             &module_registry,
             &core_import_spec,
+            &base_path,
             output_mode,
         )?;
         for rel in emitted.values() {
@@ -653,6 +657,7 @@ fn run() -> Result<(), String> {
                 prerender_ssr_data.as_ref(),
                 &global_graph_hash,
                 router_enabled,
+                &base_path,
             )?;
 
             let js_hash = stable_hash_8(&js);
@@ -674,7 +679,7 @@ fn run() -> Result<(), String> {
             output_mode.page_rel(&route_token, "")
         };
 
-        manifest_chunks.insert(input.route.clone(), format!("/{}", js_rel));
+        manifest_chunks.insert(input.route.clone(), public_asset_path(&base_path, &js_rel));
         if input.ir.server_script.is_some() && !input.ir.prerender {
             server_runtime_routes.insert(input.route.clone());
         }
@@ -704,23 +709,24 @@ fn run() -> Result<(), String> {
 
     // 6. Generate Router & Manifest
     let mut router_rel_path = if fast_path && router_enabled {
-        Some(format!("/{}", output_mode.router_rel("")))
+        Some(public_asset_path(&base_path, &output_mode.router_rel("")))
     } else {
         None
     };
-    if let Some(router_path) = &router_rel_path {
-        known_emitted_assets.insert(router_path.trim_start_matches('/').to_string());
+    if fast_path && router_rel_path.is_some() {
+        known_emitted_assets.insert(output_mode.router_rel(""));
     }
     let manifest_hash = compute_manifest_hash(&global_graph_hash, &core_hash, &manifest_chunks);
     if !fast_path {
         let manifest_json_str = {
             let manifest = Manifest {
-                entry: format!("/{}", runtime_rel),
+                entry: public_asset_path(&base_path, &runtime_rel),
+                base_path: base_path.clone(),
                 vendor: vendor_result
                     .as_ref()
-                    .map(|m| format!("/assets/{}", m.filename)),
-                css: format!("/{}", css_rel),
-                core: format!("/{}", core_rel),
+                    .map(|m| public_asset_path(&base_path, &format!("assets/{}", m.filename))),
+                css: public_asset_path(&base_path, &css_rel),
+                core: public_asset_path(&base_path, &core_rel),
                 chunks: manifest_chunks.clone(),
                 server_routes: server_runtime_routes.clone(),
                 hash: manifest_hash.clone(),
@@ -733,8 +739,8 @@ fn run() -> Result<(), String> {
             let rendered_assets =
                 template_bridge::render_assets(&template_bridge::RenderAssetsRequest {
                     manifest_json: manifest_json_str.clone(),
-                    runtime_import: format!("/{}", runtime_rel),
-                    core_import: format!("/{}", core_rel),
+                    runtime_import: public_asset_path(&base_path, &runtime_rel),
+                    core_import: public_asset_path(&base_path, &core_rel),
                 })?;
             let router_source = rendered_assets.router_source;
 
@@ -753,7 +759,7 @@ fn run() -> Result<(), String> {
 
             let router_hash = stable_hash_8(&router_source);
             let r_rel = output_mode.router_rel(&router_hash);
-            router_rel_path = Some(format!("/{}", r_rel));
+            router_rel_path = Some(public_asset_path(&base_path, &r_rel));
             write_file(&emitted_root.join(&r_rel), &router_source, output_mode)?;
             expected_asset_contents.insert(r_rel.clone(), router_source);
             known_emitted_assets.insert(r_rel);
@@ -775,16 +781,17 @@ fn run() -> Result<(), String> {
         }
     }
 
-    verify_emitted_js_imports(&emitted_root, &known_emitted_assets)?;
+    verify_emitted_js_imports(&emitted_root, &known_emitted_assets, &base_path)?;
 
     if !fast_path {
         let final_manifest = Manifest {
-            entry: format!("/{}", runtime_rel),
+            entry: public_asset_path(&base_path, &runtime_rel),
+            base_path: base_path.clone(),
             vendor: vendor_result
                 .as_ref()
-                .map(|m| format!("/assets/{}", m.filename)),
-            css: format!("/{}", css_rel),
-            core: format!("/{}", core_rel),
+                .map(|m| public_asset_path(&base_path, &format!("assets/{}", m.filename))),
+            css: public_asset_path(&base_path, &css_rel),
+            core: public_asset_path(&base_path, &core_rel),
             chunks: manifest_chunks,
             server_routes: server_runtime_routes,
             hash: manifest_hash,
@@ -798,7 +805,10 @@ fn run() -> Result<(), String> {
             output_mode,
         )?;
 
-        let mut router_manifest = RouterManifest::default();
+        let mut router_manifest = RouterManifest {
+            base_path: base_path.clone(),
+            ..RouterManifest::default()
+        };
         for (
             route,
             _html_tpl,
@@ -868,14 +878,15 @@ fn run() -> Result<(), String> {
         {
             continue;
         }
-        let mut html = inject_stylesheet_link_once(&html_tpl, &css_rel, &route)?;
+        let mut html =
+            inject_stylesheet_link_once(&html_tpl, &public_asset_path(&base_path, &css_rel), &route)?;
 
         if let Some(r_path) = &router_rel_path {
             // Router mode: single module entry point in HTML.
             html = inject_script_once(&html, r_path, "data-zx-router");
         } else {
             // Non-router mode: page module is the single module entry point.
-            html = inject_script_once(&html, &format!("/{}", js_rel), "data-zx-page");
+            html = inject_script_once(&html, &public_asset_path(&base_path, &js_rel), "data-zx-page");
         }
 
         let module_script_count = html.matches("<script type=\"module\"").count();
@@ -907,6 +918,7 @@ fn run() -> Result<(), String> {
 #[derive(Debug, Serialize)]
 struct Manifest {
     entry: String,
+    base_path: String,
     vendor: Option<String>,
     router: Option<String>,
     css: String,
@@ -915,6 +927,73 @@ struct Manifest {
     chunks: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "BTreeSet::is_empty")]
     server_routes: BTreeSet<String>,
+}
+
+fn root_base_path() -> String {
+    "/".to_string()
+}
+
+fn normalize_base_path(value: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "/" {
+        return Ok("/".to_string());
+    }
+    if trimmed.contains('?') || trimmed.contains('#') {
+        return Err("invalid value for --base-path: must not include query or hash fragments".to_string());
+    }
+    if !trimmed.starts_with('/') {
+        return Err("invalid value for --base-path: must start with '/'".to_string());
+    }
+    let normalized = Regex::new(r"/{2,}")
+        .map_err(|e| format!("failed to compile base path regex: {e}"))?
+        .replace_all(trimmed, "/")
+        .trim_end_matches('/')
+        .to_string();
+    Ok(if normalized.is_empty() { "/".to_string() } else { normalized })
+}
+
+fn prepend_base_path(base_path: &str, pathname: &str) -> String {
+    let normalized_path = if pathname.is_empty() {
+        "/".to_string()
+    } else if pathname.starts_with('/') {
+        pathname.to_string()
+    } else {
+        format!("/{}", pathname)
+    };
+    if base_path == "/" {
+        return normalized_path;
+    }
+    if normalized_path == "/" {
+        return base_path.to_string();
+    }
+    if normalized_path == base_path || normalized_path.starts_with(&format!("{}/", base_path)) {
+        return normalized_path;
+    }
+    format!("{}{}", base_path, normalized_path)
+}
+
+fn strip_base_path(public_path: &str, base_path: &str) -> String {
+    let normalized = if public_path.is_empty() {
+        "/".to_string()
+    } else if public_path.starts_with('/') {
+        public_path.replace('\\', "/")
+    } else {
+        format!("/{}", public_path.replace('\\', "/"))
+    };
+    if base_path == "/" {
+        return normalized;
+    }
+    if normalized == base_path {
+        return "/".to_string();
+    }
+    if normalized.starts_with(&format!("{}/", base_path)) {
+        return normalized[base_path.len()..].to_string();
+    }
+    normalized
+}
+
+fn public_asset_path(base_path: &str, relative_path: &str) -> String {
+    prepend_base_path(base_path, &format!("/{}", relative_path.trim_start_matches('/')))
 }
 
 struct GlobalGraph {
@@ -997,8 +1076,9 @@ fn is_external_runtime_specifier(spec: &str) -> bool {
 fn collect_fast_path_vendor_map(
     inputs: &[BundlerInput],
     output_mode: OutputMode,
+    base_path: &str,
 ) -> BTreeMap<String, String> {
-    let replacement = format!("/assets/{}", output_mode.vendor_rel(""));
+    let replacement = public_asset_path(base_path, &output_mode.vendor_rel(""));
     let mut out = BTreeMap::new();
 
     for input in inputs {
@@ -1109,6 +1189,7 @@ fn sanitize_route_to_token(route: &str) -> String {
 
 struct BundlerCliOptions {
     out_dir: PathBuf,
+    base_path: String,
     output_mode: OutputMode,
     rebuild_strategy: RebuildStrategy,
     changed_routes: BTreeSet<String>,
@@ -1146,6 +1227,7 @@ impl RebuildStrategy {
 
 fn parse_cli_options() -> Result<BundlerCliOptions, String> {
     let mut out_dir: Option<PathBuf> = None;
+    let mut base_path = "/".to_string();
     let mut dev_stable_assets = false;
     let mut rebuild_strategy = RebuildStrategy::Full;
     let mut changed_routes = BTreeSet::new();
@@ -1160,6 +1242,12 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
                     .next()
                     .ok_or_else(|| "missing value for --out-dir".to_string())?;
                 out_dir = Some(PathBuf::from(value));
+            }
+            "--base-path" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| "missing value for --base-path".to_string())?;
+                base_path = normalize_base_path(&value)?;
             }
             "--dev-stable-assets" => {
                 dev_stable_assets = true;
@@ -1187,7 +1275,7 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
             }
             _ => {
                 return Err(format!(
-                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path> [--dev-stable-assets] [--rebuild-strategy <full|bundle-only|page-only>] [--changed-route <route>] [--fast-path] [--global-graph-hash <sha256>]"
+                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path> [--base-path <path>] [--dev-stable-assets] [--rebuild-strategy <full|bundle-only|page-only>] [--changed-route <route>] [--fast-path] [--global-graph-hash <sha256>]"
                 ));
             }
         }
@@ -1195,6 +1283,7 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
 
     Ok(BundlerCliOptions {
         out_dir: out_dir.ok_or_else(|| "required flag missing: --out-dir <path>".to_string())?,
+        base_path,
         output_mode: OutputMode::from_dev_stable_flag(dev_stable_assets),
         rebuild_strategy,
         changed_routes,
@@ -1516,9 +1605,9 @@ fn inject_script_once(html: &str, script_src: &str, marker_attr: &str) -> String
     format!("{html}{script_tag}")
 }
 
-fn inject_stylesheet_link_once(html: &str, css_rel: &str, route: &str) -> Result<String, String> {
+fn inject_stylesheet_link_once(html: &str, css_href: &str, route: &str) -> Result<String, String> {
     let anchor = "<!-- ZENITH_STYLES_ANCHOR -->";
-    let css_link = format!("<link href=\"/{}\" rel=\"stylesheet\">", css_rel);
+    let css_link = format!("<link href=\"{}\" rel=\"stylesheet\">", css_href);
     let anchor_count = html.matches(anchor).count();
 
     let updated = match anchor_count {
@@ -1568,10 +1657,10 @@ fn inject_stylesheet_link_once(html: &str, css_rel: &str, route: &str) -> Result
             route, stylesheet_count
         ));
     }
-    if updated.matches(&format!("href=\"/{}\"", css_rel)).count() != 1 {
+    if updated.matches(&format!("href=\"{}\"", css_href)).count() != 1 {
         return Err(format!(
             "Route '{}' must contain exactly one stylesheet link for '{}'",
-            route, css_rel
+            route, css_href
         ));
     }
 
@@ -1673,6 +1762,7 @@ fn has_runtime_zen_reference(js: &str) -> bool {
 fn verify_emitted_js_imports(
     out_dir: &PathBuf,
     known_emitted_assets: &BTreeSet<String>,
+    base_path: &str,
 ) -> Result<(), String> {
     for rel in known_emitted_assets
         .iter()
@@ -1724,7 +1814,9 @@ fn verify_emitted_js_imports(
                         )
                     })?
             } else if spec.starts_with('/') {
-                let normalized = spec.trim_start_matches('/').replace('\\', "/");
+                let normalized = strip_base_path(&spec, base_path)
+                    .trim_start_matches('/')
+                    .replace('\\', "/");
                 if known_emitted_assets.contains(&normalized) {
                     continue;
                 }
@@ -2275,6 +2367,7 @@ fn emit_component_assets(
     runtime_import_spec: &str,
     module_registry: &BTreeMap<String, CompilerModule>,
     core_import_spec: &str,
+    base_path: &str,
     output_mode: OutputMode,
 ) -> Result<BTreeMap<String, String>, String> {
     let mut out = BTreeMap::new();
@@ -2346,6 +2439,7 @@ fn emit_component_assets(
                 &mut emitted_helper_assets,
                 &mut vec![component.module_id.clone()],
                 core_import_spec,
+                base_path,
                 output_mode,
             )?;
 
@@ -2402,6 +2496,7 @@ fn emit_component_assets(
                 &mut emitted_helper_assets,
                 &mut vec![component.module_id.clone()],
                 core_import_spec,
+                base_path,
                 output_mode,
             )?;
             let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
@@ -2440,6 +2535,7 @@ fn emit_helper_module_recursive(
     emitted_helper_assets: &mut BTreeMap<String, String>,
     stack: &mut Vec<String>,
     core_import_spec: &str,
+    base_path: &str,
     output_mode: OutputMode,
 ) -> Result<String, String> {
     if let Some(existing) = emitted_helper_assets.get(module_id) {
@@ -2512,11 +2608,12 @@ fn emit_helper_module_recursive(
             emitted_helper_assets,
             stack,
             core_import_spec,
+            base_path,
             output_mode,
         )?;
 
         let dep_rel = helper_asset_rel_path(&dep_id)?;
-        let dep_spec = format!("/{}", dep_rel.replace('\\', "/"));
+        let dep_spec = public_asset_path(base_path, &dep_rel.replace('\\', "/"));
         rewritten_source = rewrite_js_import_specifiers(&rewritten_source, &spec, &dep_spec)?;
     }
     stack.pop();
@@ -3136,6 +3233,7 @@ fn generate_entry_js(
     ssr_data: Option<&serde_json::Value>,
     global_graph_hash: &str,
     router_enabled: bool,
+    base_path: &str,
 ) -> Result<String, String> {
     let compiler_output = CompilerOutput {
         ir_version: ir.ir_version,
@@ -3232,7 +3330,7 @@ fn generate_entry_js(
         expression_bindings_json
     ));
     let (component_imports, components_table) =
-        generate_component_bootstrap_js(ir, component_assets)?;
+        generate_component_bootstrap_js(ir, component_assets, base_path)?;
     if !component_imports.is_empty() {
         js.push_str(&component_imports);
     }
@@ -3575,6 +3673,7 @@ mod tests {
 fn generate_component_bootstrap_js(
     ir: &CompilerIr,
     component_assets: &BTreeMap<String, String>,
+    base_path: &str,
 ) -> Result<(String, String), String> {
     if ir.component_instances.is_empty() {
         return Ok((String::new(), "[]".to_string()));
@@ -3646,7 +3745,7 @@ fn generate_component_bootstrap_js(
                 instance.hoist_id
             )
         })?;
-        let module_json = serde_json::to_string(&format!("/{}", module_rel))
+        let module_json = serde_json::to_string(&public_asset_path(base_path, module_rel))
             .map_err(|e| format!("failed to serialize component module path: {e}"))?;
         let props_json = serde_json::to_string(&instance.props)
             .map_err(|e| format!("failed to serialize component props: {e}"))?;

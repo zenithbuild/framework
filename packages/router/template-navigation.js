@@ -63,7 +63,7 @@ async function requestRouteCheck(context, resolved, targetUrl, signal) {
   });
 
   try {
-    const response = await fetch("/__zenith/route-check?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
+    const response = await fetch(routeCheckPath() + "?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
       headers: { "x-zenith-route-check": "1" },
       credentials: "include",
       signal
@@ -363,7 +363,7 @@ function isInternalLink(anchor) {
     return false;
   }
   const url = new URL(anchor.href, window.location.href);
-  return url.origin === window.location.origin;
+  return url.origin === window.location.origin && stripBasePath(url.pathname) !== null;
 }
 
 async function mountInitialRoute() {

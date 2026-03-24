@@ -1,0 +1,320 @@
+import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
+import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
+import { materializeImageMarkup } from '../images/materialize.js';
+import { allow, data, deny, redirect, resolveRouteResult } from '../server-contract.js';
+
+const MODULE_CACHE = new Map();
+const INTERNAL_QUERY_PREFIX = '__zenith_param_';
+
+function parseCookies(rawCookieHeader) {
+    const out = Object.create(null);
+    const raw = String(rawCookieHeader || '');
+    if (!raw) {
+        return out;
+    }
+    const pairs = raw.split(';');
+    for (const part of pairs) {
+        const eq = part.indexOf('=');
+        if (eq <= 0) {
+            continue;
+        }
+        const key = part.slice(0, eq).trim();
+        if (!key) {
+            continue;
+        }
+        const value = part.slice(eq + 1).trim();
+        try {
+            out[key] = decodeURIComponent(value);
+        } catch {
+            out[key] = value;
+        }
+    }
+    return out;
+}
+
+function escapeInlineJson(payload) {
+    return JSON.stringify(payload)
+        .replace(/</g, '\\u003C')
+        .replace(/>/g, '\\u003E')
+        .replace(/\//g, '\\u002F')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+}
+
+function defaultRouteDenyMessage(status) {
+    if (status === 401) {
+        return 'Unauthorized';
+    }
+    if (status === 403) {
+        return 'Forbidden';
+    }
+    if (status === 404) {
+        return 'Not Found';
+    }
+    return 'Internal Server Error';
+}
+
+function createTextResponse(status, message) {
+    return new Response(message || defaultRouteDenyMessage(status), {
+        status,
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8'
+        }
+    });
+}
+
+function injectSsrPayload(html, payload) {
+    const serialized = escapeInlineJson(payload);
+    const scriptTag = `<script id="zenith-ssr-data">window.__zenith_ssr_data = ${serialized};</script>`;
+    const existingTagRe = /<script\b[^>]*\bid=(["'])zenith-ssr-data\1[^>]*>[\s\S]*?<\/script>/i;
+
+    if (existingTagRe.test(html)) {
+        return html.replace(existingTagRe, scriptTag);
+    }
+    if (/<\/head>/i.test(html)) {
+        return html.replace(/<\/head>/i, `${scriptTag}</head>`);
+    }
+    const bodyOpen = html.match(/<body\b[^>]*>/i);
+    if (bodyOpen) {
+        return html.replace(bodyOpen[0], `${bodyOpen[0]}${scriptTag}`);
+    }
+    return `${scriptTag}${html}`;
+}
+
+function splitRoutePath(routePath) {
+    return String(routePath || '').split('/').filter(Boolean);
+}
+
+export function buildPublicPath(routePath, params = {}, basePath = '/') {
+    const segments = splitRoutePath(routePath);
+    if (segments.length === 0) {
+        return prependBasePath(basePath, '/');
+    }
+
+    const materialized = [];
+    for (const segment of segments) {
+        if (segment.startsWith(':')) {
+            const value = String(params[segment.slice(1)] || '');
+            materialized.push(value);
+            continue;
+        }
+        if (segment.startsWith('*')) {
+            const optional = segment.endsWith('?');
+            const key = optional ? segment.slice(1, -1) : segment.slice(1);
+            const value = String(params[key] || '').trim();
+            if (!value) {
+                continue;
+            }
+            materialized.push(...value.split('/').filter(Boolean));
+            continue;
+        }
+        materialized.push(segment);
+    }
+    return prependBasePath(basePath, `/${materialized.join('/')}`);
+}
+
+export function extractInternalParams(requestUrl, route) {
+    const url = requestUrl instanceof URL ? requestUrl : new URL(String(requestUrl));
+    const params = {};
+    for (const key of route.params || []) {
+        const queryKey = `${INTERNAL_QUERY_PREFIX}${key}`;
+        if (url.searchParams.has(queryKey)) {
+            params[key] = url.searchParams.get(queryKey) || '';
+        }
+    }
+    return params;
+}
+
+function buildPublicUrl(requestUrl, route, params) {
+    const incoming = requestUrl instanceof URL ? requestUrl : new URL(String(requestUrl));
+    const publicUrl = new URL(incoming.toString());
+    publicUrl.pathname = buildPublicPath(route.path, params, normalizeBasePath(route.base_path || '/'));
+
+    const filtered = new URLSearchParams();
+    for (const [key, value] of incoming.searchParams.entries()) {
+        if (key.startsWith(INTERNAL_QUERY_PREFIX)) {
+            continue;
+        }
+        filtered.append(key, value);
+    }
+    publicUrl.search = filtered.toString();
+    return publicUrl;
+}
+
+async function loadImageManifest(imageManifestPath) {
+    if (!imageManifestPath) {
+        return {};
+    }
+    try {
+        return JSON.parse(await readFile(imageManifestPath, 'utf8'));
+    } catch {
+        return {};
+    }
+}
+
+async function loadRouteExports(routeModulePath) {
+    const cacheKey = pathToFileURL(routeModulePath).href;
+    if (MODULE_CACHE.has(cacheKey)) {
+        return MODULE_CACHE.get(cacheKey);
+    }
+    const mod = await import(cacheKey);
+    const value = mod && typeof mod === 'object' ? mod : {};
+    MODULE_CACHE.set(cacheKey, value);
+    return value;
+}
+
+function createRouteContext({ request, route, params, publicUrl }) {
+    const requestHeaders = Object.fromEntries(request.headers.entries());
+    return {
+        params: { ...params },
+        url: publicUrl,
+        headers: { ...requestHeaders },
+        cookies: parseCookies(request.headers.get('cookie') || ''),
+        request,
+        method: request.method,
+        route: {
+            id: route.route_id || route.path,
+            pattern: route.path,
+            file: route.file || route.server_script_path || route.route_id || route.path
+        },
+        env: {},
+        auth: {
+            async getSession() {
+                return null;
+            },
+            async requireSession() {
+                throw redirect('/login', 302);
+            }
+        },
+        allow,
+        redirect,
+        deny,
+        data
+    };
+}
+
+/**
+ * @param {{
+ *   request: Request,
+ *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null },
+ *   params: Record<string, string>,
+ *   routeModulePath: string,
+ *   guardOnly?: boolean
+ * }} options
+ * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, load: string } }>}
+ */
+export async function executeRouteRequest(options) {
+    const {
+        request,
+        route,
+        params,
+        routeModulePath,
+        guardOnly = false
+    } = options;
+
+    const publicUrl = buildPublicUrl(request.url, route, params);
+    const ctx = createRouteContext({ request, route, params, publicUrl });
+    const exports = await loadRouteExports(routeModulePath);
+    const resolved = await resolveRouteResult({
+        exports,
+        ctx,
+        filePath: route.file || route.server_script_path || route.path,
+        guardOnly
+    });
+
+    return {
+        publicUrl,
+        result: resolved.result,
+        trace: resolved.trace
+    };
+}
+
+/**
+ * @param {{
+ *   request: Request,
+ *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null },
+ *   params: Record<string, string>,
+ *   routeModulePath: string,
+ *   shellHtmlPath: string,
+ *   pageAssetPath?: string | null,
+ *   imageManifestPath?: string | null,
+ *   imageConfig?: Record<string, unknown>
+ * }} options
+ * @returns {Promise<Response>}
+ */
+export async function renderRouteRequest(options) {
+    const {
+        request,
+        route,
+        params,
+        routeModulePath,
+        shellHtmlPath,
+        pageAssetPath = null,
+        imageManifestPath = null,
+        imageConfig = {}
+    } = options;
+
+    try {
+        const {
+            publicUrl,
+            result
+        } = await executeRouteRequest({
+            request,
+            route,
+            params,
+            routeModulePath
+        });
+
+        if (result.kind === 'redirect') {
+            return new Response('', {
+                status: Number.isInteger(result.status) ? result.status : 302,
+                headers: {
+                    Location: appLocalRedirectLocation(result.location, route.base_path || '/'),
+                    'Cache-Control': 'no-store'
+                }
+            });
+        }
+
+        if (result.kind === 'deny') {
+            const status = Number.isInteger(result.status) ? result.status : 403;
+            return createTextResponse(status, result.message || defaultRouteDenyMessage(status));
+        }
+
+        const ssrPayload = result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)
+            ? result.data
+            : {};
+
+        const localImages = await loadImageManifest(imageManifestPath);
+        const imagePayload = createImageRuntimePayload(
+            imageConfig,
+            localImages,
+            'passthrough',
+            route.base_path || '/'
+        );
+
+        let html = await readFile(shellHtmlPath, 'utf8');
+        if (pageAssetPath) {
+            html = await materializeImageMarkup({
+                html,
+                pageAssetPath,
+                payload: imagePayload,
+                ssrData: ssrPayload,
+                routePathname: publicUrl.pathname
+            });
+        }
+        html = injectSsrPayload(html, ssrPayload);
+        html = injectImageRuntimePayload(html, imagePayload);
+
+        return new Response(html, {
+            status: 200,
+            headers: {
+                'Content-Type': 'text/html; charset=utf-8'
+            }
+        });
+    } catch (error) {
+        const message = String(error);
+        return createTextResponse(500, message || defaultRouteDenyMessage(500));
+    }
+}

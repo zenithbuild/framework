@@ -1,4 +1,9 @@
-import { resolve } from 'node:path';
+import { mkdir, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
+import { normalizeBasePath } from './base-path.js';
+import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from './base-path-html.js';
+import { writeBuildOutputManifest } from './build-output-manifest.js';
 import { generateManifest } from './manifest.js';
 import { buildComponentRegistry } from './resolve-components.js';
 import {
@@ -12,6 +17,7 @@ import { materializeImageMarkupInHtmlFiles } from './images/materialize.js';
 import { buildImageArtifacts } from './images/service.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
 import { createStartupProfiler } from './startup-profile.js';
+import { writeServerOutput } from './server-output.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
 import {
     createBundlerToolchain,
@@ -54,15 +60,18 @@ export async function build(options) {
     const { pagesDir, outDir, config = {}, logger = null, showBundlerInfo = true } = options;
     const startupProfile = createStartupProfiler('cli-build');
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
+    const coreOutputDir = join(projectRoot, '.zenith-output');
+    const staticOutputDir = join(coreOutputDir, 'static');
     const srcDir = resolve(pagesDir, '..');
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const compilerTotals = createCompilerTotals();
-    const softNavigationEnabled = config.softNavigation === true || config.router === true;
+    const { target, adapter, mode } = resolveBuildAdapter(config);
+    const basePath = normalizeBasePath(config.basePath || '/');
+    const routerEnabled = config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
-        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true
-            || config.experimental?.embeddedMarkupExpressions === true,
+        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true,
         strictDomLints: config.strictDomLints === true
     };
 
@@ -81,11 +90,19 @@ export async function build(options) {
     const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
     void RUNTIME_MARKUP_BINDING;
 
-    const manifest = await startupProfile.measureAsync('generate_manifest', () => generateManifest(pagesDir));
+    const manifest = await startupProfile.measureAsync(
+        'generate_manifest',
+        () => generateManifest(pagesDir, '.zen', { compilerOpts })
+    );
+    if (mode !== 'legacy') {
+        adapter.validateRoutes(manifest);
+    }
     await startupProfile.measureAsync('ensure_zenith_type_declarations', () => ensureZenithTypeDeclarations({
         manifest,
         pagesDir
     }));
+    await startupProfile.measureAsync('reset_core_output', () => rm(coreOutputDir, { recursive: true, force: true }));
+    await startupProfile.measureAsync('prepare_core_output', () => mkdir(staticOutputDir, { recursive: true }));
 
     const emitCompilerWarning = createCompilerWarningEmitter((line) => {
         if (logger && typeof logger.warn === 'function') {
@@ -102,7 +119,7 @@ export async function build(options) {
         registry,
         compilerOpts,
         compilerBin,
-        softNavigationEnabled,
+        routerEnabled,
         startupProfile,
         compilerTotals,
         emitCompilerWarning
@@ -111,36 +128,78 @@ export async function build(options) {
     if (envelopes.length > 0) {
         await startupProfile.measureAsync(
             'run_bundler',
-            () => runBundler(envelopes, outDir, projectRoot, logger, showBundlerInfo, bundlerBin),
+            () => runBundler(
+                envelopes,
+                staticOutputDir,
+                projectRoot,
+                logger,
+                showBundlerInfo,
+                bundlerBin,
+                { basePath }
+            ),
             { envelopes: envelopes.length }
         );
     }
+    await startupProfile.measureAsync(
+        'rewrite_soft_navigation_base_path',
+        () => rewriteSoftNavigationHrefBasePathInHtmlFiles(staticOutputDir, basePath)
+    );
 
     const { manifest: imageManifest } = await startupProfile.measureAsync(
         'build_image_artifacts',
         () => buildImageArtifacts({
             projectRoot,
-            outDir,
+            outDir: staticOutputDir,
             config: config.images
         })
     );
-    const imageRuntimePayload = createImageRuntimePayload(config.images, imageManifest, 'passthrough');
+    const imageRuntimePayload = createImageRuntimePayload(
+        config.images,
+        imageManifest,
+        'passthrough',
+        basePath
+    );
     await startupProfile.measureAsync(
         'materialize_image_markup',
         () => materializeImageMarkupInHtmlFiles({
-            distDir: outDir,
+            distDir: staticOutputDir,
             payload: imageRuntimePayload
         })
     );
     await startupProfile.measureAsync(
         'inject_image_runtime_payload',
-        () => injectImageRuntimePayloadIntoHtmlFiles(outDir, imageRuntimePayload)
+        () => injectImageRuntimePayloadIntoHtmlFiles(staticOutputDir, imageRuntimePayload)
     );
 
+    const buildManifest = await startupProfile.measureAsync(
+        'write_core_manifest',
+        () => writeBuildOutputManifest({
+            coreOutputDir,
+            staticDir: staticOutputDir,
+            target,
+            routeManifest: manifest,
+            basePath
+        })
+    );
+    await startupProfile.measureAsync(
+        'write_server_output',
+        () => writeServerOutput({
+            coreOutputDir,
+            staticDir: staticOutputDir,
+            projectRoot,
+            config,
+            basePath
+        })
+    );
+    await startupProfile.measureAsync(
+        'adapt_output',
+        () => adapter.adapt({ coreOutput: coreOutputDir, outDir, manifest: buildManifest, config })
+    );
     const assets = await startupProfile.measureAsync('collect_assets', () => collectAssets(outDir));
     startupProfile.emit('build_complete', {
         pages: manifest.length,
         assets: assets.length,
+        target,
         compilerTotals,
         expressionRewriteMetrics
     });

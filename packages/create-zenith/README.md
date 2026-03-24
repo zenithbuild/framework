@@ -75,6 +75,29 @@ If you see version mismatches after install, delete `node_modules` and `package-
 - `templates/` is authoritative for scaffolding.
 - `examples/` is demo-only when present and is not part of the scaffold source of truth.
 
+## Deployment Defaults
+
+Generated templates currently ship with this Zenith baseline:
+
+- `pagesDir: 'src/pages'`
+- `target: 'static'`
+- `typescriptDefault: true`
+
+The basic template also keeps `router: false` explicit to preserve the single-page baseline.
+
+Supported deployment targets in the framework today are:
+
+- `static`
+- `vercel-static`
+- `netlify-static`
+- `vercel`
+- `netlify`
+- `node`
+
+`npm run preview` is target-aware. It previews the built target contract for the generated app instead of always acting like a generic static file server.
+
+For the full target matrix, emitted output shapes, and current limitations, see `/Users/judahsullivan/Personal/zenithbuild-monorepo/docs/documentation/guides/deployment-targets.md`.
+
 ## Development
 
 ```bash

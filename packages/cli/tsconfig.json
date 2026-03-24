@@ -13,8 +13,12 @@
     "noImplicitReturns": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "lib": ["ES2022"],
-    "types": ["node"]
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/toolchain-paths.ts",
@@ -26,7 +30,8 @@
     "src/types/generate-routes-dts.js",
     "src/ui/env.ts",
     "src/ui/format.ts",
-    "src/ui/logger.ts"
+    "src/ui/logger.ts",
+    ".zenith/**/*.d.ts"
   ],
   "exclude": [
     "dist",

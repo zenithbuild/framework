@@ -45,6 +45,7 @@ const FORBIDDEN_BUILD_PATTERNS = [
 const TEMPLATE_MATRIX = {
     basic: {
         styleFile: 'src/styles/global.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: false,
         routes: ['/'],
         presentFiles: [
@@ -62,6 +63,7 @@ const TEMPLATE_MATRIX = {
     },
     css: {
         styleFile: 'src/styles/global.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: false,
         routes: ['/', '/about', '/blog', '/docs'],
         presentFiles: [
@@ -76,6 +78,7 @@ const TEMPLATE_MATRIX = {
     },
     tailwind: {
         styleFile: 'src/styles/globals.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: true,
         routes: ['/', '/about', '/blog', '/docs'],
         presentFiles: [
@@ -206,6 +209,8 @@ function assertTemplateShape(projectDir, template) {
     }
 
     const configSource = readFileSync(join(projectDir, 'zenith.config.js'), 'utf8');
+    assert.match(configSource, /pagesDir:\s*['"]src\/pages['"]/);
+    assert.match(configSource, /target:\s*['"]static['"]/);
     if (template === 'basic') {
         assert.match(configSource, /router:\s*false/);
     } else {
@@ -277,7 +282,11 @@ async function assertPreviewPayload(projectDir, template) {
             const html = await response.text();
 
             assert.equal(response.status, 200, `Preview server did not return 200 for "${route}"`);
-            assert.equal((html.match(/id=\"zenith-ssr-data\"/g) || []).length, 1, `Expected exactly one SSR payload script in "${route}"`);
+            assert.equal(
+                (html.match(/id=\"zenith-ssr-data\"/g) || []).length,
+                TEMPLATE_MATRIX[template].expectedSsrPayloadScripts,
+                `Unexpected SSR payload script count in "${route}"`
+            );
 
             for (const pattern of FORBIDDEN_BUILD_PATTERNS) {
                 assert.equal(pattern.test(html), false, `Forbidden build output pattern (${route}): ${pattern}`);

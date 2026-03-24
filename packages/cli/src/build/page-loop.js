@@ -46,7 +46,7 @@ import { extractServerScript } from './server-script.js';
  *   registry: Map<string, string>
  *   compilerOpts: object
  *   compilerBin: string|object
- *   softNavigationEnabled: boolean
+ *   routerEnabled: boolean
  *   startupProfile: ReturnType<import('../startup-profile.js').createStartupProfiler>
  *   compilerTotals: Record<string, number>
  *   emitCompilerWarning: (line: string) => void
@@ -61,7 +61,7 @@ export async function buildPageEnvelopes(input) {
         registry,
         compilerOpts,
         compilerBin,
-        softNavigationEnabled,
+        routerEnabled,
         startupProfile,
         compilerTotals,
         emitCompilerWarning
@@ -296,7 +296,7 @@ export async function buildPageEnvelopes(input) {
             route: entry.path,
             file: sourceFile,
             ir: pageIr,
-            router: softNavigationEnabled
+            router: routerEnabled
         });
         recordPageProfile({
             pageProfiles,

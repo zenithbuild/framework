@@ -15,11 +15,20 @@
 //   - Tie-breaker: lexicographic route path
 // ---------------------------------------------------------------------------
 
+import { readFileSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join, relative, sep, basename, extname, dirname } from 'node:path';
+import { extractServerScript } from './build/server-script.js';
+import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
 
 /**
- * @typedef {{ path: string, file: string }} ManifestEntry
+ * @typedef {{
+ *   path: string,
+ *   file: string,
+ *   path_kind: 'static' | 'dynamic',
+ *   render_mode: 'prerender' | 'server',
+ *   params: string[]
+ * }} ManifestEntry
  */
 
 /**
@@ -27,10 +36,11 @@ import { join, relative, sep, basename, extname, dirname } from 'node:path';
  *
  * @param {string} pagesDir - Absolute path to /pages directory
  * @param {string} [extension='.zen'] - File extension to scan for
+ * @param {{ compilerOpts?: object }} [options]
  * @returns {Promise<ManifestEntry[]>}
  */
-export async function generateManifest(pagesDir, extension = '.zen') {
-    const entries = await _scanDir(pagesDir, pagesDir, extension);
+export async function generateManifest(pagesDir, extension = '.zen', options = {}) {
+    const entries = await _scanDir(pagesDir, pagesDir, extension, options.compilerOpts || {});
 
     // Validate: no repeated param names in any single route
     for (const entry of entries) {
@@ -50,7 +60,7 @@ export async function generateManifest(pagesDir, extension = '.zen') {
  * @param {string} ext - Extension to match
  * @returns {Promise<ManifestEntry[]>}
  */
-async function _scanDir(dir, root, ext) {
+async function _scanDir(dir, root, ext, compilerOpts) {
     /** @type {ManifestEntry[]} */
     const entries = [];
 
@@ -69,15 +79,51 @@ async function _scanDir(dir, root, ext) {
         const info = await stat(fullPath);
 
         if (info.isDirectory()) {
-            const nested = await _scanDir(fullPath, root, ext);
+            const nested = await _scanDir(fullPath, root, ext, compilerOpts);
             entries.push(...nested);
         } else if (item.endsWith(ext)) {
             const routePath = _fileToRoute(fullPath, root, ext);
-            entries.push({ path: routePath, file: relative(root, fullPath) });
+            entries.push(buildManifestEntry({
+                fullPath,
+                root,
+                routePath,
+                compilerOpts
+            }));
         }
     }
 
     return entries;
+}
+
+function buildManifestEntry({ fullPath, root, routePath, compilerOpts }) {
+    const rawSource = readFileSync(fullPath, 'utf8');
+    const inlineServerScript = extractServerScript(rawSource, fullPath, compilerOpts).serverScript;
+    const { guardPath, loadPath } = resolveAdjacentServerModules(fullPath);
+    const composed = composeServerScriptEnvelope({
+        sourceFile: fullPath,
+        inlineServerScript,
+        adjacentGuardPath: guardPath,
+        adjacentLoadPath: loadPath
+    });
+
+    return {
+        path: routePath,
+        file: relative(root, fullPath),
+        path_kind: _isDynamic(routePath) ? 'dynamic' : 'static',
+        render_mode: composed.serverScript && composed.serverScript.prerender !== true ? 'server' : 'prerender',
+        params: extractRouteParams(routePath)
+    };
+}
+
+function extractRouteParams(routePath) {
+    return routePath
+        .split('/')
+        .filter(Boolean)
+        .filter((segment) => segment.startsWith(':') || segment.startsWith('*'))
+        .map((segment) => {
+            const raw = segment.slice(1);
+            return raw.endsWith('?') ? raw.slice(0, -1) : raw;
+        });
 }
 
 /**

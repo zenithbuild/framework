@@ -277,11 +277,10 @@ export function createDevBuildSession(options) {
     const srcDir = resolve(resolvedPagesDir, '..');
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
-    const softNavigationEnabled = config.softNavigation === true || config.router === true;
+    const routerEnabled = config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
-        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true
-            || config.experimental?.embeddedMarkupExpressions === true,
+        experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true,
         strictDomLints: config.strictDomLints === true
     };
 
@@ -377,7 +376,7 @@ export function createDevBuildSession(options) {
             registry: state.registry,
             compilerOpts,
             compilerBin,
-            softNavigationEnabled,
+            routerEnabled,
             startupProfile,
             compilerTotals,
             emitCompilerWarning,
@@ -439,7 +438,7 @@ export function createDevBuildSession(options) {
             registry: state.registry,
             compilerOpts,
             compilerBin,
-            softNavigationEnabled,
+            routerEnabled,
             startupProfile,
             compilerTotals,
             emitCompilerWarning,
