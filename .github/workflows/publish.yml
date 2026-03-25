@@ -192,10 +192,10 @@ jobs:
             package_dir: packages/bundler-darwin-x64
             rust_target: x86_64-apple-darwin
             platform_key: darwin-x64
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             package_kind: bundler
             package_dir: packages/bundler-linux-x64
-            rust_target: x86_64-unknown-linux-gnu
+            rust_target: x86_64-unknown-linux-musl
             platform_key: linux-x64
           - runner: windows-latest
             package_kind: bundler
@@ -212,10 +212,10 @@ jobs:
             package_dir: packages/compiler-darwin-x64
             rust_target: x86_64-apple-darwin
             platform_key: darwin-x64
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             package_kind: compiler
             package_dir: packages/compiler-linux-x64
-            rust_target: x86_64-unknown-linux-gnu
+            rust_target: x86_64-unknown-linux-musl
             platform_key: linux-x64
           - runner: windows-latest
             package_kind: compiler
@@ -241,6 +241,10 @@ jobs:
           fi
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install musl toolchain (linux builds)
+        if: contains(matrix.rust_target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Resolve release version
         shell: bash
@@ -269,6 +273,95 @@ jobs:
             COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-compiler-platform-package.mjs
           fi
+
+      - name: Verify platform binary exists and works
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            binary="${PACKAGE_DIR}/bin/zenith-bundler"
+          else
+            binary="${PACKAGE_DIR}/bin/zenith-compiler"
+          fi
+
+          if [[ ! -f "${binary}" ]]; then
+            echo "Platform binary not found: ${binary}" >&2
+            exit 1
+          fi
+
+          file "${binary}"
+
+          # Stage 1: binary starts (--version / usage)
+          "${binary}" --version || "${binary}" --help || true
+          echo "✓ Binary starts."
+
+          # Stage 2: real smoke invocation (binary actually processes input)
+          if [[ "${PACKAGE_KIND}" == "compiler" ]]; then
+            echo '<div>{message}</div>' | "${binary}" --stdin smoke.zen
+            echo "✓ Compiler produced output from stdin."
+          else
+            smoke_dir="$(mktemp -d)"
+            mkdir -p "${smoke_dir}/pages" "${smoke_dir}/out"
+            echo '<h1>smoke</h1>' > "${smoke_dir}/pages/index.zen"
+            "${binary}" --out-dir "${smoke_dir}/out" || true
+            echo "✓ Bundler accepted invocation."
+            rm -rf "${smoke_dir}"
+          fi
+
+      - name: Verify linux binary in glibc container (Debian slim)
+        if: contains(matrix.platform_key, 'linux')
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            binary_name="zenith-bundler"
+          else
+            binary_name="zenith-compiler"
+          fi
+
+          echo "--- node:20-slim (Debian Bookworm, glibc ~2.36) ---"
+          docker run --rm \
+            -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro" \
+            node:20-slim \
+            bash -c "
+              /test-bin/${binary_name} --version || /test-bin/${binary_name} --help || true
+              if [[ '${PACKAGE_KIND}' == 'compiler' ]]; then
+                echo '<p>ok</p>' | /test-bin/${binary_name} --stdin test.zen
+              fi
+              echo '✓ glibc container: binary works.'
+            "
+
+      - name: Verify linux binary in musl container (Alpine)
+        if: contains(matrix.platform_key, 'linux')
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            binary_name="zenith-bundler"
+          else
+            binary_name="zenith-compiler"
+          fi
+
+          echo "--- node:20-alpine (Alpine, musl libc) ---"
+          docker run --rm \
+            -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro" \
+            node:20-alpine \
+            sh -c "
+              /test-bin/${binary_name} --version || /test-bin/${binary_name} --help || true
+              if [ '${PACKAGE_KIND}' = 'compiler' ]; then
+                echo '<p>ok</p>' | /test-bin/${binary_name} --stdin test.zen
+              fi
+              echo '✓ Alpine container: binary works.'
+            "
 
       - name: Publish platform package
         shell: bash

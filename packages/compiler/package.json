@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/compiler",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -22,16 +22,19 @@
     "url": "https://github.com/zenithbuild/framework/issues"
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "private": false,
   "scripts": {
     "build": "rm -rf dist && bun build meta/index.ts --outdir dist --target node --format esm && node ../../scripts/stage-compiler-platform-package.mjs",
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@zenithbuild/compiler-darwin-arm64": "0.7.2",
-    "@zenithbuild/compiler-darwin-x64": "0.7.2",
-    "@zenithbuild/compiler-linux-x64": "0.7.2",
-    "@zenithbuild/compiler-win32-x64": "0.7.2"
+    "@zenithbuild/compiler-darwin-arm64": "0.7.3",
+    "@zenithbuild/compiler-darwin-x64": "0.7.3",
+    "@zenithbuild/compiler-linux-x64": "0.7.3",
+    "@zenithbuild/compiler-win32-x64": "0.7.3"
   },
   "devDependencies": {
     "@types/node": "latest",

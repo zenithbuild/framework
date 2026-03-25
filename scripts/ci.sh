@@ -12,8 +12,16 @@ bun run --cwd packages/cli typecheck
 bun run --cwd packages/language-server typecheck
 bun run --cwd packages/language typecheck
 
-bun run --cwd packages/cli test:deployment-smoke
-bun run --cwd packages/cli test
+# Pin workspace binaries for deployment smoke and CLI tests.
+# Without this, toolchain-paths.ts may resolve stale npm-installed binaries
+# instead of the freshly built workspace ones.
+# Inline (not exported) so toolchain-cross-os tests still exercise normal resolution.
+ZENITH_COMPILER_BIN="$ROOT/packages/compiler/target/release/zenith-compiler" \
+ZENITH_BUNDLER_BIN="$ROOT/packages/bundler/target/release/zenith-bundler" \
+  bun run --cwd packages/cli test:deployment-smoke
+ZENITH_COMPILER_BIN="$ROOT/packages/compiler/target/release/zenith-compiler" \
+ZENITH_BUNDLER_BIN="$ROOT/packages/bundler/target/release/zenith-bundler" \
+  bun run --cwd packages/cli test
 bun run --cwd packages/core test
 bun run --cwd packages/runtime test
 bun run --cwd packages/router test

@@ -19,6 +19,12 @@ describe('cli package surface', () => {
         expect(readFileSync(join(DIST_ROOT, 'index.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
     });
 
+    test('dependencies include @zenithbuild/bundler for platform binary transit', () => {
+        const deps = PACKAGE_JSON.dependencies || {};
+        expect(deps).toHaveProperty('@zenithbuild/compiler');
+        expect(deps).toHaveProperty('@zenithbuild/bundler');
+    });
+
     test('tarball excludes src files', () => {
         const result = spawnSync('npm', ['pack', '--dry-run', '--json', '.'], {
             cwd: PACKAGE_ROOT,
