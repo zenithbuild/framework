@@ -136,6 +136,7 @@ jobs:
       - name: Run Integration Shard ${{ matrix.shard_index }}/6 (retry once)
         shell: bash
         env:
+          ZENITH_CI_PREPARE: 1
           ZENITH_CI_SHARD_INDEX: ${{ matrix.shard_index }}
           ZENITH_CI_SHARD_TOTAL: 6
         run: |
