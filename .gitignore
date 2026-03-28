@@ -4,6 +4,7 @@ dist/
 coverage/
 target/
 .zenith/
+.zenith-output/
 playwright-report/
 test-results/
 *.log

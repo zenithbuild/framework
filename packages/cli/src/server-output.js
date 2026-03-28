@@ -34,6 +34,10 @@ const SERVER_RUNTIME_FILES = [
     {
         from: new URL('./images/runtime.js', import.meta.url),
         to: 'images/runtime.js'
+    },
+    {
+        from: new URL('./server-error.js', import.meta.url),
+        to: 'server-error.js'
     }
 ];
 
