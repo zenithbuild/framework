@@ -285,8 +285,12 @@ describe('drift gates', () => {
             resolve(REPO_ROOT, 'packages/runtime/src/hydrate.js'),
             'utf8'
         );
+        const expressionsSource = readFileSync(
+            resolve(REPO_ROOT, 'packages/runtime/src/expressions.js'),
+            'utf8'
+        );
         expect(hydrateSource).not.toContain('__ZENITH_INTERNAL_ZENHTML');
-        expect(hydrateSource).toContain('fragment: _fragment');
+        expect(expressionsSource).toContain('fragment: _fragment');
 
         const buildSource = readFileSync(
             resolve(REPO_ROOT, 'packages/cli/src/build/page-ir-normalization.js'),
