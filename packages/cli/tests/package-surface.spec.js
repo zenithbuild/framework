@@ -12,6 +12,12 @@ describe('cli package surface', () => {
         expect(Object.keys(PACKAGE_JSON.exports || {})).toEqual(['.']);
     });
 
+    test('package manifest preserves zenith bin target', () => {
+        expect(PACKAGE_JSON.bin).toEqual({
+            zenith: './dist/index.js'
+        });
+    });
+
     test('build emits dist entry JS and declarations', () => {
         expect(existsSync(join(DIST_ROOT, 'index.js'))).toBe(true);
         expect(existsSync(join(DIST_ROOT, 'index.d.ts'))).toBe(true);

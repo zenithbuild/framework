@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import { buildComponentRegistry } from './resolve-components.js';
+import { normalizeBasePath } from './base-path.js';
 import {
     collectAssets,
     createCompilerWarningEmitter,
@@ -13,7 +14,8 @@ import { createPageLoopCaches } from './build/page-loop-state.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
 import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
 import { buildImageArtifacts } from './images/service.js';
-import { createImageRuntimePayload } from './images/payload.js';
+import { materializeImageMarkupInHtmlFiles } from './images/materialize.js';
+import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
@@ -281,6 +283,7 @@ export function createDevBuildSession(options) {
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const routerEnabled = config.router === true;
     const { target } = resolveBuildAdapter(config);
+    const basePath = normalizeBasePath(config.basePath || '/');
     const routeCheckEnabled = supportsTargetRouteCheck(target);
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
@@ -301,7 +304,7 @@ export function createDevBuildSession(options) {
         pageLoopCaches: createPageLoopCaches(),
         hasSuccessfulBuild: false,
         imageManifest: {},
-        imageRuntimePayload: createImageRuntimePayload(config.images, {}, 'endpoint')
+        imageRuntimePayload: createImageRuntimePayload(config.images, {}, 'passthrough', basePath)
     };
 
     async function syncImageState(startupProfile) {
@@ -314,7 +317,18 @@ export function createDevBuildSession(options) {
             })
         );
         state.imageManifest = manifest;
-        state.imageRuntimePayload = createImageRuntimePayload(config.images, manifest, 'endpoint');
+        state.imageRuntimePayload = createImageRuntimePayload(config.images, manifest, 'passthrough', basePath);
+        await startupProfile.measureAsync(
+            'materialize_image_markup',
+            () => materializeImageMarkupInHtmlFiles({
+                distDir: outDir,
+                payload: state.imageRuntimePayload
+            })
+        );
+        await startupProfile.measureAsync(
+            'inject_image_runtime_payload',
+            () => injectImageRuntimePayloadIntoHtmlFiles(outDir, state.imageRuntimePayload)
+        );
     }
 
     async function runBundlerWithCachedEnvelopes(

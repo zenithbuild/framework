@@ -1,7 +1,7 @@
-// PHASE COMPONENT PROPS — props payload shape lock.
+// PHASE COMPONENT PROPS — props prelude shape lock.
 // Contract focus:
-// - component instance props are serialized as an array payload.
-// - static and signal props preserve deterministic, explicit descriptors.
+// - component instance props are serialized as an object prelude.
+// - static and signal props preserve deterministic, explicit bindings.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -27,14 +27,14 @@ function pageAssetFromHtml(html) {
 }
 
 describe('Phase component props', () => {
-  test('emits array-based props descriptors for component instances', async () => {
+  test('emits object-based props prelude for component instances', async () => {
     const root = await createTempProject('zenith-phase-component-props');
     try {
       await scaffoldZenithProject(root, {
         router: false,
         pages: {
-          'index.zen': `<script>
-import Card from './components/Card.zen'
+          'index.zen': `<script lang="ts">
+import Card from '../components/Card.zen'
 const count = signal(0)
 </script>
 <main><Card label="Clicks" count={count}></Card></main>`
@@ -42,10 +42,15 @@ const count = signal(0)
       });
 
       await writeText(
-        path.join(root, 'pages', 'components', 'Card.zen'),
-        `<script>
-const label = __props.label
-const count = __props.count
+        path.join(root, 'components', 'Card.zen'),
+        `<script lang="ts">
+interface CardProps {
+  label?: string
+  count?: unknown
+}
+const incoming = props as CardProps
+const label = incoming.label
+const count = incoming.count
 </script>
 <article><p>{label}</p><p>{count}</p></article>
 `
@@ -60,18 +65,10 @@ const count = __props.count
       expect(pageAsset).not.toBeNull();
 
       const pageSource = await fs.readFile(path.join(distDir, pageAsset), 'utf8');
-      const propsMatch = pageSource.match(/props:(\[[^\]]*\])/);
+      const propsMatch = pageSource.match(/var props = \{[^}]*label: "Clicks"[^}]*count: [A-Za-z0-9_]+[^}]*\};/);
       expect(propsMatch).not.toBeNull();
-
-      const propsTable = JSON.parse(propsMatch[1]);
-      expect(Array.isArray(propsTable)).toBe(true);
-      expect(propsTable.length).toBe(2);
-
-      const byName = new Map(propsTable.map((entry) => [entry.name, entry]));
-      expect(byName.get('label')?.type).toBe('static');
-      expect(byName.get('label')?.value).toBe('Clicks');
-      expect(byName.get('count')?.type).toBe('signal');
-      expect(byName.get('count')?.index).toBe(0);
+      expect(propsMatch[0].includes('count: count')).toBe(false);
+      expect(/[A-Za-z0-9_]*components_Card_zen_script0_[a-f0-9]+/.test(pageSource)).toBe(true);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

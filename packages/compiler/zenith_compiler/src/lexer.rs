@@ -460,6 +460,38 @@ impl<'a> Lexer<'a> {
         );
     }
 
+    fn upcoming_matches_ascii_case_insensitive(&self, pattern: &str) -> bool {
+        let mut chars = self.chars.clone();
+        for expected in pattern.chars() {
+            let Some(actual) = chars.next() else {
+                return false;
+            };
+            if !actual.eq_ignore_ascii_case(&expected) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn lex_raw_text_until_close_tag(&mut self, tag_name: &str) -> String {
+        let started_at = self.profile_enabled.then(Instant::now);
+        let close_tag = format!("</{}>", tag_name);
+        let mut content = String::new();
+
+        while let Some(&c) = self.peek() {
+            if c == '<' && self.upcoming_matches_ascii_case_insensitive(&close_tag) {
+                break;
+            }
+            content.push(self.advance().unwrap());
+        }
+
+        if let Some(started_at) = started_at {
+            self.profile_metrics.lex_text_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        content
+    }
+
     pub fn profile_metrics(&self) -> LexerProfileMetrics {
         self.profile_metrics.clone()
     }

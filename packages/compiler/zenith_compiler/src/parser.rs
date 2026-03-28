@@ -260,7 +260,11 @@ impl<'a> Parser<'a> {
 
         self.expect(Token::Gt); // Eat '>'
 
-        let children = self.parse_children(&tag_name);
+        let children = if tag_name.eq_ignore_ascii_case("style") {
+            self.parse_raw_text_children(&tag_name)
+        } else {
+            self.parse_children(&tag_name)
+        };
 
         let node = Node::Element(ElementNode {
             tag: tag_name,
@@ -481,6 +485,57 @@ impl<'a> Parser<'a> {
         parsed_children
     }
 
+    fn parse_raw_text_children(&mut self, parent_tag: &str) -> Vec<Node> {
+        let mut raw = String::new();
+        loop {
+            match &self.current_token {
+                Token::Lt => break,
+                Token::Text(text) => {
+                    raw.push_str(text);
+                    self.advance();
+                }
+                Token::LBrace => {
+                    raw.push('{');
+                    let value = self.lexer.lex_expression_content();
+                    raw.push_str(&value);
+                    raw.push('}');
+                    self.sync_current_token();
+                }
+                Token::RBrace => {
+                    raw.push('}');
+                    self.advance();
+                }
+                Token::EOF => panic!("Unexpected EOF while parsing raw text children of <{}>", parent_tag),
+                _ => panic!(
+                    "Unexpected token while parsing raw text children of <{}>: {:?}",
+                    parent_tag, self.current_token
+                ),
+            }
+        }
+        let mut children = Vec::new();
+        if !raw.is_empty() {
+            children.push(Node::Text(raw));
+        }
+        self.parse_closing_tag(parent_tag);
+        children
+    }
+
+    fn parse_closing_tag(&mut self, parent_tag: &str) {
+        self.expect(Token::Lt);
+        match &self.current_token {
+            Token::Text(value) if value == "/" => self.advance(),
+            _ => panic!("Expected closing tag for <{}>, found {:?}", parent_tag, self.current_token),
+        }
+        match &self.current_token {
+            Token::Identifier(name) if name.eq_ignore_ascii_case(parent_tag) => self.advance(),
+            Token::Identifier(name) => {
+                panic!("Mismatched closing tag: expected </{}>, found </{}>", parent_tag, name)
+            }
+            _ => panic!("Expected closing tag name, found {:?}", self.current_token),
+        }
+        self.expect(Token::Gt);
+    }
+
     fn parse_element_tail(&mut self) -> Node {
         let started_at = self.profile_enabled.then(Instant::now);
         // Assumes '<' is already consumed.
@@ -504,7 +559,11 @@ impl<'a> Parser<'a> {
 
         self.expect(Token::Gt); // Eat '>'
 
-        let children = self.parse_children(&tag_name);
+        let children = if tag_name.eq_ignore_ascii_case("style") {
+            self.parse_raw_text_children(&tag_name)
+        } else {
+            self.parse_children(&tag_name)
+        };
 
         let node = Node::Element(ElementNode {
             tag: tag_name,

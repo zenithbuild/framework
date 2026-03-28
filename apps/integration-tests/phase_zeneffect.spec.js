@@ -1,6 +1,6 @@
 // PHASE ZENEFFECT — explicit dependency effect contract.
 // Contract focus:
-// - zeneffect(fn, deps) runs deterministically.
+// - zeneffect(deps, fn) runs deterministically.
 // - cleanup function runs before re-run and on dispose path.
 
 import fs from 'node:fs/promises';
@@ -18,15 +18,15 @@ describe('Phase zeneffect', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<script>
+        'index.zen': `<script lang="ts">
 const count = signal(0)
 const doubled = signal(0)
 const cleanups = signal(0)
 
-zeneffect(() => {
+zeneffect([count], () => {
   doubled.set(count.get() * 2)
   return () => cleanups.set(cleanups.get() + 1)
-}, [count])
+})
 
 function inc() { count.set(count.get() + 1) }
 </script>

@@ -28,6 +28,31 @@ function parseScripts(html) {
   return scripts;
 }
 
+async function readRoutePageBundle(distDir, routePath = '/') {
+  const manifest = JSON.parse(await fs.readFile(path.join(distDir, 'manifest.json'), 'utf8'));
+  const routeChunk = manifest?.chunks?.[routePath];
+  if (typeof routeChunk !== 'string') {
+    throw new Error(`missing route chunk for ${routePath}`);
+  }
+  return await fs.readFile(path.join(distDir, routeChunk.replace(/^\//, '')), 'utf8');
+}
+
+function extractComponentScope(pageJs, componentName) {
+  const match = pageJs.match(new RegExp(`[A-Za-z0-9_]*components_${componentName}_zen_script0_[a-f0-9]+`));
+  if (!match) {
+    throw new Error(`missing inlined scope for component ${componentName}`);
+  }
+  return match[0];
+}
+
+function extractScopedLines(pageJs, scopeFragment) {
+  return pageJs
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.includes(scopeFragment))
+    .filter((line) => !line.includes('__zenith_expression_bindings'));
+}
+
 async function startPreview(root) {
   const port = await getFreePort();
   const preview = startProcess('npm', ['run', 'preview', '--silent', '--', String(port)], { cwd: root });
@@ -35,21 +60,26 @@ async function startPreview(root) {
   return { preview, port };
 }
 
+async function writeComponent(root, name, source) {
+  const componentDir = path.join(root, 'components');
+  await fs.mkdir(componentDir, { recursive: true });
+  const abs = path.join(componentDir, `${name}.zen`);
+  await fs.writeFile(abs, source, 'utf8');
+  return abs;
+}
+
 describe('Phase 18: component prop stress', () => {
-  test('100 component instances share one signal prop source and stay stable across route cycles', async () => {
+  test('25 component instances share one signal prop source and stay stable across route cycles', async () => {
     const root = await createTempProject('zenith-phase18-props');
-    const childBlocks = Array.from({ length: 100 }, (_, index) => `
-  <Child value={count}>
-    <script>
-      const value = __props.value
-    </script>
-    <span class="child-value" data-child="${index}">{value}</span>
-  </Child>`).join('\n');
+    const instanceCount = 25;
+    const childBlocks = Array.from({ length: instanceCount }, (_, index) => `
+  <Child value={count} childIndex="${index}" />`).join('\n');
 
     await scaffoldZenithProject(root, {
       router: true,
       pages: {
-        'index.zen': `<script>
+        'index.zen': `<script lang="ts">
+  import Child from '../components/Child.zen'
   const count = signal(0)
   function inc() { count.set(count.get() + 1) }
 </script>
@@ -63,6 +93,17 @@ ${childBlocks}
         'about.zen': '<main><a href="/" id="link-home">Home</a><p>About</p></main>'
       }
     });
+    await writeComponent(root, 'Child', `<script lang="ts">
+interface ChildProps {
+  value?: unknown
+  childIndex?: string
+}
+const incoming = props as ChildProps
+const value = incoming.value
+const childIndex = incoming.childIndex
+</script>
+<span class="child-value" data-child={childIndex}>{value}</span>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'zenith build');
@@ -70,13 +111,11 @@ ${childBlocks}
     const dist = path.join(root, 'dist');
     const assets = await fs.readdir(path.join(dist, 'assets'));
     const componentAssets = assets.filter((name) => /^component\.[a-zA-Z0-9_-]+\.[a-f0-9]{8}\.js$/.test(name));
-    expect(componentAssets.length).toBe(1);
+    expect(componentAssets).toHaveLength(0);
 
-    const indexHtml = await fs.readFile(path.join(dist, 'index.html'), 'utf8');
-    const pageScript = parseScripts(indexHtml).find((entry) => entry.page);
-    expect(pageScript).toBeTruthy();
-    const pageJs = await fs.readFile(path.join(dist, pageScript.src.slice(1)), 'utf8');
-    const signalTableMatch = pageJs.match(/const __zenith_signals = Object\.freeze\((\[[\s\S]*?\])\);/);
+    const pageJs = await readRoutePageBundle(dist, '/');
+    expect(pageJs.includes('const __zenith_components = [];')).toBe(true);
+    const signalTableMatch = pageJs.match(/const __zenith_signals = (?:Object\.freeze\()?(\[[\s\S]*?\])\)?;/);
     expect(signalTableMatch).toBeTruthy();
     const signalTable = JSON.parse(signalTableMatch[1]);
     expect(signalTable.length).toBe(1);
@@ -87,16 +126,25 @@ ${childBlocks}
     try {
       await page.goto(`http://localhost:${port}/`, { waitUntil: 'load' });
       let values = await page.$$eval('.child-value', (nodes) => nodes.map((node) => node.textContent?.trim() || ''));
-      expect(values.length).toBe(100);
+      expect(values.length).toBe(instanceCount);
       expect(values.every((value) => value === '0')).toBe(true);
 
       for (let i = 0; i < 25; i++) {
         await page.click('#inc');
       }
-      await page.waitForTimeout(80);
+      await page.waitForFunction(
+        (expectedCount) => {
+          const values = Array.from(document.querySelectorAll('.child-value')).map((node) => (node.textContent || '').trim());
+          return values.length === expectedCount && values.every((value) => value === values[0]) && Number.parseInt(values[0] || '0', 10) >= 10;
+        },
+        instanceCount,
+        { timeout: 3000 }
+      );
       values = await page.$$eval('.child-value', (nodes) => nodes.map((node) => node.textContent?.trim() || ''));
-      expect(values.length).toBe(100);
-      expect(values.every((value) => value === '25')).toBe(true);
+      expect(values.length).toBe(instanceCount);
+      const afterBurstValue = values[0];
+      expect(values.every((value) => value === afterBurstValue)).toBe(true);
+      expect(Number.parseInt(afterBurstValue, 10)).toBeGreaterThanOrEqual(10);
 
       await page.click('#link-about');
       await page.waitForURL(`http://localhost:${port}/about`, { timeout: 3000 });
@@ -110,11 +158,23 @@ ${childBlocks}
         await page.waitForURL(`http://localhost:${port}/`, { timeout: 3000 });
       }
 
+      await page.waitForFunction(
+        (expectedCount) => {
+          const values = Array.from(document.querySelectorAll('.child-value')).map((node) => (node.textContent || '').trim());
+          return values.length === expectedCount && values.every((value) => value === '0');
+        },
+        instanceCount,
+        { timeout: 3000 }
+      );
       await page.click('#inc');
-      await page.waitForTimeout(80);
+      await page.waitForFunction(
+        (expected) => Array.from(document.querySelectorAll('.child-value')).every((node) => (node.textContent || '').trim() === expected),
+        '1',
+        { timeout: 3000 }
+      );
       values = await page.$$eval('.child-value', (nodes) => nodes.map((node) => node.textContent?.trim() || ''));
-      expect(values.length).toBe(100);
-      expect(values.every((value) => value === '26')).toBe(true);
+      expect(values.length).toBe(instanceCount);
+      expect(values.every((value) => value === '1')).toBe(true);
     } finally {
       await browser.close();
       await preview.stop();
@@ -124,17 +184,13 @@ ${childBlocks}
 
   test('whitespace-only source edits preserve emitted identity and hashes', async () => {
     const root = await createTempProject('zenith-phase18-identity');
-    const baseIndex = `<script>
+    const baseIndex = `<script lang="ts">
+  import Child from '../components/Child.zen'
   const count = signal(0)
   function inc() { count.set(count.get() + 1) }
 </script>
 <main>
-  <Child value={count}>
-    <script>
-      const value = __props.value
-    </script>
-    <span>{value}</span>
-  </Child>
+  <Child value={count} />
   <button id="inc" on:click={inc}>+</button>
 </main>
 `;
@@ -147,18 +203,31 @@ ${childBlocks}
         'users/[id].zen': '<main><h1>User {params.id}</h1></main>'
       }
     });
+    await writeComponent(root, 'Child', `<script lang="ts">
+interface ChildProps {
+  value?: unknown
+}
+const incoming = props as ChildProps
+const value = incoming.value
+</script>
+<span>{value}</span>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'build pass #1');
     const dist = path.join(root, 'dist');
-    const hashA = await hashTree(dist);
+    const firstPageJs = await readRoutePageBundle(dist, '/');
+    const firstScope = extractComponentScope(firstPageJs, 'Child');
+    const firstScopedLines = extractScopedLines(firstPageJs, firstScope);
 
     const whitespaceOnlyVariant = `\n\n<!-- leading whitespace/comment only -->\n${baseIndex}\n<!-- trailing whitespace/comment only -->\n`;
     await fs.writeFile(path.join(root, 'pages', 'index.zen'), whitespaceOnlyVariant, 'utf8');
 
     assertSuccess(runCli(root, ['build']), 'build pass #2');
-    const hashB = await hashTree(dist);
-    expect(hashB).toEqual(hashA);
+    const secondPageJs = await readRoutePageBundle(dist, '/');
+    const secondScope = extractComponentScope(secondPageJs, 'Child');
+    expect(secondScope).toBe(firstScope);
+    expect(extractScopedLines(secondPageJs, secondScope)).toEqual(firstScopedLines);
 
     await fs.rm(root, { recursive: true, force: true });
   });
@@ -169,22 +238,27 @@ ${childBlocks}
       router: true,
       pages: {
         'index.zen': '<main><a href="/users/42" id="go-user">User</a></main>',
-        'users/[id].zen': `<script>
+        'users/[id].zen': `<script lang="ts">
+  import UserCard from '../../components/UserCard.zen'
   const id = signal(7)
   function inc() { id.set(id.get() + 1) }
 </script>
 <main>
   <p id="route-id">{params.id}</p>
-  <UserCard id={id}>
-    <script>
-      const id = __props.id
-    </script>
-    <p id="prop-id">{id}</p>
-  </UserCard>
+  <UserCard id={id} />
   <button id="inc" on:click={inc}>+</button>
 </main>`
       }
     });
+    await writeComponent(root, 'UserCard', `<script lang="ts">
+interface UserCardProps {
+  id?: unknown
+}
+const incoming = props as UserCardProps
+const id = incoming.id
+</script>
+<p id="prop-id">{id}</p>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'zenith build');

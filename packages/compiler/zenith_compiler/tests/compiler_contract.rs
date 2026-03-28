@@ -111,3 +111,15 @@ fn compile_structured_per_file_isolation() {
     assert_eq!(a.expressions, vec!["x"]);
     assert_eq!(b.expressions, vec!["y"]);
 }
+
+#[test]
+fn compile_structured_preserves_style_text_without_expression_markers() {
+    let input = r#"<main><style>main{display:block;}</style><h1>{title}</h1></main>"#;
+
+    let structured = compile_structured_ok(input);
+    let full = compile(input);
+
+    assert!(structured.html.contains("<style>main{display:block;}</style>"));
+    assert_eq!(structured.expressions, vec!["title"]);
+    assert!(!full.contains("\"main\" + (display)"));
+}

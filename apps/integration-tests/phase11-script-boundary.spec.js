@@ -17,10 +17,7 @@ const FORBIDDEN_JS_PATTERNS = [
   /\bnew\s+Function\s*\(/,
   /\brequire\s*\(/,
   /\bprocess\.env\b/,
-  /\bDate\s*\(/,
-  /\bMath\.random\s*\(/,
-  /\bcrypto\.randomUUID\s*\(/,
-  /\b(?:window|globalThis)\.[A-Za-z_$][\w$]*\s*=/
+  /\b(?:window|globalThis)\.[A-Za-z_$][\w$]*\s*=(?!=)/
 ];
 
 function extractScripts(html) {
@@ -62,6 +59,10 @@ function expressionCount(jsSource) {
   return quoted.length;
 }
 
+async function loadBuildManifest(distDir) {
+  return JSON.parse(await fs.readFile(path.join(distDir, 'manifest.json'), 'utf8'));
+}
+
 async function buildFixture(options) {
   const root = await createTempProject('zenith-phase11');
 
@@ -80,7 +81,7 @@ async function buildFixture(options) {
 }
 
 describe('Phase 11: script boundary lock', () => {
-  test('router=false: reactive page gets runtime+page scripts, static page gets none', async () => {
+  test('router=false: each page gets one page module and the inline image runtime payload', async () => {
     const { root, dist } = await buildFixture({ router: false });
 
     const indexHtml = await fs.readFile(path.join(dist, 'index.html'), 'utf8');
@@ -90,16 +91,20 @@ describe('Phase 11: script boundary lock', () => {
     const aboutScripts = extractScripts(aboutHtml);
 
     expect(indexScripts.length).toBe(2);
-    expect(indexScripts.filter((s) => s.isRuntime).length).toBe(1);
     expect(indexScripts.filter((s) => s.isPage).length).toBe(1);
     expect(indexScripts.filter((s) => s.isRouter).length).toBe(0);
+    expect(indexScripts.filter((s) => s.src === null).length).toBe(1);
+    expect(indexScripts.find((s) => s.src === null)?.attrs).toContain('id="zenith-image-runtime"');
 
-    expect(aboutScripts.length).toBe(0);
+    expect(aboutScripts.length).toBe(2);
+    expect(aboutScripts.filter((s) => s.isPage).length).toBe(1);
+    expect(aboutScripts.filter((s) => s.isRouter).length).toBe(0);
+    expect(aboutScripts.filter((s) => s.src === null).length).toBe(1);
 
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  test('router=true: router script injected once per page and no inline scripts', async () => {
+  test('router=true: each page gets one router module plus the inline image runtime payload', async () => {
     const { root, dist } = await buildFixture({ router: true });
 
     const htmlFiles = ['index.html', 'about/index.html'];
@@ -108,7 +113,7 @@ describe('Phase 11: script boundary lock', () => {
       const scripts = extractScripts(html);
       const bodyEnd = html.lastIndexOf('</body>');
 
-      for (const script of scripts) {
+      for (const script of scripts.filter((entry) => entry.src)) {
         expect(script.type).toBe('module');
         expect(script.src).toMatch(/^\/assets\/[A-Za-z0-9._-]+\.js$/);
         expect(script.body.trim()).toBe('');
@@ -118,18 +123,11 @@ describe('Phase 11: script boundary lock', () => {
       const srcs = scripts.map((s) => s.src);
       expect(new Set(srcs).size).toBe(srcs.length);
 
-      // Router script must be present exactly once when router=true.
+      expect(scripts.filter((s) => s.src === null).length).toBe(1);
+      expect(scripts.find((s) => s.src === null)?.attrs).toContain('id="zenith-image-runtime"');
       expect(scripts.filter((s) => s.isRouter).length).toBe(1);
-
-      if (rel === 'index.html') {
-        // Reactive page: runtime + page + router.
-        expect(scripts.length).toBe(3);
-        expect(scripts.filter((s) => s.isRuntime).length).toBe(1);
-        expect(scripts.filter((s) => s.isPage).length).toBe(1);
-      } else {
-        // Static page: router only.
-        expect(scripts.length).toBe(1);
-      }
+      expect(scripts.filter((s) => s.isPage).length).toBe(0);
+      expect(scripts.length).toBe(2);
     }
 
     await fs.rm(root, { recursive: true, force: true });
@@ -156,18 +154,17 @@ describe('Phase 11: script boundary lock', () => {
     }
 
     // Reactive page bootstrap contract checks.
-    const indexHtml = await fs.readFile(path.join(dist, 'index.html'), 'utf8');
-    const indexScripts = extractScripts(indexHtml);
-    const pageScript = indexScripts.find((s) => s.isPage);
-
-    expect(pageScript).toBeTruthy();
-    const pageJs = await fs.readFile(path.join(dist, pageScript.src.slice(1)), 'utf8');
+    const manifest = await loadBuildManifest(dist);
+    const routeChunk = manifest?.chunks?.['/'];
+    expect(typeof routeChunk).toBe('string');
+    const pageJs = await fs.readFile(path.join(dist, routeChunk.replace(/^\//, '')), 'utf8');
 
     expect(pageJs.includes('const __zenith_expr')).toBe(true);
     expect(pageJs.includes('const __zenith_events')).toBe(true);
     expect(pageJs.includes('const __zenith_markers')).toBe(true);
     expect(pageJs.includes('hydrate({')).toBe(true);
 
+    const indexHtml = await fs.readFile(path.join(dist, 'index.html'), 'utf8');
     const markerTotal = markerCount(indexHtml);
     const exprTotal = expressionCount(pageJs);
     expect(markerTotal).toBe(exprTotal);

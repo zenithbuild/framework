@@ -11,20 +11,6 @@ import { assertSuccess } from './helpers/process.js';
 
 jest.setTimeout(120000);
 
-function pageAssetFromHtml(html) {
-  const tags = [...html.matchAll(/<script\b[^>]*>/gi)].map((match) => match[0]);
-  for (const tag of tags) {
-    if (!/\bdata-zx-page\b/i.test(tag)) {
-      continue;
-    }
-    const src = tag.match(/\bsrc="([^"]+)"/i);
-    if (src) {
-      return src[1].replace(/^\//, '');
-    }
-  }
-  return null;
-}
-
 describe('Phase server-script prerender', () => {
   test('embeds prerendered ssr_data and marks route metadata', async () => {
     const root = await createTempProject('zenith-phase-prerender');
@@ -32,7 +18,7 @@ describe('Phase server-script prerender', () => {
       await scaffoldZenithProject(root, {
         router: true,
         pages: {
-          'index.zen': `<script server>
+          'index.zen': `<script server lang="ts">
 export const prerender = true
 export const ssr = { user: { name: 'Ada' } }
 </script>
@@ -44,8 +30,12 @@ export const ssr = { user: { name: 'Ada' } }
       assertSuccess(runCli(root, ['build']), 'zenith build');
 
       const distDir = path.join(root, 'dist');
-      const indexHtml = await fs.readFile(path.join(distDir, 'index.html'), 'utf8');
-      const pageAsset = pageAssetFromHtml(indexHtml);
+      const buildManifest = JSON.parse(
+        await fs.readFile(path.join(distDir, 'manifest.json'), 'utf8')
+      );
+      const pageAsset = typeof buildManifest?.chunks?.['/'] === 'string'
+        ? buildManifest.chunks['/'].replace(/^\//, '')
+        : null;
       expect(pageAsset).not.toBeNull();
 
       const pageSource = await fs.readFile(path.join(distDir, pageAsset), 'utf8');

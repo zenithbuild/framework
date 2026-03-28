@@ -119,19 +119,46 @@ export function createExplicitDependencyEffect(effect, dependencies, scope) {
         throw new Error('[Zenith Runtime] zeneffect(deps, fn) requires a function');
     }
 
+    let disposed = false;
+    const runCleanups = [];
+
+    function registerCleanup(cleanup) {
+        if (typeof cleanup !== 'function') {
+            throw new Error('[Zenith Runtime] cleanup(fn) requires a function');
+        }
+        runCleanups.push(cleanup);
+    }
+
+    function runEffectNow() {
+        if (disposed || !scope || scope.disposed) {
+            return;
+        }
+
+        drainCleanupStack(runCleanups);
+        const result = effect(createEffectContext(registerCleanup));
+        applyCleanupResult(result, registerCleanup);
+    }
+
     const unsubscribers = dependencies.map((dep, index) => {
         if (!dep || typeof dep.subscribe !== 'function') {
             throw new Error(`[Zenith Runtime] zeneffect dependency at index ${index} must expose subscribe(fn)`);
         }
 
         return dep.subscribe(() => {
-            effect();
+            if (scope?.mountReady === true) {
+                runEffectNow();
+                return;
+            }
+            queueWhenScopeReady(scope, runEffectNow);
         });
     });
 
-    effect();
+    if (scope?.mountReady === true) {
+        runEffectNow();
+    } else {
+        queueWhenScopeReady(scope, runEffectNow);
+    }
 
-    let disposed = false;
     const dispose = () => {
         if (disposed) {
             return;
@@ -140,6 +167,7 @@ export function createExplicitDependencyEffect(effect, dependencies, scope) {
         for (let i = 0; i < unsubscribers.length; i++) {
             unsubscribers[i]();
         }
+        drainCleanupStack(runCleanups);
     };
 
     registerScopeDisposer(scope, dispose);

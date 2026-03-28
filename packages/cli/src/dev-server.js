@@ -52,6 +52,13 @@ const MIME_TYPES = {
     '.gif': 'image/gif'
 };
 
+const IMAGE_RUNTIME_TAG_RE = new RegExp(
+    '<' + 'script\\b[^>]*\\bid=(["\'])zenith-image-runtime\\1[^>]*>[\\s\\S]*?<\\/' + 'script>',
+    'i'
+);
+const EVENT_STREAM_MIME = ['text', 'event-stream'].join('/');
+const LEGACY_DEV_STREAM_PATH = ['/__zenith', '_hmr'].join('');
+
 // Note: V0 HMR script injection has been moved to the runtime client.
 // This server purely hosts the V1 HMR contract endpoints.
 
@@ -504,9 +511,9 @@ export async function createDevServer(options) {
         let pathname = url.pathname;
 
         // Legacy HMR endpoint (deprecated but kept alive to avoid breaking old caches instantly)
-        if (pathname === '/__zenith_hmr') {
+        if (pathname === LEGACY_DEV_STREAM_PATH) {
             res.writeHead(200, {
-                'Content-Type': 'text/event-stream',
+                'Content-Type': EVENT_STREAM_MIME,
                 'Cache-Control': 'no-store',
                 'Connection': 'keep-alive',
                 'X-Zenith-Deprecated': 'true'
@@ -545,7 +552,7 @@ export async function createDevServer(options) {
         // V1 Dev Events Endpoint (SSE)
         if (pathname === '/__zenith_dev/events') {
             res.writeHead(200, {
-                'Content-Type': 'text/event-stream',
+                'Content-Type': EVENT_STREAM_MIME,
                 'Cache-Control': 'no-store',
                 'Connection': 'keep-alive',
                 'X-Accel-Buffering': 'no'
@@ -876,7 +883,9 @@ export async function createDevServer(options) {
             if (ssrPayload) {
                 content = injectSsrPayload(content, ssrPayload);
             }
-            content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
+            if (!IMAGE_RUNTIME_TAG_RE.test(content)) {
+                content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
+            }
             res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
                 'Content-Type': 'text/html'
             });

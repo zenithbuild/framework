@@ -1,5 +1,5 @@
-// PHASE 13 — Component script hoisting + compile-time factory contract.
-// Component scripts must compile into deterministic component modules.
+// PHASE 13 — Component script hoisting + compile-time inlining contract.
+// Imported component scripts must inline into deterministic page bundles.
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -42,57 +42,68 @@ async function listComponentAssets(distDir) {
   const assetsDir = path.join(distDir, 'assets');
   const entries = await fs.readdir(assetsDir);
   return entries
-    .filter((name) => /^component\.[a-zA-Z0-9_-]+\.[a-f0-9]{8}\.js$/.test(name))
+    .filter((name) => /^components_[A-Za-z0-9_]+\.[a-f0-9]{8}\.js$/.test(name))
     .sort((a, b) => a.localeCompare(b));
 }
 
+function hasInlinedComponentScope(pageJs, componentName) {
+  return new RegExp(`[A-Za-z0-9_]*components_${componentName}_zen_script0_[a-f0-9]+`).test(pageJs);
+}
+
+async function writeComponent(root, name, source) {
+  const componentDir = path.join(root, 'components');
+  await fs.mkdir(componentDir, { recursive: true });
+  const abs = path.join(componentDir, `${name}.zen`);
+  await fs.writeFile(abs, source, 'utf8');
+  return abs;
+}
+
 describe('Phase 13: component script hoisting', () => {
-  test('compiler emits components_scripts and bundler emits deterministic component factory module', async () => {
+  test('build inlines imported component scripts into the deterministic page bundle', async () => {
     const root = await createTempProject('zenith-phase13');
 
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<main>
-  <Card>
-    <script>
-      const count = signal(0)
-      function inc() {
-        count.set(count.get() + 1)
-      }
-    </script>
-    <button on:click={inc}>{count}</button>
-  </Card>
+        'index.zen': `<script lang="ts">
+import Card from '../components/Card.zen'
+</script>
+<main>
+  <Card />
 </main>`
       }
     });
+    const cardPath = await writeComponent(root, 'Card', `<script lang="ts">
+const count = signal(0)
+function inc() {
+  count.set(count.get() + 1)
+}
+</script>
+<button on:click={inc}>{count}</button>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
 
-    const compilerResult = runCompilerBinary(path.join(root, 'pages', 'index.zen'));
-    assertSuccess(compilerResult, 'compiler');
-    const ir = JSON.parse(compilerResult.stdout);
-    expect(Object.keys(ir.components_scripts).length).toBeGreaterThan(0);
-    expect(Array.isArray(ir.component_instances)).toBe(true);
-    expect(ir.component_instances.length).toBeGreaterThan(0);
+    const compilerResult = runCompilerBinary(cardPath);
+    assertSuccess(compilerResult, 'component compiler');
+    const componentIr = JSON.parse(compilerResult.stdout);
+    expect(componentIr.diagnostics).toEqual([]);
+    expect(componentIr.warnings).toEqual([]);
+    expect(componentIr.html.includes('<script')).toBe(false);
 
     assertSuccess(runCli(root, ['build']), 'zenith build');
     const distDir = path.join(root, 'dist');
 
     const pageJs = await readPageBundle(distDir);
     expect((pageJs.match(/hydrate\s*\(\s*\{/g) || []).length).toBe(1);
-    expect(pageJs.includes('const __zenith_components = [')).toBe(true);
+    expect(pageJs.includes('const __zenith_component_bootstraps = [];')).toBe(true);
+    expect(pageJs.includes('const __zenith_components = [];')).toBe(true);
+    expect(hasInlinedComponentScope(pageJs, 'Card')).toBe(true);
+    expect(pageJs.includes('signal(0)')).toBe(true);
+    expect(pageJs.includes('@zenithbuild/')).toBe(false);
 
     const componentAssets = await listComponentAssets(distDir);
-    expect(componentAssets.length).toBeGreaterThan(0);
-
-    const componentSource = await fs.readFile(path.join(distDir, 'assets', componentAssets[0]), 'utf8');
-    expect(componentSource.includes('export function createComponent_')).toBe(true);
-    expect(componentSource.includes('bindings: Object.freeze({')).toBe(true);
-
-    expect(componentSource.includes('__component_instance')).toBe(false);
-    expect(componentSource.includes('mountComponent(')).toBe(false);
-    expect(componentSource.includes('onMount(')).toBe(false);
+    expect(componentAssets).toHaveLength(0);
 
     await fs.rm(root, { recursive: true, force: true });
   });
@@ -103,17 +114,20 @@ describe('Phase 13: component script hoisting', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<main>
-  <Card>
-    <script>
-      const count = signal(0)
-      function inc() { count.set(count.get() + 1) }
-    </script>
-    <button on:click={inc}>{count}</button>
-  </Card>
+        'index.zen': `<script lang="ts">
+import Card from '../components/Card.zen'
+</script>
+<main>
+  <Card />
 </main>`
       }
     });
+    await writeComponent(root, 'Card', `<script lang="ts">
+const count = signal(0)
+function inc() { count.set(count.get() + 1) }
+</script>
+<button on:click={inc}>{count}</button>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'build pass #1');
@@ -127,10 +141,10 @@ describe('Phase 13: component script hoisting', () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  test('identical component scripts across pages are deduped into one component asset', async () => {
+  test('identical component scripts across pages stay inlined without runtime component assets', async () => {
     const root = await createTempProject('zenith-phase13-dedupe');
 
-    const sameScript = `<script>
+    const sameComponent = `<script lang="ts">
   const count = signal(0)
   function inc() { count.set(count.get() + 1) }
 </script>
@@ -139,16 +153,32 @@ describe('Phase 13: component script hoisting', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<main><Card>${sameScript}</Card></main>`,
-        'about.zen': `<main><Card>${sameScript}</Card></main>`
+        'index.zen': `<script lang="ts">
+import CardA from '../components/CardA.zen'
+</script>
+<main><CardA /></main>`,
+        'about.zen': `<script lang="ts">
+import CardB from '../components/CardB.zen'
+</script>
+<main><CardB /></main>`
       }
     });
+    await writeComponent(root, 'CardA', sameComponent);
+    await writeComponent(root, 'CardB', sameComponent);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'zenith build');
 
-    const componentAssets = await listComponentAssets(path.join(root, 'dist'));
-    expect(componentAssets.length).toBe(1);
+    const distDir = path.join(root, 'dist');
+    const componentAssets = await listComponentAssets(distDir);
+    expect(componentAssets).toHaveLength(0);
+
+    const indexJs = await readPageBundle(distDir, 'index.html');
+    const aboutJs = await readPageBundle(distDir, 'about/index.html');
+    expect(hasInlinedComponentScope(indexJs, 'CardA')).toBe(true);
+    expect(hasInlinedComponentScope(aboutJs, 'CardB')).toBe(true);
+    expect(indexJs.includes('const __zenith_components = [];')).toBe(true);
+    expect(aboutJs.includes('const __zenith_components = [];')).toBe(true);
 
     await fs.rm(root, { recursive: true, force: true });
   });
@@ -159,21 +189,29 @@ describe('Phase 13: component script hoisting', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<script>
+        'index.zen': `<script lang="ts">
+  import Card from '../components/Card.zen'
   const count = signal(0)
 </script>
 <main>
-  <Card label="Clicks" count={count}>
-    <script>
-      const label = __props.label
-      const count = __props.count
-    </script>
-    <p>{label}</p>
-    <p>{count}</p>
-  </Card>
+  <Card label="Clicks" count={count} />
 </main>`
       }
     });
+    await writeComponent(root, 'Card', `<script lang="ts">
+interface CardProps {
+  label?: string
+  count?: unknown
+}
+const incoming = props as CardProps
+const label = incoming.label
+const count = incoming.count
+</script>
+<article>
+  <p>{label}</p>
+  <p>{count}</p>
+</article>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'build pass #1');
@@ -183,9 +221,10 @@ describe('Phase 13: component script hoisting', () => {
     expect(second).toEqual(first);
 
     const pageJs = await readPageBundle(path.join(root, 'dist'));
-    expect(pageJs).toMatch(
-      /props:\[\{"name":"count","type":"signal","index":0\},\{"name":"label","type":"static","value":"Clicks"\}\]/
-    );
+    const propsPrelude = pageJs.match(/var props = \{[^}]*label: "Clicks"[^}]*count: [A-Za-z0-9_]+[^}]*\};/);
+    expect(propsPrelude).not.toBeNull();
+    expect(propsPrelude[0].includes('count: count')).toBe(false);
+    expect(hasInlinedComponentScope(pageJs, 'Card')).toBe(true);
 
     await fs.rm(root, { recursive: true, force: true });
   });
@@ -196,23 +235,31 @@ describe('Phase 13: component script hoisting', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': `<script>
+        'index.zen': `<script lang="ts">
+  import Card from '../components/Card.zen'
   const count = signal(0)
   function inc() { count.set(count.get() + 1) }
 </script>
 <main>
-  <Card label="Clicks" count={count}>
-    <script>
-      const label = __props.label
-      const count = __props.count
-    </script>
-    <p id="label">{label}</p>
-    <p id="value">{count}</p>
-  </Card>
+  <Card label="Clicks" count={count} />
   <button id="inc" on:click={inc}>+</button>
 </main>`
       }
     });
+    await writeComponent(root, 'Card', `<script lang="ts">
+interface CardProps {
+  label?: string
+  count?: unknown
+}
+const incoming = props as CardProps
+const label = incoming.label
+const count = incoming.count
+</script>
+<article>
+  <p id="label">{label}</p>
+  <p id="value">{count}</p>
+</article>
+`);
 
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'zenith build');

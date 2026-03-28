@@ -5,6 +5,9 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "bin": {
+    "zenith": "./dist/index.js"
+  },
   "exports": {
     ".": "./dist/index.js"
   },

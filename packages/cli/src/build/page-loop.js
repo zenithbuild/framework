@@ -20,6 +20,7 @@ import {
     rewriteLegacyMarkupIdentifiers,
     rewriteRefBindingIdentifiers
 } from './page-ir-normalization.js';
+import { deferComponentRuntimeBlock } from './hoisted-code-transforms.js';
 import {
     addBreakdown,
     emitPageLoopSummary,
@@ -273,6 +274,11 @@ export async function buildPageEnvelopes(input) {
         const normalizeStartedAt = performance.now();
         normalizeExpressionPayload(pageIr);
         normalizeHoistedSourcePayload(pageIr);
+        if (Array.isArray(pageIr?.hoisted?.code) && pageIr.hoisted.code.length > 0) {
+            pageIr.hoisted.code = pageIr.hoisted.code
+                .map((entry) => deferComponentRuntimeBlock(entry, hoistedCodeTransformCache, expressionRewriteMetrics))
+                .filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
+        }
         rewriteLegacyMarkupIdentifiers(pageIr);
         rewriteRefBindingIdentifiers(pageIr, knownRefKeys);
         pagePhase.normalizeMs = startupProfile.roundMs(performance.now() - normalizeStartedAt);

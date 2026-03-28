@@ -91,7 +91,7 @@ export function hydrate(payload) {
             ...markerState
         });
 
-        _bindSignalSubscriptions(expressions, signalMap, renderMarkerByIndex);
+        _bindSignalSubscriptions(expressions, signalMap, stateValues, renderMarkerByIndex);
         _bindComponentSignalSubscriptions(expressions, componentBindings, renderMarkerByIndex);
 
         bindEventMarkers({
@@ -317,24 +317,47 @@ function _renderMarker(context) {
     _applyMarkerValue(nodes, marker, value);
 }
 
-function _bindSignalSubscriptions(expressions, signalMap, renderMarkerByIndex) {
+function _isSignalLike(candidate) {
+    return Boolean(candidate)
+        && typeof candidate === 'object'
+        && typeof candidate.get === 'function'
+        && typeof candidate.subscribe === 'function';
+}
+
+function _recordSignalMarkerDependency(dependentMarkersBySignal, signalValue, markerIndex) {
+    if (!_isSignalLike(signalValue)) {
+        return;
+    }
+    if (!dependentMarkersBySignal.has(signalValue)) {
+        dependentMarkersBySignal.set(signalValue, []);
+    }
+    dependentMarkersBySignal.get(signalValue).push(markerIndex);
+}
+
+function _bindSignalSubscriptions(expressions, signalMap, stateValues, renderMarkerByIndex) {
     const dependentMarkersBySignal = new Map();
     for (let i = 0; i < expressions.length; i++) {
-        const signalIndices = _resolveExpressionSignalIndices(expressions[i]);
+        const expression = expressions[i];
+        const signalIndices = _resolveExpressionSignalIndices(expression);
         for (let j = 0; j < signalIndices.length; j++) {
             const signalIndex = signalIndices[j];
-            if (!dependentMarkersBySignal.has(signalIndex)) {
-                dependentMarkersBySignal.set(signalIndex, []);
+            const targetSignal = signalMap.get(signalIndex);
+            if (!targetSignal) {
+                throw new Error(`[Zenith Runtime] expression references unknown signal id ${signalIndex}`);
             }
-            dependentMarkersBySignal.get(signalIndex).push(expressions[i].marker_index);
+            _recordSignalMarkerDependency(dependentMarkersBySignal, targetSignal, expression.marker_index);
+        }
+
+        if (Number.isInteger(expression?.state_index)) {
+            _recordSignalMarkerDependency(
+                dependentMarkersBySignal,
+                stateValues[expression.state_index],
+                expression.marker_index
+            );
         }
     }
 
-    for (const [signalId, markerIndexes] of dependentMarkersBySignal.entries()) {
-        const targetSignal = signalMap.get(signalId);
-        if (!targetSignal) {
-            throw new Error(`[Zenith Runtime] expression references unknown signal id ${signalId}`);
-        }
+    for (const [targetSignal, markerIndexes] of dependentMarkersBySignal.entries()) {
         const unsubscribe = targetSignal.subscribe(() => {
             for (let i = 0; i < markerIndexes.length; i++) {
                 renderMarkerByIndex(markerIndexes[i]);

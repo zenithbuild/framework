@@ -16,7 +16,7 @@ import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from './base-path.js';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
-import { isConfigKeyExplicit, loadConfig, validateConfig } from './config.js';
+import { isConfigKeyExplicit, isLoadedConfig, loadConfig, validateConfig } from './config.js';
 import { materializeImageMarkup } from './images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from './images/payload.js';
 import { handleImageRequest } from './images/service.js';
@@ -46,6 +46,8 @@ const MIME_TYPES = {
   '.avif': 'image/avif',
   '.gif': 'image/gif'
 };
+
+const IMAGE_RUNTIME_TAG_RE = /<script\b[^>]*\bid=(["'])zenith-image-runtime\1[^>]*>[\s\S]*?<\/script>/i;
 
 const SERVER_SCRIPT_RUNNER = String.raw`
 import vm from 'node:vm';
@@ -426,7 +428,9 @@ export async function createPreviewServer(options) {
   const loadedConfig = await loadConfig(resolvedProjectRoot);
   const resolvedConfig = options?.config && typeof options.config === 'object'
     ? (() => {
-      const overrideConfig = validateConfig(options.config);
+      const overrideConfig = isLoadedConfig(options.config)
+        ? options.config
+        : validateConfig(options.config);
       const mergedConfig = { ...loadedConfig };
       for (const key of Object.keys(overrideConfig)) {
         if (isConfigKeyExplicit(overrideConfig, key)) {
@@ -677,10 +681,12 @@ export async function createPreviewServer(options) {
       if (ssrPayload) {
         html = injectSsrPayload(html, ssrPayload);
       }
-      html = injectImageRuntimePayload(
-        html,
-        createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
-      );
+      if (!IMAGE_RUNTIME_TAG_RE.test(html)) {
+        html = injectImageRuntimePayload(
+          html,
+          createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
+        );
+      }
 
       res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
         'Content-Type': 'text/html'

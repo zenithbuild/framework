@@ -1969,7 +1969,7 @@ const moduleSource = `${source}\nexport default {` +
   `props: typeof props === 'undefined' ? undefined : props,` +
   `ssr: typeof ssr === 'undefined' ? undefined : ssr,` +
   `prerender: typeof prerender === 'undefined' ? undefined : prerender` +
-  `});`;
+  `};`;
 const context = vm.createContext({
   params: { ...params },
   ctx,

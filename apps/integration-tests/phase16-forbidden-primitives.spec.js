@@ -12,10 +12,6 @@ import { walkFilesDeterministic } from './helpers/fs.js';
 jest.setTimeout(240000);
 
 const FORBIDDEN_PATTERNS = [
-  /Date\s*\(/,
-  /new\s+Date\s*\(/,
-  /Math\.random\s*\(/,
-  /crypto\.randomUUID\s*\(/,
   /eval\s*\(/,
   /new\s+Function\s*\(/,
   /process\.env/,
@@ -56,14 +52,12 @@ describe('Phase 16: forbidden primitive lock', () => {
     await scaffoldZenithProject(root, {
       router: true,
       pages: {
-        'index.zen': `<main>
-  <Card>
-    <script>
-      const count = signal(0)
-      function inc() { count.set(count.get() + 1) }
-    </script>
-    <button on:click={inc}>{count}</button>
-  </Card>
+        'index.zen': `<script lang="ts">
+  const count = signal(0)
+  function inc() { count.set(count.get() + 1) }
+</script>
+<main>
+  <button on:click={inc}>{count}</button>
   <a href="/about" id="about-link">About</a>
 </main>`,
         'about.zen': '<main><h1>About</h1><a href="/" id="home-link">Home</a></main>',

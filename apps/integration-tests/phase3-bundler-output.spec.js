@@ -41,6 +41,29 @@ function extractMarkerIndices(html) {
   return indices;
 }
 
+function collectManifestJsRefs(manifest) {
+  const refs = new Set();
+  const candidates = [
+    manifest?.entry,
+    manifest?.vendor,
+    manifest?.router,
+    manifest?.core,
+    manifest?.css
+  ];
+
+  if (manifest?.chunks && typeof manifest.chunks === 'object') {
+    candidates.push(...Object.values(manifest.chunks));
+  }
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.endsWith('.js')) {
+      refs.add(value);
+    }
+  }
+
+  return refs;
+}
+
 function extractExpressionTableCount(jsSource) {
   const decl = jsSource.match(/const\s+__zenith_expr\s*=\s*(\[[\s\S]*?\]);/);
   if (!decl) {
@@ -91,7 +114,7 @@ describe('Phase 3: bundler output contract', () => {
 
     expect(htmlFiles.length).toBeGreaterThan(0);
 
-    const referencedJs = new Set();
+    const entryJsRefs = new Set();
     for (const rel of htmlFiles) {
       const abs = path.join(outDir, rel);
       const html = await fsp.readFile(abs, 'utf8');
@@ -105,13 +128,19 @@ describe('Phase 3: bundler output contract', () => {
         const target = path.join(outDir, refRel);
         expect(fs.existsSync(target)).toBe(true);
         if (refRel.endsWith('.js')) {
-          referencedJs.add(refRel.replaceAll('\\', '/'));
+          entryJsRefs.add(refRel.replaceAll('\\', '/'));
         }
       }
     }
 
+    const manifest = JSON.parse(await fsp.readFile(path.join(outDir, 'manifest.json'), 'utf8'));
+    const declaredJs = collectManifestJsRefs(manifest);
+    expect(entryJsRefs.size).toBeGreaterThan(0);
+    for (const ref of entryJsRefs) {
+      expect(declaredJs.has(`/${ref}`)).toBe(true);
+    }
     for (const js of jsFiles) {
-      expect(referencedJs.has(js)).toBe(true);
+      expect(declaredJs.has(`/${js}`)).toBe(true);
     }
 
     await fsp.rm(root, { recursive: true, force: true });
