@@ -1,9 +1,8 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { test, expect } from '@jest/globals';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { URL, fileURLToPath } from 'node:url';
-import { Compiler } from '@zenithbuild/compiler';
+import { compile } from '@zenithbuild/compiler';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const WORKSPACE_ROOT = resolve(PACKAGE_ROOT, '../..');
@@ -11,25 +10,24 @@ const EXAMPLES_DIR = join(WORKSPACE_ROOT, 'docs', 'documentation', 'examples');
 
 test('all .zen examples in docs must compile cleanly (no false teaching surfaces)', () => {
     const examples = readdirSync(EXAMPLES_DIR).filter((file) => file.endsWith('.zen'));
-    assert.ok(examples.length > 0, 'Should find at least one .zen example to compile');
-
-    const compiler = new Compiler();
+    expect(examples.length).toBeGreaterThan(0);
 
     for (const exampleFile of examples) {
         const filePath = join(EXAMPLES_DIR, exampleFile);
         const source = readFileSync(filePath, 'utf8');
 
         try {
-            const result = compiler.compile(source, {
-                filename: exampleFile,
-                mode: 'client',
-                generate_ssr: false
-            });
+            const result = compile(source, exampleFile);
 
-            assert.ok(result, `Compiler returned no result for ${exampleFile}`);
-            assert.ok(result.js, `Compiler returned no JS for ${exampleFile}`);
+            expect(result).toBeTruthy();
+            expect(typeof result.html).toBe('string');
+            expect(Array.isArray(result.diagnostics)).toBe(true);
+            expect(Array.isArray(result.marker_bindings)).toBe(true);
         } catch (err) {
-            assert.fail(`Example ${exampleFile} failed to compile. Snippets must match canonical syntax.\nError: ${err.message}`);
+            const message = err instanceof Error ? err.message : String(err);
+            throw new Error(
+                `Example ${exampleFile} failed to compile. Snippets must match canonical syntax.\nError: ${message}`
+            );
         }
     }
 });
