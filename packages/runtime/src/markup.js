@@ -89,10 +89,10 @@ function _fragmentInterpolate(val, interpolationIndex) {
         return '';
     }
     if (typeof val === 'string') {
-        return _escapeHtml(val);
+        return _escapeFragmentHtml(val);
     }
     if (typeof val === 'number') {
-        return _escapeHtml(String(val));
+        return _escapeFragmentHtml(String(val));
     }
     if (_isHtmlFragment(val)) {
         return val.html;
@@ -131,7 +131,7 @@ function _fragmentInterpolate(val, interpolationIndex) {
     });
 }
 
-function _escapeHtml(input) {
+function _escapeFragmentHtml(input) {
     return String(input)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')

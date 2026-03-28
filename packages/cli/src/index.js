@@ -100,9 +100,16 @@ export async function cli(args, cwd) {
         process.exit(0);
     }
 
-    if (!command || !COMMANDS.includes(command)) {
+    if (!command) {
         printUsage(logger);
-        process.exit(command ? 1 : 0);
+        process.exit(0);
+    }
+
+    if (!COMMANDS.includes(command)) {
+        logger.print(`Unknown command: ${command}`);
+        logger.print('');
+        printUsage(logger);
+        process.exit(1);
     }
 
     const projectRoot = resolve(cwd || process.cwd());

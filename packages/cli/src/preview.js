@@ -628,9 +628,13 @@ export async function createPreviewServer(options) {
           });
         } catch (error) {
           logServerException('preview server route execution failed', error);
-          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-          res.end(defaultRouteDenyMessage(500));
-          return;
+          ssrPayload = {
+            __zenith_error: {
+              status: 500,
+              code: 'LOAD_FAILED',
+              message: error instanceof Error ? error.message : String(error || '')
+            }
+          };
         }
 
         const trace = routeExecution?.trace || { guard: 'none', action: 'none', load: 'none' };

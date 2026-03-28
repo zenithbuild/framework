@@ -93,7 +93,7 @@ describe('component expression rewrite preservation', () => {
         const inactiveClass = extractScopedIdentifier(pageAsset, 'src_components_MiniChooser_zen_script0_', 'inactiveClass');
 
         const fnMatch = pageAsset.match(
-            /function\(__ctx\)\s*\{[^}]*return signalMap\.get\(\d+\)\.get\(\) === "core" \? ([^:;]+) : ([^;]+); \}/
+            /function\(__ctx\)\s*\{[^}]*return signalMap\.get\(\d+\)\.get\(\) === ['"]core['"] \? ([^:;]+) : ([^;]+);\s*\}/
         );
         expect(fnMatch).toBeTruthy();
         const fnBody = String(fnMatch?.[0] || '');
