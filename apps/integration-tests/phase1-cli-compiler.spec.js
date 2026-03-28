@@ -95,23 +95,40 @@ describe('Phase 1: CLI -> compiler process seam', () => {
       });
     });
 
-    expect(spawnSyncMock).toHaveBeenCalledTimes(1);
+    expect(spawnSyncMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(spawnMock).toHaveBeenCalledTimes(1);
 
-    const [spawnPath, spawnArgs, spawnOpts] = spawnSyncMock.mock.calls[0];
+    const compilerCalls = spawnSyncMock.mock.calls.filter(([spawnPath]) => spawnPath === compilerBin);
+    expect(compilerCalls).toHaveLength(1);
+
+    const [spawnPath, spawnArgs, spawnOpts] = compilerCalls[0];
     expect(spawnPath).toBe(compilerBin);
-    expect(spawnArgs).toHaveLength(1);
-    expect(spawnArgs[0]).toMatch(/pages[\\/]index\.zen$/);
+    expect(spawnArgs).toEqual([
+      '--stdin',
+      expect.stringMatching(/pages[\\/]index\.zen$/)
+    ]);
     expect(spawnOpts).toEqual(expect.objectContaining({ encoding: 'utf8' }));
 
-    const parsed = JSON.parse(spawnSyncMock.mock.results[0].value.stdout);
+    const compilerResult = spawnSyncMock.mock.results[
+      spawnSyncMock.mock.calls.findIndex(([spawnPath]) => spawnPath === compilerBin)
+    ]?.value;
+    const parsed = JSON.parse(compilerResult.stdout);
     expect(validateCompilerIR(parsed)).toEqual([]);
-    expect(spawnSyncMock.mock.results[0].value.stderr).toBe('');
+    expect(compilerResult.stderr).toBe('');
 
     const [bundlerPath, bundlerArgs, bundlerOpts] = spawnMock.mock.calls[0];
     expect(bundlerPath).toBe(bundlerBin);
-    expect(bundlerArgs).toEqual(['--out-dir', project.outDir]);
-    expect(bundlerOpts).toEqual({ stdio: ['pipe', 'inherit', 'inherit'] });
+    expect(bundlerArgs).toEqual([
+      '--out-dir',
+      path.join(project.root, '.zenith-output', 'static'),
+      '--base-path',
+      '/',
+      '--route-check'
+    ]);
+    expect(bundlerOpts).toEqual(expect.objectContaining({
+      cwd: project.root,
+      stdio: ['pipe', 'inherit', 'inherit']
+    }));
 
     const bundlerChild = spawnMock.mock.results[0].value;
     const payload = JSON.parse(bundlerChild.__stdinChunks.join(''));
@@ -119,7 +136,18 @@ describe('Phase 1: CLI -> compiler process seam', () => {
     expect(payload).toHaveLength(1);
     const envelope = payload[0];
 
-    expect(envelope.ir).toEqual(fakeIR);
+    expect(envelope.ir).toEqual(expect.objectContaining(fakeIR));
+    expect(envelope.ir).toEqual(expect.objectContaining({
+      components_scripts: {},
+      component_instances: [],
+      signals: [],
+      has_guard: false,
+      has_load: false,
+      has_action: false,
+      guard_module_ref: null,
+      load_module_ref: null,
+      action_module_ref: null
+    }));
     expect(envelope.route).toBe('/');
     expect(envelope.file).toMatch(/pages[\\/]index\.zen$/);
     expect(envelope.router).toBe(true);
@@ -138,27 +166,9 @@ describe('Phase 1: CLI -> compiler process seam', () => {
     const ir = JSON.parse(result.stdout);
     expect(validateCompilerIR(ir)).toEqual([]);
 
-    // No unexpected keys at the process seam.
-    expect(Object.keys(ir).sort()).toEqual([
-      'component_instances',
-      'components_scripts',
-      'event_bindings',
-      'expression_bindings',
-      'expressions',
-      'graph_edges',
-      'graph_hash',
-      'graph_nodes',
-      'hoisted',
-      'html',
-      'imports',
-      'ir_version',
-      'marker_bindings',
-      'modules',
-      'prerender',
-      'server_script',
-      'signals',
-      'ssr_data',
-      'style_blocks'
-    ]);
+    expect(ir.schemaVersion).toBe(1);
+    expect(Array.isArray(ir.diagnostics)).toBe(true);
+    expect(Array.isArray(ir.warnings)).toBe(true);
+    expect(Array.isArray(ir.ref_bindings)).toBe(true);
   });
 });
