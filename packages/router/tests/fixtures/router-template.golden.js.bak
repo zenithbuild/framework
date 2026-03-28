@@ -16,6 +16,7 @@ const __ZENITH_MANIFEST__ = {
     "/about": "/assets/about.bbbbbbb2.js"
   }
 };
+const __ZENITH_ROUTE_CHECK_ENABLED__ = true;
 const __ZENITH_BASE_PATH__ = normalizeBasePath(
   typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
 );
@@ -655,6 +656,9 @@ function createScrollDetail(targetUrl, scrollTarget) {
 }
 
 async function requestRouteCheck(context, resolved, targetUrl, signal) {
+  if (!__ZENITH_ROUTE_CHECK_ENABLED__) {
+    return { kind: "allow" };
+  }
   if (!requiresServerReload(resolved.route)) {
     return { kind: "allow" };
   }

@@ -3,6 +3,7 @@ import { createDevServer } from '../dist/dev-server.js';
 import { createPreviewServer } from '../dist/preview.js';
 import { jest } from '@jest/globals';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import http from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -43,6 +44,32 @@ async function fetchText(baseUrl, pathname, options = {}) {
         headers: response.headers,
         body: await response.text()
     };
+}
+
+async function requestText(port, pathname, headers = {}) {
+    return new Promise((resolve, reject) => {
+        const req = http.request({
+            host: '127.0.0.1',
+            port,
+            path: pathname,
+            method: 'GET',
+            headers
+        }, (res) => {
+            let body = '';
+            res.on('data', (chunk) => {
+                body += chunk;
+            });
+            res.on('end', () => {
+                resolve({
+                    status: res.statusCode,
+                    headers: res.headers,
+                    body
+                });
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
 }
 
 describe('Phase 0 server routing contract', () => {
@@ -180,11 +207,82 @@ describe('Phase 0 server routing contract', () => {
         expect(allowedPreview).toEqual(allowedDev);
     });
 
-    test('thrown server errors and implicit empty payloads stay aligned between dev and preview', async () => {
+    test('post actions re-render HTML with ctx.action state consistently in dev and preview', async () => {
+        project = await makeProject({
+            'contact.zen': [
+                '<script server lang="ts">',
+                'export async function action(ctx) {',
+                '  const form = await ctx.request.formData();',
+                '  const name = String(form.get("name") || "").trim();',
+                '  if (!name) return ctx.invalid({ field: "name", message: "Name required" }, 422);',
+                '  return ctx.data({ saved: true, name });',
+                '}',
+                'export async function load(ctx) {',
+                '  return ctx.data({ route: ctx.route.pattern, method: ctx.method, action: ctx.action });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Contact</main></body></html>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        dev = await createDevServer({ pagesDir: project.pagesDir, outDir: project.outDir, port: 0 });
+        preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+
+        const invalidDev = await fetchText(origin(dev.port), '/contact', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: 'name='
+        });
+        const invalidPreview = await fetchText(origin(preview.port), '/contact', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: 'name='
+        });
+
+        expect(invalidDev.status).toBe(422);
+        expect(invalidPreview.status).toBe(422);
+        expect(extractSsrPayload(invalidDev.body)).toEqual({
+            route: '/contact',
+            method: 'POST',
+            action: {
+                ok: false,
+                status: 422,
+                data: { field: 'name', message: 'Name required' }
+            }
+        });
+        expect(extractSsrPayload(invalidPreview.body)).toEqual(extractSsrPayload(invalidDev.body));
+
+        const successDev = await fetchText(origin(dev.port), '/contact', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: 'name=Zenith'
+        });
+        const successPreview = await fetchText(origin(preview.port), '/contact', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: 'name=Zenith'
+        });
+
+        expect(successDev.status).toBe(200);
+        expect(successPreview.status).toBe(200);
+        expect(extractSsrPayload(successDev.body)).toEqual({
+            route: '/contact',
+            method: 'POST',
+            action: {
+                ok: true,
+                status: 200,
+                data: { saved: true, name: 'Zenith' }
+            }
+        });
+        expect(extractSsrPayload(successPreview.body)).toEqual(extractSsrPayload(successDev.body));
+    });
+
+    test('thrown server errors are sanitized and implicit empty payloads stay aligned between dev and preview', async () => {
         project = await makeProject({
             'broken.zen': [
                 '<script server lang="ts">',
-                'export async function load(ctx) {',
+                'export async function guard(ctx) {',
                 '  void ctx;',
                 '  throw new Error("Route exploded");',
                 '}',
@@ -207,8 +305,27 @@ describe('Phase 0 server routing contract', () => {
         const brokenPreview = await fetchText(origin(preview.port), '/broken');
         expect(brokenDev.status).toBe(500);
         expect(brokenPreview.status).toBe(500);
-        expect(brokenDev.body).toBe('Error: Route exploded');
-        expect(brokenPreview.body).toBe('Error: Route exploded');
+        expect(brokenDev.body).toBe('Internal Server Error');
+        expect(brokenPreview.body).toBe('Internal Server Error');
+
+        const brokenCheckDev = await fetchText(origin(dev.port), '/__zenith/route-check?path=%2Fbroken', {
+            headers: { 'x-zenith-route-check': '1' }
+        });
+        const brokenCheckPreview = await fetchText(origin(preview.port), '/__zenith/route-check?path=%2Fbroken', {
+            headers: { 'x-zenith-route-check': '1' }
+        });
+        expect(brokenCheckDev.status).toBe(200);
+        expect(brokenCheckPreview.status).toBe(200);
+        expect(JSON.parse(brokenCheckDev.body).result).toEqual({
+            kind: 'deny',
+            status: 500,
+            message: 'Internal Server Error'
+        });
+        expect(JSON.parse(brokenCheckPreview.body).result).toEqual({
+            kind: 'deny',
+            status: 500,
+            message: 'Internal Server Error'
+        });
 
         const emptyDev = await fetchText(origin(dev.port), '/empty');
         const emptyPreview = await fetchText(origin(preview.port), '/empty');
@@ -216,5 +333,35 @@ describe('Phase 0 server routing contract', () => {
         expect(emptyPreview.status).toBe(200);
         expect(emptyDev.body).toContain('window.__zenith_ssr_data = {};');
         expect(emptyPreview.body).toContain('window.__zenith_ssr_data = {};');
+    });
+
+    test('dev and preview ignore untrusted Host when reconstructing ctx.url.origin', async () => {
+        project = await makeProject({
+            'origin.zen': [
+                '<script server lang="ts">',
+                'export async function load(ctx) {',
+                '  return ctx.data({ origin: ctx.url.origin, host: ctx.headers.host ?? null });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Origin</main></body></html>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        dev = await createDevServer({ pagesDir: project.pagesDir, outDir: project.outDir, port: 0 });
+        preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+
+        const hostileHost = 'evil.example:9999';
+        const devPayload = extractSsrPayload((await requestText(dev.port, '/origin', { Host: hostileHost })).body);
+        const previewPayload = extractSsrPayload((await requestText(preview.port, '/origin', { Host: hostileHost })).body);
+
+        expect(devPayload).toEqual({
+            origin: `http://127.0.0.1:${dev.port}`,
+            host: hostileHost
+        });
+        expect(previewPayload).toEqual({
+            origin: `http://127.0.0.1:${preview.port}`,
+            host: hostileHost
+        });
     });
 });

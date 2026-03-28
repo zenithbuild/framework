@@ -75,4 +75,43 @@ describe('preview base path', () => {
         expect(assetResponse.status).toBe(200);
         expect(String(assetResponse.headers.get('content-type') || '')).toContain('javascript');
     });
+
+    test('route-check stays basePath-aware in preview', async () => {
+        project = await createProject({
+            'pages/index.zen': '<main>Home</main>\n',
+            'pages/secure/index.zen': '<main>Secure</main>\n',
+            'pages/secure/page.guard.ts': [
+                'export async function guard(ctx) {',
+                '  if (ctx.url.searchParams.get("auth") !== "yes") return ctx.redirect("/login", 307);',
+                '  return ctx.allow();',
+                '}'
+            ].join('\n')
+        });
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: {
+                router: true,
+                basePath: '/docs'
+            }
+        });
+
+        preview = await createPreviewServer({
+            distDir: project.outDir,
+            port: 0,
+            config: { basePath: '/docs', router: true }
+        });
+
+        const origin = `http://127.0.0.1:${preview.port}`;
+        const routeCheck = await fetch(`${origin}/docs/__zenith/route-check?path=%2Fdocs%2Fsecure%3Fauth%3Dno`, {
+            headers: { 'x-zenith-route-check': '1' }
+        });
+        expect(routeCheck.status).toBe(200);
+        expect((await routeCheck.json()).result).toEqual({
+            kind: 'redirect',
+            location: '/docs/login',
+            status: 307
+        });
+    });
 });

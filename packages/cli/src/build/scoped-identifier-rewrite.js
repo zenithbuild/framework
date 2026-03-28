@@ -1,137 +1,8 @@
 import {
-    extractDeclaredIdentifiers,
     normalizeTypeScriptExpression,
-    renderObjectKey,
-    rewriteIdentifiersWithinExpression
+    renderObjectKey
 } from './typescript-expression-utils.js';
-
-/**
- * @param {string} value
- * @returns {string | null}
- */
-function deriveScopedIdentifierAlias(value) {
-    const ident = String(value || '').trim();
-    if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ident)) {
-        return null;
-    }
-    const parts = ident.split('_').filter(Boolean);
-    const candidate = parts.length > 1 ? parts[parts.length - 1] : ident;
-    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(candidate) ? candidate : ident;
-}
-
-/**
- * @param {Map<string, string>} map
- * @param {Set<string>} ambiguous
- * @param {string | null} raw
- * @param {string | null} rewritten
- */
-function recordScopedIdentifierRewrite(map, ambiguous, raw, rewritten) {
-    if (typeof raw !== 'string' || raw.length === 0 || typeof rewritten !== 'string' || rewritten.length === 0) {
-        return;
-    }
-    const existing = map.get(raw);
-    if (existing && existing !== rewritten) {
-        map.delete(raw);
-        ambiguous.add(raw);
-        return;
-    }
-    if (!ambiguous.has(raw)) {
-        map.set(raw, rewritten);
-    }
-}
-
-/**
- * @param {object | null | undefined} ir
- * @returns {{ map: Map<string, string>, ambiguous: Set<string> }}
- */
-export function buildScopedIdentifierRewrite(ir) {
-    const out = { map: new Map(), ambiguous: new Set() };
-    if (!ir || typeof ir !== 'object') {
-        return out;
-    }
-
-    const stateBindings = Array.isArray(ir?.hoisted?.state) ? ir.hoisted.state : [];
-    for (const stateEntry of stateBindings) {
-        const key = typeof stateEntry?.key === 'string' ? stateEntry.key : null;
-        recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(key), key);
-    }
-
-    const functionBindings = Array.isArray(ir?.hoisted?.functions) ? ir.hoisted.functions : [];
-    for (const fnName of functionBindings) {
-        if (typeof fnName !== 'string') {
-            continue;
-        }
-        recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(fnName), fnName);
-    }
-
-    const declarations = Array.isArray(ir?.hoisted?.declarations) ? ir.hoisted.declarations : [];
-    for (const declaration of declarations) {
-        if (typeof declaration !== 'string') {
-            continue;
-        }
-        for (const identifier of extractDeclaredIdentifiers(declaration)) {
-            recordScopedIdentifierRewrite(out.map, out.ambiguous, deriveScopedIdentifierAlias(identifier), identifier);
-        }
-    }
-
-    return out;
-}
-
-/**
- * @param {string} expr
- * @param {{
- *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
- *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
- * } | null} rewriteContext
- * @returns {string}
- */
-export function rewritePropsExpression(expr, rewriteContext = null) {
-    const trimmed = String(expr || '').trim();
-    if (!trimmed) {
-        return trimmed;
-    }
-
-    const expressionMap = rewriteContext?.expressionRewrite?.map;
-    const expressionAmbiguous = rewriteContext?.expressionRewrite?.ambiguous;
-    if (
-        expressionMap instanceof Map &&
-        !(expressionAmbiguous instanceof Set && expressionAmbiguous.has(trimmed))
-    ) {
-        const exact = expressionMap.get(trimmed);
-        if (typeof exact === 'string' && exact.length > 0) {
-            return normalizeTypeScriptExpression(exact);
-        }
-    }
-
-    const scopeMap = rewriteContext?.scopeRewrite?.map;
-    const scopeAmbiguous = rewriteContext?.scopeRewrite?.ambiguous;
-    const rootMatch = trimmed.match(/^([A-Za-z_$][A-Za-z0-9_$]*)([\s\S]*)$/);
-    if (!(scopeMap instanceof Map)) {
-        return normalizeTypeScriptExpression(trimmed);
-    }
-    if (!rootMatch) {
-        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
-    }
-
-    const root = rootMatch[1];
-    if (scopeAmbiguous instanceof Set && scopeAmbiguous.has(root)) {
-        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
-    }
-
-    const rewrittenRoot = scopeMap.get(root);
-    if (typeof rewrittenRoot !== 'string' || rewrittenRoot.length === 0 || rewrittenRoot === root) {
-        return rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
-    }
-
-    if (rootMatch[2].trim().length === 0) {
-        return normalizeTypeScriptExpression(rewrittenRoot);
-    }
-
-    const rewrittenExpr = rewriteIdentifiersWithinExpression(trimmed, scopeMap, scopeAmbiguous);
-    return typeof rewrittenExpr === 'string' && rewrittenExpr.length > 0
-        ? rewrittenExpr
-        : normalizeTypeScriptExpression(`${rewrittenRoot}${rootMatch[2]}`);
-}
+import { rewriteCompilerSignalMapReferences } from './compiler-signal-expression.js';
 
 /**
  * @param {string | null | undefined} compiledExpr
@@ -146,27 +17,34 @@ export function resolveCompiledPropsExpression(compiledExpr, expressionRewrite =
     if (!source) {
         return null;
     }
-
     const signals = Array.isArray(expressionRewrite?.signals) ? expressionRewrite.signals : [];
     const stateBindings = Array.isArray(expressionRewrite?.stateBindings) ? expressionRewrite.stateBindings : [];
-    const resolved = source.replace(/signalMap\.get\((\d+)\)(?:\.get\(\))?/g, (full, rawIndex) => {
-        const signalIndex = Number.parseInt(rawIndex, 10);
-        if (!Number.isInteger(signalIndex)) {
-            return full;
-        }
+    return rewriteCompilerSignalMapReferences(source, ({ ts, signalIndex, valueRead }) => {
         const signal = signals[signalIndex];
         const stateIndex = signal?.state_index;
         const stateKey = Number.isInteger(stateIndex) ? stateBindings[stateIndex]?.key : null;
         if (typeof stateKey !== 'string' || stateKey.length === 0) {
-            return full;
+            return null;
         }
-        return full.endsWith('.get()') ? `${stateKey}.get()` : stateKey;
+        if (valueRead) {
+            return ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(
+                    ts.factory.createIdentifier(stateKey),
+                    'get'
+                ),
+                undefined,
+                []
+            );
+        }
+        return ts.factory.createIdentifier(stateKey);
     });
-
-    return normalizeTypeScriptExpression(resolved);
 }
 
 /**
+ * The only allowed downstream props rewrite boundary is compiler-owned exact lookup.
+ * If the compiler did not emit a mapping for the attr expression, CLI keeps the
+ * original expression text without attempting identifier reinterpretation.
+ *
  * @param {string} expr
  * @param {{
  *   expressionRewrite?: {
@@ -175,8 +53,7 @@ export function resolveCompiledPropsExpression(compiledExpr, expressionRewrite =
  *     ambiguous?: Set<string>,
  *     signals?: Array<{ state_index?: number }>,
  *     stateBindings?: Array<{ key?: string }>
- *   } | null,
- *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ *   } | null
  * } | null} rewriteContext
  * @returns {string}
  */
@@ -205,14 +82,19 @@ export function resolvePropsValueCode(expr, rewriteContext = null) {
         }
     }
 
-    return rewritePropsExpression(trimmed, rewriteContext);
+    return normalizeTypeScriptExpression(trimmed);
 }
 
 /**
  * @param {string} attrs
  * @param {{
- *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
- *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ *   expressionRewrite?: {
+ *     map?: Map<string, string>,
+ *     bindings?: Map<string, { compiled_expr?: string | null }>,
+ *     ambiguous?: Set<string>,
+ *     signals?: Array<{ state_index?: number }>,
+ *     stateBindings?: Array<{ key?: string }>
+ *   } | null
  * } | null} rewriteContext
  * @returns {string}
  */
@@ -257,8 +139,13 @@ export function renderPropsLiteralFromAttrs(attrs, rewriteContext = null) {
  * @param {string} source
  * @param {string} attrs
  * @param {{
- *   expressionRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null,
- *   scopeRewrite?: { map?: Map<string, string>, ambiguous?: Set<string> } | null
+ *   expressionRewrite?: {
+ *     map?: Map<string, string>,
+ *     bindings?: Map<string, { compiled_expr?: string | null }>,
+ *     ambiguous?: Set<string>,
+ *     signals?: Array<{ state_index?: number }>,
+ *     stateBindings?: Array<{ key?: string }>
+ *   } | null
  * } | null} rewriteContext
  * @returns {string}
  */

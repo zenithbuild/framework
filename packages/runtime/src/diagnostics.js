@@ -432,3 +432,10 @@ export function rethrowZenithRuntimeError(error, fallback = {}) {
     _reportRuntimeError(wrapped);
     throw wrapped;
 }
+export const DOCS_LINKS = Object.freeze({
+    eventBinding: '/docs/documentation/contracts/runtime-contract.md#event-bindings',
+    expressionScope: '/docs/documentation/reference/reactive-binding-model.md#expression-resolution',
+    markerTable: '/docs/documentation/reference/markers.md',
+    componentBootstrap: '/docs/documentation/contracts/runtime-contract.md#component-bootstrap',
+    refs: '/docs/documentation/reference/reactive-binding-model.md#refs-and-mount'
+});

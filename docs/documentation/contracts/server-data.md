@@ -11,21 +11,26 @@ tags: ["server", "data", "contracts"]
 
 ## Contract: Allowed Server Exports
 
-Contract: Supported `<script server>` exports are `data`, `load(ctx)`, and optional `prerender`.
+Contract: Supported `<script server>` exports are optional `guard(ctx)`, optional `action(ctx)`, one payload source (`data` or `load(ctx)`), and optional `prerender`.
 
-Invariant: New server exports do not mix with deprecated server export variants in the same file.
+Invariant: `guard(ctx)` is the route-protection gate, `action(ctx)` is the canonical POST mutation boundary, and `data` or `load(ctx)` is the payload source. Legacy payload exports may not mix with the canonical surface.
 
 Banned:
 - Exporting both `data` and `load` in one file.
+- Returning `data(...)` from `guard(ctx)`.
+- Mixing `data` or `load` with legacy `ssr_data` / `props` / `ssr` exports.
+- Combining `action(ctx)` with `prerender = true`.
 - Server exports outside the public contract.
 
 Definition of Done:
-- Exactly one payload source is defined.
-- `load` uses one argument (`ctx`).
+- At most one payload source is defined.
+- `guard(ctx)`, `action(ctx)`, and `load(ctx)` each use exactly one argument.
+- Expected mutation validation failures return `invalid(payload, 400|422)` and re-render through the same route payload path.
 
 Failure Modes:
-- Mixed exports produce ambiguous payload ownership.
-- Invalid load signature prevents deterministic context access.
+- Mixed payload exports produce ambiguous ownership.
+- Invalid `guard` / `action` / `load` signatures break deterministic context access.
+- Mutation handlers turn into ad hoc RPC surfaces instead of route-owned form posts.
 
 Evidence:
 - Build-time server export validation rejects mixed or invalid patterns.

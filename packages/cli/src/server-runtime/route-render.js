@@ -3,7 +3,8 @@ import { pathToFileURL } from 'node:url';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
 import { materializeImageMarkup } from '../images/materialize.js';
-import { allow, data, deny, redirect, resolveRouteResult } from '../server-contract.js';
+import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException } from '../server-error.js';
+import { allow, data, deny, invalid, redirect, resolveRouteResult } from '../server-contract.js';
 
 const MODULE_CACHE = new Map();
 const INTERNAL_QUERY_PREFIX = '__zenith_param_';
@@ -41,19 +42,6 @@ function escapeInlineJson(payload) {
         .replace(/\//g, '\\u002F')
         .replace(/\u2028/g, '\\u2028')
         .replace(/\u2029/g, '\\u2029');
-}
-
-function defaultRouteDenyMessage(status) {
-    if (status === 401) {
-        return 'Unauthorized';
-    }
-    if (status === 403) {
-        return 'Forbidden';
-    }
-    if (status === 404) {
-        return 'Not Found';
-    }
-    return 'Internal Server Error';
 }
 
 function createTextResponse(status, message) {
@@ -180,6 +168,7 @@ function createRouteContext({ request, route, params, publicUrl }) {
             file: route.file || route.server_script_path || route.route_id || route.path
         },
         env: {},
+        action: null,
         auth: {
             async getSession() {
                 return null;
@@ -191,6 +180,7 @@ function createRouteContext({ request, route, params, publicUrl }) {
         allow,
         redirect,
         deny,
+        invalid,
         data
     };
 }
@@ -203,7 +193,7 @@ function createRouteContext({ request, route, params, publicUrl }) {
  *   routeModulePath: string,
  *   guardOnly?: boolean
  * }} options
- * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, load: string } }>}
+ * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number }>}
  */
 export async function executeRouteRequest(options) {
     const {
@@ -227,7 +217,8 @@ export async function executeRouteRequest(options) {
     return {
         publicUrl,
         result: resolved.result,
-        trace: resolved.trace
+        trace: resolved.trace,
+        status: resolved.status
     };
 }
 
@@ -238,7 +229,6 @@ export async function executeRouteRequest(options) {
  *   params: Record<string, string>,
  *   routeModulePath: string,
  *   shellHtmlPath: string,
- *   pageAssetPath?: string | null,
  *   imageManifestPath?: string | null,
  *   imageConfig?: Record<string, unknown>
  * }} options
@@ -251,7 +241,6 @@ export async function renderRouteRequest(options) {
         params,
         routeModulePath,
         shellHtmlPath,
-        pageAssetPath = null,
         imageManifestPath = null,
         imageConfig = {}
     } = options;
@@ -259,7 +248,8 @@ export async function renderRouteRequest(options) {
     try {
         const {
             publicUrl,
-            result
+            result,
+            status
         } = await executeRouteRequest({
             request,
             route,
@@ -279,7 +269,7 @@ export async function renderRouteRequest(options) {
 
         if (result.kind === 'deny') {
             const status = Number.isInteger(result.status) ? result.status : 403;
-            return createTextResponse(status, result.message || defaultRouteDenyMessage(status));
+            return createTextResponse(status, clientFacingRouteMessage(status, result.message));
         }
 
         const ssrPayload = result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)
@@ -295,26 +285,24 @@ export async function renderRouteRequest(options) {
         );
 
         let html = await readFile(shellHtmlPath, 'utf8');
-        if (pageAssetPath) {
-            html = await materializeImageMarkup({
-                html,
-                pageAssetPath,
-                payload: imagePayload,
-                ssrData: ssrPayload,
-                routePathname: publicUrl.pathname
-            });
-        }
+        html = await materializeImageMarkup({
+            html,
+            payload: imagePayload,
+            imageMaterialization: Array.isArray(route.image_materialization)
+                ? route.image_materialization
+                : []
+        });
         html = injectSsrPayload(html, ssrPayload);
         html = injectImageRuntimePayload(html, imagePayload);
 
         return new Response(html, {
-            status: 200,
+            status: Number.isInteger(status) ? status : 200,
             headers: {
                 'Content-Type': 'text/html; charset=utf-8'
             }
         });
     } catch (error) {
-        const message = String(error);
-        return createTextResponse(500, message || defaultRouteDenyMessage(500));
+        logServerException('node route render failed', error);
+        return createTextResponse(500, defaultRouteDenyMessage(500));
     }
 }

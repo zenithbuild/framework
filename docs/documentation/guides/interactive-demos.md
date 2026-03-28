@@ -9,7 +9,7 @@ tags: ["guides", "demos", "interactive"]
 
 # Interactive Demos
 
-These demos are sourced from `zenith-docs/demos/*.zen`, compiled in CI, and rendered through whitelisted demo routes.
+These demos are sourced from `docs/demos/*.zen`, compiled in CI, and rendered through whitelisted demo routes.
 
 ## Counter
 

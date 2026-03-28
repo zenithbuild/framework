@@ -1,4 +1,4 @@
-export function renderRouterCoreSource({ manifest, runtimeSpec, coreSpec }) {
+export function renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck = false }) {
     return `import { hydrate as __zenithHydrate } from '${runtimeSpec}';
 import { zenOnMount as __zenithOnMount } from '${coreSpec}';
 
@@ -6,6 +6,7 @@ void __zenithHydrate;
 void __zenithOnMount;
 
 const __ZENITH_MANIFEST__ = ${manifest};
+const __ZENITH_ROUTE_CHECK_ENABLED__ = ${routeCheck ? 'true' : 'false'};
 const __ZENITH_BASE_PATH__ = normalizeBasePath(
   typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
 );

@@ -1,6 +1,6 @@
 # CLI_CONTRACT.md — Sealed Project Orchestrator
 
-Canonical public docs: `../zenith-docs/documentation/cli-contract.md`
+Canonical public docs: `../../docs/documentation/cli-contract.md`
 
 > **This document is a legal boundary.**
 > The CLI is a deterministic project orchestrator.
@@ -26,6 +26,7 @@ The CLI:
 The CLI does **not**:
 - Own navigation, hydration, reactivity, mounting, or diffing
 - Those belong to `@zenithbuild/runtime` and `@zenithbuild/router`
+- Ship plugin install/remove commands as part of the public CLI surface
 
 ---
 
@@ -141,6 +142,13 @@ pages/*.zen
 ```
 
 Each stage is a discrete function call. No implicit chaining.
+
+### Image Materialization Boundary
+
+- Build, preview, and packaged server rendering consume route-scoped `image_materialization` entries from router-manifest or packaged route metadata.
+- Image HTML materialization consumes compiler-owned static `data-zenith-image` payloads already present in emitted HTML.
+- CLI image materialization must not execute emitted page assets to recover image props or HTML.
+- Dynamic or non-literal `Image` props are unsupported until the compiler/bundler emits a structured image materialization artifact.
 
 ---
 

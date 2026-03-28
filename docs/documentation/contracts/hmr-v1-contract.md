@@ -70,5 +70,5 @@ Build errors must not crash dev server:
 V0 path `/__zenith_hmr` is legacy-only compatibility. V1 consumers must use `/__zenith_dev/events` and `/__zenith_dev/state`, with runtime-driven CSS updates via `/__zenith_dev/styles.css?buildId=<n>`.
 
 Canonical sources:
-- `/Users/judahsullivan/Personal/zenith/zenith-cli/CLI_CONTRACT.md`
-- `/Users/judahsullivan/Personal/zenith/zenith-runtime/src/template.js`
+- `packages/cli/CLI_CONTRACT.md`
+- `packages/runtime/src/template.js`

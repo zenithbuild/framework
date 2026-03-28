@@ -16,12 +16,17 @@ import { existsSync, watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from './base-path.js';
+import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { createDevBuildSession } from './dev-build-session.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { createSilentLogger } from './ui/logger.js';
 import { readChangeFingerprint } from './dev-watch.js';
+import { createTrustedOriginResolver, publicHost } from './request-origin.js';
+import { encodeRequestBodyBase64, readRequestBodyBuffer } from './request-body.js';
+import { supportsTargetRouteCheck } from './route-check-support.js';
+import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from './server-error.js';
 import {
-    defaultRouteDenyMessage,
     executeServerRoute,
     injectSsrPayload,
     loadRouteManifest,
@@ -68,6 +73,8 @@ export async function createDevServer(options) {
     } = options;
     const logger = providedLogger || createSilentLogger();
     const buildSession = createDevBuildSession({ pagesDir, outDir, config, logger });
+    const configuredBasePath = normalizeBasePath(config.basePath || '/');
+    const routeCheckEnabled = supportsTargetRouteCheck(resolveBuildAdapter(config).target);
 
     const resolvedPagesDir = resolve(pagesDir);
     const resolvedOutDir = resolve(outDir);
@@ -107,19 +114,21 @@ export async function createDevServer(options) {
     let currentCssHref = '';
     let currentCssContent = '';
     let actualPort = port;
+    const resolveServerOrigin = createTrustedOriginResolver({
+        host,
+        getPort: () => actualPort,
+        label: 'dev server'
+    });
     let currentRoutes = [];
     const rebuildDebounceMs = 5;
     const queuedRebuildDebounceMs = 5;
 
     function _publicHost() {
-        if (host === '0.0.0.0' || host === '::') {
-            return '127.0.0.1';
-        }
-        return host;
+        return publicHost(host);
     }
 
     function _serverOrigin() {
-        return `http://${_publicHost()}:${actualPort}`;
+        return resolveServerOrigin();
     }
 
     function _trace(event, payload = {}) {
@@ -235,6 +244,9 @@ export async function createDevServer(options) {
     }
 
     function _buildNotFoundPayload(pathname, category, cause) {
+        const hintedPath = category === 'page'
+            ? (stripBasePath(pathname, configuredBasePath) || pathname)
+            : pathname;
         const payload = {
             kind: 'zenith_dev_not_found',
             category,
@@ -265,7 +277,7 @@ export async function createDevServer(options) {
             return payload;
         }
 
-        const routeFile = _routeFileHint(pathname);
+        const routeFile = _routeFileHint(hintedPath);
         payload.routeFile = routeFile;
         payload.cause = `no route file found at ${routeFile}`;
         payload.hint = `Create ${routeFile} or verify router manifest output.`;
@@ -488,10 +500,7 @@ export async function createDevServer(options) {
     }
 
     const server = createServer(async (req, res) => {
-        const requestBase = typeof req.headers.host === 'string' && req.headers.host.length > 0
-            ? `http://${req.headers.host}`
-            : _serverOrigin();
-        const url = new URL(req.url, requestBase);
+        const url = new URL(req.url, _serverOrigin());
         let pathname = url.pathname;
 
         // Legacy HMR endpoint (deprecated but kept alive to avoid breaking old caches instantly)
@@ -603,7 +612,7 @@ export async function createDevServer(options) {
             return;
         }
 
-        if (pathname === '/_zenith/image') {
+        if (pathname === imageEndpointPath(configuredBasePath)) {
             await handleImageRequest(req, res, {
                 requestUrl: url,
                 projectRoot,
@@ -612,8 +621,13 @@ export async function createDevServer(options) {
             return;
         }
 
-        if (pathname === '/__zenith/route-check') {
+        if (pathname === routeCheckPath(configuredBasePath)) {
             try {
+                if (!routeCheckEnabled) {
+                    res.writeHead(501, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+                    res.end(JSON.stringify({ error: 'route_check_unsupported' }));
+                    return;
+                }
                 if (!initialBuildSettled && buildStatus === 'building') {
                     res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
                     res.end(JSON.stringify({
@@ -645,9 +659,17 @@ export async function createDevServer(options) {
                     res.end(JSON.stringify({ error: 'external_route_evaluation_forbidden' }));
                     return;
                 }
+                const canonicalTargetPath = stripBasePath(targetUrl.pathname, configuredBasePath);
+                if (canonicalTargetPath === null) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'route_not_found' }));
+                    return;
+                }
+                const canonicalTargetUrl = new URL(targetUrl.toString());
+                canonicalTargetUrl.pathname = canonicalTargetPath;
 
                 const routes = await _loadRoutesForRequests();
-                const resolvedCheck = resolveRequestRoute(targetUrl, routes);
+                const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, routes);
                 if (!resolvedCheck.matched || !resolvedCheck.route) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'route_not_found' }));
@@ -668,15 +690,16 @@ export async function createDevServer(options) {
                 });
                 // Security: Enforce relative or same-origin redirects
                 if (checkResult && checkResult.result && checkResult.result.kind === 'redirect') {
-                    const loc = String(checkResult.result.location || '/');
+                    const loc = appLocalRedirectLocation(checkResult.result.location || '/', configuredBasePath);
+                    checkResult.result.location = loc;
                     if (loc.includes('://') || loc.startsWith('//')) {
                         try {
                             const parsedLoc = new URL(loc);
                             if (parsedLoc.origin !== targetUrl.origin) {
-                                checkResult.result.location = '/'; // Fallback to root for open redirect attempt
+                                checkResult.result.location = appLocalRedirectLocation('/', configuredBasePath);
                             }
                         } catch {
-                            checkResult.result.location = '/';
+                            checkResult.result.location = appLocalRedirectLocation('/', configuredBasePath);
                         }
                     }
                 }
@@ -689,7 +712,7 @@ export async function createDevServer(options) {
                     'Vary': 'Cookie'
                 });
                 res.end(JSON.stringify({
-                    result: checkResult?.result || checkResult,
+                    result: sanitizeRouteResult(checkResult?.result || checkResult),
                     routeId: resolvedCheck.route.route_id || '',
                     to: targetUrl.toString()
                 }));
@@ -704,6 +727,7 @@ export async function createDevServer(options) {
         let resolvedPathFor404 = null;
         let staticRootFor404 = null;
         try {
+            const canonicalPath = stripBasePath(pathname, configuredBasePath);
             if (!initialBuildSettled && buildStatus === 'building') {
                 const pendingPayload = {
                     kind: 'zenith_dev_build_pending',
@@ -735,9 +759,13 @@ export async function createDevServer(options) {
                 return;
             }
 
-            const requestExt = extname(pathname);
+            if (canonicalPath === null) {
+                throw new Error('not found');
+            }
+
+            const requestExt = extname(canonicalPath);
             if (requestExt && requestExt !== '.html') {
-                const assetPath = join(outDir, pathname);
+                const assetPath = join(outDir, canonicalPath);
                 resolvedPathFor404 = assetPath;
                 staticRootFor404 = outDir;
                 const asset = await _readFileForRequest(assetPath);
@@ -748,7 +776,9 @@ export async function createDevServer(options) {
             }
 
             const routes = await _loadRoutesForRequests();
-            const resolved = resolveRequestRoute(url, routes);
+            const canonicalUrl = new URL(url.toString());
+            canonicalUrl.pathname = canonicalPath;
+            const resolved = resolveRequestRoute(canonicalUrl, routes);
             let filePath = null;
 
             if (resolved.matched && resolved.route) {
@@ -762,7 +792,7 @@ export async function createDevServer(options) {
                     : resolved.route.output;
                 filePath = resolveWithinDist(outDir, output);
             } else {
-                filePath = toStaticFilePath(outDir, pathname);
+                filePath = toStaticFilePath(outDir, canonicalPath);
             }
 
             resolvedPathFor404 = filePath;
@@ -773,34 +803,38 @@ export async function createDevServer(options) {
             }
 
             let ssrPayload = null;
+            let routeExecution = null;
             if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
-                let routeExecution = null;
                 try {
+                    const requestMethod = req.method || 'GET';
+                    const requestBodyBuffer =
+                        requestMethod === 'GET' || requestMethod === 'HEAD'
+                            ? null
+                            : await readRequestBodyBuffer(req);
                     routeExecution = await executeServerRoute({
                         source: resolved.route.server_script,
                         sourcePath: resolved.route.server_script_path || '',
                         params: resolved.params,
                         requestUrl: url.toString(),
-                        requestMethod: req.method || 'GET',
+                        requestMethod,
                         requestHeaders: req.headers,
+                        requestBodyBase64: encodeRequestBodyBase64(requestBodyBuffer),
                         routePattern: resolved.route.path,
                         routeFile: resolved.route.server_script_path || '',
                         routeId: resolved.route.route_id || ''
                     });
                 } catch (error) {
-                    ssrPayload = {
-                        __zenith_error: {
-                            code: 'LOAD_FAILED',
-                            message: error instanceof Error ? error.message : String(error)
-                        }
-                    };
+                    logServerException('dev server route execution failed', error);
+                    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end(defaultRouteDenyMessage(500));
+                    return;
                 }
 
-                const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
+                const trace = routeExecution?.trace || { guard: 'none', action: 'none', load: 'none' };
                 const routeId = resolved.route.route_id || '';
                 if (verboseLogging) {
                     logger.router(
-                        `${routeId || resolved.route.path} guard=${trace.guard} load=${trace.load}`
+                        `${routeId || resolved.route.path} guard=${trace.guard} action=${trace.action} load=${trace.load}`
                     );
                 }
 
@@ -808,7 +842,7 @@ export async function createDevServer(options) {
                 if (result && result.kind === 'redirect') {
                     const status = Number.isInteger(result.status) ? result.status : 302;
                     res.writeHead(status, {
-                        Location: result.location,
+                        Location: appLocalRedirectLocation(result.location, configuredBasePath),
                         'Cache-Control': 'no-store'
                     });
                     res.end('');
@@ -817,7 +851,7 @@ export async function createDevServer(options) {
                 if (result && result.kind === 'deny') {
                     const status = Number.isInteger(result.status) ? result.status : 403;
                     res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-                    res.end(result.message || defaultRouteDenyMessage(status));
+                    res.end(clientFacingRouteMessage(status, result.message));
                     return;
                 }
                 if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
@@ -826,21 +860,22 @@ export async function createDevServer(options) {
             }
 
             let content = await _readFileForRequest(filePath, 'utf8');
-            if (resolved.matched && resolved.route?.page_asset) {
-                const pageAssetPath = resolveWithinDist(outDir, resolved.route.page_asset);
+            if (resolved.matched) {
                 content = await materializeImageMarkup({
                     html: content,
-                    pageAssetPath,
                     payload: buildSession.getImageRuntimePayload(),
-                    ssrData: ssrPayload,
-                    routePathname: resolved.route.path || pathname
+                    imageMaterialization: Array.isArray(resolved.route?.image_materialization)
+                        ? resolved.route.image_materialization
+                        : []
                 });
             }
             if (ssrPayload) {
                 content = injectSsrPayload(content, ssrPayload);
             }
             content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
-            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
+                'Content-Type': 'text/html'
+            });
             res.end(content);
         } catch (error) {
             const category = _classifyNotFound(pathname);

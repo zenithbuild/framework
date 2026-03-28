@@ -121,6 +121,57 @@ describe('native image optimization', () => {
         expect(html).toContain('/docs/_zenith/image/local/');
     });
 
+    test('build materializes multiple static Image instances without executing page assets', async () => {
+        const png = await createPng1x1();
+        project = await makeProject({
+            'src/pages/index.zen': '<main><Image src="/a.png" alt="A" /><Image src="/b.png" alt="B" /></main>\n',
+            'public/a.png': png,
+            'public/b.png': png
+        });
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: {
+                images: {
+                    formats: ['webp'],
+                    deviceSizes: [1],
+                    imageSizes: [1]
+                }
+            }
+        });
+
+        const html = await readFile(join(project.outDir, 'index.html'), 'utf8');
+        expect((html.match(/<img\b/g) || []).length).toBe(2);
+        expect(html).toContain('alt="A"');
+        expect(html).toContain('alt="B"');
+    });
+
+    test('build fails honestly when Image props are dynamic', async () => {
+        const png = await createPng1x1();
+        project = await makeProject({
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'const hero = "/hero.png";',
+                '</script>',
+                '<main><Image src={hero} alt="Hero" /></main>'
+            ].join('\n'),
+            'public/hero.png': png
+        });
+
+        await expect(build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: {
+                images: {
+                    formats: ['webp'],
+                    deviceSizes: [1],
+                    imageSizes: [1]
+                }
+            }
+        })).rejects.toThrow(/Image materialization only supports static literal props|unsupported dynamic Image prop expression|static literal props only/i);
+    });
+
     test('preview auto-loads image config and rewrites allowed remote images through the image endpoint', async () => {
         remote = await startRemoteImageServer();
         const remoteUrl = `http://127.0.0.1:${remote.port}/hero.png`;
@@ -212,5 +263,19 @@ describe('native image optimization', () => {
         expect(response.status).toBe(400);
         expect(payload.error).toBe('image_request_failed');
         expect(String(payload.message || '')).toContain('Loopback and local network image fetches are blocked');
+    });
+
+    test('image materialization source contains no dynamic evaluation path', async () => {
+        const source = await readFile(new URL('../src/images/materialize.ts', import.meta.url), 'utf8');
+
+        expect(source.includes('new Function')).toBe(false);
+        expect(source.includes('replaceImageMarkers')).toBe(true);
+    });
+
+    test('CLI contract documents the static image materialization boundary', async () => {
+        const contract = await readFile(new URL('../CLI_CONTRACT.md', import.meta.url), 'utf8');
+
+        expect(contract).toContain('Image HTML materialization consumes compiler-owned static `data-zenith-image` payloads');
+        expect(contract).toContain('Dynamic or non-literal `Image` props are unsupported');
     });
 });

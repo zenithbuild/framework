@@ -6,7 +6,7 @@ const LEGACY_EXPORT_RE = /\bexport\s+const\s+(?:ssr_data|props|ssr)\b/;
 
 /**
  * @param {string} sourceFile
- * @param {'guard' | 'load'} kind
+ * @param {'guard' | 'load' | 'action'} kind
  * @returns {string[]}
  */
 function adjacentModuleCandidates(sourceFile, kind) {
@@ -27,7 +27,7 @@ function adjacentModuleCandidates(sourceFile, kind) {
 
 /**
  * @param {string} sourceFile
- * @param {'guard' | 'load'} kind
+ * @param {'guard' | 'load' | 'action'} kind
  * @returns {string | null}
  */
 function resolveAdjacentModule(sourceFile, kind) {
@@ -75,21 +75,24 @@ function classifyInlineServerSource(source) {
 /**
  * @param {{
  *   sourceFile: string,
- *   inlineServerScript?: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, source_path: string } | null,
+ *   inlineServerScript?: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null,
  *   adjacentGuardPath?: string | null,
- *   adjacentLoadPath?: string | null
+ *   adjacentLoadPath?: string | null,
+ *   adjacentActionPath?: string | null
  * }} input
- * @returns {{ serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, source_path: string } | null, guardPath: string | null, loadPath: string | null }}
+ * @returns {{ serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null, guardPath: string | null, loadPath: string | null, actionPath: string | null }}
  */
 export function composeServerScriptEnvelope({
     sourceFile,
     inlineServerScript = null,
     adjacentGuardPath = null,
-    adjacentLoadPath = null
+    adjacentLoadPath = null,
+    adjacentActionPath = null
 }) {
     const inlineSource = String(inlineServerScript?.source || '').trim();
     const inlineHasGuard = inlineServerScript?.has_guard === true;
     const inlineHasLoad = inlineServerScript?.has_load === true;
+    const inlineHasAction = inlineServerScript?.has_action === true;
     const { hasData, hasLegacy } = classifyInlineServerSource(inlineSource);
 
     if (inlineHasGuard && adjacentGuardPath) {
@@ -110,6 +113,15 @@ export function composeServerScriptEnvelope({
         );
     }
 
+    if (inlineHasAction && adjacentActionPath) {
+        throw new Error(
+            `Zenith server script contract violation:\n` +
+            `  File: ${sourceFile}\n` +
+            `  Reason: action is defined both inline and in an adjacent module\n` +
+            `  Example: keep action in either <script server> or ${basename(adjacentActionPath)}, not both`
+        );
+    }
+
     if (adjacentLoadPath && (hasData || hasLegacy)) {
         throw new Error(
             `Zenith server script contract violation:\n` +
@@ -126,13 +138,17 @@ export function composeServerScriptEnvelope({
     if (adjacentLoadPath) {
         prologue.push(`export { load } from '${renderRelativeSpecifier(sourceFile, adjacentLoadPath)}';`);
     }
+    if (adjacentActionPath) {
+        prologue.push(`export { action } from '${renderRelativeSpecifier(sourceFile, adjacentActionPath)}';`);
+    }
 
     const mergedSource = [...prologue, inlineSource].filter(Boolean).join('\n');
     if (!mergedSource.trim()) {
         return {
             serverScript: null,
             guardPath: adjacentGuardPath,
-            loadPath: adjacentLoadPath
+            loadPath: adjacentLoadPath,
+            actionPath: adjacentActionPath
         };
     }
 
@@ -142,20 +158,23 @@ export function composeServerScriptEnvelope({
             prerender: inlineServerScript?.prerender === true,
             has_guard: inlineHasGuard || Boolean(adjacentGuardPath),
             has_load: inlineHasLoad || Boolean(adjacentLoadPath),
+            has_action: inlineHasAction || Boolean(adjacentActionPath),
             source_path: sourceFile
         },
         guardPath: adjacentGuardPath,
-        loadPath: adjacentLoadPath
+        loadPath: adjacentLoadPath,
+        actionPath: adjacentActionPath
     };
 }
 
 /**
  * @param {string} sourceFile
- * @returns {{ guardPath: string | null, loadPath: string | null }}
+ * @returns {{ guardPath: string | null, loadPath: string | null, actionPath: string | null }}
  */
 export function resolveAdjacentServerModules(sourceFile) {
     return {
         guardPath: resolveAdjacentModule(sourceFile, 'guard'),
-        loadPath: resolveAdjacentModule(sourceFile, 'load')
+        loadPath: resolveAdjacentModule(sourceFile, 'load'),
+        actionPath: resolveAdjacentModule(sourceFile, 'action')
     };
 }

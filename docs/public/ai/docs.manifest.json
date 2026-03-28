@@ -11,7 +11,7 @@
         "title": "Contracts",
         "summary": "Normative framework contracts and invariants.",
         "order": 10,
-        "count": 21
+        "count": 23
       },
       {
         "slug": "syntax",
@@ -146,6 +146,32 @@
     },
     {
       "kind": "doc",
+      "slug": "contracts/config-contract",
+      "title": "Config Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "config",
+        "schema"
+      ],
+      "source_path": "documentation/contracts/config-contract.md",
+      "url": "/docs/contracts/config-contract",
+      "category": "contracts",
+      "category_title": "Contracts",
+      "category_order": 10,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
       "slug": "contracts/core-contract",
       "title": "Core Contract",
       "status": "canonical",
@@ -237,6 +263,32 @@
       ],
       "source_path": "documentation/contracts/editor-integration.md",
       "url": "/docs/contracts/editor-integration",
+      "category": "contracts",
+      "category_title": "Contracts",
+      "category_order": 10,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/extension-contract",
+      "title": "Extension Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "plugins",
+        "extensions"
+      ],
+      "source_path": "documentation/contracts/extension-contract.md",
+      "url": "/docs/contracts/extension-contract",
       "category": "contracts",
       "category_title": "Contracts",
       "category_order": 10,

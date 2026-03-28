@@ -335,4 +335,4 @@ const imageHtml = renderImage();
 const imagePayload = serializeImageProps();
 </script>
 
-<span class="contents" data-zenith-image={imagePayload} innerHTML={imageHtml}></span>
+<span class="contents" data-zenith-image={imagePayload} unsafeHTML={imageHtml}></span>

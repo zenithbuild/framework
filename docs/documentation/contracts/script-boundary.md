@@ -21,4 +21,4 @@ Definition of Done:
 - Emitted scripts are deterministic ESM assets.
 - Runtime remains explicit bootstrap-only.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-bundler/SCRIPT_BOUNDARY_CONTRACT.md`.
+Canonical source: `packages/bundler/SCRIPT_BOUNDARY_CONTRACT.md`.

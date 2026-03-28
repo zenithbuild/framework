@@ -42,12 +42,6 @@ Definition of Done:
 | reactivity/dom-and-environment | DOM and Environment | reactivity | keep | Refs, zenWindow/zenDocument, zenOn, zenResize, collectRefs |
 | reactivity/effects-vs-mount | zenEffect vs zenMount | reactivity | keep | When to use zenEffect vs zenMount |
 
-## Legacy Docs (Rewrite or Deprecate)
+## Legacy Docs (Deleted)
 
-| path | current issue | action |
-| --- | --- | --- |
-| documentation/router/introduction.md | Contradicts hard reload default policy | rewrite |
-| documentation/router/zenlink.md | Outdated link API details | rewrite |
-| documentation/router/api.md | Legacy runtime assumptions | rewrite |
-| documentation/reference/hooks-reference.md | Old API naming and behavior | rewrite |
-| documentation/zenith-spec.md | Mixed historical and current contract language | rewrite |
+All `documentation/_legacy` files have been permanently deleted to prevent false syntax teaching (like `onclick=` and `querySelector`) and to establish a single truth surface.

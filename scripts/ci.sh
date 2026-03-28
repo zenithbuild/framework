@@ -5,6 +5,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 bash ./scripts/build.sh
+node ./scripts/verify-compiler-shipped-surface.mjs
+node ./scripts/verify-publish-surface.mjs --selection release
+node ./scripts/verify-publish-surface.mjs --selection scaffolder
 
 bun run --cwd packages/runtime typecheck
 bun run --cwd packages/router typecheck
@@ -30,11 +33,23 @@ bun run --cwd packages/language-server test
 bun run --cwd packages/language test
 bun run --cwd docs docs:gate
 node --test scripts/assert-tag-on-branch.spec.mjs
+node --test scripts/verify-publish-surface.spec.mjs
 node --test scripts/publish-packages-bootstrap.spec.mjs
 node --test scripts/publish-packages-existing-package.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
 
 cargo test --manifest-path packages/compiler/Cargo.toml
 cargo test --manifest-path packages/bundler/Cargo.toml
+
+# Bundler node/js contract tests
+bun run --cwd packages/bundler contract:deps
+bun run --cwd packages/bundler contract:scan
+bun run --cwd packages/bundler contract:imports
+
+# Compiler node/js bridge tests
+node --test packages/compiler/tests/*.spec.js
+
+# Integration Matrix
+bun run --cwd apps/integration-tests test:ci
 
 bash ./scripts/smoke.sh

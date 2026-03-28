@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
 import { build } from '../dist/build.js';
@@ -279,5 +280,28 @@ describe('config truth', () => {
         });
 
         await expect(loadConfig(project.root)).rejects.toThrow('[Zenith:Config] Unknown key: "assetPrefix"');
+    });
+
+    test('docs vs implementation key parity lock matches exactly 10 keys', async () => {
+        const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+        const docsPath = join(rootDir, 'docs', 'documentation', 'contracts', 'config-contract.md');
+        
+        expect(existsSync(docsPath)).toBe(true);
+        const docsContent = await readFile(docsPath, 'utf8');
+
+        // Extract the schema table
+        const schemaTableMatch = docsContent.match(/\| Key \| Type \| Default \| Description \|\n\|---\|---\|---\|---\|\n((?:\|.*\|\n)+)/);
+        expect(schemaTableMatch).not.toBeNull();
+
+        const tableRows = schemaTableMatch[1].trim().split('\n');
+        const documentedKeys = tableRows.map((row) => {
+            const columns = row.split('|');
+            // Extract `key` from backticks e.g. | `router` |
+            const keyMatch = columns[1].match(/`([^`]+)`/);
+            return keyMatch ? keyMatch[1] : null;
+        }).filter(Boolean);
+
+        expect(documentedKeys.sort()).toEqual(PHASE_ONE_BASELINE_KEYS.slice().sort());
+        expect(documentedKeys.length).toBe(10);
     });
 });

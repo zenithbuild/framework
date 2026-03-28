@@ -1,6 +1,6 @@
 # BUNDLER_CONTRACT.md — Sealed Runtime Interface
 
-Canonical public docs: `../zenith-docs/documentation/contracts/bundler-contract.md`
+Canonical public docs: `../../docs/documentation/contracts/bundler-contract.md`
 
 
 > **This document is a legal boundary.**

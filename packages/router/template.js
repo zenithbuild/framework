@@ -1,4 +1,6 @@
 import { renderRouterCoreSource } from './template-core.js';
+import { renderRouterDocumentSource } from './template-document.js';
+import { renderRouterFormSource } from './template-form.js';
 import { renderRouterLifecycleSource } from './template-lifecycle.js';
 import { renderRouterNavigationSource } from './template-navigation.js';
 
@@ -19,7 +21,7 @@ export function renderRouterModule(opts) {
         throw new Error('renderRouterModule(opts) requires an options object');
     }
 
-    const { manifestJson, runtimeImport, coreImport } = opts;
+    const { manifestJson, runtimeImport, coreImport, routeCheck = false } = opts;
     if (typeof manifestJson !== 'string' || manifestJson.length === 0) {
         throw new Error('renderRouterModule(opts) requires opts.manifestJson string');
     }
@@ -34,5 +36,5 @@ export function renderRouterModule(opts) {
     const runtimeSpec = sanitizeImportSpecifier(runtimeImport);
     const coreSpec = sanitizeImportSpecifier(coreImport);
 
-    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec })}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterNavigationSource()}\n`;
+    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck })}\n\n${renderRouterDocumentSource()}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterNavigationSource()}\n\n${renderRouterFormSource()}\n`;
 }

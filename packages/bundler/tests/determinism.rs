@@ -176,8 +176,8 @@ async fn template_literal_escape_snapshot() {
     // Note: The HTML is inside a template literal `...`
     // So to include a backtick it must be `\`
     // To include ${ it must be $\
-    // But wait, Zenith compiler output escaping logic:
-    // escape_js_template_literal turns ` -> \` and ${ -> \${
+    // Zenith uses the compiler-owned JS serializer for template literals:
+    // backticks -> \` and ${ -> \${
 
     // In the emitted JS:
     // const __zenith_html = `<div title="\`backtick\`" data-x="\${expr}"></div>`;

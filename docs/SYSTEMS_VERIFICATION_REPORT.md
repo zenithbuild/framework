@@ -85,18 +85,14 @@ list.forEach((item, index) => {
 
 **Root Cause:** The compiler emits ONE template instance for SSR, but runtime must clone/multiply for each array item. This is inherent to dynamic lists but the implementation is too aggressive.
 
-#### ⚠️ RISK: Expression Evaluation via `new Function()`
+#### Historical note: legacy `new Function()` references are not the live image materialization path
 
-```typescript
-// wrapExpression.ts:61-62
-var evalFn = new Function('__ctx',
-  'with (__ctx) { return (' + '${escapedTransformedCode}' + '); }'
-);
-```
+This report previously implied that active CLI image materialization executed page assets through `new Function()`.
+That is no longer the live boundary.
 
-While this is compile-time code generation (acceptable), the `with` statement dependency creates:
-- CSP policy concerns in production
-- Potential scope leakage
+Current image materialization consumes structured route-scoped `image_materialization` artifacts from router-manifest or packaged route metadata and does not execute page assets.
+
+The remaining `new Function()` reference tied to this area lives under `packages/bundler/_legacy_v1/` and should be treated as legacy, non-canonical code rather than the active product path.
 
 ### 3. CLI — ✅ Verified
 

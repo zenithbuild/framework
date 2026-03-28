@@ -418,3 +418,14 @@ for (const template of Object.keys(TEMPLATE_MATRIX)) {
         }
     });
 }
+
+test('scaffolder advertises only templates that physically exist (no false advertising)', () => {
+    const templatesDir = join(PACKAGE_ROOT, 'templates');
+    const physicalTemplates = readdirSync(templatesDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name !== 'features')
+        .map((entry) => entry.name)
+        .sort();
+        
+    const advertisedTemplates = Object.keys(TEMPLATE_MATRIX).sort();
+    assert.deepEqual(advertisedTemplates, physicalTemplates, 'Advertised templates in test matrix must exactly match physical template folders');
+});

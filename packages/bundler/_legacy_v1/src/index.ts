@@ -1,3 +1,5 @@
+// Legacy v1 bundler surface only. Modern CLI builds invoke the native bundler
+// in `packages/bundler/src/main.rs` and do not route image materialization through this module.
 export * from './native'
 export { zenithLoader, getCollectedCss, clearCssCache } from './plugins/zenith-loader'
 export * from './bundle-generator'

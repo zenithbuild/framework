@@ -1,7 +1,7 @@
 //! Utility functions for the bundler.
 //!
 //! - Virtual module ID construction and parsing
-//! - JS string escaping (injection-safe)
+//! - JS literal serialization through compiler-owned helpers
 //! - Post-build validation helpers
 
 use regex::Regex;
@@ -9,6 +9,7 @@ use regex::Regex;
 use crate::{BundleError, CompilerOutput, Diagnostic, DiagnosticLevel};
 use std::collections::BTreeMap;
 use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::js_serialize::{serialize_js_string_literal, serialize_js_template_literal};
 use zenith_compiler::script::ExtractedStyleBlock;
 
 use oxc_allocator::Allocator;
@@ -101,55 +102,6 @@ pub fn reject_external_zenith_import(specifier: &str) -> Result<(), BundleError>
 /// determinism guarantees may be invalidated.
 pub const EXPECTED_ROLLDOWN_COMMIT: &str = "67a1f58";
 
-// ---------------------------------------------------------------------------
-// JS String Escaping
-// ---------------------------------------------------------------------------
-
-/// Escape a string for safe embedding inside a JS template literal (backtick string).
-/// Prevents injection by escaping backticks, backslashes, and `${`.
-pub fn escape_js_template_literal(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 16);
-    let chars: Vec<char> = s.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        match chars[i] {
-            '\\' => {
-                out.push_str("\\\\");
-            }
-            '`' => {
-                out.push_str("\\`");
-            }
-            '$' if i + 1 < len && chars[i + 1] == '{' => {
-                out.push_str("\\${");
-                i += 1; // skip the '{'
-            }
-            c => {
-                out.push(c);
-            }
-        }
-        i += 1;
-    }
-    out
-}
-
-/// Escape a string for safe embedding inside a JS double-quoted string literal.
-pub fn escape_js_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 16);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c => out.push(c),
-        }
-    }
-    out
-}
-
 /// Clean a path string by resolving . and .. components purely textually.
 /// Does NOT touch the filesystem.
 pub fn clean_path(path: &str) -> String {
@@ -186,25 +138,78 @@ pub fn clean_path(path: &str) -> String {
 /// - `__zenith_expr` — the expression table
 /// - A default export function (hydration stub)
 pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
-    let html_escaped = escape_js_template_literal(&output.html);
+    let html_literal = serialize_js_template_literal(&output.html);
 
     let expr_items: Vec<String> = output
         .expressions
         .iter()
-        .map(|e| format!("\"{}\"", escape_js_string(e)))
+        .map(|e| serialize_js_string_literal(e))
         .collect();
 
     let expr_array = expr_items.join(", ");
 
     format!(
-        r#"export const __zenith_html = `{}`;
+        r#"export const __zenith_html = {};
 export const __zenith_expr = [{}];
 export const __zenith_contract = "v0";
 export default function __zenith_page() {{
   return {{ html: __zenith_html, expressions: __zenith_expr, contract: __zenith_contract }};
 }}"#,
-        html_escaped, expr_array
+        html_literal, expr_array
     )
+}
+
+/// Emit a runtime expression function through AST parse/codegen instead of
+/// splicing compiler output directly into generated JS.
+pub fn emit_runtime_expression_function(compiled_expr: &str) -> Result<String, String> {
+    let source = format!(
+        concat!(
+            "const __zenith_expr_fn = function(__ctx) {{\n",
+            "  const signalMap = __ctx.signalMap;\n",
+            "  const params = __ctx.params;\n",
+            "  const props = __ctx.props;\n",
+            "  const ssrData = __ctx.ssrData;\n",
+            "  const data = ssrData;\n",
+            "  const ssr = ssrData;\n",
+            "  const componentBindings = __ctx.componentBindings;\n",
+            "  return ({});\n",
+            "}};\n"
+        ),
+        compiled_expr
+    );
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::default().with_module(true);
+    let parser = Parser::new(&allocator, &source, source_type);
+    let parse_result = parser.parse();
+
+    if !parse_result.errors.is_empty() {
+        let errs = parse_result
+            .errors
+            .iter()
+            .map(|error| format!("{error}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(format!(
+            "failed to emit runtime expression function from compiler expression:\n{}",
+            errs
+        ));
+    }
+
+    let codegen = Codegen::<false>::new(&source, CodegenOptions::default());
+    let compiled = codegen.build(&parse_result.program);
+    let rendered = compiled.source_text.trim();
+    let prefix = "const __zenith_expr_fn = ";
+    let initializer = rendered
+        .strip_prefix(prefix)
+        .and_then(|value| value.strip_suffix(';'))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            "failed to extract canonical runtime expression function source".to_string()
+        })?;
+
+    Ok(initializer.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +503,20 @@ pub fn rewrite_js_imports_ast(
 mod tests {
     use super::*;
 
+    fn assert_module_parses(source: &str) {
+        let allocator = Allocator::default();
+        let source_type = SourceType::default().with_module(true);
+        let parser = Parser::new(&allocator, source, source_type);
+        let parse_result = parser.parse();
+
+        assert!(
+            parse_result.errors.is_empty(),
+            "expected emitted module to parse, errors: {:?}\nsource:\n{}",
+            parse_result.errors,
+            source
+        );
+    }
+
     #[test]
     fn test_virtual_entry_id() {
         assert_eq!(virtual_entry_id("home"), "\0zenith:entry:home");
@@ -520,20 +539,6 @@ mod tests {
         assert!(is_zen_file("page.zen"));
         assert!(is_zen_file("/foo/bar.zen"));
         assert!(!is_zen_file("page.tsx"));
-    }
-
-    #[test]
-    fn test_escape_js_template_literal() {
-        assert_eq!(escape_js_template_literal("hello"), "hello");
-        assert_eq!(escape_js_template_literal("a`b"), "a\\`b");
-        assert_eq!(escape_js_template_literal("${x}"), "\\${x}");
-        assert_eq!(escape_js_template_literal("a\\b"), "a\\\\b");
-    }
-
-    #[test]
-    fn test_escape_js_string() {
-        assert_eq!(escape_js_string(r#"he said "hi""#), r#"he said \"hi\""#);
-        assert_eq!(escape_js_string("line1\nline2"), "line1\\nline2");
     }
 
     #[test]
@@ -589,6 +594,7 @@ mod tests {
             event_bindings: Default::default(),
             ref_bindings: Default::default(),
             style_blocks: Default::default(),
+            image_materialization: Default::default(),
         };
         let entry = generate_virtual_entry(&output);
         assert!(entry.contains("__zenith_html"));
@@ -596,6 +602,56 @@ mod tests {
         assert!(entry.contains("\"title\""));
         // Inside a JS template literal, double quotes are NOT escaped
         assert!(entry.contains("data-zx-e=\"0\""));
+    }
+
+    #[test]
+    fn test_generate_virtual_entry_uses_compiler_owned_serialization() {
+        let output = CompilerOutput {
+            ir_version: 1,
+            graph_hash: String::new(),
+            graph_edges: Vec::new(),
+            graph_nodes: Vec::new(),
+            html: "<div data-note=\"`tick` ${hole}\u{2028}\"></div>".into(),
+            expressions: vec![
+                "\"quote\"".into(),
+                "line1\nline2".into(),
+                "\\slash\\u{2029}".into(),
+            ],
+            imports: Default::default(),
+            server_script: Default::default(),
+            prerender: false,
+            ssr_data: Default::default(),
+            hoisted: Default::default(),
+            components_scripts: Default::default(),
+            component_instances: Default::default(),
+            signals: Default::default(),
+            expression_bindings: Default::default(),
+            marker_bindings: Default::default(),
+            event_bindings: Default::default(),
+            ref_bindings: Default::default(),
+            style_blocks: Default::default(),
+            image_materialization: Default::default(),
+        };
+
+        let entry = generate_virtual_entry(&output);
+        assert!(entry.contains(r#"<div data-note="\`tick\` \${hole}\u2028"></div>"#));
+        assert!(entry.contains(r#"\"quote\""#));
+        assert!(entry.contains(r#""line1\nline2""#));
+        assert!(entry.contains(r#""\\slash\\u{2029}""#));
+        assert_module_parses(&entry);
+    }
+
+    #[test]
+    fn test_emit_runtime_expression_function_canonicalizes_compiled_expression_output() {
+        let function_source = emit_runtime_expression_function(
+            "(() => {\n  const note = `raw ${props.note}`;\n  return note + \" \\\\\" + \"quote\\\"\" + \"line\\u2028sep\\u2029tail\";\n})()",
+        )
+        .expect("compiled expression function should emit");
+
+        assert!(function_source.starts_with("function(__ctx)"));
+        assert!(function_source.contains("const signalMap = __ctx.signalMap;"));
+        assert!(function_source.contains("const note = `raw ${props.note}`;"));
+        assert_module_parses(&format!("const __zenith_expr_fns = [{}];", function_source));
     }
 
     #[test]

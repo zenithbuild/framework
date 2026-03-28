@@ -89,6 +89,7 @@ export const vercelAdapter = {
             await cp(join(options.coreOutput, 'server', 'images'), join(functionDir, 'images'), { recursive: true, force: true });
             await cp(join(options.coreOutput, 'server', 'base-path.js'), join(functionDir, 'base-path.js'), { force: true });
             await cp(join(options.coreOutput, 'server', 'server-contract.js'), join(functionDir, 'server-contract.js'), { force: true });
+            await cp(join(options.coreOutput, 'server', 'server-error.js'), join(functionDir, 'server-error.js'), { force: true });
             await cp(join(options.coreOutput, 'server', 'routes', route.name), functionDir, { recursive: true, force: true });
             await writeFile(join(functionDir, 'package.json'), '{\n  "type": "module"\n}\n', 'utf8');
             await writeFile(join(functionDir, 'index.js'), createFunctionSource(route), 'utf8');

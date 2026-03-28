@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/cli",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Deterministic project orchestrator for Zenith framework",
   "license": "MIT",
   "type": "module",
@@ -35,8 +35,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.7.3",
-    "@zenithbuild/bundler": "0.7.3",
+    "@zenithbuild/compiler": "0.7.4",
+    "@zenithbuild/bundler": "0.7.4",
     "picocolors": "^1.1.1",
     "sharp": "^0.34.4"
   },

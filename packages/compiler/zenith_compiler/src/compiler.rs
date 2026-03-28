@@ -1,5 +1,6 @@
 use crate::ast::SourceSpan;
 use crate::codegen::generate;
+use crate::expression_scope::analyze_scoped_expression;
 use crate::parser::{Parser, ParserProfileMetrics};
 use crate::script::{
     extract_script_blocks_with_profile, ComponentInstanceBinding, ComponentScriptAsset,
@@ -47,13 +48,6 @@ fn safe_member_chain_re() -> &'static Regex {
     RE.get_or_init(|| {
         Regex::new(r"^(?:params|data|ssr|props)(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$")
             .expect("valid member chain regex")
-    })
-}
-
-fn identifier_capture_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\b([A-Za-z_$][A-Za-z0-9_$]*)\b").expect("valid identifier capture regex")
     })
 }
 
@@ -275,13 +269,13 @@ pub struct SignalPayload {
     pub state_index: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
 pub struct SourcePositionPayload {
     pub line: usize,
     pub column: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
 pub struct SourceSpanPayload {
     pub file: String,
     pub start: SourcePositionPayload,
@@ -297,6 +291,7 @@ pub struct ExpressionBindingPayload {
     pub state_index: Option<usize>,
     pub component_instance: Option<String>,
     pub component_binding: Option<String>,
+    /// Compiler-owned source expression text for exact downstream lookup only.
     pub literal: Option<String>,
     /// Precompiled expression for compound expressions that reference signals.
     /// Replaces signal identifiers with `signalMap.get(id).get()` for runtime evaluation without eval.
@@ -304,7 +299,7 @@ pub struct ExpressionBindingPayload {
     pub source: Option<SourceSpanPayload>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
 pub struct MarkerPayload {
     pub index: usize,
     pub kind: String,
@@ -460,6 +455,8 @@ pub struct CompilerOutput {
     pub ref_bindings: Vec<RefBindingPayload>,
     /// Compiler-emitted style blocks in deterministic order.
     pub style_blocks: Vec<ExtractedStyleBlock>,
+    /// Static image materialization rows (selector + JSON props), filled when CLI merges props literals.
+    pub image_materialization: Vec<crate::image_materialization::ImageMaterializationEntry>,
 }
 
 impl Default for CompilerOutput {
@@ -484,6 +481,7 @@ impl Default for CompilerOutput {
             event_bindings: Vec::new(),
             ref_bindings: Vec::new(),
             style_blocks: Vec::new(),
+            image_materialization: Vec::new(),
         }
     }
 }
@@ -563,6 +561,7 @@ pub fn compile(input: &str) -> Result<String, String> {
         let options = CompileOptions::default();
         let (
             ast,
+            _raw_expressions,
             expressions,
             _hoisted,
             _component_scripts,
@@ -599,6 +598,7 @@ fn compile_internal_result(
 ) -> Result<
     (
         crate::ast::Node,
+        Vec<String>,
         Vec<String>,
         HoistedOutput,
         BTreeMap<String, ComponentScriptAsset>,
@@ -642,6 +642,7 @@ fn compile_internal_result(
     let transform_started_at = Instant::now();
     let (
         ast,
+        raw_expressions,
         expressions,
         hoisted,
         component_scripts,
@@ -662,6 +663,7 @@ fn compile_internal_result(
     }));
     Ok((
         ast,
+        raw_expressions,
         expressions,
         hoisted,
         component_scripts,
@@ -706,6 +708,7 @@ fn compile_capture(
             let compile_internal_started_at = Instant::now();
             let (
                 ast,
+                raw_expressions,
                 expressions,
                 hoisted,
                 component_scripts,
@@ -726,7 +729,7 @@ fn compile_capture(
             let map_signals_ms = map_signals_started_at.elapsed().as_secs_f64() * 1000.0;
 
             let map_marker_bindings_started_at = Instant::now();
-            let marker_bindings = map_markers(markers, source_path);
+            let marker_bindings = map_markers(markers, source_path, input);
             let map_marker_bindings_ms =
                 map_marker_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
 
@@ -736,8 +739,13 @@ fn compile_capture(
                 .collect::<BTreeMap<_, _>>();
 
             let map_expression_bindings_started_at = Instant::now();
-            let expression_bindings =
-                map_expression_bindings(&expressions, &hoisted, &signals, &marker_sources);
+            let expression_bindings = map_expression_bindings(
+                &raw_expressions,
+                &expressions,
+                &hoisted,
+                &signals,
+                &marker_sources,
+            );
             let map_expression_bindings_ms =
                 map_expression_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
 
@@ -756,12 +764,12 @@ fn compile_capture(
                 map_component_instances_started_at.elapsed().as_secs_f64() * 1000.0;
 
             let map_event_bindings_started_at = Instant::now();
-            let event_bindings_payload = map_events(events, source_path);
+            let event_bindings_payload = map_events(events, source_path, input);
             let map_event_bindings_ms =
                 map_event_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
 
             let map_ref_bindings_started_at = Instant::now();
-            let ref_bindings_payload = map_ref_bindings(ref_bindings, source_path);
+            let ref_bindings_payload = map_ref_bindings(ref_bindings, source_path, input);
             let map_ref_bindings_ms = map_ref_bindings_started_at.elapsed().as_secs_f64() * 1000.0;
 
             let map_warnings_started_at = Instant::now();
@@ -830,6 +838,7 @@ fn compile_capture(
             event_bindings,
             ref_bindings,
             style_blocks: Vec::new(),
+            image_materialization: Vec::new(),
         };
 
         Ok((output, warnings))
@@ -934,6 +943,7 @@ fn map_signals(hoisted: &HoistedOutput) -> Vec<SignalPayload> {
 }
 
 fn map_expression_bindings(
+    raw_expressions: &[String],
     expressions: &[String],
     hoisted: &HoistedOutput,
     signals: &[SignalPayload],
@@ -951,6 +961,12 @@ fn map_expression_bindings(
         .enumerate()
         .map(|(index, expr)| {
             let trimmed = expr.trim();
+            let source = marker_sources.get(&index).cloned().unwrap_or(None);
+            let raw_expr = raw_expressions
+                .get(index)
+                .map(String::as_str)
+                .unwrap_or(expr);
+            let raw_literal = resolve_raw_expression_literal(raw_expr, expr, source.as_ref());
 
             if let Some(state_index) = resolve_direct_state_index(trimmed, &hoisted.state_bindings)
             {
@@ -966,9 +982,9 @@ fn map_expression_bindings(
                     state_index: Some(state_index),
                     component_instance: None,
                     component_binding: None,
-                    literal: None,
+                    literal: Some(raw_literal.clone()),
                     compiled_expr: None,
-                    source: marker_sources.get(&index).cloned().unwrap_or(None),
+                    source,
                 };
             }
 
@@ -980,9 +996,9 @@ fn map_expression_bindings(
                     state_index: None,
                     component_instance: Some(instance),
                     component_binding: Some(binding),
-                    literal: None,
+                    literal: Some(raw_literal.clone()),
                     compiled_expr: None,
-                    source: marker_sources.get(&index).cloned().unwrap_or(None),
+                    source,
                 };
             }
 
@@ -994,15 +1010,19 @@ fn map_expression_bindings(
                     state_index: None,
                     component_instance: None,
                     component_binding: None,
-                    literal: Some(expr.clone()),
+                    literal: Some(raw_literal.clone()),
                     compiled_expr: None,
-                    source: marker_sources.get(&index).cloned().unwrap_or(None),
+                    source,
                 };
             }
 
-            let state_index = resolve_state_index_from_expression(trimmed, &hoisted.state_bindings);
-            let signal_indices = collect_signal_indices_from_expression(
-                trimmed,
+            let analysis = analyze_scoped_expression(trimmed, &runtime_replacements);
+            let state_index = resolve_state_index_from_free_identifiers(
+                &analysis.free_identifiers,
+                &hoisted.state_bindings,
+            );
+            let signal_indices = collect_signal_indices_from_free_identifiers(
+                &analysis.free_identifiers,
                 &hoisted.state_bindings,
                 &signal_index_by_state,
             );
@@ -1017,22 +1037,45 @@ fn map_expression_bindings(
                 state_index,
                 component_instance: None,
                 component_binding: None,
-                literal: Some(expr.clone()),
-                compiled_expr: Some(compile_expression_for_runtime(
-                    trimmed,
-                    &runtime_replacements,
-                )),
-                source: marker_sources.get(&index).cloned().unwrap_or(None),
+                literal: Some(raw_literal),
+                compiled_expr: Some(finalize_runtime_expression(&analysis.rewritten)),
+                source,
             }
         })
         .collect()
+}
+
+fn resolve_raw_expression_literal(
+    raw_expr: &str,
+    rewritten_expr: &str,
+    source: Option<&SourceSpanPayload>,
+) -> String {
+    let trimmed_raw = raw_expr.trim();
+    if !trimmed_raw.is_empty() {
+        return trimmed_raw.to_string();
+    }
+
+    let snippet = source
+        .and_then(|value| value.snippet.as_deref())
+        .map(str::trim)
+        .unwrap_or("");
+
+    if let Some(inner) = snippet.strip_prefix('{').and_then(|value| value.strip_suffix('}')) {
+        let trimmed = inner.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    rewritten_expr.to_string()
 }
 
 fn resolve_direct_state_index(expr: &str, state_bindings: &[HoistedStateBinding]) -> Option<usize> {
     if !is_identifier(expr) {
         return None;
     }
-    resolve_state_index_from_expression(expr, state_bindings)
+    let free_identifiers = [expr.to_string()].into_iter().collect::<BTreeSet<_>>();
+    resolve_state_index_from_free_identifiers(&free_identifiers, state_bindings)
 }
 
 fn is_safe_literal_binding(expr: &str) -> bool {
@@ -1068,20 +1111,13 @@ fn is_safe_member_chain_literal(expr: &str) -> bool {
     safe_member_chain_re().is_match(expr)
 }
 
-fn collect_signal_indices_from_expression(
-    expr: &str,
+fn collect_signal_indices_from_free_identifiers(
+    free_identifiers: &BTreeSet<String>,
     state_bindings: &[HoistedStateBinding],
     signal_index_by_state: &BTreeMap<usize, usize>,
 ) -> Vec<usize> {
     let mut signal_indices = BTreeSet::new();
-    for capture in identifier_capture_re().captures_iter(expr) {
-        let Some(ident_match) = capture.get(1) else {
-            continue;
-        };
-        if ident_match.start() > 0 && expr.as_bytes().get(ident_match.start() - 1) == Some(&b'.') {
-            continue;
-        }
-        let ident = ident_match.as_str();
+    for ident in free_identifiers {
         let Some(state_index) = resolve_direct_state_index(ident, state_bindings) else {
             continue;
         };
@@ -1093,16 +1129,10 @@ fn collect_signal_indices_from_expression(
     signal_indices.into_iter().collect()
 }
 
-struct RuntimeExpressionReplacement {
-    access_pattern: String,
-    token_re: Regex,
-    replacement: String,
-}
-
 fn build_runtime_expression_replacements(
     state_bindings: &[HoistedStateBinding],
     signal_index_by_state: &BTreeMap<usize, usize>,
-) -> Vec<RuntimeExpressionReplacement> {
+) -> BTreeMap<String, String> {
     let mut alias_usage = BTreeMap::new();
     for (state_index, binding) in state_bindings.iter().enumerate() {
         let Some(alias) = derive_state_alias(&binding.key) else {
@@ -1119,61 +1149,30 @@ fn build_runtime_expression_replacements(
         }
     }
 
-    let mut replacements = Vec::new();
+    let mut replacements = BTreeMap::new();
     for (state_index, binding) in state_bindings.iter().enumerate() {
         let Some(signal_id) = signal_index_by_state.get(&state_index).copied() else {
             continue;
         };
-        replacements.push((binding.key.clone(), signal_id));
+        replacements.insert(
+            binding.key.clone(),
+            format!("signalMap.get({signal_id}).get()"),
+        );
         if let Some(alias) = derive_state_alias(&binding.key) {
             if alias != binding.key && matches!(alias_usage.get(&alias), Some((1, 0))) {
-                replacements.push((alias, signal_id));
+                replacements.insert(alias, format!("signalMap.get({signal_id}).get()"));
             }
         }
     }
-
-    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0)));
-    replacements.dedup_by(|a, b| a.0 == b.0);
-
     replacements
-        .into_iter()
-        .map(|(ident, signal_id)| RuntimeExpressionReplacement {
-            access_pattern: format!("{}.get()", ident),
-            token_re: Regex::new(&format!(r"\b{}\b", regex::escape(&ident)))
-                .expect("valid runtime expression replacement regex"),
-            replacement: format!("signalMap.get({signal_id}).get()"),
-        })
-        .collect()
 }
 
-fn compile_expression_for_runtime(
-    expr: &str,
-    replacements: &[RuntimeExpressionReplacement],
-) -> String {
-    let mut compiled = expr.to_string();
-
-    for replacement in replacements {
-        compiled = compiled.replace(&replacement.access_pattern, &replacement.replacement);
-
-        let current_compiled = compiled.clone();
-        compiled = replacement
-            .token_re
-            .replace_all(&current_compiled, |caps: &regex::Captures| {
-                let m = caps.get(0).unwrap();
-                let start = m.start();
-
-                // Do not rewrite if it's a property access (preceded by '.')
-                if start > 0 && current_compiled.as_bytes().get(start - 1) == Some(&b'.') {
-                    return m.as_str().to_string();
-                }
-
-                replacement.replacement.clone()
-            })
-            .into_owned();
-    }
-
-    compiled = compiled.replace("__zenith_fragment(", "__ctx.fragment(");
-    compiled
+fn finalize_runtime_expression(compiled_expr: &str) -> String {
+    let replacements = BTreeMap::from([(
+        "__zenith_fragment".to_string(),
+        "__ctx.fragment".to_string(),
+    )]);
+    analyze_scoped_expression(compiled_expr, &replacements).rewritten
 }
 
 fn derive_state_alias(key: &str) -> Option<String> {
@@ -1191,22 +1190,19 @@ fn derive_state_alias(key: &str) -> Option<String> {
 
 /// Extract identifiers from an expression and resolve to state_index if exactly one
 /// state binding matches (by key suffix `_ident`).
-fn resolve_state_index_from_expression(
-    expr: &str,
+fn resolve_state_index_from_free_identifiers(
+    free_identifiers: &BTreeSet<String>,
     state_bindings: &[HoistedStateBinding],
 ) -> Option<usize> {
     let mut matched_index: Option<usize> = None;
-    for cap in identifier_capture_re().captures_iter(expr) {
-        let ident_match = cap.get(1)?;
-        if ident_match.start() > 0 && expr.as_bytes().get(ident_match.start() - 1) == Some(&b'.') {
-            continue;
-        }
-        let ident = ident_match.as_str();
+    for ident in free_identifiers {
         if ident == "true" || ident == "false" || ident == "null" || ident == "undefined" {
             continue;
         }
         for (idx, binding) in state_bindings.iter().enumerate() {
-            if binding.key == ident || derive_state_alias(&binding.key).as_deref() == Some(ident) {
+            if binding.key == *ident
+                || derive_state_alias(&binding.key).as_deref() == Some(ident.as_str())
+            {
                 if matched_index.is_some() && matched_index != Some(idx) {
                     return None;
                 }
@@ -1241,7 +1237,7 @@ fn parse_component_binding(expr: &str) -> Option<(String, String)> {
     Some((instance.to_string(), binding.to_string()))
 }
 
-fn map_markers(markers: Vec<MarkerBinding>, source_path: &str) -> Vec<MarkerPayload> {
+fn map_markers(markers: Vec<MarkerBinding>, source_path: &str, source_input: &str) -> Vec<MarkerPayload> {
     markers
         .into_iter()
         .map(|marker| MarkerPayload {
@@ -1254,36 +1250,44 @@ fn map_markers(markers: Vec<MarkerBinding>, source_path: &str) -> Vec<MarkerPayl
             .to_string(),
             selector: marker.selector,
             attr: marker.attr,
-            source: map_source_span(source_path, marker.source),
+            source: map_source_span(source_path, source_input, marker.source),
         })
         .collect()
 }
 
-fn map_events(events: Vec<EventBinding>, source_path: &str) -> Vec<EventPayload> {
+fn map_events(events: Vec<EventBinding>, source_path: &str, source_input: &str) -> Vec<EventPayload> {
     events
         .into_iter()
         .map(|event| EventPayload {
             index: event.index,
             event: event.event,
             selector: event.selector,
-            source: map_source_span(source_path, event.source),
+            source: map_source_span(source_path, source_input, event.source),
         })
         .collect()
 }
 
-fn map_ref_bindings(bindings: Vec<RefBinding>, source_path: &str) -> Vec<RefBindingPayload> {
+fn map_ref_bindings(
+    bindings: Vec<RefBinding>,
+    source_path: &str,
+    source_input: &str,
+) -> Vec<RefBindingPayload> {
     bindings
         .into_iter()
         .map(|binding| RefBindingPayload {
             index: binding.index,
             identifier: binding.identifier,
             selector: binding.selector,
-            source: map_source_span(source_path, binding.source),
+            source: map_source_span(source_path, source_input, binding.source),
         })
         .collect()
 }
 
-fn map_source_span(source_path: &str, source: Option<SourceSpan>) -> Option<SourceSpanPayload> {
+fn map_source_span(
+    source_path: &str,
+    source_input: &str,
+    source: Option<SourceSpan>,
+) -> Option<SourceSpanPayload> {
     source.map(|span| SourceSpanPayload {
         file: source_path.to_string(),
         start: SourcePositionPayload {
@@ -1294,8 +1298,54 @@ fn map_source_span(source_path: &str, source: Option<SourceSpan>) -> Option<Sour
             line: span.end.line,
             column: span.end.column,
         },
-        snippet: None,
+        snippet: extract_source_span_snippet(source_input, &span),
     })
+}
+
+fn extract_source_span_snippet(source_input: &str, span: &SourceSpan) -> Option<String> {
+    let lines = source_input.lines().collect::<Vec<_>>();
+    let start_line = span.start.line.checked_sub(1)?;
+    let end_line = span.end.line.checked_sub(1)?;
+    if start_line >= lines.len() || end_line >= lines.len() || start_line > end_line {
+        return None;
+    }
+
+    let mut snippet = String::new();
+    for line_index in start_line..=end_line {
+        let line = lines[line_index];
+        let start_column = if line_index == start_line {
+            span.start.column.saturating_sub(1)
+        } else {
+            0
+        };
+        let end_column = if line_index == end_line {
+            span.end.column.saturating_sub(1)
+        } else {
+            line.chars().count()
+        };
+        if end_column < start_column {
+            return None;
+        }
+        snippet.push_str(&slice_columns(line, start_column, end_column));
+        if line_index != end_line {
+            snippet.push('\n');
+        }
+    }
+
+    Some(snippet)
+}
+
+fn slice_columns(line: &str, start_column: usize, end_column: usize) -> String {
+    line.chars()
+        .enumerate()
+        .filter_map(|(index, ch)| {
+            if index >= start_column && index < end_column {
+                Some(ch)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn map_warnings(warnings: Vec<TransformWarning>) -> Vec<CompileWarning> {

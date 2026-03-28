@@ -1,14 +1,8 @@
 import { performance } from 'node:perf_hooks';
-import { extractTemplate } from '../resolve-components.js';
-import { runCompiler } from './compiler-runtime.js';
+import { rewriteCompilerSignalMapReferences } from './compiler-signal-expression.js';
 
 /**
- * @param {string} compPath
- * @param {string} componentSource
  * @param {object} compIr
- * @param {object} compilerOpts
- * @param {string|object} compilerBin
- * @param {Map<string, string[]> | null} [templateExpressionCache]
  * @param {Record<string, number> | null} [rewriteMetrics]
  * @returns {{
  *   map: Map<string, string>,
@@ -27,14 +21,11 @@ import { runCompiler } from './compiler-runtime.js';
  * }}
  */
 export function buildComponentExpressionRewrite(
-    compPath,
-    componentSource,
     compIr,
-    compilerOpts,
-    compilerBin,
-    templateExpressionCache = null,
     rewriteMetrics = null
 ) {
+    // Downstream is only allowed to read compiler-owned raw->rewritten pairs here.
+    // It must not synthesize new identifier meaning beyond this mapping.
     const out = {
         map: new Map(),
         bindings: new Map(),
@@ -49,64 +40,20 @@ export function buildComponentExpressionRewrite(
         return out;
     }
 
-    const hoistedState = Array.isArray(compIr?.hoisted?.state) ? compIr.hoisted.state : [];
-    const hoistedFunctions = Array.isArray(compIr?.hoisted?.functions) ? compIr.hoisted.functions : [];
-    const hoistedDeclarations = Array.isArray(compIr?.hoisted?.declarations) ? compIr.hoisted.declarations : [];
-    const signals = Array.isArray(compIr?.signals) ? compIr.signals : [];
-    if (
-        hoistedState.length === 0 &&
-        hoistedFunctions.length === 0 &&
-        hoistedDeclarations.length === 0 &&
-        signals.length === 0
-    ) {
-        return out;
-    }
     if (rewriteMetrics && typeof rewriteMetrics === 'object') {
         rewriteMetrics.calls += 1;
     }
-
-    const templateOnly = extractTemplate(componentSource);
-    if (!templateOnly.trim()) {
-        return out;
-    }
-
-    const cacheKey = `${compPath}\u0000${templateOnly}`;
-    let rawExpressions = null;
-    if (templateExpressionCache instanceof Map && templateExpressionCache.has(cacheKey)) {
-        rawExpressions = templateExpressionCache.get(cacheKey);
-        if (rewriteMetrics && typeof rewriteMetrics === 'object') {
-            rewriteMetrics.cacheHits += 1;
-        }
-    } else {
-        let templateIr;
-        const templateCompileStartedAt = performance.now();
-        try {
-            templateIr = runCompiler(compPath, templateOnly, compilerOpts, {
-                suppressWarnings: true,
-                compilerToolchain: compilerBin
-            });
-        } catch {
-            return out;
-        }
-        rawExpressions = Array.isArray(templateIr?.expressions) ? templateIr.expressions : [];
-        if (templateExpressionCache instanceof Map) {
-            templateExpressionCache.set(cacheKey, rawExpressions);
-        }
-        if (rewriteMetrics && typeof rewriteMetrics === 'object') {
-            rewriteMetrics.cacheMisses += 1;
-            rewriteMetrics.templateCompileMs += Math.round((performance.now() - templateCompileStartedAt) * 100) / 100;
-        }
-    }
-
-    const count = Math.min(rawExpressions.length, rewrittenExpressions.length);
-    for (let i = 0; i < count; i++) {
-        const raw = rawExpressions[i];
+    for (let i = 0; i < rewrittenExpressions.length; i++) {
         const rewritten = rewrittenExpressions[i];
-        if (typeof raw !== 'string' || typeof rewritten !== 'string') {
+        if (typeof rewritten !== 'string') {
             continue;
         }
 
         const binding = rewrittenBindings[i];
+        // Compiler emits the raw source literal for exact lookup; CLI only transports it.
+        const raw = typeof binding?.literal === 'string' && binding.literal.length > 0
+            ? binding.literal
+            : rewritten;
         const normalizedBinding = binding && typeof binding === 'object'
             ? {
                 compiled_expr: typeof binding.compiled_expr === 'string' ? binding.compiled_expr : null,
@@ -150,6 +97,11 @@ export function buildComponentExpressionRewrite(
         }
     }
 
+    if (rewriteMetrics && typeof rewriteMetrics === 'object') {
+        rewriteMetrics.compilerOwnedBindings += out.sequence.length;
+        rewriteMetrics.ambiguousBindings += out.ambiguous.size;
+    }
+
     return out;
 }
 
@@ -166,28 +118,41 @@ export function remapCompiledExpressionSignals(
     componentStateBindings,
     pageSignalIndexByStateKey
 ) {
+    // This is a mechanical index remap across page merge boundaries, not a second compiler pass.
     if (typeof compiledExpr !== 'string' || compiledExpr.length === 0) {
         return null;
     }
 
-    return compiledExpr.replace(/signalMap\.get\((\d+)\)/g, (full, rawIndex) => {
-        const localIndex = Number.parseInt(rawIndex, 10);
-        if (!Number.isInteger(localIndex)) {
-            return full;
-        }
-        const signal = componentSignals[localIndex];
+    return rewriteCompilerSignalMapReferences(compiledExpr, ({ ts, signalIndex, valueRead }) => {
+        const signal = componentSignals[signalIndex];
         if (!signal || !Number.isInteger(signal.state_index)) {
-            return full;
+            return null;
         }
         const stateKey = componentStateBindings[signal.state_index]?.key;
         if (typeof stateKey !== 'string' || stateKey.length === 0) {
-            return full;
+            return null;
         }
         const pageIndex = pageSignalIndexByStateKey.get(stateKey);
         if (!Number.isInteger(pageIndex)) {
-            return full;
+            return null;
         }
-        return `signalMap.get(${pageIndex})`;
+
+        const signalMapRead = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('signalMap'),
+                'get'
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(pageIndex))]
+        );
+        if (valueRead) {
+            return ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(signalMapRead, 'get'),
+                undefined,
+                []
+            );
+        }
+        return signalMapRead;
     });
 }
 
@@ -376,6 +341,15 @@ export function mergeExpressionRewriteMaps(
         );
         const existing = pageBindingMap.get(raw);
         if (existing && JSON.stringify(existing) !== JSON.stringify(resolved)) {
+            const existingWeight = measureBindingSpecificity(existing, raw);
+            const resolvedWeight = measureBindingSpecificity(resolved, raw);
+            if (resolvedWeight > existingWeight && existingWeight === 0) {
+                pageBindingMap.set(raw, resolved);
+                continue;
+            }
+            if (existingWeight > resolvedWeight && resolvedWeight === 0) {
+                continue;
+            }
             pageAmbiguous.add(raw);
             pageMap.delete(raw);
             pageBindingMap.delete(raw);
@@ -397,6 +371,37 @@ export function mergeExpressionRewriteMaps(
         }
         pageMap.set(raw, rewritten);
     }
+}
+
+function measureBindingSpecificity(binding, raw) {
+    if (!binding || typeof binding !== 'object') {
+        return 0;
+    }
+
+    let score = 0;
+    if (
+        typeof binding.compiled_expr === 'string' &&
+        binding.compiled_expr.length > 0 &&
+        binding.compiled_expr !== raw
+    ) {
+        score += 4;
+    }
+    if (Number.isInteger(binding.signal_index)) {
+        score += 2;
+    }
+    if (Array.isArray(binding.signal_indices) && binding.signal_indices.length > 0) {
+        score += 2;
+    }
+    if (Number.isInteger(binding.state_index)) {
+        score += 1;
+    }
+    if (typeof binding.component_instance === 'string' && binding.component_instance.length > 0) {
+        score += 1;
+    }
+    if (typeof binding.component_binding === 'string' && binding.component_binding.length > 0) {
+        score += 1;
+    }
+    return score;
 }
 
 /**

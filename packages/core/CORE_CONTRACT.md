@@ -1,13 +1,11 @@
-# CORE_CONTRACT.md — Deterministic Utility Substrate
+# CORE_CONTRACT.md — Public Package Boundary and Deterministic Utility Layer
 
-Canonical public docs: `../zenith-docs/documentation/contracts/core-contract.md`
+Canonical public docs: `../../docs/documentation/contracts/core-contract.md`
 
 > **This document is a legal boundary.**
-> Core is a shared utility layer. It contains no business logic,
-> no routing, no DOM, no framework behavior. Pure helper substrate only.
->
-> **Standalone test:** If `zenith-core` were published alone on npm,
-> it must make sense as a generic deterministic utility library.
+> `@zenithbuild/core` is the public dependency boundary for Zenith apps.
+> It owns deterministic shared utilities and the public config/type surface.
+> It does not own compiler semantics, router runtime behavior, or adapter packaging logic.
 
 ## Status: FROZEN (V0)
 
@@ -15,19 +13,20 @@ Canonical public docs: `../zenith-docs/documentation/contracts/core-contract.md`
 
 ## 1. Core Identity
 
-Core provides deterministic **transforms**, **formatting**, and **schema validation**.
+Core provides:
 
-**Core provides:**
-- Deterministic transforms: `hash`, `normalizePath`, `sortRoutes`, `parseConfig`, `parseSemver`
-- Deterministic formatting: `formatError`
-- Deterministic schema validation: `validateConfigSchema`, `validateRouteParams`
+- the public `zenith` CLI entrypoint
+- deterministic config loading and validation
+- exported config/build-manifest/adapter types
+- path ordering, hashing, error, version, and schema helpers
+- the generated core-module source bridge used by the framework runtime boundary
 
-**Core does NOT:**
-- Scan repositories
-- Enforce cross-layer behavior
-- Know about router semantics
-- Know about bundler internals
-- Police other layers' architecture
+Core does not:
+
+- classify routes or execute navigation
+- hydrate DOM or run runtime bindings
+- bundle assets or package adapters
+- reinterpret compiler output downstream
 
 ---
 
@@ -35,14 +34,17 @@ Core provides deterministic **transforms**, **formatting**, and **schema validat
 
 | Module | Purpose |
 |---|---|
-| `config.js` | Load + validate config schema |
-| `path.js` | Normalize paths + `[param]` → `:param` |
-| `order.js` | Static-first stable sort |
-| `hash.js` | SHA-256 content hashing |
-| `errors.js` | Error factory + prefixing |
-| `version.js` | SemVer parsing + major compatibility |
-| `guards.js` | Small pure validation helpers |
-| `index.js` | Re-exports |
+| `config.ts` | Load + validate config schema |
+| `config-types.ts` | Public config, manifest, and adapter types |
+| `path.ts` | Normalize paths + `[param]` → `:param` |
+| `order.ts` | Static-first stable sort |
+| `hash.ts` | SHA-256 content hashing |
+| `errors.ts` | Error factory + prefixing |
+| `version.ts` | SemVer parsing + major compatibility |
+| `guards.ts` | Small pure validation helpers |
+| `schema.ts` / `ir/` | Shared IR/schema exports |
+| `core-template.ts` | Deterministic generated core module bridge |
+| `index.ts` | Re-exports |
 
 ---
 
@@ -55,25 +57,51 @@ Core provides deterministic **transforms**, **formatting**, and **schema validat
 | Paths | Normalized separators (`/`), consistent param format |
 | Config | Missing keys → explicit defaults, unknown keys → throw |
 | Errors | Consistent format: `[Zenith:MODULE] message` |
+| Config loading | Exactly one of `zenith.config.ts` or `zenith.config.js` is loaded |
 
 ---
 
-## 4. Explicit Prohibitions
+## 4. Public Config Surface
 
-Core source **must never**:
+Top-level Zenith config keys currently validated by core:
 
-1. Import from `@zenithbuild/compiler`, `@zenithbuild/bundler`, `@zenithbuild/runtime`, or `@zenithbuild/router`
-2. Reference `window`, `document`, `navigator`, or any browser API
-3. Use `eval()`, `new Function()`, or `document.write()`
-4. Perform build orchestration of any kind
-5. Access the filesystem **except when explicitly loading `zenith.config.js`**
-6. Mutate global state
-7. Contain preset/mode logic (`basic`, `router`, `fullstack` belong in `create-zenith`)
-8. Initiate version checks against other packages (other layers call core's utility)
+```ts
+export default defineConfig({
+  router: false,
+  embeddedMarkupExpressions: false,
+  typescriptDefault: true,
+  outDir: 'dist',
+  pagesDir: 'pages',
+  basePath: '/',
+  target: 'static',
+  adapter: null,
+  strictDomLints: false,
+  images: {}
+});
+```
+
+Rules:
+
+- `target` and `adapter` are mutually exclusive
+- unknown top-level keys throw
+- `basePath` is normalized and must stay path-only
+- `images` is a structured config object validated by core
+
+## 5. Explicit Prohibitions
+
+Core source must never:
+
+1. Reference `window`, `document`, `navigator`, or browser-only APIs.
+2. Use `eval()`, `new Function()`, or `document.write()`.
+3. Perform dev/build/preview orchestration.
+4. Infer route protection, router, or adapter behavior from app source.
+5. Read project files other than explicit config loading.
+6. Mutate process-wide framework state as hidden behavior.
+7. Invent hidden config defaults or silently accept unknown config keys.
 
 ---
 
-## 5. Hash Contract
+## 6. Hash Contract
 
 - Algorithm: **SHA-256** via `node:crypto`
 - Output: **hex string**
@@ -81,29 +109,6 @@ Core source **must never**:
 
 > **Critical rule:** Hash algorithm must match bundler's algorithm exactly.
 > If bundler changes hash algorithm, core must change in lockstep.
-
----
-
-## 6. Config Schema (V0)
-
-```js
-// zenith.config.js
-export default {
-  router: false,    // boolean — opt-in client router
-  outDir: 'dist',   // string — output directory
-  pagesDir: 'pages' // string — pages directory
-}
-```
-
-| Key | Type | Default | Validation |
-|---|---|---|---|
-| `router` | `boolean` | `false` | Must be boolean |
-| `outDir` | `string` | `'dist'` | Non-empty string |
-| `pagesDir` | `string` | `'pages'` | Non-empty string |
-
-Unknown keys → throw `[Zenith:Config] Unknown key: "foo"`.
-
-**No other keys for V0.** No `mode`, `target`, `presets`, `experimental`, `base`, `assetsDir`.
 
 ---
 
@@ -137,9 +142,6 @@ Guards do NOT:
 
 ---
 
-## 9. Dependency Rules
+## 9. Boundary Rule
 
-- **Zero dependencies on other Zenith packages**
-- Zero runtime npm dependencies
-- Dev dependencies: Jest only
-- Pure ESM, Node.js built-ins only
+If a capability changes route behavior, bundling, runtime DOM behavior, or adapter packaging, core may type or validate its config shape but it must not become the implementation owner.

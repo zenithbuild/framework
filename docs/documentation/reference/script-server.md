@@ -11,16 +11,19 @@ tags: ["reference", "server", "script-server"]
 
 ## Contract: Supported Exports
 
-Contract: `<script server>` supports `data`, `load(ctx)`, and optional `prerender`.
+Contract: `<script server>` supports optional `guard(ctx)`, optional `action(ctx)`, one payload source (`data` or `load(ctx)`), and optional `prerender`.
 
-Invariant: `load` accepts exactly one argument and returns JSON-safe object payload.
+Invariant: `guard(ctx)`, `action(ctx)`, and `load(ctx)` accept exactly one argument. `guard` controls route access; `action` owns POST mutations; `data` or `load` provides the render payload.
 
 Definition of Done:
-- Public examples use only allowed exports.
+- Public examples use only allowed exports and do not mix payload sources.
 - Context access happens through `ctx` argument.
+- Mutation examples use normal HTML forms first and opt into client enhancement separately.
 
 Failure Modes:
 - Multiple payload exports conflict.
+- `guard(ctx)` attempts to act as a payload channel.
+- `action(ctx)` expands into a generic server function surface instead of a route-owned form handler.
 - Runtime depends on undeclared context globals.
 
 Evidence:

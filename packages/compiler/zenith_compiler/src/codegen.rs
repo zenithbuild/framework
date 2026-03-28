@@ -1,13 +1,15 @@
 use crate::ast::{Attribute, Node};
+use crate::js_serialize::{serialize_js_string_literal, serialize_js_template_literal};
 
 pub fn generate(root: Node, expressions: Vec<String>) -> String {
     let expr_list = expressions
         .iter()
-        .map(|e| format!("\"{}\"", e.replace("\"", "\\\""))) // Simple JSON-like escaping
+        .map(|expression| serialize_js_string_literal(expression))
         .collect::<Vec<_>>()
         .join(", ");
 
     let html = generate_node(&root);
+    let html_literal = serialize_js_template_literal(&html);
 
     format!(
         r#"export const __zenith_expr = [{}]
@@ -16,8 +18,8 @@ export function setup() {{
   return {{}}
 }}
 
-export default `{}`"#,
-        expr_list, html
+export default {}"#,
+        expr_list, html_literal
     )
 }
 

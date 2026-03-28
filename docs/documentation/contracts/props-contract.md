@@ -21,4 +21,4 @@ Definition of Done:
 - Compiler owns props serialization.
 - Runtime consumes props as explicit factory inputs only.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/PROPS_CONTRACT.md`.
+Canonical source: `packages/compiler/PROPS_CONTRACT.md`.

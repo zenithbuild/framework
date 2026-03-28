@@ -21,4 +21,4 @@ Definition of Done:
 - Payload validation throws on drift.
 - Marker/expression/event ordering is preserved exactly.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/HYDRATION_CONTRACT.md`.
+Canonical source: `packages/runtime/HYDRATION_CONTRACT.md`.

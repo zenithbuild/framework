@@ -284,6 +284,16 @@ impl<'a> Parser<'a> {
                     let attr_name_offset = self.current_token_start;
                     self.advance();
 
+                    if name.eq_ignore_ascii_case("innerHTML") {
+                        let attr_name_location = self.location_for_offset(attr_name_offset);
+                        panic!(
+                            "innerHTML bindings are forbidden.\n\
+                             Found: {} at line {}, column {}.\n\
+                             Use unsafeHTML={{value}} for explicit raw HTML, or embedded markup expressions for compiler-owned fragments.",
+                            name, attr_name_location.line, attr_name_location.column
+                        );
+                    }
+
                     if self.current_token == Token::Eq {
                         self.advance(); // Eat '='
 
@@ -640,9 +650,8 @@ fn lower_embedded_markup_expression(raw: &str) -> String {
         if b == b'<' {
             if let Some((markup, end)) = read_markup_literal(raw, i) {
                 assert_embedded_markup_safe(&markup);
-                out.push_str("__zenith_fragment(");
+                out.push_str("__zenith_fragment");
                 out.push_str(&markup_literal_to_template(&markup));
-                out.push(')');
                 i = end;
                 continue;
             }

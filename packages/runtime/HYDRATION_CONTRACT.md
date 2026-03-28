@@ -1,6 +1,6 @@
 # Zenith Runtime V0 Hydration Contract
 
-Canonical public docs: `../zenith-docs/documentation/contracts/hydration-contract.md`
+Canonical public docs: `../../docs/documentation/contracts/hydration-contract.md`
 
 
 Status: FROZEN (V0)

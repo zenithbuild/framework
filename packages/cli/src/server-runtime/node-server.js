@@ -5,6 +5,8 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { handleImageRequest } from '../images/service.js';
+import { createTrustedOriginResolver } from '../request-origin.js';
+import { defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
 import { executeRouteRequest, renderRouteRequest } from './route-render.js';
 import { resolveRequestRoute } from './resolve-request-route.js';
 
@@ -71,20 +73,6 @@ function toStaticFilePath(staticDir, pathname) {
         resolvedPath += '/index.html';
     }
     return resolveWithinRoot(staticDir, resolvedPath);
-}
-
-function publicHost(host) {
-    if (host === '0.0.0.0' || host === '::') {
-        return '127.0.0.1';
-    }
-    return host;
-}
-
-function createRequestBase(req, fallbackOrigin) {
-    if (typeof req.headers.host === 'string' && req.headers.host.length > 0) {
-        return `http://${req.headers.host}`;
-    }
-    return fallbackOrigin;
 }
 
 async function createWebRequest(req, url) {
@@ -256,10 +244,11 @@ async function handleRouteCheck(req, res, url, context) {
             });
             result = normalizeRouteCheckResult(execution.result, targetUrl, context.basePath);
         } catch (error) {
+            logServerException('node route-check failed', error);
             result = {
                 kind: 'deny',
                 status: 500,
-                message: String(error)
+                message: defaultRouteDenyMessage(500)
             };
         }
     }
@@ -272,14 +261,14 @@ async function handleRouteCheck(req, res, url, context) {
         Vary: 'Cookie'
     });
     res.end(JSON.stringify({
-        result,
+        result: sanitizeRouteResult(result),
         routeId,
         to: targetUrl.toString()
     }));
 }
 
 async function handleNodeRequest(req, res, context, serverOrigin) {
-    const url = new URL(req.url || '/', createRequestBase(req, serverOrigin));
+    const url = new URL(req.url || '/', serverOrigin);
     const canonicalPath = stripBasePath(url.pathname, context.basePath);
 
     if (url.pathname === routeCheckPath(context.basePath)) {
@@ -326,9 +315,6 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             params: serverResolved.params,
             routeModulePath: join(routeDir, 'route', 'entry.js'),
             shellHtmlPath: join(routeDir, 'route', 'page.html'),
-            pageAssetPath: serverResolved.route.page_asset_file
-                ? join(routeDir, 'route', serverResolved.route.page_asset_file)
-                : null,
             imageManifestPath: serverResolved.route.image_manifest_file
                 ? join(routeDir, 'route', serverResolved.route.image_manifest_file)
                 : null,
@@ -357,20 +343,28 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
     res.end('404 Not Found');
 }
 
-export async function createRequestHandler(options = {}) {
-    const context = await loadRuntimeContext(options);
-    const host = publicHost(options.host || '127.0.0.1');
-    const port = Number.isInteger(options.port) ? options.port : 3000;
-    const serverOrigin = `http://${host}:${port}`;
-
+function createNodeRequestHandler(context, resolveServerOrigin) {
     return async (req, res) => {
         try {
-            await handleNodeRequest(req, res, context, serverOrigin);
+            await handleNodeRequest(req, res, context, resolveServerOrigin());
         } catch (error) {
+            logServerException('node request handler failed', error);
             res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-            res.end(String(error));
+            res.end(defaultRouteDenyMessage(500));
         }
     };
+}
+
+export async function createRequestHandler(options = {}) {
+    const context = await loadRuntimeContext(options);
+    const resolveServerOrigin = createTrustedOriginResolver({
+        publicOrigin: options.publicOrigin,
+        host: options.host || '127.0.0.1',
+        port: Number.isInteger(options.port) ? options.port : undefined,
+        label: 'createRequestHandler()'
+    });
+    resolveServerOrigin();
+    return createNodeRequestHandler(context, resolveServerOrigin);
 }
 
 export async function createNodeServer(options = {}) {
@@ -378,16 +372,26 @@ export async function createNodeServer(options = {}) {
         port = 3000,
         host = '127.0.0.1'
     } = options;
-    const handler = await createRequestHandler({ ...options, port, host });
+    const context = await loadRuntimeContext(options);
+    let actualPort = Number.isInteger(port) && port > 0 ? port : 0;
+    const resolveServerOrigin = createTrustedOriginResolver({
+        publicOrigin: options.publicOrigin,
+        host,
+        getPort: () => actualPort,
+        label: 'createNodeServer()'
+    });
+    const handler = createNodeRequestHandler(context, resolveServerOrigin);
     const server = createServer((req, res) => {
         void handler(req, res);
     });
 
     return new Promise((resolveServer) => {
         server.listen(port, host, () => {
+            const address = server.address();
+            actualPort = address && typeof address === 'object' ? address.port : port;
             resolveServer({
                 server,
-                port: server.address().port,
+                port: actualPort,
                 close: () => server.close()
             });
         });

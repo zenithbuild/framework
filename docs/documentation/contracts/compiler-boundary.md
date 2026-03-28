@@ -22,4 +22,4 @@ Definition of Done:
 - Parse -> scope -> safety -> lowering -> emission remains deterministic.
 - Impossible behavior fails at compile time.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/COMPILER_BOUNDARY.md`.
+Canonical source: `packages/compiler/COMPILER_BOUNDARY.md`.

@@ -55,6 +55,12 @@ async function readBuiltRuntimeAsset(outDir) {
     return readFile(join(assetsDir, String(runtimeFile)), 'utf8');
 }
 
+function extractExpressionBindings(asset) {
+    const match = asset.match(/const __zenith_expression_bindings = (\[[\s\S]*?\]);/);
+    expect(match).toBeTruthy();
+    return JSON.parse(String(match?.[1] || '[]'));
+}
+
 describe('expression pipeline regressions', () => {
     let project = null;
 
@@ -107,7 +113,7 @@ describe('expression pipeline regressions', () => {
         expect(pageAsset).not.toMatch(/signalMap\.get\(\d+\)\.get\(\)\.title/);
     });
 
-    test('emits fn_index expressions against __ctx.fragment instead of __zenith_fragment', async () => {
+    test('emits fn_index expressions against __ctx.fragment tags instead of __zenith_fragment aliases', async () => {
         project = await makeWorkspaceProject({
             'src/pages/index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
         });
@@ -119,8 +125,72 @@ describe('expression pipeline regressions', () => {
         });
         const pageAsset = await readBuiltPageAsset(project.outDir);
 
-        expect(pageAsset).toContain('__ctx.fragment(');
-        expect(pageAsset).not.toContain('return __zenith_fragment(');
+        expect(pageAsset).toMatch(/__ctx\.fragment\s*`<a>Hi<\/a>`/);
+        expect(pageAsset).not.toContain('__zenith_fragment = __ctx.fragment');
+        expect(pageAsset).not.toContain('const fragment = __ctx.fragment');
+    });
+
+    test('preserves shadowed callback params after component expansion', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/ShadowPanel.zen': [
+                '<script lang="ts">',
+                'state count = 1;',
+                'const items = [1, 2, 3];',
+                '</script>',
+                '<section>{items.map((count) => count + 1).join(",")}</section>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><ShadowPanel /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+
+        expect(pageAsset).toContain('.map((count) => count + 1)');
+        expect(pageAsset).not.toContain('.map((signalMap.get(');
+    });
+
+    test('preserves destructuring locals after component expansion while rewriting free state structurally', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/DestructurePanel.zen': [
+                '<script lang="ts">',
+                'state total = 5;',
+                'const items = [{ count: 1 }, { count: 2 }];',
+                '</script>',
+                '<section>{items.map(({ count }) => count + total).join(",")}</section>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><DestructurePanel /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+
+        expect(pageAsset).toMatch(/\.map\(\(\{\s*count\s*\}\)\s*=>\s*count\s*\+\s*signalMap\.get\(/);
+        expect(pageAsset).not.toMatch(/\(\{\s*signalMap\.get/);
+    });
+
+    test('direct local identifier bindings stay compiler-scoped after component expansion', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/TitleBadge.zen': [
+                '<script lang="ts">',
+                'const resolvedTitle = typeof props.title === "string" ? props.title : "Zenith";',
+                '</script>',
+                '<h1>{resolvedTitle}</h1>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><TitleBadge title="About" /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+        const bindings = extractExpressionBindings(pageAsset);
+
+        expect(bindings).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ state_index: expect.any(Number) })
+            ])
+        );
+        expect(pageAsset).toMatch(/"literal":"[^"]*resolvedTitle"/);
+        expect(pageAsset).not.toContain('"literal":"resolvedTitle"');
+        expect(pageAsset).not.toContain('return resolvedTitle;');
     });
 
     test('keeps distinct signal rewrites when multiple components share the same state alias', async () => {
@@ -146,14 +216,12 @@ describe('expression pipeline regressions', () => {
             config: { embeddedMarkupExpressions: true }
         });
         const pageAsset = await readBuiltPageAsset(project.outDir);
-        const matches = Array.from(
-            pageAsset.matchAll(
-                /signalMap\.get\((\d+)\)\.get\(\) \? "(First|Second) Open" : "(First|Second) Closed"/g
-            )
+        const bindings = extractExpressionBindings(pageAsset).filter((binding) =>
+            /First Open|Second Open/.test(String(binding.literal || ''))
         );
 
-        expect(matches).toHaveLength(2);
-        expect(new Set(matches.map((match) => match[1])).size).toBe(2);
+        expect(bindings).toHaveLength(2);
+        expect(new Set(bindings.map((binding) => binding.signal_index)).size).toBe(2);
         expect(pageAsset).not.toContain('return open ?');
     });
 

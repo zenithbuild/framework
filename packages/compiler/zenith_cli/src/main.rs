@@ -7,6 +7,8 @@ use zenith_compiler::compiler::{
     CompilerOutput,
 };
 use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::compiler::MarkerPayload;
+use serde::Deserialize;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -26,10 +28,40 @@ struct Cli {
     /// Treat ZEN-DOM-* warnings as build failures.
     #[arg(long = "strict-dom-lints")]
     strict_dom_lints: bool,
+
+    /// Build `image_materialization` from marker bindings + static props object literals (stdin JSON).
+    #[arg(long = "merge-image-materialization")]
+    merge_image_materialization: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct MergeImageMaterializationIn {
+    marker_bindings: Vec<MarkerPayload>,
+    literals: Vec<String>,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.merge_image_materialization {
+        use std::io::Read;
+        let mut buffer = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buffer)
+            .context("Failed to read merge payload from stdin")?;
+        let input: MergeImageMaterializationIn = serde_json::from_str(&buffer)
+            .context("Failed to parse merge-image-materialization JSON")?;
+        let entries = zenith_compiler::image_materialization::build_image_materialization(
+            &input.marker_bindings,
+            &input.literals,
+        )
+        .map_err(|e| anyhow::anyhow!(e))?;
+        println!(
+            "{}",
+            serde_json::json!({ "image_materialization": entries })
+        );
+        return Ok(());
+    }
 
     let (content, original_path) = if cli.stdin {
         use std::io::Read;

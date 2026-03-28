@@ -126,7 +126,7 @@ describe('platform server adapters', () => {
             'https://example.com/__zenith/records_param_id?__zenith_param_id=explode'
         ));
         expect(failed.status).toBe(500);
-        expect(await failed.text()).toBe('Error: Route exploded');
+        expect(await failed.text()).toBe('Internal Server Error');
     });
 
     test('netlify target emits publish/functions layout and packaged function can execute adjacent load modules', async () => {

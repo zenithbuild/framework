@@ -1,6 +1,6 @@
 # Reactive Binding Mental Model (Zenith V0)
 
-Canonical public docs: `../zenith-docs/documentation/reference/reactive-binding-model.md`
+Canonical public docs: `../../docs/documentation/reference/reactive-binding-model.md`
 
 
 Status: FROZEN

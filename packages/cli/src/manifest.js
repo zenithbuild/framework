@@ -98,12 +98,13 @@ async function _scanDir(dir, root, ext, compilerOpts) {
 function buildManifestEntry({ fullPath, root, routePath, compilerOpts }) {
     const rawSource = readFileSync(fullPath, 'utf8');
     const inlineServerScript = extractServerScript(rawSource, fullPath, compilerOpts).serverScript;
-    const { guardPath, loadPath } = resolveAdjacentServerModules(fullPath);
+    const { guardPath, loadPath, actionPath } = resolveAdjacentServerModules(fullPath);
     const composed = composeServerScriptEnvelope({
         sourceFile: fullPath,
         inlineServerScript,
         adjacentGuardPath: guardPath,
-        adjacentLoadPath: loadPath
+        adjacentLoadPath: loadPath,
+        adjacentActionPath: actionPath
     });
 
     return {

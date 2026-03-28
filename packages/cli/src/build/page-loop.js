@@ -5,7 +5,7 @@ import { applyOccurrenceRewritePlans } from '../component-instance-ir.js';
 import { collectExpandedComponentOccurrences } from '../component-occurrences.js';
 import { expandComponents } from '../resolve-components.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from '../server-script-composition.js';
-import { createTimedCompilerRunner } from './compiler-runtime.js';
+import { createTimedCompilerRunner, mergePageImageMaterialization } from './compiler-runtime.js';
 import {
     buildComponentExpressionRewrite,
     mergeExpressionRewriteMaps,
@@ -15,13 +15,10 @@ import { createPageIrMergeCache } from './merge-component-ir.js';
 import { buildPageOwnerContext, runPageComponentLoop } from './page-component-loop.js';
 import {
     applyExpressionRewrites,
-    applyScopedIdentifierRewrites,
-    normalizeExpressionBindingDependencies,
     normalizeExpressionPayload,
     normalizeHoistedSourcePayload,
     rewriteLegacyMarkupIdentifiers,
-    rewriteRefBindingIdentifiers,
-    synthesizeSignalBackedCompiledExpressions
+    rewriteRefBindingIdentifiers
 } from './page-ir-normalization.js';
 import {
     addBreakdown,
@@ -35,7 +32,6 @@ import {
     createPageLoopCaches,
     createPageLoopExecutionState
 } from './page-loop-state.js';
-import { buildScopedIdentifierRewrite } from './scoped-identifier-rewrite.js';
 import { extractServerScript } from './server-script.js';
 
 /**
@@ -74,7 +70,6 @@ export async function buildPageEnvelopes(input) {
         componentIrCache,
         componentDocumentModeCache,
         componentExpressionRewriteCache,
-        templateExpressionCache,
         hoistedCodeTransformCache
     } = cacheState;
     const {
@@ -122,7 +117,11 @@ export async function buildPageEnvelopes(input) {
         const pageOwnerSource = extractServerScript(rawSource, sourceFile, compilerOpts).source;
         pagePhase.serverExtractMs += startupProfile.roundMs(performance.now() - pageOwnerExtractStartedAt);
 
-        const { guardPath: adjacentGuard, loadPath: adjacentLoad } = resolveAdjacentServerModules(sourceFile);
+        const {
+            guardPath: adjacentGuard,
+            loadPath: adjacentLoad,
+            actionPath: adjacentAction
+        } = resolveAdjacentServerModules(sourceFile);
         const expandedStartedAt = performance.now();
         const { expandedSource } = expandComponents(rawSource, registry, sourceFile);
         pageExpandMs = startupProfile.roundMs(performance.now() - expandedStartedAt);
@@ -134,7 +133,7 @@ export async function buildPageEnvelopes(input) {
 
         await cooperativeYield();
         const pageCompileStartedAt = performance.now();
-        const pageIr = timedRunCompiler(
+        let pageIr = timedRunCompiler(
             'page',
             sourceFile,
             compileSource,
@@ -147,16 +146,19 @@ export async function buildPageEnvelopes(input) {
             sourceFile,
             inlineServerScript: extractedServer.serverScript,
             adjacentGuardPath: adjacentGuard,
-            adjacentLoadPath: adjacentLoad
+            adjacentLoadPath: adjacentLoad,
+            adjacentActionPath: adjacentAction
         });
         const hasGuard = composedServer.serverScript?.has_guard === true;
         const hasLoad = composedServer.serverScript?.has_load === true;
+        const hasAction = composedServer.serverScript?.has_action === true;
 
         applyServerEnvelopeToPageIr({
             pageIr,
             composedServer,
             hasGuard,
             hasLoad,
+            hasAction,
             entry,
             srcDir,
             sourceFile
@@ -171,10 +173,10 @@ export async function buildPageEnvelopes(input) {
         const pageAmbiguousExpressionMap = new Set();
         const knownRefKeys = new Set();
         const componentOccurrencePlans = [];
+        const imagePropsLiterals = [];
         const {
             pageOwnerCompileMs: resolvedPageOwnerCompileMs,
-            pageOwnerExpressionRewrite,
-            pageOwnerScopeRewrite
+            pageOwnerExpressionRewrite
         } = await buildPageOwnerContext({
             componentOccurrences,
             sourceFile,
@@ -183,19 +185,13 @@ export async function buildPageEnvelopes(input) {
             compilerBin,
             timedRunCompiler,
             cooperativeYield,
-            templateExpressionCache,
             expressionRewriteMetrics,
             startupProfile
         });
         pageOwnerCompileMs = resolvedPageOwnerCompileMs;
         const pageSelfRewriteStartedAt = performance.now();
         const pageSelfExpressionRewrite = buildComponentExpressionRewrite(
-            sourceFile,
-            compileSource,
             pageIr,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
             expressionRewriteMetrics
         );
         pagePhase.selfRewriteMs = startupProfile.roundMs(performance.now() - pageSelfRewriteStartedAt);
@@ -228,10 +224,8 @@ export async function buildPageEnvelopes(input) {
             componentIrCache,
             componentDocumentModeCache,
             componentExpressionRewriteCache,
-            templateExpressionCache,
             expressionRewriteMetrics,
             pageOwnerExpressionRewrite,
-            pageOwnerScopeRewrite,
             pageIr,
             pageIrMergeCache,
             seenStaticImports,
@@ -240,6 +234,7 @@ export async function buildPageEnvelopes(input) {
             pageAmbiguousExpressionMap,
             knownRefKeys,
             componentOccurrencePlans,
+            imagePropsLiterals,
             pagePhase,
             pageBindingResolutionBreakdown,
             pageMergeBreakdown,
@@ -252,6 +247,12 @@ export async function buildPageEnvelopes(input) {
         pageComponentCacheMisses = pageStats.pageComponentCacheMisses;
 
         pagePhase.componentLoopMs = startupProfile.roundMs(performance.now() - componentLoopStartedAt);
+
+        if (imagePropsLiterals.length > 0) {
+            pageIr = mergePageImageMaterialization(pageIr, imagePropsLiterals, {
+                compilerToolchain: compilerBin
+            });
+        }
 
         const occurrencePlanApplyStartedAt = performance.now();
         applyOccurrenceRewritePlans(
@@ -269,19 +270,9 @@ export async function buildPageEnvelopes(input) {
         const expressionApplyStartedAt = performance.now();
         applyExpressionRewrites(pageIr, pageExpressionRewriteMap, pageExpressionBindingMap, pageAmbiguousExpressionMap);
         pagePhase.expressionApplyMs = startupProfile.roundMs(performance.now() - expressionApplyStartedAt);
-        const scopedRewriteStartedAt = performance.now();
-        const scopedRewritePlanStartedAt = performance.now();
-        const scopedRewritePlan = buildScopedIdentifierRewrite(pageIr);
-        pagePhase.scopedRewritePlanMs = startupProfile.roundMs(performance.now() - scopedRewritePlanStartedAt);
-        const scopedRewriteApplyStartedAt = performance.now();
-        applyScopedIdentifierRewrites(pageIr, scopedRewritePlan, pageScopedRewriteBreakdown);
-        pagePhase.scopedRewriteApplyMs = startupProfile.roundMs(performance.now() - scopedRewriteApplyStartedAt);
-        pagePhase.scopedRewriteMs = startupProfile.roundMs(performance.now() - scopedRewriteStartedAt);
         const normalizeStartedAt = performance.now();
-        synthesizeSignalBackedCompiledExpressions(pageIr);
         normalizeExpressionPayload(pageIr);
         normalizeHoistedSourcePayload(pageIr);
-        normalizeExpressionBindingDependencies(pageIr);
         rewriteLegacyMarkupIdentifiers(pageIr);
         rewriteRefBindingIdentifiers(pageIr, knownRefKeys);
         pagePhase.normalizeMs = startupProfile.roundMs(performance.now() - normalizeStartedAt);
@@ -296,6 +287,9 @@ export async function buildPageEnvelopes(input) {
             route: entry.path,
             file: sourceFile,
             ir: pageIr,
+            image_materialization: Array.isArray(pageIr.image_materialization)
+                ? pageIr.image_materialization
+                : [],
             router: routerEnabled
         });
         recordPageProfile({

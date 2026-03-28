@@ -1,9 +1,13 @@
 pub mod ast;
 pub mod codegen;
 pub mod compiler;
+pub mod image_materialization;
 pub mod deterministic;
 pub mod event_contract;
+pub mod expression_scope;
+pub mod js_serialize;
 pub mod lexer;
 pub mod parser;
 pub mod script;
+pub mod script_transform;
 pub mod transform;

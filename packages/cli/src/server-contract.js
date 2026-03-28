@@ -2,11 +2,11 @@
 // ---------------------------------------------------------------------------
 // Shared validation and payload resolution logic for <script server> blocks.
 
-const NEW_KEYS = new Set(['data', 'load', 'guard', 'prerender']);
+const NEW_KEYS = new Set(['data', 'load', 'guard', 'action', 'prerender']);
 const LEGACY_KEYS = new Set(['ssr_data', 'props', 'ssr', 'prerender']);
-const ALLOWED_KEYS = new Set(['data', 'load', 'guard', 'prerender', 'ssr_data', 'props', 'ssr']);
+const ALLOWED_KEYS = new Set(['data', 'load', 'guard', 'action', 'prerender', 'ssr_data', 'props', 'ssr']);
 
-const ROUTE_RESULT_KINDS = new Set(['allow', 'redirect', 'deny', 'data']);
+const ROUTE_RESULT_KINDS = new Set(['allow', 'redirect', 'deny', 'data', 'invalid']);
 
 export function allow() {
     return { kind: 'allow' };
@@ -30,6 +30,14 @@ export function deny(status = 403, message = undefined) {
 
 export function data(payload) {
     return { kind: 'data', data: payload };
+}
+
+export function invalid(payload, status = 400) {
+    return {
+        kind: 'invalid',
+        data: payload,
+        status: Number.isInteger(status) ? status : 400
+    };
 }
 
 function isRouteResultLike(value) {
@@ -71,6 +79,47 @@ function assertValidRouteResultShape(value, where, allowedKinds) {
             throw new Error(`[Zenith] ${where}: deny message must be a string when provided.`);
         }
     }
+
+    if (kind === 'invalid') {
+        if (!Number.isInteger(value.status) || (value.status !== 400 && value.status !== 422)) {
+            throw new Error(`[Zenith] ${where}: invalid status must be 400 or 422.`);
+        }
+    }
+}
+
+function assertOneArgRouteFunction({ filePath, exportName, value }) {
+    if (typeof value !== 'function') {
+        throw new Error(`[Zenith] ${filePath}: "${exportName}" must be a function.`);
+    }
+    if (value.length !== 1) {
+        throw new Error(`[Zenith] ${filePath}: "${exportName}(ctx)" must take exactly 1 argument.`);
+    }
+    const fnStr = value.toString();
+    const paramsMatch = fnStr.match(/^[^{=]+\(([^)]*)\)/);
+    if (paramsMatch && paramsMatch[1].includes('...')) {
+        throw new Error(`[Zenith] ${filePath}: "${exportName}(ctx)" must not contain rest parameters.`);
+    }
+}
+
+function buildActionState(result) {
+    if (!result || typeof result !== 'object') {
+        return null;
+    }
+    if (result.kind === 'data') {
+        return {
+            ok: true,
+            status: 200,
+            data: result.data
+        };
+    }
+    if (result.kind === 'invalid') {
+        return {
+            ok: false,
+            status: Number.isInteger(result.status) ? result.status : 400,
+            data: result.data
+        };
+    }
+    return null;
 }
 
 export function validateServerExports({ exports, filePath }) {
@@ -84,8 +133,9 @@ export function validateServerExports({ exports, filePath }) {
     const hasData = 'data' in exports;
     const hasLoad = 'load' in exports;
     const hasGuard = 'guard' in exports;
+    const hasAction = 'action' in exports;
 
-    const hasNew = hasData || hasLoad;
+    const hasNew = hasData || hasLoad || hasAction;
     const hasLegacy = ('ssr_data' in exports) || ('props' in exports) || ('ssr' in exports);
 
     if (hasData && hasLoad) {
@@ -102,32 +152,16 @@ export function validateServerExports({ exports, filePath }) {
         throw new Error(`[Zenith] ${filePath}: "prerender" must be a boolean.`);
     }
 
-    if (hasLoad && typeof exports.load !== 'function') {
-        throw new Error(`[Zenith] ${filePath}: "load" must be a function.`);
-    }
     if (hasLoad) {
-        if (exports.load.length !== 1) {
-            throw new Error(`[Zenith] ${filePath}: "load(ctx)" must take exactly 1 argument.`);
-        }
-        const fnStr = exports.load.toString();
-        const paramsMatch = fnStr.match(/^[^{=]+\(([^)]*)\)/);
-        if (paramsMatch && paramsMatch[1].includes('...')) {
-            throw new Error(`[Zenith] ${filePath}: "load(ctx)" must not contain rest parameters.`);
-        }
+        assertOneArgRouteFunction({ filePath, exportName: 'load', value: exports.load });
     }
 
-    if (hasGuard && typeof exports.guard !== 'function') {
-        throw new Error(`[Zenith] ${filePath}: "guard" must be a function.`);
-    }
     if (hasGuard) {
-        if (exports.guard.length !== 1) {
-            throw new Error(`[Zenith] ${filePath}: "guard(ctx)" must take exactly 1 argument.`);
-        }
-        const fnStr = exports.guard.toString();
-        const paramsMatch = fnStr.match(/^[^{=]+\(([^)]*)\)/);
-        if (paramsMatch && paramsMatch[1].includes('...')) {
-            throw new Error(`[Zenith] ${filePath}: "guard(ctx)" must not contain rest parameters.`);
-        }
+        assertOneArgRouteFunction({ filePath, exportName: 'guard', value: exports.guard });
+    }
+
+    if (hasAction) {
+        assertOneArgRouteFunction({ filePath, exportName: 'action', value: exports.action });
     }
 }
 
@@ -197,8 +231,15 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
 
     const trace = {
         guard: 'none',
+        action: 'none',
         load: 'none'
     };
+    let responseStatus = 200;
+    const requestMethod = String(ctx?.method || ctx?.request?.method || 'GET').toUpperCase();
+    const isActionRequest = !guardOnly && requestMethod === 'POST';
+    if (ctx && typeof ctx === 'object') {
+        ctx.action = null;
+    }
 
     if ('guard' in exports) {
         const guardRaw = await exports.guard(ctx);
@@ -221,6 +262,36 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
         return { result: allow(), trace };
     }
 
+    if (isActionRequest && 'action' in exports) {
+        const actionRaw = await exports.action(ctx);
+        let actionResult = null;
+        if (isRouteResultLike(actionRaw)) {
+            actionResult = actionRaw;
+            assertValidRouteResultShape(
+                actionResult,
+                `${filePath}: action(ctx) return`,
+                new Set(['data', 'invalid', 'redirect', 'deny'])
+            );
+            if (actionResult.kind === 'data' || actionResult.kind === 'invalid') {
+                assertJsonSerializable(actionResult.data, `${filePath}: action(ctx) return`);
+            }
+        } else {
+            assertJsonSerializable(actionRaw, `${filePath}: action(ctx) return`);
+            actionResult = data(actionRaw);
+        }
+        trace.action = actionResult.kind;
+        if (actionResult.kind === 'redirect' || actionResult.kind === 'deny') {
+            return { result: actionResult, trace };
+        }
+        const actionState = buildActionState(actionResult);
+        if (ctx && typeof ctx === 'object') {
+            ctx.action = actionState;
+        }
+        if (actionState && actionState.ok === false) {
+            responseStatus = actionState.status;
+        }
+    }
+
     let payload;
     if ('load' in exports) {
         const loadRaw = await exports.load(ctx);
@@ -237,13 +308,13 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
             loadResult = data(loadRaw);
         }
         trace.load = loadResult.kind;
-        return { result: loadResult, trace };
+        return { result: loadResult, trace, status: loadResult.kind === 'data' ? responseStatus : undefined };
     }
     if ('data' in exports) {
         payload = exports.data;
         assertJsonSerializable(payload, `${filePath}: data export`);
         trace.load = 'data';
-        return { result: data(payload), trace };
+        return { result: data(payload), trace, status: responseStatus };
     }
 
     // legacy fallback
@@ -251,22 +322,31 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
         payload = exports.ssr_data;
         assertJsonSerializable(payload, `${filePath}: ssr_data export`);
         trace.load = 'data';
-        return { result: data(payload), trace };
+        return { result: data(payload), trace, status: responseStatus };
     }
     if ('props' in exports) {
         payload = exports.props;
         assertJsonSerializable(payload, `${filePath}: props export`);
         trace.load = 'data';
-        return { result: data(payload), trace };
+        return { result: data(payload), trace, status: responseStatus };
     }
     if ('ssr' in exports) {
         payload = exports.ssr;
         assertJsonSerializable(payload, `${filePath}: ssr export`);
         trace.load = 'data';
-        return { result: data(payload), trace };
+        return { result: data(payload), trace, status: responseStatus };
     }
 
-    return { result: data({}), trace };
+    if (isActionRequest && ctx?.action) {
+        trace.load = 'data';
+        return {
+            result: data({ action: ctx.action }),
+            trace,
+            status: responseStatus
+        };
+    }
+
+    return { result: data({}), trace, status: responseStatus };
 }
 
 export async function resolveServerPayload({ exports, ctx, filePath }) {

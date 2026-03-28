@@ -16,7 +16,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Download publish metadata
+      - name: Download publish artifacts
         id: metadata
         shell: bash
         env:
@@ -29,7 +29,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts")"
 
-          download_url="$(printf '%s' "${artifacts_json}" | node -e '
+          download_metadata_url="$(printf '%s' "${artifacts_json}" | node -e '
             let data = "";
             process.stdin.setEncoding("utf8");
             process.stdin.on("data", (chunk) => { data += chunk; });
@@ -42,22 +42,61 @@ jobs:
             });
           ')"
 
-          if [[ -z "${download_url}" ]]; then
+          if [[ -z "${download_metadata_url}" ]]; then
             echo "No framework-release-metadata artifact found for publish run ${RUN_ID}." >&2
+            exit 1
+          fi
+
+          download_verification_url="$(printf '%s' "${artifacts_json}" | node -e '
+            let data = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", (chunk) => { data += chunk; });
+            process.stdin.on("end", () => {
+              const payload = JSON.parse(data);
+              const artifact = (payload.artifacts || []).find((item) => item.name === "framework-release-verification");
+              if (artifact && typeof artifact.archive_download_url === "string") {
+                process.stdout.write(artifact.archive_download_url);
+              }
+            });
+          ')"
+
+          if [[ -z "${download_verification_url}" ]]; then
+            echo "No framework-release-verification artifact found for publish run ${RUN_ID}." >&2
             exit 1
           fi
 
           curl -fsSL \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "${download_url}" \
+            "${download_metadata_url}" \
             -o framework-release-metadata.zip
 
           unzip -p framework-release-metadata.zip framework-release.json > framework-release.json
 
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${download_verification_url}" \
+            -o framework-release-verification.zip
+
+          unzip -p framework-release-verification.zip framework-release-verification.json > framework-release-verification.json
+
           version="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.version || "");')"
           tag="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.tag || "");')"
           sha="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release.json", "utf8")); process.stdout.write(payload.sha || "");')"
+          
+          verified="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release-verification.json", "utf8")); process.stdout.write(payload.verified === true ? "true" : "false");')"
+          verified_version="$(node -e 'const fs = require("node:fs"); const payload = JSON.parse(fs.readFileSync("framework-release-verification.json", "utf8")); process.stdout.write(payload.version || "");')"
+
+          if [[ "${verified}" != "true" ]]; then
+            echo "framework-release-verification indicates unverified registry truth. Release blocked." >&2
+            exit 1
+          fi
+
+          if [[ "${verified_version}" != "${version}" ]]; then
+            echo "Mismatch: metadata version ${version} != verification version ${verified_version}. Release blocked." >&2
+            exit 1
+          fi
 
           if [[ -z "${version}" || -z "${tag}" || -z "${sha}" ]]; then
             echo "framework-release.json is missing version, tag, or sha." >&2

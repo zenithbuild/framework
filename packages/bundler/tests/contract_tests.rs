@@ -293,6 +293,7 @@ async fn golden_e2e_with_strict_metadata() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let plan = BundlePlan {

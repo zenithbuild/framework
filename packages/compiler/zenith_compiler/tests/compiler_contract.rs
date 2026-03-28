@@ -75,6 +75,7 @@ fn compiler_output_is_sealed_data_only() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Vec::new(),
+        image_materialization: Vec::new(),
     };
 
     // Can clone and compare (derives enforced)

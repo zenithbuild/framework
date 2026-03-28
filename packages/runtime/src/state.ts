@@ -10,7 +10,7 @@
 //   store.set((prev) => ({ ...prev, count: prev.count + 1 }));
 // ---------------------------------------------------------------------------
 
-import { _nextReactiveId, _trackDependency } from './zeneffect.js';
+import { _nextReactiveId, _trackDependency } from './reactivity-core.js';
 
 type PlainState = Record<string, unknown>;
 type StateUpdater<T extends PlainState> = T | ((prev: Readonly<T>) => T);

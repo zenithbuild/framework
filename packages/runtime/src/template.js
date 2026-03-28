@@ -15,21 +15,20 @@ function readRuntimeSourceFile(fileName) {
 }
 
 function stripImports(source) {
-    return source.replace(/^\s*import\s+[^;]+;\s*$/gm, '').trim();
+    return source
+        .replace(/^\s*import\s+[^;]+;\s*$/gm, '')
+        .replace(/^\s*export\s+\{[^}]+\}\s+from\s+['"]\.[^'"]+['"];\s*$/gm, '')
+        .trim();
 }
 
 function buildRuntimeModuleSource() {
     const segments = [
-        stripImports(readRuntimeSourceFile('zeneffect.js')),
-        stripImports(readRuntimeSourceFile('ref.js')),
-        stripImports(readRuntimeSourceFile('env.js')),
-        stripImports(readRuntimeSourceFile('platform.js')),
-        stripImports(readRuntimeSourceFile('signal.js')),
-        stripImports(readRuntimeSourceFile('state.js')),
-        stripImports(readRuntimeSourceFile('diagnostics.js')),
-        stripImports(readRuntimeSourceFile('cleanup.js')),
-        stripImports(readRuntimeSourceFile('hydrate.js'))
-    ].filter(Boolean);
+        'reactivity-core.js', 'side-effect-scope.js', 'effect-utils.js', 'effect-scheduler.js',
+        'effect-runtime.js', 'mount-runtime.js', 'zeneffect.js', 'ref.js', 'env.js',
+        'platform.js', 'signal.js', 'state.js',
+        'diagnostics.js', 'cleanup.js', 'template-parser.js', 'markup.js', 'payload.js',
+        'expressions.js', 'render.js', 'fragment-patch.js', 'scanner.js', 'events.js', 'hydrate.js'
+    ].map((fileName) => stripImports(readRuntimeSourceFile(fileName))).filter(Boolean);
 
     return normalizeNewlines(segments.join('\n\n'));
 }

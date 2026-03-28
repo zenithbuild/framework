@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-03-28
+
+### Changed
+
+- Bumped the lockstep framework train to `0.7.4` so published `@zenithbuild/compiler` and optional `@zenithbuild/compiler-*` platform packages ship a `zenith-compiler` binary that includes `--merge-image-materialization` (Track B static image props artifact), matching CI verification of staged platform binaries.
+- Aligned language tooling packages (`@zenithbuild/language-server`, `@zenithbuild/language`) and workspace consumers on the same compiler train version.
+
 ## [0.7.2] - 2026-03-24
 
 ### Changed

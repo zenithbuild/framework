@@ -29,7 +29,7 @@ const manifestJson = JSON.stringify(
 
 const runtimeImport = '/assets/runtime.11111111.js';
 const coreImport = '/assets/core.33333333.js';
-const opts = { manifestJson, runtimeImport, coreImport };
+const opts = { manifestJson, runtimeImport, coreImport, routeCheck: true };
 
 const sourceA = renderRouterModule(opts);
 const sourceB = renderRouterModule(opts);
@@ -42,6 +42,7 @@ assert.equal(sourceA.includes('\r'), false, 'router template must normalize line
 assert.ok(sourceA.includes(`from '${runtimeImport}'`), 'router template must import runtime via provided specifier');
 assert.ok(sourceA.includes(`from '${coreImport}'`), 'router template must import core via provided specifier');
 assert.ok(sourceA.includes('const __ZENITH_MANIFEST__ ='), 'router template must inject __ZENITH_MANIFEST__ constant');
+assert.ok(sourceA.includes('const __ZENITH_ROUTE_CHECK_ENABLED__ = true;'), 'router template must inline route-check capability');
 assert.ok(sourceA.includes(manifestJson), 'router template must inline provided manifestJson string');
 assert.ok(
     sourceA.includes('import(__ZENITH_MANIFEST__.chunks[route])'),
@@ -63,9 +64,23 @@ assert.ok(
 
 const clickStart = sourceA.indexOf('document.addEventListener("click"');
 assert.ok(clickStart >= 0, 'router template must register delegated click handler');
+const submitStart = sourceA.indexOf('document.addEventListener("submit"');
+assert.ok(submitStart >= 0, 'router template must register delegated submit handler');
 
 const targetIndex = sourceA.indexOf('closest("a[data-zen-link]")', clickStart);
 assert.ok(targetIndex >= 0, 'click flow must target a[data-zen-link]');
+assert.ok(
+    sourceA.includes('form.hasAttribute("data-zen-form")'),
+    'enhanced form flow must stay opt-in via data-zen-form'
+);
+assert.ok(
+    sourceA.includes('method: "POST"'),
+    'enhanced form submissions must use POST for the canonical action flow'
+);
+assert.ok(
+    sourceA.includes('new FormData(form'),
+    'enhanced form flow must submit browser-native FormData payloads'
+);
 
 const preventDefaultIndex = sourceA.indexOf('event.preventDefault();', clickStart);
 const fetchIndex = sourceA.indexOf('fetch(targetUrl.href');
@@ -159,21 +174,25 @@ assert.equal(sourceA.includes('.zen'), false, 'router template must not contain 
 assert.equal(sourceA.includes('zenith:'), false, 'router template must not contain zenith:* specifiers');
 
 const performNavigationStart = sourceA.indexOf('async function performNavigation(targetUrl, historyMode, popstateState)');
-const mountIdx = sourceA.indexOf('const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);', performNavigationStart);
+const commitNavigationStart = sourceA.indexOf('async function commitNavigationDocument(');
+const commitNavigationEnd = sourceA.indexOf('async function performNavigation(targetUrl, historyMode, popstateState)');
+const commitNavigationSource = sourceA.slice(commitNavigationStart, commitNavigationEnd);
+const mountIdx = sourceA.indexOf('const committed = await commitNavigationDocument(', performNavigationStart);
 const requestIdx = sourceA.indexOf('dispatchRouteEvent("navigation:request", buildNavigationPayload(context));');
-const dataReadyIdx = sourceA.indexOf('emitNavigationEvent(context, "navigation:data-ready"');
-const scrollBeforeIdx = sourceA.indexOf('dispatchScrollEvent("before"', performNavigationStart);
-const beforeLeaveIdx = sourceA.indexOf('await emitNavigationEvent(context, "navigation:before-leave"', performNavigationStart);
-const leaveCompleteIdx = sourceA.indexOf('emitNavigationEvent(context, "navigation:leave-complete"', performNavigationStart);
-const beforeSwapIdx = sourceA.indexOf('await emitNavigationEvent(context, "navigation:before-swap"', performNavigationStart);
-const contentSwappedIdx = sourceA.indexOf('emitNavigationEvent(context, "navigation:content-swapped"', performNavigationStart);
-const beforeEnterIdx = sourceA.indexOf('await emitNavigationEvent(context, "navigation:before-enter"', performNavigationStart);
-const scrollAfterIdx = sourceA.indexOf('dispatchScrollEvent("after"', performNavigationStart);
-const enterCompleteIdx = sourceA.indexOf('emitNavigationEvent(context, "navigation:enter-complete"', performNavigationStart);
+const dataReadyIdx = commitNavigationSource.indexOf('emitNavigationEvent(context, "navigation:data-ready"');
+const scrollBeforeIdx = commitNavigationSource.indexOf('dispatchScrollEvent("before"');
+const beforeLeaveIdx = commitNavigationSource.indexOf('await emitNavigationEvent(context, "navigation:before-leave"');
+const leaveCompleteIdx = commitNavigationSource.indexOf('emitNavigationEvent(context, "navigation:leave-complete"');
+const beforeSwapIdx = commitNavigationSource.indexOf('await emitNavigationEvent(context, "navigation:before-swap"');
+const contentSwappedIdx = commitNavigationSource.indexOf('emitNavigationEvent(context, "navigation:content-swapped"');
+const beforeEnterIdx = commitNavigationSource.indexOf('await emitNavigationEvent(context, "navigation:before-enter"');
+const scrollAfterIdx = commitNavigationSource.indexOf('dispatchScrollEvent("after"');
+const enterCompleteIdx = commitNavigationSource.indexOf('emitNavigationEvent(context, "navigation:enter-complete"');
 const abortIdx = sourceA.indexOf('dispatchRouteEvent("navigation:abort"');
 const errorIdx = sourceA.indexOf('dispatchRouteEvent("navigation:error"');
 
 assert.ok(performNavigationStart >= 0, 'router template must define performNavigation');
+assert.ok(commitNavigationStart >= 0, 'router template must define commitNavigationDocument');
 assert.ok(mountIdx >= 0, 'router template must mount the route during navigation');
 assert.ok(requestIdx >= 0, 'router template must emit navigation:request');
 assert.ok(dataReadyIdx >= 0, 'router template must emit navigation:data-ready');
@@ -186,13 +205,12 @@ assert.ok(enterCompleteIdx >= 0, 'router template must emit navigation:enter-com
 assert.ok(abortIdx >= 0, 'router template must emit navigation:abort');
 assert.ok(errorIdx >= 0, 'router template must emit navigation:error');
 assert.ok(
-    requestIdx < dataReadyIdx &&
+    requestIdx < mountIdx &&
     dataReadyIdx < scrollBeforeIdx &&
     scrollBeforeIdx < beforeLeaveIdx &&
     beforeLeaveIdx < leaveCompleteIdx &&
     leaveCompleteIdx < beforeSwapIdx &&
-    beforeSwapIdx < mountIdx &&
-    mountIdx < contentSwappedIdx &&
+    beforeSwapIdx < contentSwappedIdx &&
     contentSwappedIdx < beforeEnterIdx &&
     beforeEnterIdx < scrollAfterIdx &&
     scrollAfterIdx < enterCompleteIdx,

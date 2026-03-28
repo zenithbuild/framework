@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler-darwin-x64",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Internal darwin-x64 native binary for @zenithbuild/bundler",
   "license": "MIT",
   "os": [

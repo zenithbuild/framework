@@ -1,6 +1,6 @@
 # RUNTIME_CONTRACT.md — Sealed Runtime Interface
 
-Canonical public docs: `../zenith-docs/documentation/contracts/runtime-contract.md`
+Canonical public docs: `../../docs/documentation/contracts/runtime-contract.md`
 
 
 > **This document is a legal boundary.**
@@ -117,15 +117,16 @@ effect(() => {
 Internals:
 - On execution, sets itself as the "current tracking context"
 - Any signal read during execution adds this effect to its subscriber set
-- When a dependency signal changes, the effect re-runs
+- When a dependency signal changes, the effect is scheduled to re-run
 
-### Constraints
+### Scheduling & Execution Constraints
 
-- No batching
-- No scheduler / microtask queue
-- No async effects
+- By default, effects are scheduled on the microtask queue (`flush: 'post'`) to prevent render thrashing
+- Synchronous execution is supported via `flush: 'sync'`
+- Advanced debouncing, throttling, and RAF deferral schedulers are internally implemented for complex interactions
 - No suspense / lazy loading
-- No lifecycle hooks beyond `cleanup()`
+- `mount()` exists as the sole component bootstrap hook, deferring initialization until the DOM attachment scope is complete
+- Beyond `mount()` and `cleanup()`, the runtime offers no lifecycle hooks
 
 ---
 
@@ -166,13 +167,24 @@ Cleanup is deterministic — calling it twice is a no-op.
 Total exports (exhaustive):
 
 ```js
-export { signal }    // Create reactive signal
-export { effect }    // Create reactive effect
-export { mount }     // Mount page module into container
-export { cleanup }   // Tear down all bindings
+export { signal }      // Create reactive signal
+export { state }       // Create deep reactive state proxy
+export { zeneffect }   // Canonical reactive effect subscription
+export { zenMount }    // Canonical component bootstrap lifecycle hook
+export { zenWindow }   // Canonical SSR-safe global window access
+export { zenDocument } // Canonical SSR-safe global document access
+export { hydrate }     // Mount page module into container
+export { cleanup }     // Deterministic teardown of effects/listeners
 ```
 
-Four functions. No more.
+### Optional Secondary Aliases
+For developer convenience, the runtime also exports optional, standard-named aliases. These exist purely as synonyms mapped to the canonical primitives:
+```js
+export { effect }      // Alias for zeneffect
+export { mount }       // Alias for zenMount
+export { window }      // Alias for zenWindow
+export { document }    // Alias for zenDocument
+```
 
 ---
 

@@ -23,4 +23,4 @@ Definition of Done:
 - Bundler deduplicates by `hoist_id`.
 - Runtime mounts factories from payload only.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/COMPONENT_SCRIPT_HOISTING.md`.
+Canonical source: `packages/compiler/COMPONENT_SCRIPT_HOISTING.md`.

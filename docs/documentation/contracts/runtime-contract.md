@@ -21,7 +21,7 @@ Definition of Done:
 - Runtime behavior is explicit and minimal.
 - Contract drift triggers hard errors.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/RUNTIME_CONTRACT.md`.
+Canonical source: `packages/runtime/RUNTIME_CONTRACT.md`.
 
 See also:
 - [HMR V1 Contract](/docs/contracts/hmr-v1-contract)

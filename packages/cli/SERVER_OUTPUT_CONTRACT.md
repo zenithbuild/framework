@@ -84,7 +84,7 @@ The server manifest has the shape:
 - `guard` and `load` run through `server-contract.js`.
 - `data(...)` or implicit empty data injects `window.__zenith_ssr_data` into the HTML shell.
 - `base_path` is used to reconstruct public request URLs and app-local redirects.
-- thrown execution errors return a `500` plain-text response instead of escaping raw exceptions through the host adapter. The message currently preserves the thrown error string.
+- thrown execution errors return a `500` plain-text response with the generic body `Internal Server Error` instead of escaping raw exceptions through the host adapter.
 
 ## Current Limits
 

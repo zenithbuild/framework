@@ -10,6 +10,7 @@ pub struct RenderAssetsRequest {
     pub manifest_json: String,
     pub runtime_import: String,
     pub core_import: String,
+    pub route_check: bool,
 }
 
 #[derive(Debug, Deserialize)]

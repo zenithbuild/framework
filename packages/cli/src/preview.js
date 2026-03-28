@@ -15,10 +15,15 @@ import { access, readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from './base-path.js';
+import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { isConfigKeyExplicit, loadConfig, validateConfig } from './config.js';
 import { materializeImageMarkup } from './images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from './images/payload.js';
 import { handleImageRequest } from './images/service.js';
+import { encodeRequestBodyBase64, readRequestBodyBuffer } from './request-body.js';
+import { createTrustedOriginResolver } from './request-origin.js';
+import { supportsTargetRouteCheck } from './route-check-support.js';
+import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from './server-error.js';
 import { createSilentLogger } from './ui/logger.js';
 import {
   compareRouteSpecificity,
@@ -211,6 +216,13 @@ function ctxDeny(status = 403, message = undefined) {
     message: typeof message === 'string' ? message : undefined
   };
 }
+function ctxInvalid(payload, status = 400) {
+  return {
+    kind: 'invalid',
+    data: payload,
+    status: Number.isInteger(status) ? status : 400
+  };
+}
 function ctxData(payload) {
   return {
     kind: 'data',
@@ -218,10 +230,16 @@ function ctxData(payload) {
   };
 }
 
-const requestSnapshot = new Request(requestUrl, {
+const requestInit = {
   method: requestMethod,
   headers: new Headers(safeRequestHeaders)
-});
+};
+const requestBodyBase64 = String(process.env.ZENITH_SERVER_REQUEST_BODY_BASE64 || '');
+if (requestMethod !== 'GET' && requestMethod !== 'HEAD' && requestBodyBase64.length > 0) {
+  requestInit.body = Buffer.from(requestBodyBase64, 'base64');
+  requestInit.duplex = 'half';
+}
+const requestSnapshot = new Request(requestUrl, requestInit);
 const routeParams = { ...params };
 const routeMeta = {
   id: routeId,
@@ -237,6 +255,7 @@ const routeContext = {
   method: requestMethod,
   route: routeMeta,
   env: {},
+  action: null,
   auth: {
     async getSession(_ctx) {
       return null;
@@ -248,6 +267,7 @@ const routeContext = {
   allow: ctxAllow,
   redirect: ctxRedirect,
   deny: ctxDeny,
+  invalid: ctxInvalid,
   data: ctxData
 };
 
@@ -328,7 +348,7 @@ async function linkModule(specifier, parentIdentifier) {
   return loadFileModule(resolvedUrl);
 }
 
-const allowed = new Set(['data', 'load', 'guard', 'ssr_data', 'props', 'ssr', 'prerender']);
+const allowed = new Set(['data', 'load', 'guard', 'action', 'ssr_data', 'props', 'ssr', 'prerender']);
 const prelude = "const params = globalThis.params;\n" +
   "const ctx = globalThis.ctx;\n" +
   "import { resolveRouteResult } from 'zenith:server-contract';\n" +
@@ -380,13 +400,15 @@ try {
 
   process.stdout.write(JSON.stringify(resolved || null));
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error
+    ? (typeof error.stack === 'string' && error.stack.length > 0 ? error.stack : error.message)
+    : String(error);
+  process.stderr.write('[Zenith:Server] preview route execution failed\\n' + message + '\\n');
   process.stdout.write(
     JSON.stringify({
       __zenith_error: {
         status: 500,
-        code: 'LOAD_FAILED',
-        message
+        code: 'LOAD_FAILED'
       }
     })
   );
@@ -425,7 +447,13 @@ export async function createPreviewServer(options) {
   const logger = providedLogger || createSilentLogger();
   const verboseLogging = logger.mode?.logLevel === 'verbose';
   const configuredBasePath = normalizeBasePath(config.basePath || '/');
+  const routeCheckEnabled = supportsTargetRouteCheck(resolveBuildAdapter(config).target);
   let actualPort = port;
+  const resolveServerOrigin = createTrustedOriginResolver({
+    host,
+    getPort: () => actualPort,
+    label: 'preview server'
+  });
 
   async function loadImageManifest() {
     try {
@@ -437,27 +465,18 @@ export async function createPreviewServer(options) {
     }
   }
 
-  function publicHost() {
-    if (host === '0.0.0.0' || host === '::') {
-      return '127.0.0.1';
-    }
-    return host;
-  }
-
-  function serverOrigin() {
-    return `http://${publicHost()}:${actualPort}`;
-  }
-
   const server = createServer(async (req, res) => {
-    const requestBase = typeof req.headers.host === 'string' && req.headers.host.length > 0
-      ? `http://${req.headers.host}`
-      : serverOrigin();
-    const url = new URL(req.url, requestBase);
+    const url = new URL(req.url, resolveServerOrigin());
     const { basePath, routes } = await loadRouteManifestState(distDir, configuredBasePath);
     const canonicalPath = stripBasePath(url.pathname, basePath);
 
     try {
       if (url.pathname === routeCheckPath(basePath)) {
+        if (!routeCheckEnabled) {
+          res.writeHead(501, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ error: 'route_check_unsupported' }));
+          return;
+        }
         // Security: Require explicitly designated header to prevent public oracle probing
         if (req.headers['x-zenith-route-check'] !== '1') {
           res.writeHead(403, { 'Content-Type': 'application/json' });
@@ -531,7 +550,7 @@ export async function createPreviewServer(options) {
           'Vary': 'Cookie'
         });
         res.end(JSON.stringify({
-          result: checkResult?.result || checkResult,
+          result: sanitizeRouteResult(checkResult?.result || checkResult),
           routeId: resolvedCheck.route.route_id || '',
           to: targetUrl.toString()
         }));
@@ -587,33 +606,37 @@ export async function createPreviewServer(options) {
       }
 
       let ssrPayload = null;
+      let routeExecution = null;
       if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
-        let routeExecution = null;
         try {
+          const requestMethod = req.method || 'GET';
+          const requestBodyBuffer =
+            requestMethod === 'GET' || requestMethod === 'HEAD'
+              ? null
+              : await readRequestBodyBuffer(req);
           routeExecution = await executeServerRoute({
             source: resolved.route.server_script,
             sourcePath: resolved.route.server_script_path || '',
             params: resolved.params,
             requestUrl: url.toString(),
-            requestMethod: req.method || 'GET',
+            requestMethod,
             requestHeaders: req.headers,
+            requestBodyBase64: encodeRequestBodyBase64(requestBodyBuffer),
             routePattern: resolved.route.path,
             routeFile: resolved.route.server_script_path || '',
             routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '')
           });
         } catch (error) {
-          ssrPayload = {
-            __zenith_error: {
-              code: 'LOAD_FAILED',
-              message: error instanceof Error ? error.message : String(error)
-            }
-          };
+          logServerException('preview server route execution failed', error);
+          res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(defaultRouteDenyMessage(500));
+          return;
         }
 
-        const trace = routeExecution?.trace || { guard: 'none', load: 'none' };
+        const trace = routeExecution?.trace || { guard: 'none', action: 'none', load: 'none' };
         const routeId = resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '');
         if (verboseLogging) {
-          logger.router(`${routeId} guard=${trace.guard} load=${trace.load}`);
+          logger.router(`${routeId} guard=${trace.guard} action=${trace.action} load=${trace.load}`);
         }
 
         const result = routeExecution?.result;
@@ -629,7 +652,7 @@ export async function createPreviewServer(options) {
         if (result && result.kind === 'deny') {
           const status = Number.isInteger(result.status) ? result.status : 403;
           res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
-          res.end(result.message || defaultRouteDenyMessage(status));
+          res.end(clientFacingRouteMessage(status, result.message));
           return;
         }
         if (result && result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
@@ -638,14 +661,13 @@ export async function createPreviewServer(options) {
       }
 
       let html = await readFile(htmlPath, 'utf8');
-      if (resolved.matched && resolved.route?.page_asset) {
-        const pageAssetPath = resolveWithinDist(distDir, resolved.route.page_asset);
+      if (resolved.matched) {
         html = await materializeImageMarkup({
           html,
-          pageAssetPath,
           payload: createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath),
-          ssrData: ssrPayload,
-          routePathname: url.pathname
+          imageMaterialization: Array.isArray(resolved.route?.image_materialization)
+            ? resolved.route.image_materialization
+            : []
         });
       }
       if (ssrPayload) {
@@ -656,7 +678,9 @@ export async function createPreviewServer(options) {
         createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
       );
 
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
+        'Content-Type': 'text/html'
+      });
       res.end(html);
     } catch {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -733,7 +757,7 @@ export const matchRoute = matchManifestRoute;
 
 /**
  * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
- * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, load: string } }>}
+ * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number }>}
  */
 export async function executeServerRoute({
   source,
@@ -742,6 +766,7 @@ export async function executeServerRoute({
   requestUrl,
   requestMethod,
   requestHeaders,
+  requestBodyBase64,
   routePattern,
   routeFile,
   routeId,
@@ -750,7 +775,7 @@ export async function executeServerRoute({
   if (!source || !String(source).trim()) {
     return {
       result: { kind: 'data', data: {} },
-      trace: { guard: 'none', load: 'none' }
+      trace: { guard: 'none', action: 'none', load: 'none' }
     };
   }
 
@@ -761,6 +786,7 @@ export async function executeServerRoute({
     requestUrl: requestUrl || 'http://localhost/',
     requestMethod: requestMethod || 'GET',
     requestHeaders: sanitizeRequestHeaders(requestHeaders || {}),
+    requestBodyBase64: requestBodyBase64 || '',
     routePattern: routePattern || '',
     routeFile: routeFile || sourcePath || '',
     routeId: routeId || routeIdFromSourcePath(sourcePath || ''),
@@ -770,7 +796,7 @@ export async function executeServerRoute({
   if (payload === null || payload === undefined) {
     return {
       result: { kind: 'data', data: {} },
-      trace: { guard: 'none', load: 'none' }
+      trace: { guard: 'none', action: 'none', load: 'none' }
     };
   }
   if (typeof payload !== 'object' || Array.isArray(payload)) {
@@ -783,9 +809,9 @@ export async function executeServerRoute({
       result: {
         kind: 'deny',
         status: 500,
-        message: String(errorEnvelope.message || 'Server route execution failed')
+        message: defaultRouteDenyMessage(500)
       },
-      trace: { guard: 'none', load: 'deny' }
+      trace: { guard: 'none', action: 'none', load: 'deny' }
     };
   }
 
@@ -797,9 +823,11 @@ export async function executeServerRoute({
       trace: trace && typeof trace === 'object'
         ? {
           guard: String(trace.guard || 'none'),
+          action: String(trace.action || 'none'),
           load: String(trace.load || 'none')
         }
-        : { guard: 'none', load: 'none' }
+        : { guard: 'none', action: 'none', load: 'none' },
+      status: Number.isInteger(payload.status) ? payload.status : undefined
     };
   }
 
@@ -808,15 +836,8 @@ export async function executeServerRoute({
       kind: 'data',
       data: payload
     },
-    trace: { guard: 'none', load: 'data' }
+    trace: { guard: 'none', action: 'none', load: 'data' }
   };
-}
-
-export function defaultRouteDenyMessage(status) {
-  if (status === 401) return 'Unauthorized';
-  if (status === 403) return 'Forbidden';
-  if (status === 404) return 'Not Found';
-  return 'Internal Server Error';
 }
 
 /**
@@ -849,7 +870,7 @@ export async function executeServerScript(input) {
       __zenith_error: {
         status,
         code: status >= 500 ? 'LOAD_FAILED' : (status === 404 ? 'NOT_FOUND' : 'ACCESS_DENIED'),
-        message: String(result.message || defaultRouteDenyMessage(status))
+        message: clientFacingRouteMessage(status, result.message)
       }
     };
   }
@@ -875,6 +896,7 @@ function spawnNodeServerRunner(input) {
           ZENITH_SERVER_REQUEST_URL: input.requestUrl || 'http://localhost/',
           ZENITH_SERVER_REQUEST_METHOD: input.requestMethod || 'GET',
           ZENITH_SERVER_REQUEST_HEADERS: JSON.stringify(input.requestHeaders || {}),
+          ZENITH_SERVER_REQUEST_BODY_BASE64: input.requestBodyBase64 || '',
           ZENITH_SERVER_ROUTE_PATTERN: input.routePattern || '',
           ZENITH_SERVER_ROUTE_FILE: input.routeFile || input.sourcePath || '',
           ZENITH_SERVER_ROUTE_ID: input.routeId || '',
@@ -904,6 +926,11 @@ function spawnNodeServerRunner(input) {
           )
         );
         return;
+      }
+      const stderrOutput = stderr.trim();
+      const internalErrorIndex = stderrOutput.indexOf('[Zenith:Server]');
+      if (internalErrorIndex >= 0) {
+        console.error(stderrOutput.slice(internalErrorIndex).trim());
       }
       const raw = stdout.trim();
       if (!raw || raw === 'null') {

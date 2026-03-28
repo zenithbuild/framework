@@ -184,9 +184,34 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
         run: ./scripts/publish-scaffolder.sh
 
-  release_create_zenith:
+  verify_registry:
     needs: [detect, publish_scaffolder]
     if: needs.detect.outputs.publish_scaffolder == 'true' && needs.publish_scaffolder.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Verify npm registry propagation
+        shell: bash
+        env:
+          SCAFFOLDER_VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-npm-registry.mjs scaffolder "${SCAFFOLDER_VERSION}" "latest" scaffolder-release-verification.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scaffolder-release-verification
+          path: scaffolder-release-verification.json
+          if-no-files-found: error
+
+  release_create_zenith:
+    needs: [detect, verify_registry]
+    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.verify_registry.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

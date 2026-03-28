@@ -15,7 +15,9 @@ import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
 import { materializeImageMarkupInHtmlFiles } from './images/materialize.js';
 import { buildImageArtifacts } from './images/service.js';
+import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
+import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { writeServerOutput } from './server-output.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
@@ -28,8 +30,6 @@ import {
 import { maybeWarnAboutZenithVersionMismatch } from './version-check.js';
 
 export { createCompilerWarningEmitter };
-
-const RUNTIME_MARKUP_BINDING = '__ZENITH_INTERNAL_ZENHTML';
 
 function createCompilerTotals() {
     return {
@@ -68,6 +68,7 @@ export async function build(options) {
     const compilerTotals = createCompilerTotals();
     const { target, adapter, mode } = resolveBuildAdapter(config);
     const basePath = normalizeBasePath(config.basePath || '/');
+    const routeCheckEnabled = supportsTargetRouteCheck(target);
     const routerEnabled = config.router === true;
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
@@ -88,7 +89,6 @@ export async function build(options) {
     }
 
     const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
-    void RUNTIME_MARKUP_BINDING;
 
     const manifest = await startupProfile.measureAsync(
         'generate_manifest',
@@ -135,8 +135,13 @@ export async function build(options) {
                 logger,
                 showBundlerInfo,
                 bundlerBin,
-                { basePath }
+                { basePath, routeCheck: routeCheckEnabled }
             ),
+            { envelopes: envelopes.length }
+        );
+        await startupProfile.measureAsync(
+            'inject_image_materialization_manifest',
+            () => injectImageMaterializationIntoRouterManifest(staticOutputDir, envelopes),
             { envelopes: envelopes.length }
         );
     }

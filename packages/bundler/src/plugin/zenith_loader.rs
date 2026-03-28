@@ -347,6 +347,7 @@ mod tests {
                 event_bindings: Default::default(),
                 ref_bindings: Default::default(),
                 style_blocks: Default::default(),
+                image_materialization: Default::default(),
             }),
             strict: true,
             is_dev: false,

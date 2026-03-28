@@ -411,6 +411,7 @@ async fn strict_inline_and_rolldown_mirror_count() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let plan = BundlePlan {
@@ -463,6 +464,7 @@ async fn strict_inline_and_rolldown_mirror_content() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let plan = BundlePlan {

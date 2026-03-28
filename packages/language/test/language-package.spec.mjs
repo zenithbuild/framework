@@ -185,6 +185,19 @@ test('snippet file contains no React/Vue/Svelte/JSX framework drift', async () =
   assert.equal(/\b@click\b/.test(serialized), false, 'snippets must not use @click (Vue pattern)');
 });
 
+test('guard/load snippet uses the canonical server-contract import', async () => {
+  const snippets = JSON.parse(
+    await fs.readFile(path.join(packageRoot, 'snippets', 'zenith.code-snippets'), 'utf8')
+  );
+  const guardLoad = snippets['zen-guard-load'];
+
+  assert.ok(guardLoad, 'zen-guard-load snippet must exist');
+  const body = Array.isArray(guardLoad.body) ? guardLoad.body.join('\n') : '';
+
+  assert.match(body, /zenith:server-contract/);
+  assert.doesNotMatch(body, /@zenithbuild\/core\/server/);
+});
+
 test('language-configuration includes wordPattern and indentation rules', async () => {
   const config = JSON.parse(
     await fs.readFile(path.join(packageRoot, 'language-configuration.json'), 'utf8')

@@ -18,6 +18,8 @@ import {
   readDemoRegistry,
 } from "./shared.mjs";
 
+const EXAMPLES_ROOT = path.join(DOCS_ROOT, "examples");
+
 function isZenFence(lang) {
   return lang === "zen" || lang === "zenith";
 }
@@ -49,6 +51,37 @@ async function compileSnippet(compile, tempDir, baseName, source) {
   const filePath = path.join(tempDir, `${baseName}.zen`);
   await fs.writeFile(filePath, source, "utf8");
   compile(filePath);
+}
+
+async function listZenFiles(rootDir) {
+  const files = [];
+
+  async function walk(dir) {
+    let entries = [];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
+
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith(".zen")) {
+        files.push(full);
+      }
+    }
+  }
+
+  await walk(rootDir);
+  files.sort((a, b) => a.localeCompare(b));
+  return files;
 }
 
 const RESERVED_TEMPLATE_IDENTIFIERS = new Set([
@@ -136,6 +169,7 @@ function validateNoFreeIdentifiers(source) {
 async function main() {
   const compile = await loadCompiler();
   const docsFiles = await listMarkdown(DOCS_ROOT, { excludeSegments: ["_legacy"] });
+  const exampleFiles = await listZenFiles(EXAMPLES_ROOT);
   const { registryPath, demos } = await readDemoRegistry();
   const demoIds = new Set();
   const violations = [];
@@ -256,6 +290,30 @@ async function main() {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         violations.push(`${String(demo?.source || "")}: demo '${id}' failed compile (${message})`);
+      }
+    }
+
+    for (const fullPath of exampleFiles) {
+      const rel = toRelative(fullPath);
+      try {
+        const source = await fs.readFile(fullPath, "utf8");
+        const forbidden = findForbiddenMatches(source);
+        if (forbidden.length > 0) {
+          violations.push(`${rel}: forbidden syntax detected (${forbidden.join(", ")})`);
+          continue;
+        }
+
+        const freeIdentifiers = validateNoFreeIdentifiers(source);
+        if (freeIdentifiers.length > 0) {
+          violations.push(`${rel}: free identifiers detected (${freeIdentifiers.join(", ")})`);
+          continue;
+        }
+
+        snippetCount += 1;
+        compile(fullPath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        violations.push(`${rel}: public example failed compile (${message})`);
       }
     }
   } finally {

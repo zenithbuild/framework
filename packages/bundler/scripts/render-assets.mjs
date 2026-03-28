@@ -28,13 +28,15 @@ async function main() {
   const coreImport = typeof parsed.coreImport === 'string' && parsed.coreImport.length > 0
     ? parsed.coreImport
     : '/assets/core.placeholder.js';
+  const routeCheck = parsed.routeCheck === true;
 
   const runtimeSource = normalizeNewlines(runtimeModuleSource());
   const routerSource = normalizeNewlines(
     renderRouterModule({
       manifestJson,
       runtimeImport,
-      coreImport
+      coreImport,
+      routeCheck
     })
   );
 

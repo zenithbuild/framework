@@ -457,9 +457,35 @@ jobs:
           PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/language-server,packages/language
         run: ./scripts/publish-packages.sh
 
-  release_metadata:
+  verify_registry:
     needs: [preflight, publish_release]
     if: needs.publish_release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Verify npm registry propagation
+        shell: bash
+        env:
+          DIST_TAG: ${{ needs.preflight.outputs.dist_tag }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-npm-registry.mjs release "${RELEASE_VERSION}" "${DIST_TAG}" framework-release-verification.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: framework-release-verification
+          path: framework-release-verification.json
+          if-no-files-found: error
+
+  release_metadata:
+    needs: [preflight, verify_registry]
+    if: needs.verify_registry.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Write release metadata artifact

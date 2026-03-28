@@ -4,8 +4,9 @@ The official CLI for scaffolding new Zenith applications. Fast, animated, and de
 
 ## Canonical Docs
 
-- Create contract: `framework/docs`
-- Install and compatibility: `framework/docs`
+- Create contract: `../../docs/documentation/contracts/create-contract.md`
+- Deployment targets guide: `../../docs/documentation/guides/deployment-targets.md`
+- Install and compatibility: `../../docs/documentation/install-compatibility.md`
 
 ## Overview
 
@@ -18,7 +19,7 @@ The official CLI for scaffolding new Zenith applications. Fast, animated, and de
 - **Reliable Fallbacks**: Automatically detects CI environments and non-TTY pipes to provide clean, static output.
 - **Smart Detection**: automatically detects your preferred package manager (Bun, pnpm, Yarn, or npm).
 - **Template Authority**: Scaffold generation now reads only from `templates/` (`basic`, `css`, `tailwind`), which is the single source of truth for starter projects.
-- **Tool-Agnostic Output**: ESLint, Prettier, and TypeScript path aliases are opt-in. If you answer `No`, the generated project contains no scripts, dependencies, config files, or ignore files for that tool.
+- **Tool-Agnostic Output**: ESLint and Prettier are opt-in. If you answer `No`, the generated project contains no scripts, dependencies, config files, or ignore files for that tool.
 
 ## Quick Start
 
@@ -47,7 +48,6 @@ During scaffold, `create-zenith` asks whether to include:
 
 - ESLint
 - Prettier
-- TypeScript path aliases
 
 Tooling behavior is strict:
 
@@ -56,14 +56,7 @@ Tooling behavior is strict:
 - If you enable Prettier, the project gets `.prettierrc`, `.prettierignore`, a format script, and the Prettier dependency.
 - If you disable Prettier, the project contains zero Prettier references.
 
-## Beta Version Pinning
-
-Zenith beta currently pins `@zenithbuild/core` to `0.5.0-beta.2.20` and leaf packages (compiler, cli, runtime, router, bundler) to `0.5.0-beta.2.20`. This is intentional — core contains the CLI entry point and may bump independently for bin/CLI fixes without touching the engine.
-
-If you see version mismatches after install, delete `node_modules` and `package-lock.json`, then reinstall.
-
-## Latest Release
-
+## Current Release Notes
 - Generated apps now depend on `@zenithbuild/core@latest` so new installs track the current stable framework release.
 - Template downloads now resolve from `zenithbuild/framework`, which is the active monorepo source of truth.
 - Starter templates now live under `templates/`, and the scaffolder no longer depends on `examples/`.
@@ -96,7 +89,7 @@ Supported deployment targets in the framework today are:
 
 `npm run preview` is target-aware. It previews the built target contract for the generated app instead of always acting like a generic static file server.
 
-For the full target matrix, emitted output shapes, and current limitations, see `/Users/judahsullivan/Personal/zenithbuild-monorepo/docs/documentation/guides/deployment-targets.md`.
+For the full target matrix, emitted output shapes, and current limitations, see `../../docs/documentation/guides/deployment-targets.md`.
 
 ## Development
 

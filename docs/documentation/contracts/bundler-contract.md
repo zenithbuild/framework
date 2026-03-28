@@ -21,4 +21,4 @@ Definition of Done:
 - Export/data-attribute contracts are preserved.
 - Hashing and ordering remain deterministic.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-bundler/BUNDLER_CONTRACT.md`.
+Canonical source: `packages/bundler/BUNDLER_CONTRACT.md`.

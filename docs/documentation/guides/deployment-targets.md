@@ -107,6 +107,7 @@ Client router:
 SSR and packaged server runtimes:
 
 - reconstruct `ctx.url.pathname` as the public path, including `basePath`
+- reconstruct `ctx.url.origin` from trusted server origin config or the bound listener, never from raw request `Host`
 - keep route classification canonical and base-path free upstream
 - prefix app-local redirects such as `/login` to `/docs/login`
 
@@ -115,6 +116,8 @@ Image runtime:
 - prefixes optimized local image URLs with `basePath`
 - prefixes the endpoint URL for remote optimization with `basePath`
 - keeps on-disk optimized image artifacts base-path free
+- materializes `<Image />` markup from route-scoped compiler/bundler artifacts and does not execute page assets during build, preview, or server render
+- currently requires static image props during materialization; dynamic image props are unsupported until a dedicated compiler artifact exists
 
 Adapter rule:
 
@@ -145,6 +148,7 @@ The basic template also keeps `router: false` explicit as part of its single-pag
 
 - There is no separate `assetPrefix` knob. Public assets intentionally follow `basePath` so the URL model stays single-source and deterministic.
 - `/_zenith/image` is deployed by the `node` target today. Other server-capable targets do not yet emit a deployed image endpoint.
+- `/__zenith/route-check` is deployed by local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` targets currently skip advisory route-check and rely on the direct HTML request instead.
 - Hosted verification for Vercel and Netlify should still be treated as an operational validation step outside the local build contract.
 
 ## Adapter Rule

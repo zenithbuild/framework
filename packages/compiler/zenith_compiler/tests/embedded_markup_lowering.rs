@@ -29,7 +29,7 @@ fn lowers_component_tags_inside_expression_to_fragments() {
     let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
-        expr.contains("__zenith_fragment("),
+        expr.contains("__zenith_fragment`"),
         "expected embedded markup lowering, got: {}",
         expr
     );
@@ -61,12 +61,12 @@ fn lowers_nested_markup_inside_markup_interpolations() {
     let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
-        expr.matches("__zenith_fragment(").count() >= 3,
+        expr.matches("__zenith_fragment`").count() >= 3,
         "expected nested fragment lowering, got: {}",
         expr
     );
     assert!(
-        expr.contains("${ok ? (__zenith_fragment("),
+        expr.contains("${ok ? (__zenith_fragment`"),
         "nested markup branches should be lowered inside interpolation: {}",
         expr
     );

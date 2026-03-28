@@ -47,7 +47,7 @@ Today the supported target names are:
 
 `zenith preview` is target-aware. It previews the built target contract rather than assuming every build is a plain static site.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-cli/CLI_CONTRACT.md`.
+Canonical source: `packages/cli/CLI_CONTRACT.md`.
 
 See also:
 - [HMR V1 Contract](/docs/contracts/hmr-v1-contract)

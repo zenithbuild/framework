@@ -29,7 +29,7 @@
       "name": "smoke-test",
       "version": "0.6.10",
       "dependencies": {
-        "@zenithbuild/core": "0.7.0",
+        "@zenithbuild/core": "0.7.4",
       },
       "devDependencies": {
         "@playwright/test": "^1.58.2",
@@ -37,11 +37,11 @@
         "@types/bun": "latest",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
         "@typescript-eslint/parser": "^8.53.0",
-        "@zenithbuild/bundler": "0.7.0",
-        "@zenithbuild/cli": "0.7.0",
-        "@zenithbuild/compiler": "0.7.0",
-        "@zenithbuild/router": "0.7.0",
-        "@zenithbuild/runtime": "0.7.0",
+        "@zenithbuild/bundler": "0.7.4",
+        "@zenithbuild/cli": "0.7.4",
+        "@zenithbuild/compiler": "0.7.4",
+        "@zenithbuild/router": "0.7.4",
+        "@zenithbuild/runtime": "0.7.4",
         "eslint": "^9.39.2",
         "playwright": "^1.58.2",
         "prettier": "^3.7.4",
@@ -52,12 +52,12 @@
       "name": "zenith-docs-site",
       "version": "0.6.6",
       "dependencies": {
-        "@zenithbuild/bundler": "0.7.0",
-        "@zenithbuild/cli": "0.7.0",
-        "@zenithbuild/compiler": "0.7.0",
-        "@zenithbuild/core": "0.7.0",
-        "@zenithbuild/router": "0.7.0",
-        "@zenithbuild/runtime": "0.7.0",
+        "@zenithbuild/bundler": "0.7.4",
+        "@zenithbuild/cli": "0.7.4",
+        "@zenithbuild/compiler": "0.7.4",
+        "@zenithbuild/core": "0.7.4",
+        "@zenithbuild/router": "0.7.4",
+        "@zenithbuild/runtime": "0.7.4",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -66,10 +66,10 @@
     },
     "packages/bundler": {
       "name": "@zenithbuild/bundler",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "dependencies": {
-        "@zenithbuild/router": "0.7.0",
-        "@zenithbuild/runtime": "0.7.0",
+        "@zenithbuild/router": "0.7.4",
+        "@zenithbuild/runtime": "0.7.4",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -77,33 +77,34 @@
         "typescript": "^5",
       },
       "optionalDependencies": {
-        "@zenithbuild/bundler-darwin-arm64": "0.7.0",
-        "@zenithbuild/bundler-darwin-x64": "0.7.0",
-        "@zenithbuild/bundler-linux-x64": "0.7.0",
-        "@zenithbuild/bundler-win32-x64": "0.7.0",
+        "@zenithbuild/bundler-darwin-arm64": "0.7.4",
+        "@zenithbuild/bundler-darwin-x64": "0.7.4",
+        "@zenithbuild/bundler-linux-x64": "0.7.4",
+        "@zenithbuild/bundler-win32-x64": "0.7.4",
       },
     },
     "packages/bundler-darwin-arm64": {
       "name": "@zenithbuild/bundler-darwin-arm64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/bundler-darwin-x64": {
       "name": "@zenithbuild/bundler-darwin-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/bundler-linux-x64": {
       "name": "@zenithbuild/bundler-linux-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/bundler-win32-x64": {
       "name": "@zenithbuild/bundler-win32-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/cli": {
       "name": "@zenithbuild/cli",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "dependencies": {
-        "@zenithbuild/compiler": "0.7.0",
+        "@zenithbuild/bundler": "0.7.4",
+        "@zenithbuild/compiler": "0.7.4",
         "picocolors": "^1.1.1",
         "sharp": "^0.34.4",
       },
@@ -117,46 +118,46 @@
     },
     "packages/compiler": {
       "name": "@zenithbuild/compiler",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "devDependencies": {
         "@types/node": "latest",
         "typescript": "^5",
       },
       "optionalDependencies": {
-        "@zenithbuild/compiler-darwin-arm64": "0.7.0",
-        "@zenithbuild/compiler-darwin-x64": "0.7.0",
-        "@zenithbuild/compiler-linux-x64": "0.7.0",
-        "@zenithbuild/compiler-win32-x64": "0.7.0",
+        "@zenithbuild/compiler-darwin-arm64": "0.7.4",
+        "@zenithbuild/compiler-darwin-x64": "0.7.4",
+        "@zenithbuild/compiler-linux-x64": "0.7.4",
+        "@zenithbuild/compiler-win32-x64": "0.7.4",
       },
     },
     "packages/compiler-darwin-arm64": {
       "name": "@zenithbuild/compiler-darwin-arm64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/compiler-darwin-x64": {
       "name": "@zenithbuild/compiler-darwin-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/compiler-linux-x64": {
       "name": "@zenithbuild/compiler-linux-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/compiler-win32-x64": {
       "name": "@zenithbuild/compiler-win32-x64",
-      "version": "0.7.0",
+      "version": "0.7.4",
     },
     "packages/core": {
       "name": "@zenithbuild/core",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "bin": {
         "zenith": "bin/zenith.js",
       },
       "dependencies": {
-        "@zenithbuild/bundler": "0.7.0",
-        "@zenithbuild/cli": "0.7.0",
-        "@zenithbuild/compiler": "0.7.0",
-        "@zenithbuild/router": "0.7.0",
-        "@zenithbuild/runtime": "0.7.0",
+        "@zenithbuild/bundler": "0.7.4",
+        "@zenithbuild/cli": "0.7.4",
+        "@zenithbuild/compiler": "0.7.4",
+        "@zenithbuild/router": "0.7.4",
+        "@zenithbuild/runtime": "0.7.4",
       },
       "devDependencies": {
         "@jest/globals": "^30.2.0",
@@ -183,9 +184,9 @@
     },
     "packages/language": {
       "name": "@zenithbuild/language",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "dependencies": {
-        "@zenithbuild/compiler": "0.6.17",
+        "@zenithbuild/compiler": "0.7.4",
         "vscode-languageclient": "^9.0.1",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-textdocument": "^1.0.11",
@@ -201,12 +202,12 @@
     },
     "packages/language-server": {
       "name": "@zenithbuild/language-server",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "bin": {
         "zenith-language-server": "bin/zenith-language-server.js",
       },
       "dependencies": {
-        "@zenithbuild/compiler": "0.6.17",
+        "@zenithbuild/compiler": "0.7.4",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-textdocument": "^1.0.11",
       },
@@ -219,7 +220,7 @@
     },
     "packages/router": {
       "name": "@zenithbuild/router",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "devDependencies": {
         "@napi-rs/cli": "^2.18.4",
         "@types/bun": "latest",
@@ -230,10 +231,12 @@
     },
     "packages/runtime": {
       "name": "@zenithbuild/runtime",
-      "version": "0.7.0",
+      "version": "0.7.4",
       "devDependencies": {
+        "@happy-dom/global-registrator": "^20.8.9",
         "@jest/globals": "^30.2.0",
         "@types/node": "latest",
+        "happy-dom": "^20.8.9",
         "jest": "^30.2.0",
         "jest-environment-jsdom": "^30.2.0",
         "typescript": "^5.7.3",
@@ -402,6 +405,8 @@
     "@eslint/object-schema": ["@eslint/object-schema@2.1.7", "", {}, "sha512-VtAOaymWVfZcmZbp6E2mympDIHvyjXs/12LqWYjVw6qjrfF+VK+fyG33kChz3nnK+SU5/NeHOqrTEHS8sXO3OA=="],
 
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.4.1", "", { "dependencies": { "@eslint/core": "^0.17.0", "levn": "^0.4.1" } }, "sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA=="],
+
+    "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.8.9", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.8.9" } }, "sha512-DtZeRRHY9A/bisTJziUBBPrdnPui7+R185G/hzi6/Boymhqh7/wi53AY+IvQHS1+7OPaqfO/1XNpngNwthLz+A=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, "sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA=="],
 
@@ -625,6 +630,10 @@
 
     "@types/vscode": ["@types/vscode@1.109.0", "", {}, "sha512-0Pf95rnwEIwDbmXGC08r0B4TQhAbsHQ5UyTIgVgoieDe4cOnf92usuR5dEczb6bTKEp7ziZH4TV1TRGPPCExtw=="],
 
+    "@types/whatwg-mimetype": ["@types/whatwg-mimetype@3.0.2", "", {}, "sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA=="],
+
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
+
     "@types/yargs": ["@types/yargs@17.0.35", "", { "dependencies": { "@types/yargs-parser": "*" } }, "sha512-qUHkeCyQFxMXg79wQfTtfndEC+N9ZZg76HJftDJp+qH2tV7Gj4OJi7l+PiWwJ+pWtW8GwSmqsDj/oymhrTWXjg=="],
 
     "@types/yargs-parser": ["@types/yargs-parser@21.0.3", "", {}, "sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ=="],
@@ -825,7 +834,7 @@
 
     "enhanced-resolve": ["enhanced-resolve@5.20.0", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.0" } }, "sha512-/ce7+jQ1PQ6rVXwe+jKEg5hW5ciicHwIQUagZkp6IufBoY3YDgdTTY1azVs0qoRgVmvsNB+rbjLJxDAeHHtwsQ=="],
 
-    "entities": ["entities@6.0.1", "", {}, "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="],
+    "entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
 
     "error-ex": ["error-ex@1.3.4", "", { "dependencies": { "is-arrayish": "^0.2.1" } }, "sha512-sqQamAnR14VgCr1A618A3sGrygcpK+HEbenA/HiEAkkUwcZIIB/tgWqHFxWgOyDh4nB4JCRimh79dR5Ywc9MDQ=="],
 
@@ -902,6 +911,8 @@
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
     "gradient-string": ["gradient-string@3.0.0", "", { "dependencies": { "chalk": "^5.3.0", "tinygradient": "^1.1.5" } }, "sha512-frdKI4Qi8Ihp4C6wZNB565de/THpIaw3DjP5ku87M+N9rNSGmPTjfkq61SdRXB7eCaL8O1hkKDvf6CDMtOzIAg=="],
+
+    "happy-dom": ["happy-dom@20.8.9", "", { "dependencies": { "@types/node": ">=20.0.0", "@types/whatwg-mimetype": "^3.0.2", "@types/ws": "^8.18.1", "entities": "^7.0.1", "whatwg-mimetype": "^3.0.0", "ws": "^8.18.3" } }, "sha512-Tz23LR9T9jOGVZm2x1EPdXqwA37G/owYMxRwU0E4miurAtFsPMQ1d2Jc2okUaSjZqAFz2oEn3FLXC5a0a+siyA=="],
 
     "has-flag": ["has-flag@4.0.0", "", {}, "sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ=="],
 
@@ -1287,7 +1298,7 @@
 
     "whatwg-encoding": ["whatwg-encoding@3.1.1", "", { "dependencies": { "iconv-lite": "0.6.3" } }, "sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ=="],
 
-    "whatwg-mimetype": ["whatwg-mimetype@4.0.0", "", {}, "sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg=="],
+    "whatwg-mimetype": ["whatwg-mimetype@3.0.0", "", {}, "sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q=="],
 
     "whatwg-url": ["whatwg-url@14.2.0", "", { "dependencies": { "tr46": "^5.1.0", "webidl-conversions": "^7.0.0" } }, "sha512-De72GdQZzNTUBBChsXueQUnPKDkg/5A5zp7pFDuQAj5UFoENpiACU0wlCvzpAGnTkj++ihpKwKyYewn/XNUbKw=="],
 
@@ -1397,17 +1408,13 @@
 
     "@typescript-eslint/visitor-keys/eslint-visitor-keys": ["eslint-visitor-keys@5.0.1", "", {}, "sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA=="],
 
-    "@zenithbuild/language/@types/node": ["@types/node@25.4.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-9wLpoeWuBlcbBpOY3XmzSTG3oscB6xjBEEtn+pYXTfhyXhIxC5FsBer2KTopBlvKEiW9l13po9fq+SJY/5lkhw=="],
-
-    "@zenithbuild/language-server/@types/bun": ["@types/bun@1.3.10", "", { "dependencies": { "bun-types": "1.3.10" } }, "sha512-0+rlrUrOrTSskibryHbvQkDOWRJwJZqZlxrUs1u4oOoTln8+WIXBPmAuCF35SWB2z4Zl3E84Nl/D0P7803nigQ=="],
-
-    "@zenithbuild/language-server/@types/node": ["@types/node@25.4.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-9wLpoeWuBlcbBpOY3XmzSTG3oscB6xjBEEtn+pYXTfhyXhIxC5FsBer2KTopBlvKEiW9l13po9fq+SJY/5lkhw=="],
-
     "anymatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
 
     "babel-jest/chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
 
     "create-zenith/@types/node": ["@types/node@20.19.35", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-Uarfe6J91b9HAUXxjvSOdiO2UPOKLm07Q1oh0JHxoZ1y8HoqxDAu3gVrsrOHeiio0kSsoVBt4wFrKOm0dKxVPQ=="],
+
+    "data-urls/whatwg-mimetype": ["whatwg-mimetype@4.0.0", "", {}, "sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg=="],
 
     "eslint/chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
 
@@ -1473,7 +1480,11 @@
 
     "jest-worker/supports-color": ["supports-color@8.1.1", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-MpUEN2OodtUzxvKQl72cUF7RQ5EiHsGvSsVG0ia9c5RbWGL2CI4C7EpPS8UTBIplnlzZiNuV56w+FuNxy3ty2Q=="],
 
+    "jsdom/whatwg-mimetype": ["whatwg-mimetype@4.0.0", "", {}, "sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg=="],
+
     "micromatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
+
+    "parse5/entities": ["entities@6.0.1", "", {}, "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="],
 
     "pkg-dir/find-up": ["find-up@4.1.0", "", { "dependencies": { "locate-path": "^5.0.0", "path-exists": "^4.0.0" } }, "sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw=="],
 
@@ -1503,8 +1514,6 @@
 
     "@typescript-eslint/typescript-estree/minimatch/brace-expansion": ["brace-expansion@5.0.4", "", { "dependencies": { "balanced-match": "^4.0.2" } }, "sha512-h+DEnpVvxmfVefa4jFbCf5HdH5YMDXRsmKflpf1pILZWRFlTbJpxeU55nJl4Smt5HQaGzg1o6RHFPJaOqnmBDg=="],
 
-    "@zenithbuild/language-server/@types/bun/bun-types": ["bun-types@1.3.10", "", { "dependencies": { "@types/node": "*" } }, "sha512-tcpfCCl6XWo6nCVnpcVrxQ+9AYN1iqMIzgrSKYMB/fjLtV2eyAVEg7AxQJuCq/26R6HpKWykQXuSOq/21RYcbg=="],
-
     "create-zenith/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "eslint/minimatch/brace-expansion": ["brace-expansion@1.1.12", "", { "dependencies": { "balanced-match": "^1.0.0", "concat-map": "0.0.1" } }, "sha512-9T9UjW3r0UW5c1Q7GTwllptXwhvYmEzFhzMfZ9H7FQWt+uZePjZPjBP/W1ZEyZ1twGWom5/56TF4lPcqjnDHcg=="],
@@ -1518,8 +1527,6 @@
     "@istanbuljs/load-nyc-config/find-up/locate-path/p-locate": ["p-locate@4.1.0", "", { "dependencies": { "p-limit": "^2.2.0" } }, "sha512-R79ZZ/0wAxKGu3oYMlz8jy/kbhsNrS7SKZ7PxEHBgJ5+F2mtFW2fK2cOtBh1cHYkQsbzFV7I+EoRKe6Yt0oK7A=="],
 
     "@typescript-eslint/typescript-estree/minimatch/brace-expansion/balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="],
-
-    "@zenithbuild/language-server/@types/bun/bun-types/@types/node": ["@types/node@25.3.3", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-DpzbrH7wIcBaJibpKo9nnSQL0MTRdnWttGyE5haGwK86xgMOkFLp7vEyfQPGLOJh5wNYiJ3V9PmUMDhV9u8kkQ=="],
 
     "pkg-dir/find-up/locate-path/p-locate": ["p-locate@4.1.0", "", { "dependencies": { "p-limit": "^2.2.0" } }, "sha512-R79ZZ/0wAxKGu3oYMlz8jy/kbhsNrS7SKZ7PxEHBgJ5+F2mtFW2fK2cOtBh1cHYkQsbzFV7I+EoRKe6Yt0oK7A=="],
 

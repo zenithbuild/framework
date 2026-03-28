@@ -1,10 +1,11 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::sync::OnceLock;
 use std::time::Instant;
+
+use crate::script_transform::analyze_component_script_structure;
 
 pub const SCRIPT_PLACEHOLDER_TAG: &str = "zenith-script";
 pub const SCRIPT_ID_ATTR: &str = "data-zx-script-id";
@@ -88,47 +89,6 @@ fn script_setup_attr_count_re() -> &'static Regex {
     RE.get_or_init(|| {
         Regex::new(r#"(?i)(?:^|[\s<])setup(?:\s*=|[\s>/])"#).expect("valid setup count regex")
     })
-}
-
-fn decl_binding_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=")
-            .expect("valid decl binding regex")
-    })
-}
-
-fn function_binding_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\bfunction\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(")
-            .expect("valid function binding regex")
-    })
-}
-
-fn import_line_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?m)^\s*import\s+[^;\n]+;?").expect("valid import line regex"))
-}
-
-fn decl_line_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"(?m)^\s*(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=.*")
-            .expect("valid decl line regex")
-    })
-}
-
-fn state_decl_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\bstate\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=").expect("valid state decl regex")
-    })
-}
-
-fn state_kw_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\bstate\s+").expect("valid state keyword regex"))
 }
 
 fn dom_query_selector_re() -> &'static Regex {
@@ -539,234 +499,29 @@ fn analyze_component_script(
     profile: &mut ScriptProfileMetrics,
 ) -> Result<HoistedScript, ScriptContractError> {
     assert_no_forbidden_tokens(source, source_path, id)?;
-
-    let setup_regex_started_at = profile_enabled.then(Instant::now);
-    let decl_re = decl_binding_re();
-    let fn_re = function_binding_re();
-    let import_re = import_line_re();
-    let decl_line_re = decl_line_re();
-    let state_decl_re = state_decl_re();
-    let state_kw_re = state_kw_re();
-    if let Some(started_at) = setup_regex_started_at {
-        profile.analyze_setup_regex_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
     let import_work_started_at = profile_enabled.then(Instant::now);
-    let import_lines = import_re
-        .find_iter(source)
-        .map(|m| m.as_str().trim().to_string())
-        .collect::<Vec<_>>();
-    let imports = dedupe_preserve_order(import_lines);
-
-    let source_without_imports = import_re.replace_all(source, "").into_owned();
+    let rename_prefix = format!(
+        "__{}_{}_",
+        sanitize_component_slug(component_path),
+        stable_hash_8(component_path),
+    );
+    let analyzed = analyze_component_script_structure(source, component_path, &rename_prefix)
+        .map_err(|reason| script_contract_error(source_path, id, reason))?;
+    let imports = analyzed.imports;
+    let source_without_imports = analyzed.source_without_imports;
+    let renamed_source = analyzed.renamed_source;
+    let declarations = analyzed.declarations;
+    let bindings = analyzed.bindings;
     let canonical_source = canonicalize_script_source(&source_without_imports);
     let hoist_id = stable_hash_8(&canonical_source);
     let factory_name = format!("createComponent_{}", sanitize_factory_suffix(&hoist_id));
     if let Some(started_at) = import_work_started_at {
-        profile.analyze_import_work_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    let mut declared: Vec<(usize, String, HoistedBindingKind)> = Vec::new();
-
-    let decl_scan_started_at = profile_enabled.then(Instant::now);
-    for capture in decl_re.captures_iter(source) {
-        let ident = capture
-            .get(1)
-            .map(|m| m.as_str())
-            .unwrap_or_default()
-            .to_string();
-        let start = capture.get(1).map(|m| m.start()).unwrap_or(0);
-        let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
-        if !is_top_level_position(source, full_start) {
-            continue;
-        }
-        let tail = &source[full_start..];
-
-        let binding_kind_started_at = profile_enabled.then(Instant::now);
-        let kind = if Regex::new(&format!(
-            r"^(?:const|let|var)\s+{}\s*=\s*signal\s*\(",
-            regex::escape(&ident)
-        ))
-        .unwrap()
-        .is_match(tail)
-        {
-            HoistedBindingKind::Signal
-        } else if Regex::new(&format!(
-            r"^(?:const|let|var)\s+{}\s*=\s*state\s*\(",
-            regex::escape(&ident)
-        ))
-        .unwrap()
-        .is_match(tail)
-        {
-            HoistedBindingKind::State
-        } else if Regex::new(&format!(
-            r"^(?:const|let|var)\s+{}\s*=\s*ref\s*(?:<[^>]*>)?\s*\(",
-            regex::escape(&ident)
-        ))
-        .unwrap()
-        .is_match(tail)
-        {
-            HoistedBindingKind::Ref
-        } else {
-            HoistedBindingKind::Const
-        };
-        if let Some(started_at) = binding_kind_started_at {
-            profile.analyze_binding_kind_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-        }
-
-        declared.push((start, ident, kind));
-    }
-    if let Some(started_at) = decl_scan_started_at {
-        profile.analyze_decl_scan_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    let function_scan_started_at = profile_enabled.then(Instant::now);
-    for capture in fn_re.captures_iter(source) {
-        let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
-        if !is_top_level_position(source, full_start) {
-            continue;
-        }
-        let ident = capture
-            .get(1)
-            .map(|m| m.as_str())
-            .unwrap_or_default()
-            .to_string();
-        let start = capture.get(1).map(|m| m.start()).unwrap_or(0);
-        declared.push((start, ident, HoistedBindingKind::Function));
-    }
-    if let Some(started_at) = function_scan_started_at {
-        profile.analyze_function_scan_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    // Zenith shorthand: state name = value (reactive state declaration)
-    let state_decl_scan_started_at = profile_enabled.then(Instant::now);
-    for capture in state_decl_re.captures_iter(source) {
-        let full_start = capture.get(0).map(|m| m.start()).unwrap_or(0);
-        if !is_top_level_position(source, full_start) {
-            continue;
-        }
-        let ident = capture
-            .get(1)
-            .map(|m| m.as_str())
-            .unwrap_or_default()
-            .to_string();
-        let start = capture.get(1).map(|m| m.start()).unwrap_or(0);
-        declared.push((start, ident, HoistedBindingKind::State));
-    }
-    if let Some(started_at) = state_decl_scan_started_at {
-        profile.analyze_state_decl_scan_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    declared.sort_by(|a, b| a.0.cmp(&b.0));
-
-    let mut bindings = Vec::new();
-    for (_, ident, kind) in declared {
-        if bindings
-            .iter()
-            .any(|existing: &HoistedBinding| existing.original == ident)
-        {
-            return Err(script_contract_error(
-                source_path,
-                id,
-                format!(
-                    "component script declaration collision: `{}` declared multiple times",
-                    ident
-                ),
-            ));
-        }
-
-        let renamed = format!(
-            "__{}_{}_{}",
-            sanitize_component_slug(component_path),
-            stable_hash_8(component_path),
-            ident
-        );
-        bindings.push(HoistedBinding {
-            original: ident,
-            renamed,
-            kind,
-        });
-    }
-
-    let mut renamed_source = source.to_string();
-    let mut rename_order = bindings.clone();
-    rename_order.sort_by(|a, b| b.original.len().cmp(&a.original.len()));
-    let rename_rewrite_started_at = profile_enabled.then(Instant::now);
-    for binding in &rename_order {
-        let pattern = Regex::new(&format!(
-            r"(^|[^A-Za-z0-9_$.])({})([^A-Za-z0-9_$]|$)",
-            regex::escape(&binding.original)
-        ))
-        .unwrap();
-        renamed_source = pattern
-            .replace_all(
-                &renamed_source,
-                format!("${{1}}{}${{3}}", binding.renamed).as_str(),
-            )
-            .into_owned();
-    }
-    if let Some(started_at) = rename_rewrite_started_at {
-        profile.analyze_rename_rewrite_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-    // Lower Zenith shorthand "state name = value" to valid JS "var name = signal(value)"
-    let state_lower_started_at = profile_enabled.then(Instant::now);
-    renamed_source = state_kw_re
-        .replace_all(&renamed_source, "var ")
-        .into_owned();
-
-    // Wrap State declaration RHS in signal() so state vars become reactive
-    for binding in bindings
-        .iter()
-        .filter(|b| matches!(b.kind, HoistedBindingKind::State))
-    {
-        let r = regex::escape(&binding.renamed);
-        let decl_re = Regex::new(&format!(r"var\s+{r}\s*=\s*([^;]+);")).unwrap();
-        renamed_source = decl_re
-            .replace_all(
-                &renamed_source,
-                format!("var {} = signal($1);", binding.renamed),
-            )
-            .into_owned();
-    }
-
-    // Lower assignments to State vars: R = RHS -> R.set(RHS') where RHS' has R -> R.get()
-    for binding in bindings
-        .iter()
-        .filter(|b| matches!(b.kind, HoistedBindingKind::State))
-    {
-        let r = regex::escape(&binding.renamed);
-        // Match R = RHS at statement boundary (not in var/const/let declaration)
-        let assign_re = Regex::new(&format!(r"((?:^|[\n;{{])\s*){r}\s*=\s*([^;]+)")).unwrap();
-        renamed_source = assign_re
-            .replace_all(&renamed_source, |caps: &regex::Captures<'_>| {
-                let prefix = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-                let rhs = caps.get(2).map(|m| m.as_str()).unwrap_or("");
-                let rhs_with_get = Regex::new(&format!(r"\b{r}\b"))
-                    .unwrap()
-                    .replace_all(rhs, format!("{}.get()", binding.renamed))
-                    .into_owned();
-                format!("{}{}.set({})", prefix, binding.renamed, rhs_with_get)
-            })
-            .into_owned();
-    }
-    if let Some(started_at) = state_lower_started_at {
-        profile.analyze_state_lower_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    let lower_state_reads_started_at = profile_enabled.then(Instant::now);
-    renamed_source = lower_state_reads_to_get(&renamed_source, &bindings);
-    if let Some(started_at) = lower_state_reads_started_at {
-        profile.analyze_lower_state_reads_ms += started_at.elapsed().as_secs_f64() * 1000.0;
-    }
-
-    let declaration_collect_started_at = profile_enabled.then(Instant::now);
-    let declarations = decl_line_re
-        .find_iter(&renamed_source)
-        .filter(|m| is_top_level_position(&renamed_source, m.start()))
-        .map(|m| m.as_str().trim().to_string())
-        .collect::<Vec<_>>();
-    if let Some(started_at) = declaration_collect_started_at {
-        profile.analyze_declaration_collect_ms += started_at.elapsed().as_secs_f64() * 1000.0;
+        let elapsed_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+        profile.analyze_import_work_ms += elapsed_ms;
+        profile.analyze_rename_rewrite_ms += elapsed_ms;
+        profile.analyze_state_lower_ms += elapsed_ms;
+        profile.analyze_lower_state_reads_ms += elapsed_ms;
+        profile.analyze_declaration_collect_ms += elapsed_ms;
     }
 
     let mut functions = Vec::new();
@@ -804,158 +559,6 @@ fn analyze_component_script(
         signals,
         bindings,
     })
-}
-
-fn lower_state_reads_to_get(source: &str, bindings: &[HoistedBinding]) -> String {
-    let mut rewritten = source.to_string();
-
-    for (index, binding) in bindings
-        .iter()
-        .enumerate()
-        .filter(|(_, binding)| matches!(binding.kind, HoistedBindingKind::State))
-    {
-        let ident = regex::escape(&binding.renamed);
-        let decl_placeholder = format!("__ZENITH_STATE_DECL_{index}__");
-        let get_placeholder = format!("__ZENITH_STATE_GET_{index}__");
-        let set_placeholder = format!("__ZENITH_STATE_SET_{index}__");
-
-        let decl_re = Regex::new(&format!(r"\bvar\s+({ident})\b")).unwrap();
-        rewritten = decl_re
-            .replace_all(&rewritten, format!("var {decl_placeholder}"))
-            .into_owned();
-
-        rewritten = rewritten.replace(
-            &format!("{}.get", binding.renamed),
-            &format!("{get_placeholder}.get"),
-        );
-        rewritten = rewritten.replace(
-            &format!("{}.set", binding.renamed),
-            &format!("{set_placeholder}.set"),
-        );
-
-        let ident_re = Regex::new(&format!(r"\b{ident}\b")).unwrap();
-        rewritten = ident_re
-            .replace_all(&rewritten, format!("{}.get()", binding.renamed))
-            .into_owned();
-
-        rewritten = rewritten.replace(&decl_placeholder, &binding.renamed);
-        rewritten = rewritten.replace(
-            &format!("{get_placeholder}.get"),
-            &format!("{}.get", binding.renamed),
-        );
-        rewritten = rewritten.replace(
-            &format!("{set_placeholder}.set"),
-            &format!("{}.set", binding.renamed),
-        );
-    }
-
-    rewritten
-}
-
-fn is_top_level_position(source: &str, pos: usize) -> bool {
-    #[derive(Clone, Copy, PartialEq, Eq)]
-    enum ScanMode {
-        Code,
-        SingleQuote,
-        DoubleQuote,
-        Template,
-        LineComment,
-        BlockComment,
-    }
-
-    let bytes = source.as_bytes();
-    let mut i = 0usize;
-    let mut depth = 0i32;
-    let mut mode = ScanMode::Code;
-    let end = pos.min(bytes.len());
-
-    while i < end {
-        match mode {
-            ScanMode::Code => {
-                if i + 1 < end && bytes[i] == b'/' && bytes[i + 1] == b'/' {
-                    mode = ScanMode::LineComment;
-                    i += 2;
-                    continue;
-                }
-                if i + 1 < end && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-                    mode = ScanMode::BlockComment;
-                    i += 2;
-                    continue;
-                }
-                match bytes[i] {
-                    b'\'' => {
-                        mode = ScanMode::SingleQuote;
-                        i += 1;
-                        continue;
-                    }
-                    b'"' => {
-                        mode = ScanMode::DoubleQuote;
-                        i += 1;
-                        continue;
-                    }
-                    b'`' => {
-                        mode = ScanMode::Template;
-                        i += 1;
-                        continue;
-                    }
-                    b'{' => {
-                        depth += 1;
-                    }
-                    b'}' => {
-                        depth = (depth - 1).max(0);
-                    }
-                    _ => {}
-                }
-                i += 1;
-            }
-            ScanMode::SingleQuote => {
-                if bytes[i] == b'\\' {
-                    i = (i + 2).min(end);
-                    continue;
-                }
-                if bytes[i] == b'\'' {
-                    mode = ScanMode::Code;
-                }
-                i += 1;
-            }
-            ScanMode::DoubleQuote => {
-                if bytes[i] == b'\\' {
-                    i = (i + 2).min(end);
-                    continue;
-                }
-                if bytes[i] == b'"' {
-                    mode = ScanMode::Code;
-                }
-                i += 1;
-            }
-            ScanMode::Template => {
-                if bytes[i] == b'\\' {
-                    i = (i + 2).min(end);
-                    continue;
-                }
-                if bytes[i] == b'`' {
-                    mode = ScanMode::Code;
-                }
-                i += 1;
-            }
-            ScanMode::LineComment => {
-                if bytes[i] == b'\n' {
-                    mode = ScanMode::Code;
-                }
-                i += 1;
-            }
-            ScanMode::BlockComment => {
-                if i + 1 < end && bytes[i] == b'*' && bytes[i + 1] == b'/' {
-                    mode = ScanMode::Code;
-                    i += 2;
-                    continue;
-                }
-                i += 1;
-            }
-        }
-    }
-
-    depth == 0
 }
 
 fn update_tag_depth(segment: &str, depth: &mut i32) {
@@ -1001,7 +604,7 @@ fn sanitize_component_slug(source_path: &str) -> String {
     slug
 }
 
-fn stable_hash_8(input: &str) -> String {
+pub(crate) fn stable_hash_8(input: &str) -> String {
     let mut hash: i32 = 0;
     for byte in input.bytes() {
         hash = hash
@@ -1011,17 +614,6 @@ fn stable_hash_8(input: &str) -> String {
     }
     let normalized = hash.wrapping_abs() as u32;
     format!("{normalized:08x}")
-}
-
-fn dedupe_preserve_order(items: Vec<String>) -> Vec<String> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::new();
-    for item in items {
-        if seen.insert(item.clone()) {
-            out.push(item);
-        }
-    }
-    out
 }
 
 fn canonicalize_script_source(source: &str) -> String {

@@ -1,4 +1,4 @@
-# @zenith/router
+# @zenithbuild/router
 
 > Internal Zenith package. The generated router runtime is the authoritative surface here, not a general SPA framework API.
 

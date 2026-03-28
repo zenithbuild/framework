@@ -15,6 +15,14 @@ const NODE_RUNTIME_FILES = [
         to: 'runtime/resolve-request-route.js'
     },
     {
+        from: new URL('../request-origin.js', import.meta.url),
+        to: 'request-origin.js'
+    },
+    {
+        from: new URL('../server-error.js', import.meta.url),
+        to: 'server-error.js'
+    },
+    {
         from: new URL('../images/service.js', import.meta.url),
         to: 'images/service.js'
     }

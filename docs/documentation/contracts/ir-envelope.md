@@ -19,4 +19,4 @@ Definition of Done:
 - Envelope shape remains deterministic.
 - Any shape change increments IR version and updates validators/tests.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/IR_ENVELOPE_CONTRACT.md`.
+Canonical source: `packages/compiler/IR_ENVELOPE_CONTRACT.md`.

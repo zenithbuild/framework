@@ -67,6 +67,11 @@ describe('server output contract', () => {
                 '  return ctx.data({ viewer: ctx.env.viewer });',
                 '}'
             ].join('\n'),
+            'pages/secure/page.action.ts': [
+                'export async function action(ctx) {',
+                '  return ctx.data({ submitted: ctx.method === "POST" });',
+                '}'
+            ].join('\n'),
             'zenith.config.js': 'module.exports = { target: "vercel", basePath: "/docs" };\n'
         });
 
@@ -95,8 +100,10 @@ describe('server output contract', () => {
                     server_script_path: '<project>/pages/secure/index.zen',
                     guard_module_ref: null,
                     load_module_ref: 'pages/secure/page.load.ts',
+                    action_module_ref: 'pages/secure/page.action.ts',
                     has_guard: true,
                     has_load: true,
+                    has_action: true,
                     params: [],
                     image_manifest_file: null,
                     image_config: {
@@ -122,6 +129,7 @@ describe('server output contract', () => {
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'materialize.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'entry.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'page.html'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.action.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.load.js'))).toBe(true);
     });
 });

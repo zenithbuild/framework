@@ -1,30 +1,28 @@
-# @zenith/runtime
+# @zenithbuild/runtime
 
 > **⚠️ Internal API:** This package is an internal implementation detail of the Zenith framework. It is not intended for public use and its API may break without warning. Please use `@zenithbuild/core` instead.
 
-
-The core runtime library for the Zenith framework.
+Internal runtime package for Zenith hydration, bindings, and reactive primitives consumed by compiled output.
 
 ## Canonical Docs
 
-- Runtime contract: `../zenith-docs/documentation/contracts/runtime-contract.md`
-- Hydration contract: `../zenith-docs/documentation/contracts/hydration-contract.md`
-- Reactive binding model: `../zenith-docs/documentation/reference/reactive-binding-model.md`
+- Runtime contract: `../../docs/documentation/contracts/runtime-contract.md`
+- Hydration contract: `../../docs/documentation/contracts/hydration-contract.md`
+- Reactive binding model: `../../docs/documentation/reference/reactive-binding-model.md`
 
 ## Overview
-This package provides the reactivity system, hydration logic, and Virtual DOM primitives used by Zenith applications. It is designed to be lightweight, fast, and tree-shakeable.
+This package provides the minimal runtime surfaces needed after compile:
+
+- signal/state/effect/mount primitives
+- DOM binding and hydration helpers
+- template/runtime bridges consumed by compiler and bundler output
+
+It does not define a public virtual-DOM framework API.
 
 ## Features
-- **Fine-Grained Reactivity**: Signals, Effects, Derived State (Memos).
-- **Hydration**: Efficient client-side hydration of server-rendered HTML.
-- **VDOM primitives**: `h` and `fragment` for lightweight view rendering.
-- **Lifecycle Hooks**: `onMount`, `onUnmount`.
+- **Fine-Grained Reactivity**: signal/state/effect primitives used by emitted code.
+- **Hydration**: deterministic client-side hydration for server-rendered HTML.
+- **Lifecycle Cleanup**: explicit mount/effect cleanup semantics.
 
 ## Usage
-This package is typically installed automatically by the Zenith CLI.
-```typescript
-import { signal, effect } from "@zenith/runtime";
-
-const count = signal(0);
-effect(() => console.log(count()));
-```
+This package is installed as an internal framework dependency. App code should normally use the public Zenith surface instead of importing `@zenithbuild/runtime` directly.

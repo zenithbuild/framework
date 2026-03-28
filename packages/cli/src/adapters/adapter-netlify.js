@@ -123,6 +123,7 @@ export const netlifyAdapter = {
             await cp(join(options.coreOutput, 'server', 'images'), join(functionsDir, '_zenith', 'images'), { recursive: true, force: true });
             await cp(join(options.coreOutput, 'server', 'base-path.js'), join(functionsDir, '_zenith', 'base-path.js'), { force: true });
             await cp(join(options.coreOutput, 'server', 'server-contract.js'), join(functionsDir, '_zenith', 'server-contract.js'), { force: true });
+            await cp(join(options.coreOutput, 'server', 'server-error.js'), join(functionsDir, '_zenith', 'server-error.js'), { force: true });
             for (const route of serverRoutes) {
                 await cp(
                     join(options.coreOutput, 'server', 'routes', route.name),

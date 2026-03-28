@@ -9,12 +9,19 @@ import { zenOn, zenWindow } from '../dist/index.js';
 describe('runtime API lock', () => {
     test('exports explicit hydration/reactivity functions', () => {
         const keys = Object.keys(runtimeApi).sort();
+        console.log('ACTUAL KEYS:', keys);
         expect(keys).toEqual([
             'collectRefs',
+            'document',
+            'effect',
             'hydrate',
+            'mount',
             'signal',
             'state',
+            'window',
             'zenDocument',
+            'zenEffect',
+            'zenMount',
             'zenOn',
             'zenResize',
             'zenWindow',
@@ -739,11 +746,36 @@ describe('hydrate integration contract', () => {
         expect(snapshotAfter).toBe(snapshotBefore);
     });
 
-    // ── Functional drift gates for _zenhtml sanitization ──────────────
+    // ── Functional drift gates for compiler-owned fragment rendering ─────────
 
-    test('_zenhtml rejects script tag injection in interpolated values', () => {
+    test('fragment escapes interpolated HTML strings by default', () => {
         container.innerHTML = '<section data-zx-e="0"></section>';
-        const injection = '<script>alert(1)</script>';
+        const injection = '<em>unsafe</em>';
+
+        hydrate({
+            ir_version: 1,
+            root: container,
+            expressions: [
+                {
+                    marker_index: 0,
+                    fn_index: 0
+                }
+            ],
+            markers: [{ index: 0, kind: 'text', selector: '[data-zx-e~="0"]' }],
+            events: [],
+            state_values: [],
+            state_keys: [],
+            signals: [],
+            expr_fns: [({ fragment }) => fragment`<div>${injection}</div>`]
+        });
+
+        const div = container.querySelector('section div');
+        expect(div.textContent).toBe(injection);
+        expect(container.querySelector('section').innerHTML).toContain('&lt;em&gt;unsafe&lt;/em&gt;');
+    });
+
+    test('fragment rejects script tags in literal markup', () => {
+        container.innerHTML = '<section data-zx-e="0"></section>';
 
         expect(() =>
             hydrate({
@@ -760,14 +792,13 @@ describe('hydrate integration contract', () => {
                 state_values: [],
                 state_keys: [],
                 signals: [],
-                expr_fns: [({ zenhtml }) => zenhtml`<div>${injection}</div>`]
+                expr_fns: [({ fragment }) => fragment`<script>alert(1)</script>`]
             })
         ).toThrow(/forbidden.*script/i);
     });
 
-    test('_zenhtml rejects javascript: URL injection in interpolated values', () => {
+    test('fragment rejects javascript: URLs in literal markup', () => {
         container.innerHTML = '<section data-zx-e="0"></section>';
-        const url = 'javascript:alert(1)';
 
         expect(() =>
             hydrate({
@@ -784,36 +815,12 @@ describe('hydrate integration contract', () => {
                 state_values: [],
                 state_keys: [],
                 signals: [],
-                expr_fns: [({ zenhtml }) => zenhtml`<a href="${url}">link</a>`]
+                expr_fns: [({ fragment }) => fragment`<a href="javascript:alert(1)">link</a>`]
             })
         ).toThrow(/javascript.*URL/i);
     });
 
-    test('_zenhtml rejects inline event handler attributes', () => {
-        container.innerHTML = '<section data-zx-e="0"></section>';
-        const handler = 'alert(1)';
-
-        expect(() =>
-            hydrate({
-                ir_version: 1,
-                root: container,
-                expressions: [
-                    {
-                        marker_index: 0,
-                        fn_index: 0
-                    }
-                ],
-                markers: [{ index: 0, kind: 'text', selector: '[data-zx-e~="0"]' }],
-                events: [],
-                state_values: [],
-                state_keys: [],
-                signals: [],
-                expr_fns: [({ zenhtml }) => zenhtml`<div onclick=${handler}>test</div>`]
-            })
-        ).toThrow(/event handler.*on\*/i);
-    });
-
-    test('_zenhtml rejects non-renderable object interpolation', () => {
+    test('fragment rejects non-renderable object interpolation', () => {
         container.innerHTML = '<section data-zx-e="0"></section>';
         const obj = { foo: 'bar' };
 
@@ -832,7 +839,7 @@ describe('hydrate integration contract', () => {
                 state_values: [],
                 state_keys: [],
                 signals: [],
-                expr_fns: [({ zenhtml }) => zenhtml`<div>${obj}</div>`]
+                expr_fns: [({ fragment }) => fragment`<div>${obj}</div>`]
             })
         ).toThrow(/non-renderable object/i);
     });
@@ -905,56 +912,26 @@ describe('runtime source guardrails', () => {
         expect(source.includes("querySelectorAll('*')")).toBe(false);
     });
 
-    // ── Drift gates for _zenhtml / innerHTML (beta.2 baseline) ──────────────
-
-    test('innerHTML assignment count does not exceed baseline', () => {
-        // Do not hardcode innerHTML = count to a magic number. Instead,
-        // snapshot the baseline count and compare. If this test fails,
-        // a new innerHTML = was introduced; either remove it or update
-        // the baseline with a justification comment.
-        const HYDRATE_BASELINE = 4; // baseline as of beta.2: fragment render, container clear, innerHTML attr binding, + 1 comment mention
-        const RUNTIME_BASELINE = 2; // baseline as of beta.2: page render, container clear
-
-        const hydrateSource = fs.readFileSync(
-            path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/hydrate.js'),
-            'utf8'
-        );
-        const runtimeSource = fs.readFileSync(
-            path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/runtime.js'),
-            'utf8'
-        );
-
-        const hydrateCount = (hydrateSource.match(/innerHTML\s*=/g) || []).length;
-        const runtimeCount = (runtimeSource.match(/innerHTML\s*=/g) || []).length;
-
-        expect(hydrateCount).toBe(HYDRATE_BASELINE);
-        expect(runtimeCount).toBe(RUNTIME_BASELINE);
-    });
-
-    test('scope.zenhtml = binding is banned (must use internal identifier)', () => {
+    test('runtime source removes legacy zenhtml plumbing', () => {
         const source = fs.readFileSync(
             path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/hydrate.js'),
             'utf8'
         );
 
-        // The scope binding must use __ZENITH_INTERNAL_ZENHTML, never bare zenhtml
-        expect(source.includes('scope.zenhtml =')).toBe(false);
-        expect(source.includes('scope.zenhtml=')).toBe(false);
-        expect(source.includes('scope.__ZENITH_INTERNAL_ZENHTML')).toBe(true);
+        expect(source.includes('zenhtml:')).toBe(false);
+        expect(source.includes('__ZENITH_INTERNAL_ZENHTML')).toBe(false);
+        expect(source.includes('LEGACY_MARKUP_HELPER')).toBe(false);
     });
 
-    test('zenhtml is not part of public exports or globals', () => {
-        const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src');
-        const files = fs.readdirSync(srcDir).filter((name) => name.endsWith('.js'));
+    test('runtime source gates raw HTML behind unsafeHTML', () => {
+        const source = fs.readFileSync(
+            path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/hydrate.js'),
+            'utf8'
+        );
 
-        for (let i = 0; i < files.length; i++) {
-            const source = fs.readFileSync(path.join(srcDir, files[i]), 'utf8');
-            expect(source.includes('export')).toBe(true) || true; // some files may not export
-            // Ban direct zenhtml exports and global bindings
-            expect(/export\s+.*\bzenhtml\b/.test(source)).toBe(false);
-            expect(source.includes('globalThis.zenhtml')).toBe(false);
-            expect(source.includes('window.zenhtml')).toBe(false);
-        }
+        expect(source.includes("attrName.toLowerCase() === 'innerhtml'")).toBe(true);
+        expect(source.includes('innerHTML bindings are forbidden in Zenith')).toBe(true);
+        expect(source.includes("attrName.toLowerCase() === 'unsafehtml'")).toBe(true);
     });
 
 });

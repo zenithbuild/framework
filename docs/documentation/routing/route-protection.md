@@ -11,24 +11,25 @@ nav:
 
 # Route Protection
 
-Zenith provides a secure, deterministic route protection mechanism via two optional async exports: `guard(ctx)` and `load(ctx)`.
+Zenith provides a secure, deterministic server route mechanism via three optional async exports: `guard(ctx)`, `action(ctx)`, and `load(ctx)`.
 
 **Core Principle ("Server is Security"):** True route protection only happens on the server. Client-side protection is a UX enhancement (preventing UI flashes) but is never a security boundary. `/__zenith/route-check` does not grant security; it only avoids flash.
 
-Zenith enforces this principle by executing `guard` and `load` on the server before rendering HTML, and on the client router as a "no-flash" fallback mechanism.
+Zenith enforces this principle by executing `guard`, `action`, and `load` on the server before returning the final HTML response, and on the client router as an advisory UX layer only where applicable.
 
 ## The Contract
 
-You can export `guard` and `load` from one `<script server lang="ts">` block in your `.zen` page, or from adjacent sibling modules:
+You can export `guard`, `action`, and `load` from one `<script server lang="ts">` block in your `.zen` page, or from adjacent sibling modules:
 
-- `<route>.guard.ts` / `<route>.load.ts`
-- `page.guard.ts` / `page.load.ts` next to `index.zen`
+- `<route>.guard.ts` / `<route>.action.ts` / `<route>.load.ts`
+- `page.guard.ts` / `page.action.ts` / `page.load.ts` next to `index.zen`
 
 They must return a canonical `RouteResult`:
 - `allow()`
 - `redirect(location, status?)`
 - `deny(status?, message?)` where status is `401`, `403`, or `404`
 - `data(payload)`
+- `invalid(payload, 400|422)` for expected action validation failures
 
 ### Execution Order
 
@@ -36,7 +37,12 @@ They must return a canonical `RouteResult`:
    - **Allowed Returns:** `allow()`, `redirect()`, `deny()`. 
    - **Forbidden Returns:** `data()` (emits a fatal build-time / runtime error).
 
-2. **`load(ctx)`**: Runs second (only if `guard` did not short-circuit). Fetch data needed for rendering.
+2. **`action(ctx)`**: Runs on `POST` requests after `guard(ctx)` and before `load(ctx)`.
+   - **Allowed Returns:** `data()`, `invalid(payload, 400|422)`, `redirect()`, `deny()`.
+   - **Purpose:** Own the mutation, then hand the normalized result to `load(ctx)` through `ctx.action`.
+   - **Scope Guard:** `action(ctx)` is the canonical form mutation hook, not a general RPC surface.
+
+3. **`load(ctx)`**: Runs after `guard(ctx)` and after `action(ctx)` on POST requests. Fetch data needed for rendering.
    - **Allowed Returns:** `data()`, `redirect()`, `deny()`.
    - **Plain Object Shortcut:** Returning a plain object is treated the same as `data(payload)`.
    - **Legacy Compatibility:** You cannot mix `load`/`data` exports with legacy `ssr`/`ssr_data` exports in the same route.
@@ -72,14 +78,14 @@ They must return a canonical `RouteResult`:
 </script>
 
 <main>
-  <h1>Welcome, {params.user.name}</h1>
-  <p>Revenue: {params.metrics.revenue}</p>
+  <h1>Welcome, {data.user.name}</h1>
+  <p>Revenue: {data.metrics.revenue}</p>
 </main>
 ```
 
 ## The Context (`ctx`) Object
 
-Both `guard` and `load` receive a single `ctx` object argument which provides access to the request context:
+`guard`, `action`, and `load` receive a single `ctx` object argument which provides access to the request context:
 - `ctx.url`: URL instance
 - `ctx.params`: Route parameters (e.g. `[id]`)
 - `ctx.headers`: Request headers
@@ -87,21 +93,46 @@ Both `guard` and `load` receive a single `ctx` object argument which provides ac
 - `ctx.request`: Standard `Request` clone
 - `ctx.method`: HTTP Method
 - `ctx.env`: Shared object to pass data from `guard` to `load`
-- `ctx.allow()`, `ctx.redirect()`, `ctx.deny()`, `ctx.data()`: Bound constructors
+- `ctx.action`: `null` on normal GET requests, or the normalized action result during the same POST request
+- `ctx.allow()`, `ctx.redirect()`, `ctx.deny()`, `ctx.invalid()`, `ctx.data()`: Bound constructors
+
+`ctx.action` is either:
+- `null`
+- `{ ok: true, status: 200, data }`
+- `{ ok: false, status: 400|422, data }`
 
 ## Routing Behavior
 
 ### Static Site Generation (SSG)
-Routes protected with `guard(ctx)` or `load(ctx)` **cannot be statically generated**. If you have `export const prerender = true` in the same file, or enforce global static build, the compiler will throw a build error.
+Routes using `guard(ctx)`, `action(ctx)`, or `load(ctx)` **cannot be statically generated**. If you have `export const prerender = true` in the same file, or enforce global static build, the compiler will throw a build error.
 
 ### Client Router (Advisory Preflight, Server-Authoritative Commit)
-When navigating via marked soft-nav links (`<a data-zen-link>`), the router may preflight guarded server routes through `/__zenith/route-check` using the target pathname plus query string. That preflight is advisory only.
+When navigating via marked soft-nav links (`<a data-zen-link>`), the router may preflight guarded server routes through `/__zenith/route-check` using the target pathname plus query string when the configured target exposes that endpoint. That preflight is advisory only.
+
+Today, advisory route-check is available in local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` server adapters skip advisory route-check and rely on the direct same-origin HTML request instead.
 
 The actual soft-navigation authority is the direct same-origin HTML fetch for the target URL:
 - if the server returns a successful HTML page, the router may soft-commit it
 - if the server returns a redirect, deny, non-HTML response, or fetch failure, the router falls back to browser navigation
 
 Client routing never overrules the server result.
+
+### Progressive Enhancement Forms
+
+Normal HTML `POST` forms work without JavaScript.
+
+If you opt in with `data-zen-form`, the client router may progressively enhance the submission for same-origin server routes:
+- the browser still submits `FormData`
+- the server still owns the mutation through `action(ctx)`
+- the response is the same matched route HTML, not a separate RPC payload
+- expected validation failures use `invalid(...)` and re-render the route with `ctx.action`
+
+This enhancement is intentionally narrow:
+- `POST` only
+- same-origin only
+- server routes only
+- no optimistic UI
+- no file-upload abstraction
 
 ### Optional Client Policy and Events
 You can still subscribe to advisory route-protection events:
@@ -128,7 +159,8 @@ Supported route-protection events:
 ## Direct Request Outcomes
 
 - `redirect(...)` returns the provided 3xx status and `Location` header immediately.
+- `invalid(payload, 400|422)` keeps the request on the same route and re-renders with `ctx.action`.
 - `deny(401|403|404, ...)` returns a matched-route status and plain-text body immediately.
 - A matched-route `deny(404, ...)` is different from an unmatched route 404.
-- A thrown error inside an executing `guard(ctx)` or `load(ctx)` returns `500 text/plain`.
-- If Zenith cannot produce a canonical route result from the extracted server module at all, the direct HTML response carries `__zenith_error.code = "LOAD_FAILED"`.
+- A thrown error inside an executing `guard(ctx)`, `action(ctx)`, or `load(ctx)` returns `500 text/plain` with the generic body `Internal Server Error`.
+- Zenith logs internal route execution failures server-side; direct client responses do not expose the thrown error text.

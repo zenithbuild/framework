@@ -1,5 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  renderImageHtmlWithPayload,
+  replaceImageMarkers,
+  serializeImageProps
+} from './runtime.js';
 
 type ImagePayload = {
   mode: string;
@@ -7,53 +12,21 @@ type ImagePayload = {
   localImages: Record<string, unknown>;
 };
 
+type ImageMaterializationEntry = {
+  selector?: string;
+  props?: Record<string, unknown> | null;
+};
+
 type RouteManifestEntry = {
   output?: string;
-  page_asset?: string;
   path?: string;
   server_script?: string | null;
   prerender?: boolean;
-};
-
-type PageModuleNamespace = {
-  __zenith_markers?: Array<{
-    index: number;
-    kind: string;
-    selector?: string;
-    attr?: string;
-  }>;
-  __zenith_expression_bindings?: Array<{
-    marker_index?: number;
-    fn_index?: number;
-  }>;
-  __zenith_expr_fns?: Array<(ctx: Record<string, unknown>) => unknown>;
-};
-
-const RUNTIME_EXPORTS = {
-  hydrate: () => () => {},
-  signal: (value: unknown) => value,
-  state: (value: unknown) => value,
-  ref: () => ({ current: null }),
-  zeneffect: () => () => {},
-  zenEffect: () => () => {},
-  zenMount: () => {},
-  zenWindow: () => undefined,
-  zenDocument: () => undefined,
-  zenOn: () => () => {},
-  zenResize: () => () => {},
-  collectRefs: (...refs: unknown[]) => refs.filter(Boolean)
+  image_materialization?: ImageMaterializationEntry[];
 };
 
 function escapeRegex(value: string): string {
   return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function parseMarkerSelector(selector: string): { attrName: string; attrValue: string } | null {
@@ -72,7 +45,7 @@ function upsertAttributeMarkup(attributes: string, attrName: string, value: unkn
   if (value === null || value === undefined || value === false || value === '') {
     return attributes.replace(attrPattern, '');
   }
-  const serialized = ` ${trimmedName}="${escapeHtml(value)}"`;
+  const serialized = ` ${trimmedName}="${String(value)}"`;
   if (attrPattern.test(attributes)) {
     return attributes.replace(attrPattern, serialized);
   }
@@ -86,7 +59,7 @@ function applyAttributeMarker(html: string, selector: string, attrName: string, 
     `<([A-Za-z][\\w:-]*)([^>]*\\s${escapeRegex(parsed.attrName)}=(["'])${escapeRegex(parsed.attrValue)}\\3[^>]*)>`,
     'g'
   );
-  return html.replace(markerRe, (match, tagName, attrs) => {
+  return html.replace(markerRe, (_match, tagName, attrs) => {
     const nextAttrs = upsertAttributeMarkup(String(attrs || ''), attrName, value);
     return `<${tagName}${nextAttrs}>`;
   });
@@ -103,129 +76,49 @@ function applyInnerHtmlMarker(html: string, selector: string, value: unknown): s
   return html.replace(markerRe, (_match, tagName, attrs) => `<${tagName}${attrs}>${replacement}</${tagName}>`);
 }
 
-function stripModuleSyntax(source: string): string {
-  let next = source.replace(/^import\s+[^;]+;\s*$/gm, '');
-  if (/(^|\n)\s*import\s+/m.test(next)) {
-    throw new Error('[Zenith:Image] Cannot materialize page asset with unresolved imports');
-  }
-  next = next.replace(/^export\s+default\s+function\s+/gm, 'function ');
-  next = next.replace(/^export\s+function\s+/gm, 'function ');
-  next = next.replace(/^export\s+const\s+/gm, 'const ');
-  next = next.replace(/^export\s+let\s+/gm, 'let ');
-  next = next.replace(/^export\s+var\s+/gm, 'var ');
-  next = next.replace(/\bexport\s*\{[^}]*\};?/g, '');
-  return next;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-async function evaluatePageModule(
-  assetPath: string,
-  payload: ImagePayload,
-  ssrData: Record<string, unknown> | null,
-  routePathname: string
-): Promise<PageModuleNamespace | null> {
-  const source = stripModuleSyntax(await readFile(assetPath, 'utf8'));
-  const runtimeNames = Object.keys(RUNTIME_EXPORTS);
-  const evaluator = new Function(
-    'runtime',
-    'payload',
-    'ssrData',
-    'routePathname',
-    [
-      '"use strict";',
-      `const { ${runtimeNames.join(', ')} } = runtime;`,
-      'const document = {};',
-      'const location = { pathname: routePathname || "/" };',
-      'const Document = class ZenithServerDocument {};',
-      'const globalThis = {',
-      '  __zenith_image_runtime: payload,',
-      '  document,',
-      '  location,',
-      '  Document',
-      '};',
-      'if (ssrData && typeof ssrData === "object" && !Array.isArray(ssrData)) {',
-      '  globalThis.__zenith_ssr_data = ssrData;',
-      '}',
-      'globalThis.globalThis = globalThis;',
-      'globalThis.window = globalThis;',
-      'globalThis.self = globalThis;',
-      source,
-      'return {',
-      '  __zenith_markers: typeof __zenith_markers !== "undefined" ? __zenith_markers : [],',
-      '  __zenith_expression_bindings: typeof __zenith_expression_bindings !== "undefined" ? __zenith_expression_bindings : [],',
-      '  __zenith_expr_fns: typeof __zenith_expr_fns !== "undefined" ? __zenith_expr_fns : []',
-      '};'
-    ].join('\n')
-  );
-  return evaluator(RUNTIME_EXPORTS, payload, ssrData, routePathname) as PageModuleNamespace;
-}
-
-function buildExpressionContext(ssrData: Record<string, unknown> | null): Record<string, unknown> {
-  return {
-    signalMap: new Map(),
-    params: {},
-    props: {},
-    ssrData: ssrData || {},
-    componentBindings: {},
-    zenhtml: null,
-    fragment: null
-  };
+function hasUnmaterializedImageMarkers(html: string): boolean {
+  const matches = html.match(/<span\b[^>]*\bdata-zx-(?:data-zenith-image|unsafeHTML)=(["'])[^"']+\1[^>]*>/gi) || [];
+  return matches.some((tag) => /\sdata-zenith-image=/.test(tag) === false);
 }
 
 export async function materializeImageMarkup(options: {
   html: string;
-  pageAssetPath?: string | null;
   payload: ImagePayload;
-  ssrData?: Record<string, unknown> | null;
-  routePathname?: string;
+  imageMaterialization?: ImageMaterializationEntry[] | null;
 }): Promise<string> {
   const {
     html,
-    pageAssetPath,
     payload,
-    ssrData = null,
-    routePathname = '/'
+    imageMaterialization = []
   } = options;
-  if (!pageAssetPath || !html.includes('data-zx-data-zenith-image')) {
+  const entries = Array.isArray(imageMaterialization) ? imageMaterialization : [];
+
+  if (typeof html !== 'string' || html.length === 0) {
     return html;
   }
 
-  const namespace = await evaluatePageModule(pageAssetPath, payload, ssrData, routePathname);
-  if (!namespace) {
-    return html;
-  }
-
-  const markers = Array.isArray(namespace.__zenith_markers) ? namespace.__zenith_markers : [];
-  const bindings = Array.isArray(namespace.__zenith_expression_bindings) ? namespace.__zenith_expression_bindings : [];
-  const exprFns = Array.isArray(namespace.__zenith_expr_fns) ? namespace.__zenith_expr_fns : [];
-  if (markers.length === 0 || bindings.length === 0 || exprFns.length === 0) {
-    return html;
-  }
-
-  const markerByIndex = new Map(markers.map((marker) => [marker.index, marker]));
   let nextHtml = html;
-  const context = buildExpressionContext(ssrData);
-
-  for (const binding of bindings) {
-    const marker = markerByIndex.get(Number(binding.marker_index));
-    const exprFn = Number.isInteger(binding.fn_index) ? exprFns[binding.fn_index!] : null;
-    if (
-      !marker ||
-      typeof exprFn !== 'function' ||
-      marker.kind !== 'attr' ||
-      typeof marker.selector !== 'string' ||
-      marker.selector.includes('data-zx-data-zenith-image') === false &&
-      marker.selector.includes('data-zx-innerHTML') === false
-    ) {
+  for (const entry of entries) {
+    if (!entry || typeof entry.selector !== 'string' || !isPlainObject(entry.props)) {
       continue;
     }
-    const value = exprFn(context);
-    if (marker.attr === 'innerHTML') {
-      nextHtml = applyInnerHtmlMarker(nextHtml, marker.selector, value);
-      continue;
-    }
-    nextHtml = applyAttributeMarker(nextHtml, marker.selector, marker.attr || '', value);
+    const encodedProps = serializeImageProps(entry.props);
+    const renderedHtml = renderImageHtmlWithPayload(entry.props, payload);
+    nextHtml = applyAttributeMarker(nextHtml, entry.selector, 'data-zenith-image', encodedProps);
+    nextHtml = applyInnerHtmlMarker(nextHtml, entry.selector, renderedHtml);
   }
 
+  nextHtml = replaceImageMarkers(nextHtml, payload);
+  if (hasUnmaterializedImageMarkers(nextHtml)) {
+    throw new Error(
+      '[Zenith:Image] Unresolved Image markers require a compiler-owned image materialization artifact. ' +
+      'Dynamic image props are currently unsupported.'
+    );
+  }
   return nextHtml;
 }
 
@@ -250,11 +143,9 @@ export async function materializeImageMarkupInHtmlFiles(options: {
       continue;
     }
     const outputPath = typeof route.output === 'string' ? route.output.replace(/^\//, '') : '';
-    const assetPath = typeof route.page_asset === 'string' ? route.page_asset.replace(/^\//, '') : '';
-    if (!outputPath || !assetPath) continue;
+    if (!outputPath) continue;
 
     const fullHtmlPath = join(distDir, outputPath);
-    const fullAssetPath = join(distDir, assetPath);
     let html = '';
     try {
       html = await readFile(fullHtmlPath, 'utf8');
@@ -263,9 +154,8 @@ export async function materializeImageMarkupInHtmlFiles(options: {
     }
     const nextHtml = await materializeImageMarkup({
       html,
-      pageAssetPath: fullAssetPath,
       payload,
-      routePathname: typeof route.path === 'string' ? route.path : '/'
+      imageMaterialization: Array.isArray(route.image_materialization) ? route.image_materialization : []
     });
     if (nextHtml !== html) {
       await writeFile(fullHtmlPath, nextHtml, 'utf8');

@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import http from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -17,6 +18,38 @@ async function createProject(files) {
         await writeFile(absolutePath, contents, 'utf8');
     }
     return root;
+}
+
+function extractSsrPayload(html) {
+    const payloadMatch = html.match(/window\.__zenith_ssr_data\s*=\s*(\{[\s\S]*?\});/);
+    expect(payloadMatch).toBeTruthy();
+    return JSON.parse(String(payloadMatch[1]));
+}
+
+async function requestText(port, pathname, headers = {}) {
+    return new Promise((resolve, reject) => {
+        const req = http.request({
+            host: '127.0.0.1',
+            port,
+            path: pathname,
+            method: 'GET',
+            headers
+        }, (res) => {
+            let body = '';
+            res.on('data', (chunk) => {
+                body += chunk;
+            });
+            res.on('end', () => {
+                resolve({
+                    status: res.statusCode,
+                    headers: res.headers,
+                    body
+                });
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
 }
 
 describe('node adapter', () => {
@@ -112,5 +145,78 @@ describe('node adapter', () => {
 
         const rootResponse = await fetch(`${origin}/`, { redirect: 'manual' });
         expect(rootResponse.status).toBe(404);
+    });
+
+    test('node target ignores untrusted Host headers and requires an explicit public origin for detached handlers', async () => {
+        projectRoot = await createProject({
+            'pages/origin.zen': [
+                '<script server lang="ts">',
+                'export async function load(ctx) {',
+                '  return ctx.data({ origin: ctx.url.origin, host: ctx.headers.host ?? null });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Origin</main></body></html>'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await cli(['build'], projectRoot);
+
+        const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
+        await expect(mod.createRequestHandler()).rejects.toThrow('publicOrigin');
+
+        preview = await mod.createNodeServer({
+            distDir: join(projectRoot, 'dist'),
+            port: 0,
+            host: '127.0.0.1'
+        });
+
+        const hostileHost = 'evil.example:9999';
+        const response = await requestText(preview.port, '/origin', { Host: hostileHost });
+        const payload = extractSsrPayload(response.body);
+
+        expect(response.status).toBe(200);
+        expect(payload).toEqual({
+            origin: `http://127.0.0.1:${preview.port}`,
+            host: hostileHost
+        });
+    });
+
+    test('node target sanitizes thrown server errors in direct requests and route-check', async () => {
+        projectRoot = await createProject({
+            'pages/broken.zen': [
+                '<script server lang="ts">',
+                'export async function guard(ctx) {',
+                '  void ctx;',
+                '  throw new Error("Route exploded");',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Broken</main></body></html>'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await cli(['build'], projectRoot);
+
+        const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
+        preview = await mod.createNodeServer({
+            distDir: join(projectRoot, 'dist'),
+            port: 0,
+            host: '127.0.0.1'
+        });
+
+        const direct = await requestText(preview.port, '/broken');
+        expect(direct.status).toBe(500);
+        expect(direct.body).toBe('Internal Server Error');
+
+        const routeCheck = await requestText(preview.port, '/__zenith/route-check?path=%2Fbroken', {
+            'x-zenith-route-check': '1'
+        });
+        expect(routeCheck.status).toBe(200);
+        expect(JSON.parse(routeCheck.body).result).toEqual({
+            kind: 'deny',
+            status: 500,
+            message: 'Internal Server Error'
+        });
     });
 });

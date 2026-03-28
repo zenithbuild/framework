@@ -1,61 +1,155 @@
-// ---------------------------------------------------------------------------
-// events.js — Zenith Runtime V0
-// ---------------------------------------------------------------------------
-// Event binding system.
-//
-// For: <button data-zx-on-click="1">
-//
-// Algorithm:
-//   1. Extract event name from attribute suffix ("click")
-//   2. Resolve expression at index → must be a function
-//   3. addEventListener directly
-//
-// No synthetic events.
-// No delegation.
-// No wrapping.
-// ---------------------------------------------------------------------------
-
 import { _registerListener } from './cleanup.js';
-import { rethrowZenithRuntimeError, throwZenithRuntimeError } from './diagnostics.js';
+import { rethrowZenithRuntimeError, throwZenithRuntimeError, DOCS_LINKS } from './diagnostics.js';
+import { _evaluateExpression, _describeBindingExpression, _resolveBindingSource } from './expressions.js';
 
-/**
- * Bind an event listener to a DOM element.
- *
- * @param {Element} element - The DOM element
- * @param {string} eventName - The event name (e.g. "click")
- * @param {() => any} exprFn - Pre-bound expression function that must resolve to a handler
- */
-export function bindEvent(element, eventName, exprFn) {
-    const resolved = exprFn();
+export function bindEventMarkers(context) {
+    const { root, events } = context;
+    const eventIndices = new Set();
+    const escDispatchEntries = [];
 
-    if (typeof resolved !== 'function') {
-        throwZenithRuntimeError({
-            phase: 'bind',
-            code: 'BINDING_APPLY_FAILED',
-            message: `Event binding expected a function reference for "${eventName}"`,
-            marker: { type: `data-zx-on-${eventName}`, id: '<unknown>' },
-            path: `event:${eventName}`,
-            hint: 'Use on:*={handler} and ensure forwarded props are function-valued.',
-            docsLink: '/docs/documentation/contracts/runtime-contract.md#event-bindings'
-        });
+    for (let i = 0; i < events.length; i++) {
+        const eventBinding = events[i];
+        if (eventIndices.has(eventBinding.index)) {
+            throw new Error(`[Zenith Runtime] duplicate event index ${eventBinding.index}`);
+        }
+        eventIndices.add(eventBinding.index);
+
+        const marker = context.markerByIndex.get(eventBinding.index) || null;
+        const nodes = context.resolveNodes(
+            eventBinding.selector,
+            eventBinding.index,
+            'event',
+            eventBinding.source || marker?.source
+        );
+        const expressionBinding = context.expressions[eventBinding.index];
+        const handler = _resolveEventHandler(context, expressionBinding, marker, eventBinding);
+
+        for (let j = 0; j < nodes.length; j++) {
+            const node = nodes[j];
+            const wrappedHandler = _createWrappedEventHandler(handler, expressionBinding, marker, eventBinding);
+            if (eventBinding.event === 'esc') {
+                escDispatchEntries.push({ node, handler: wrappedHandler });
+                continue;
+            }
+            _bindDomEvent(node, eventBinding.event, wrappedHandler);
+        }
     }
 
-    const wrapped = function zenithBoundEvent(event) {
+    if (escDispatchEntries.length > 0) {
+        _registerEscDispatch(root, escDispatchEntries);
+    }
+}
+
+function _resolveEventHandler(context, expressionBinding, marker, eventBinding) {
+    const handler = _evaluateExpression(
+        expressionBinding,
+        context.stateValues,
+        context.stateKeys,
+        context.signalMap,
+        context.componentBindings,
+        context.params,
+        context.ssrData,
+        'event',
+        context.props,
+        context.exprFns,
+        marker,
+        eventBinding
+    );
+    if (typeof handler === 'function') {
+        return handler;
+    }
+
+    throwZenithRuntimeError({
+        phase: 'bind',
+        code: 'BINDING_APPLY_FAILED',
+        message: `Event binding at index ${eventBinding.index} expected a function reference. You passed: ${_describeBindingExpression(expressionBinding)}`,
+        marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
+        path: `event[${eventBinding.index}].${eventBinding.event}`,
+        hint: 'Use on:*={handler} or ensure the forwarded prop is a function.',
+        docsLink: DOCS_LINKS.eventBinding,
+        source: _resolveBindingSource(expressionBinding, marker, eventBinding)
+    });
+}
+
+function _createWrappedEventHandler(handler, expressionBinding, marker, eventBinding) {
+    return function zenithEventHandler(event) {
         try {
-            return resolved.call(this, event);
+            return handler.call(this, event);
         } catch (error) {
             rethrowZenithRuntimeError(error, {
                 phase: 'event',
                 code: 'EVENT_HANDLER_FAILED',
-                message: `Event handler failed for "${eventName}"`,
-                marker: { type: `data-zx-on-${eventName}`, id: '<unknown>' },
-                path: `event:${eventName}:${resolved.name || '<anonymous>'}`,
-                hint: 'Inspect handler logic and referenced state.',
-                docsLink: '/docs/documentation/contracts/runtime-contract.md#event-bindings'
+                message: `Event handler failed for "${eventBinding.event}"`,
+                marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
+                path: `event[${eventBinding.index}].${eventBinding.event}`,
+                hint: 'Inspect the handler body and referenced state.',
+                docsLink: DOCS_LINKS.eventBinding,
+                source: _resolveBindingSource(expressionBinding, marker, eventBinding)
             });
         }
     };
+}
 
-    element.addEventListener(eventName, wrapped);
-    _registerListener(element, eventName, wrapped);
+function _registerEscDispatch(root, escDispatchEntries) {
+    const doc = _resolveOwnerDocument(root);
+    if (!doc || typeof doc.addEventListener !== 'function') {
+        return;
+    }
+
+    const escDispatchListener = function zenithEscDispatch(event) {
+        if (!event || event.key !== 'Escape') {
+            return;
+        }
+
+        const targetEntry = _resolveEscTarget(doc, escDispatchEntries);
+        if (!targetEntry) {
+            return;
+        }
+
+        return targetEntry.handler.call(targetEntry.node, event);
+    };
+
+    _bindDomEvent(doc, 'keydown', escDispatchListener);
+}
+
+function _resolveEscTarget(doc, escDispatchEntries) {
+    const activeElement = doc.activeElement || null;
+
+    if (activeElement && activeElement !== doc.body && activeElement !== doc.documentElement) {
+        for (let i = escDispatchEntries.length - 1; i >= 0; i--) {
+            const entry = escDispatchEntries[i];
+            if (!entry?.node || !entry.node.isConnected) {
+                continue;
+            }
+            if (typeof entry.node.contains === 'function' && entry.node.contains(activeElement)) {
+                return entry;
+            }
+        }
+    }
+
+    if (activeElement === null || activeElement === doc.body || activeElement === doc.documentElement) {
+        for (let i = escDispatchEntries.length - 1; i >= 0; i--) {
+            const entry = escDispatchEntries[i];
+            if (entry?.node?.isConnected) {
+                return entry;
+            }
+        }
+    }
+
+    return null;
+}
+
+function _bindDomEvent(target, eventName, handler) {
+    target.addEventListener(eventName, handler);
+    _registerListener(target, eventName, handler);
+}
+
+function _resolveOwnerDocument(root) {
+    if (root?.ownerDocument) {
+        return root.ownerDocument;
+    }
+    if (root?.nodeType === 9) {
+        return root;
+    }
+    return typeof document !== 'undefined' ? document : null;
 }

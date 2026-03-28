@@ -1,6 +1,6 @@
 # Component Script Hoisting Contract (Zenith V0)
 
-Canonical public docs: `../zenith-docs/documentation/contracts/component-script-hoisting.md`
+Canonical public docs: `../../docs/documentation/contracts/component-script-hoisting.md`
 
 
 ## Purpose

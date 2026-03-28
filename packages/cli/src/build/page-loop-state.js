@@ -21,7 +21,6 @@ export function createPageLoopCaches() {
         componentIrCache: new Map(),
         componentDocumentModeCache: new Map(),
         componentExpressionRewriteCache: new Map(),
-        templateExpressionCache: new Map(),
         hoistedCodeTransformCache: {
             transpileToJs: new Map(),
             deferRuntime: new Map()
@@ -33,9 +32,8 @@ export function createPageLoopExecutionState() {
     return {
         expressionRewriteMetrics: {
             calls: 0,
-            cacheHits: 0,
-            cacheMisses: 0,
-            templateCompileMs: 0
+            compilerOwnedBindings: 0,
+            ambiguousBindings: 0
         },
         pagePhaseTotals: createPagePhaseTotals(),
         occurrenceApplyPhaseTotals: createOccurrenceApplyPhaseTotals(),
@@ -66,29 +64,33 @@ export function applyServerEnvelopeToPageIr({
     composedServer,
     hasGuard,
     hasLoad,
+    hasAction,
     entry,
     srcDir,
     sourceFile
 }) {
     if (composedServer.serverScript) {
-        pageIr.server_script = composedServer.serverScript;
+        const { has_action: _unusedHasAction, ...serverScript } = composedServer.serverScript;
+        pageIr.server_script = serverScript;
         pageIr.prerender = composedServer.serverScript.prerender === true;
         if (pageIr.ssr_data === undefined) {
             pageIr.ssr_data = null;
         }
     }
 
-    if (pageIr.prerender === true && (hasGuard || hasLoad)) {
+    if (pageIr.prerender === true && (hasGuard || hasLoad || hasAction)) {
         throw new Error(
             `[zenith] Build failed for ${entry.file}: protected routes require SSR/runtime. ` +
-            'Cannot prerender a static route with a `guard` or `load` function.'
+            'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
         );
     }
 
     pageIr.has_guard = hasGuard;
     pageIr.has_load = hasLoad;
+    pageIr.has_action = hasAction;
     pageIr.guard_module_ref = composedServer.guardPath ? relative(srcDir, composedServer.guardPath).replaceAll('\\', '/') : null;
     pageIr.load_module_ref = composedServer.loadPath ? relative(srcDir, composedServer.loadPath).replaceAll('\\', '/') : null;
+    pageIr.action_module_ref = composedServer.actionPath ? relative(srcDir, composedServer.actionPath).replaceAll('\\', '/') : null;
     preparePageIrForMerge(pageIr);
 }
 

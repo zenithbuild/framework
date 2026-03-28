@@ -9,14 +9,14 @@ tags: ["contracts", "core", "determinism"]
 
 # Core Contract
 
-## ZEN-RULE-101: Core Is Utility-Only
+## ZEN-RULE-101: Core Is The Public Package Boundary For Deterministic Utilities
 
-Contract: `@zenithbuild/core` is a deterministic utility substrate.
+Contract: `@zenithbuild/core` is the public Zenith package boundary for apps plus deterministic shared utilities.
 
-Invariant: Core must not own routing, runtime orchestration, bundling, or compiler behavior.
+Invariant: Core may own config validation/types and shared helpers, but it must not own routing, runtime orchestration, bundling, or compiler semantics.
 
 Definition of Done:
-- Core exports pure helpers (hashing, ordering, path normalization, config/schema validation).
-- Core has no framework-layer imports.
+- Core exports the public config/type/helper surface truthfully.
+- Core keeps browser APIs, hidden config defaults, and eval-like behavior out of the shared layer.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-core/CORE_CONTRACT.md`.
+Canonical source: `packages/core/CORE_CONTRACT.md`.

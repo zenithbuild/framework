@@ -21,5 +21,6 @@ Definition of Done:
 - Same preset + name yields deterministic file tree.
 - Version authority is explicit and static.
 - Optional tooling is additive only. If a user declines ESLint or Prettier, the generated project must contain zero references to that tool.
+- The shipped template set is `basic`, `css`, and `tailwind`, sourced from `templates/`.
 
-Canonical source: `/Users/judahsullivan/Personal/zenithbuild-monorepo/packages/create-zenith/CREATE_CONTRACT.md`.
+Canonical source: `packages/create-zenith/CREATE_CONTRACT.md`.

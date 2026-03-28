@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 
 import { cloneComponentIrForInstance } from '../component-instance-ir.js';
+import { renderPropsLiteralFromAttrs } from './scoped-identifier-rewrite.js';
 import { extractTemplate, isDocumentMode } from '../resolve-components.js';
 import {
     buildComponentExpressionRewrite,
@@ -9,7 +10,6 @@ import {
     resolveStateKeyFromBindings
 } from './expression-rewrites.js';
 import { mergeComponentIr } from './merge-component-ir.js';
-import { buildScopedIdentifierRewrite } from './scoped-identifier-rewrite.js';
 import { stripStyleBlocks } from './compiler-runtime.js';
 import { extractDeclaredIdentifiers } from './typescript-expression-utils.js';
 
@@ -21,13 +21,6 @@ function createEmptyExpressionRewrite() {
         stateBindings: [],
         ambiguous: new Set(),
         sequence: []
-    };
-}
-
-function createEmptyScopeRewrite() {
-    return {
-        map: new Map(),
-        ambiguous: new Set()
     };
 }
 
@@ -89,11 +82,7 @@ function resolveDocumentMode({
 
 function resolveComponentExpressionRewrite({
     compPath,
-    componentSource,
     compIr,
-    compilerOpts,
-    compilerBin,
-    templateExpressionCache,
     expressionRewriteMetrics,
     componentExpressionRewriteCache,
     pageComponentLoopBreakdown,
@@ -102,15 +91,7 @@ function resolveComponentExpressionRewrite({
     let expressionRewrite = componentExpressionRewriteCache.get(compPath);
     if (!expressionRewrite) {
         const startedAt = performance.now();
-        expressionRewrite = buildComponentExpressionRewrite(
-            compPath,
-            componentSource,
-            compIr,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
-            expressionRewriteMetrics
-        );
+        expressionRewrite = buildComponentExpressionRewrite(compIr, expressionRewriteMetrics);
         pageComponentLoopBreakdown.componentExpressionRewriteBuildMs += startupProfile.roundMs(
             performance.now() - startedAt
         );
@@ -128,16 +109,13 @@ async function resolveOwnerRewriteContext({
     cooperativeYield,
     componentIrCache,
     componentExpressionRewriteCache,
-    componentScopeRewriteCache,
-    templateExpressionCache,
     expressionRewriteMetrics,
     startupProfile,
     compilerTotals,
     emitCompilerWarning,
     pageComponentLoopBreakdown,
     pageStats,
-    pageOwnerExpressionRewrite,
-    pageOwnerScopeRewrite
+    pageOwnerExpressionRewrite
 }) {
     const ownerPath = typeof occurrence.ownerPath === 'string' && occurrence.ownerPath.length > 0
         ? occurrence.ownerPath
@@ -145,8 +123,7 @@ async function resolveOwnerRewriteContext({
 
     if (ownerPath === sourceFile) {
         return {
-            attrExpressionRewrite: pageOwnerExpressionRewrite,
-            attrScopeRewrite: pageOwnerScopeRewrite
+            attrExpressionRewrite: pageOwnerExpressionRewrite
         };
     }
 
@@ -187,42 +164,19 @@ async function resolveOwnerRewriteContext({
             );
         }
         const startedAt = performance.now();
-        attrExpressionRewrite = buildComponentExpressionRewrite(
-            ownerPath,
-            ownerSource,
-            ownerIr,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
-            expressionRewriteMetrics
-        );
+        attrExpressionRewrite = buildComponentExpressionRewrite(ownerIr, expressionRewriteMetrics);
         pageComponentLoopBreakdown.ownerExpressionRewriteBuildMs += startupProfile.roundMs(
             performance.now() - startedAt
         );
         componentExpressionRewriteCache.set(ownerPath, attrExpressionRewrite);
     }
 
-    let attrScopeRewrite = componentScopeRewriteCache.get(ownerPath);
-    if (!attrScopeRewrite) {
-        const startedAt = performance.now();
-        attrScopeRewrite = buildScopedIdentifierRewrite(ownerIr);
-        pageComponentLoopBreakdown.ownerScopeRewriteBuildMs += startupProfile.roundMs(
-            performance.now() - startedAt
-        );
-        componentScopeRewriteCache.set(ownerPath, attrScopeRewrite);
-    }
-
-    return { attrExpressionRewrite, attrScopeRewrite };
+    return { attrExpressionRewrite };
 }
 
 function resolveInstanceState({
     useIsolatedInstance,
     compIr,
-    compPath,
-    componentSource,
-    compilerOpts,
-    compilerBin,
-    templateExpressionCache,
     expressionRewriteMetrics,
     expressionRewrite,
     startupProfile,
@@ -248,15 +202,7 @@ function resolveInstanceState({
     pagePhase.cloneMs += startupProfile.roundMs(performance.now() - cloneStartedAt);
 
     const instanceRewriteStartedAt = performance.now();
-    const instanceRewrite = buildComponentExpressionRewrite(
-        compPath,
-        componentSource,
-        cloned.ir,
-        compilerOpts,
-        compilerBin,
-        templateExpressionCache,
-        expressionRewriteMetrics
-    );
+    const instanceRewrite = buildComponentExpressionRewrite(cloned.ir, expressionRewriteMetrics);
     pagePhase.instanceRewriteMs += startupProfile.roundMs(performance.now() - instanceRewriteStartedAt);
 
     return {
@@ -275,15 +221,13 @@ export async function buildPageOwnerContext({
     compilerBin,
     timedRunCompiler,
     cooperativeYield,
-    templateExpressionCache,
     expressionRewriteMetrics,
     startupProfile
 }) {
     if (componentOccurrences.length === 0) {
         return {
             pageOwnerCompileMs: 0,
-            pageOwnerExpressionRewrite: createEmptyExpressionRewrite(),
-            pageOwnerScopeRewrite: createEmptyScopeRewrite()
+            pageOwnerExpressionRewrite: createEmptyExpressionRewrite()
         };
     }
 
@@ -300,16 +244,7 @@ export async function buildPageOwnerContext({
 
     return {
         pageOwnerCompileMs,
-        pageOwnerExpressionRewrite: buildComponentExpressionRewrite(
-            sourceFile,
-            pageOwnerSource,
-            pageOwnerIr,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
-            expressionRewriteMetrics
-        ),
-        pageOwnerScopeRewrite: buildScopedIdentifierRewrite(pageOwnerIr)
+        pageOwnerExpressionRewrite: buildComponentExpressionRewrite(pageOwnerIr, expressionRewriteMetrics)
     };
 }
 
@@ -328,10 +263,8 @@ export async function runPageComponentLoop({
     componentIrCache,
     componentDocumentModeCache,
     componentExpressionRewriteCache,
-    templateExpressionCache,
     expressionRewriteMetrics,
     pageOwnerExpressionRewrite,
-    pageOwnerScopeRewrite,
     pageIr,
     pageIrMergeCache,
     seenStaticImports,
@@ -340,6 +273,7 @@ export async function runPageComponentLoop({
     pageAmbiguousExpressionMap,
     knownRefKeys,
     componentOccurrencePlans,
+    imagePropsLiterals,
     pagePhase,
     pageBindingResolutionBreakdown,
     pageMergeBreakdown,
@@ -347,9 +281,7 @@ export async function runPageComponentLoop({
     hoistedCodeTransformCache,
     pageStats
 }) {
-    const componentScopeRewriteCache = new Map();
     let componentInstanceCounter = 0;
-
     for (const occurrence of componentOccurrences) {
         await cooperativeYield();
         const compName = occurrence.name;
@@ -387,17 +319,13 @@ export async function runPageComponentLoop({
         });
         const expressionRewrite = resolveComponentExpressionRewrite({
             compPath,
-            componentSource,
             compIr,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
             expressionRewriteMetrics,
             componentExpressionRewriteCache,
             pageComponentLoopBreakdown,
             startupProfile
         });
-        const { attrExpressionRewrite, attrScopeRewrite } = await resolveOwnerRewriteContext({
+        const { attrExpressionRewrite } = await resolveOwnerRewriteContext({
             occurrence,
             sourceFile,
             compilerOpts,
@@ -406,27 +334,26 @@ export async function runPageComponentLoop({
             cooperativeYield,
             componentIrCache,
             componentExpressionRewriteCache,
-            componentScopeRewriteCache,
-            templateExpressionCache,
             expressionRewriteMetrics,
             startupProfile,
             compilerTotals,
             emitCompilerWarning,
             pageComponentLoopBreakdown,
             pageStats,
-            pageOwnerExpressionRewrite,
-            pageOwnerScopeRewrite
+            pageOwnerExpressionRewrite
         });
+        if (compName === 'Image') {
+            imagePropsLiterals.push(
+                renderPropsLiteralFromAttrs(occurrence.attrs || '', {
+                    expressionRewrite: attrExpressionRewrite
+                })
+            );
+        }
 
         const useIsolatedInstance = occurrenceCount > 1;
         const instanceState = resolveInstanceState({
             useIsolatedInstance,
             compIr,
-            compPath,
-            componentSource,
-            compilerOpts,
-            compilerBin,
-            templateExpressionCache,
             expressionRewriteMetrics,
             expressionRewrite,
             startupProfile,
@@ -447,8 +374,7 @@ export async function runPageComponentLoop({
                 documentMode: isDocMode,
                 componentAttrs: typeof occurrence.attrs === 'string' ? occurrence.attrs : '',
                 componentAttrsRewrite: {
-                    expressionRewrite: attrExpressionRewrite,
-                    scopeRewrite: attrScopeRewrite
+                    expressionRewrite: attrExpressionRewrite
                 }
             },
             seenStaticImports,

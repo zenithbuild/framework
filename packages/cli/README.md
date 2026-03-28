@@ -2,26 +2,30 @@
 
 > **⚠️ Internal API:** This package is an internal implementation detail of the Zenith framework. It is not intended for public use and its API may break without warning. Please use `@zenithbuild/core` instead.
 
-
 The command-line interface for developing and building Zenith applications.
 
 ## Canonical Docs
 
-- CLI contract: `../zenith-docs/documentation/cli-contract.md`
-- Deployment targets guide: `/Users/judahsullivan/Personal/zenithbuild-monorepo/docs/documentation/guides/deployment-targets.md`
-- Script server/data contract: `../zenith-docs/documentation/contracts/server-data.md`
+- CLI contract: `../../docs/documentation/cli-contract.md`
+- Deployment targets guide: `../../docs/documentation/guides/deployment-targets.md`
+- Route protection: `../../docs/documentation/routing/route-protection.md`
 - Server output contract: `./SERVER_OUTPUT_CONTRACT.md`
 
 ## Overview
 
-`@zenithbuild/cli` provides the toolchain needed to manage Zenith projects. While `create-zenith` is for scaffolding, this CLI is for the daily development loop: serving apps, building for production, and managing plugins.
+`@zenithbuild/cli` is Zenith's deterministic project orchestrator. It owns the daily development loop:
+
+- `zenith dev`
+- `zenith build`
+- `zenith preview`
+
+It does not ship a public plugin-management surface.
 
 ## Features
 
 - **Dev Server**: Instant HMR (Hot Module Replacement) powered by Bun.
-- **Build System**: optimized production bundling.
-- **Plugin Management**: Easily add and remove Zenith plugins.
-- **Preview**: Test your production builds locally.
+- **Build System**: deterministic build output and adapter packaging.
+- **Preview**: target-aware verification of built output.
 
 ## Config Baseline
 
@@ -78,6 +82,8 @@ Current limitations:
 
 - There is no separate `assetPrefix` knob. Assets intentionally follow `basePath`.
 - `vercel` and `netlify` do not yet emit a deployed `/_zenith/image` endpoint. The `node` target does.
+- Image materialization is route-artifact-driven. Build, preview, and server render consume structured `image_materialization` metadata instead of executing page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
+- There is no shipped plugin install/remove command surface in this CLI.
 
 ## Commands
 
@@ -89,9 +95,6 @@ Compiles and bundles your application for production.
 
 ### `zenith preview`
 Previews the locally built target contract for verification. Static targets serve built files; `target: 'node'` boots the built Node artifact.
-
-### `zenith add <plugin>`
-Installs and configures a Zenith plugin.
 
 ## Installation
 

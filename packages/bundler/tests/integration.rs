@@ -106,6 +106,7 @@ async fn strict_mode_matching_metadata_passes() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let opts = BundleOptions {
@@ -148,6 +149,7 @@ async fn strict_mode_mismatched_count_fails() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let opts = BundleOptions {
@@ -197,6 +199,7 @@ async fn strict_mode_mismatched_content_fails() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let opts = BundleOptions {

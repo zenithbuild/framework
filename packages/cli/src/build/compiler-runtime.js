@@ -190,9 +190,66 @@ export function createTimedCompilerRunner(startupProfile, compilerTotals) {
  * @param {object | null} [logger]
  * @param {boolean} [showInfo]
  * @param {string|object} [bundlerBin]
- * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string, basePath?: string }} [bundlerOptions]
+ * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string, basePath?: string, routeCheck?: boolean }} [bundlerOptions]
  * @returns {Promise<void>}
  */
+
+
+/**
+ * Merge compiler-owned static image materialization rows from marker bindings + rewritten props literals.
+ * @param {object} pageIr
+ * @param {string[]} literals
+ * @param {object} [compilerRunOptions]
+ * @returns {object}
+ */
+export function mergePageImageMaterialization(pageIr, literals, compilerRunOptions = {}) {
+    if (!Array.isArray(literals) || literals.length === 0) {
+        return pageIr;
+    }
+    const compilerToolchain = compilerRunOptions.compilerToolchain
+        || (compilerRunOptions.compilerBin && typeof compilerRunOptions.compilerBin === 'object'
+            ? compilerRunOptions.compilerBin
+            : null);
+    const compilerBin = !compilerToolchain && typeof compilerRunOptions.compilerBin === 'string'
+        ? compilerRunOptions.compilerBin
+        : null;
+    const payload = JSON.stringify({
+        marker_bindings: pageIr.marker_bindings,
+        literals
+    });
+    const args = ['--merge-image-materialization'];
+    const opts = {
+        encoding: 'utf8',
+        maxBuffer: COMPILER_SPAWN_MAX_BUFFER,
+        input: payload
+    };
+    const result = compilerToolchain
+        ? runToolchainSync(compilerToolchain, args, opts).result
+        : (compilerBin
+            ? spawnSync(compilerBin, args, opts)
+            : runToolchainSync(
+                createCompilerToolchain({
+                    logger: compilerRunOptions.logger || null
+                }),
+                args,
+                opts
+            ).result);
+
+    if (result.error) {
+        throw new Error(`merge image materialization spawn failed: ${result.error.message}`);
+    }
+    if (result.status !== 0) {
+        throw new Error(
+            `merge image materialization failed with exit code ${result.status}\n${result.stderr || ''}`
+        );
+    }
+    const parsed = JSON.parse(result.stdout);
+    return {
+        ...pageIr,
+        image_materialization: parsed.image_materialization
+    };
+}
+
 export function runBundler(
     envelope,
     outDir,
@@ -218,6 +275,9 @@ export function runBundler(
         ];
         if (typeof bundlerOptions.basePath === 'string' && bundlerOptions.basePath.length > 0) {
             bundlerArgs.push('--base-path', bundlerOptions.basePath);
+        }
+        if (bundlerOptions.routeCheck === true) {
+            bundlerArgs.push('--route-check');
         }
         if (bundlerOptions.devStableAssets === true) {
             bundlerArgs.push('--dev-stable-assets');

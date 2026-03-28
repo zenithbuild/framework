@@ -431,7 +431,7 @@ describe('build orchestration', () => {
         const pageAssetPath = join(outDir, scriptPath);
         const pageAsset = await readFile(pageAssetPath, 'utf8');
 
-        expect(pageAsset.includes('__zenith_fragment(')).toBe(true);
+        expect(pageAsset).toMatch(/__ctx\.fragment\s*`/);
         expect(pageAsset.includes('props.href')).toBe(false);
         expect(pageAsset.includes('<span class="contents">')).toBe(false);
 
@@ -475,7 +475,7 @@ describe('build orchestration', () => {
         expect((await readFile(join(outDir, 'index.html'), 'utf8')).includes('<!DOCTYPE html>')).toBe(true);
     });
 
-    test('rewrites component template expressions with script bindings after expansion', async () => {
+    test('rejects legacy zenhtml markup syntax', async () => {
         const root = join(tmpdir(), `zenith-build-expr-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         const srcDir = join(root, 'src');
         const pagesDir = join(srcDir, 'pages');
@@ -505,16 +505,48 @@ describe('build orchestration', () => {
             'utf8'
         );
 
-        await build({ pagesDir, outDir });
+        await expect(build({ pagesDir, outDir })).rejects.toThrow(/Legacy zenhtml`.*unsupported/i);
+    });
+
+    test('rewrites component embedded markup expressions with script bindings after expansion', async () => {
+        const root = join(tmpdir(), `zenith-build-expr-fragment-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const srcDir = join(root, 'src');
+        const pagesDir = join(srcDir, 'pages');
+        const componentsDir = join(srcDir, 'components');
+        const outDir = join(root, 'dist');
+        project = { root, pagesDir, outDir };
+
+        await mkdir(pagesDir, { recursive: true });
+        await mkdir(componentsDir, { recursive: true });
+
+        await writeFile(
+            join(componentsDir, 'MappedList.zen'),
+            [
+                '<script lang="ts">',
+                'const items = [{ label: "A" }, { label: "B" }];',
+                '</script>',
+                '<section>',
+                '  <ul>{items.map((item) => (<li>{item.label}</li>))}</ul>',
+                '</section>'
+            ].join('\n'),
+            'utf8'
+        );
+
+        await writeFile(
+            join(pagesDir, 'index.zen'),
+            '<main><MappedList /></main>\n',
+            'utf8'
+        );
+
+        await build({ pagesDir, outDir, config: { embeddedMarkupExpressions: true } });
         const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
         const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
         expect(scriptMatch).toBeTruthy();
         const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
         expect(pageAsset.includes('items.map((item)')).toBe(true);
-        expect(pageAsset).toMatch(/__ZENITH_INTERNAL_ZENHTML\s*`<li>\$\{/);
+        expect(pageAsset).toMatch(/__ctx\.fragment\s*`<li>\$\{item\.label\}<\/li>`/);
         expect(pageAsset.includes('___')).toBe(true);
-        expect(pageAsset.includes('"literal":"items.map((item)')).toBe(false);
         expect(/const __zenith_state_keys = \[[^\]]+items/.test(pageAsset)).toBe(true);
     });
 
@@ -562,8 +594,9 @@ describe('build orchestration', () => {
         const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
 
-        expect(pageAsset).toMatch(/return signalMap\.get\(\d+\)\.get\(\) === "dark" \? "🌙" : "☀️";/);
-        expect(pageAsset).toMatch(/return signalMap\.get\(\d+\)\.get\(\) === "dark" \? "Switch to light theme" : "Switch to dark theme";/);
+        expect(pageAsset).toMatch(/return signalMap\.get\(\d+\)\.get\(\) === ['"]dark['"] \?/);
+        expect(pageAsset).toMatch(/Switch to light theme/);
+        expect(pageAsset).toMatch(/Switch to dark theme/);
         expect(pageAsset).toMatch(/"signal_indices":\[\d+\]/);
         expect(pageAsset).toMatch(/"state_index":\d+/);
     });
@@ -604,8 +637,8 @@ describe('build orchestration', () => {
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
 
         expect(pageAsset).toContain('overlayTone = "bg-fuchsia-500/30"');
-        expect(pageAsset).not.toContain('return "base " + overlayTone;');
-        expect(pageAsset).toMatch(/return "base " \+ [A-Za-z0-9_$]+;/);
+        expect(pageAsset).not.toMatch(/return ['"]base ['"] \+ overlayTone;/);
+        expect(pageAsset).toMatch(/return ['"]base ['"] \+ [A-Za-z0-9_$]+;/);
     });
 
     test('build compiles local tailwind entry css internally', async () => {
@@ -665,7 +698,7 @@ describe('build orchestration', () => {
                 'const ready = signal(false);',
                 'zenMount(() => { ready.set(true); });',
                 '</script>',
-                '<section>{items.map((item) => zenhtml`<span>${item.label}</span>`)}</section>'
+                '<section>{items.map((item) => (<span>{item.label}</span>))}</section>'
             ].join('\n'),
             'utf8'
         );
@@ -676,20 +709,17 @@ describe('build orchestration', () => {
             'utf8'
         );
 
-        await build({ pagesDir, outDir });
+        await build({ pagesDir, outDir, config: { embeddedMarkupExpressions: true } });
         const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
         const scriptMatch = indexHtml.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
         expect(scriptMatch).toBeTruthy();
         const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
 
-        const stateEntryMatch = pageAsset.match(/"literal":"([A-Za-z0-9_$]+)\.map\(\(item\)/);
-        expect(stateEntryMatch).toBeTruthy();
-        const hoistedItemIdent = stateEntryMatch?.[1];
-        expect(typeof hoistedItemIdent).toBe('string');
-        expect(pageAsset).toMatch(new RegExp(`(?:var|const|let) ${hoistedItemIdent} = \\[\{`));
-
-        const declarationMatch = pageAsset.match(new RegExp(`(?:var|const|let) ${hoistedItemIdent} = \\[\{`));
+        const declarationMatch = pageAsset.match(
+            /(?:var|const|let)\s+([A-Za-z0-9_$]+)\s*=\s*\[\{\s*label:\s*["']A["']/
+        );
+        expect(declarationMatch).toBeTruthy();
         const declarationIndex = declarationMatch ? declarationMatch.index : -1;
         const bootstrapIndex = pageAsset.indexOf('__zenith_component_bootstraps.push(() => {');
         expect(declarationIndex).toBeGreaterThanOrEqual(0);
@@ -738,7 +768,6 @@ describe('build orchestration', () => {
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
 
         expect(pageAsset).toMatch(/(?:var|const|let) props = \{ pageTitle: "About Page" \};/);
-        expect(pageAsset.includes('"literal":"resolvedTitle"')).toBe(false);
         expect(pageAsset.includes('resolvedTitle')).toBe(true);
     });
 

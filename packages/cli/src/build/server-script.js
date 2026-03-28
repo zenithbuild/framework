@@ -5,13 +5,13 @@ import { findNextKnownComponentTag } from '../component-tag-parser.js';
  * @param {string} source
  * @param {string} sourceFile
  * @param {object} [compilerOpts]
- * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, source_path: string } | null }}
+ * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null }}
  */
 export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     const serverMatches = [];
     const reservedServerExportRe =
-        /\bexport\s+const\s+(?:data|prerender|guard|load|ssr_data|props|ssr)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard)\s*\(|\bexport\s+const\s+(?:load|guard)\s*=/;
+        /\bexport\s+const\s+(?:data|prerender|guard|load|action|ssr_data|props|ssr)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard|action)\s*\(|\bexport\s+const\s+(?:load|guard|action)\s*=/;
 
     for (const match of source.matchAll(scriptRe)) {
         const attrs = String(match[1] || '');
@@ -22,7 +22,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
-                `  Reason: guard/load/data exports are only allowed in <script server lang="ts"> or adjacent .guard.ts / .load.ts files\n` +
+                `  Reason: guard/load/action/data exports are only allowed in <script server lang="ts"> or adjacent .guard.ts / .load.ts / .action.ts files\n` +
                 `  Example: move the export into <script server lang="ts">`
             );
         }
@@ -112,6 +112,25 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
+    const actionFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+action\s*\(([^)]*)\)/);
+    const actionConstParenMatch = serverSource.match(/\bexport\s+const\s+action\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
+    const actionConstSingleArgMatch = serverSource.match(
+        /\bexport\s+const\s+action\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
+    );
+    const hasAction = Boolean(actionFnMatch || actionConstParenMatch || actionConstSingleArgMatch);
+    const actionMatchCount =
+        Number(Boolean(actionFnMatch)) +
+        Number(Boolean(actionConstParenMatch)) +
+        Number(Boolean(actionConstSingleArgMatch));
+    if (actionMatchCount > 1) {
+        throw new Error(
+            `Zenith server script contract violation:\n` +
+            `  File: ${sourceFile}\n` +
+            `  Reason: multiple action exports detected\n` +
+            `  Example: keep exactly one export const action = async (ctx) => ({ ... })`
+        );
+    }
+
     const hasData = /\bexport\s+const\s+data\b/.test(serverSource);
     const hasSsrData = /\bexport\s+const\s+ssr_data\b/.test(serverSource);
     const hasSsr = /\bexport\s+const\s+ssr\b/.test(serverSource);
@@ -162,6 +181,20 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         }
     }
 
+    if (hasAction) {
+        const singleArg = String(actionConstSingleArgMatch?.[1] || '').trim();
+        const paramsText = String((actionFnMatch || actionConstParenMatch)?.[1] || '').trim();
+        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
+        if (arity !== 1) {
+            throw new Error(
+                `Zenith server script contract violation:\n` +
+                `  File: ${sourceFile}\n` +
+                `  Reason: action(ctx) must accept exactly one argument\n` +
+                `  Example: export const action = async (ctx) => ({ ... })`
+            );
+        }
+    }
+
     const prerenderMatch = serverSource.match(/\bexport\s+const\s+prerender\s*=\s*([^\n;]+)/);
     let prerender = false;
     if (prerenderMatch) {
@@ -186,6 +219,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
                 prerender,
                 has_guard: hasGuard,
                 has_load: hasLoad,
+                has_action: hasAction,
                 source_path: sourceFile
             }
         };
@@ -200,6 +234,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
             prerender,
             has_guard: hasGuard,
             has_load: hasLoad,
+            has_action: hasAction,
             source_path: sourceFile
         }
     };

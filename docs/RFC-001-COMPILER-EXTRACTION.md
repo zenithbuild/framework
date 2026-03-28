@@ -418,9 +418,10 @@ Dynamic lists require runtime DOM creation. This is an **accepted exception** to
 
 ## Open Questions
 
-1. **Should expression evaluators be pre-compiled or use `new Function()`?**
-   - Current: `new Function()` with `with` statement
-   - Alternative: Pre-compiled closures (requires different bundling)
+1. **Historical question: should legacy expression evaluators be pre-compiled or use `new Function()`?**
+   - Historical prototype: `new Function()` with `with` statement
+   - Current image materialization boundary: route-scoped static artifacts; no page-asset evaluation
+   - Alternative: pre-compiled closures or deletion of the remaining legacy evaluator surface
 
 2. **How to handle component styles in extracted compiler?**
    - Current: Collected and inlined

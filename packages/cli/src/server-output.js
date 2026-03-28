@@ -30,6 +30,10 @@ const SERVER_RUNTIME_FILES = [
     {
         from: new URL('./images/shared.js', import.meta.url),
         to: 'images/shared.js'
+    },
+    {
+        from: new URL('./images/runtime.js', import.meta.url),
+        to: 'images/runtime.js'
     }
 ];
 
@@ -327,12 +331,17 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
             server_script_path: route.server_script_path || null,
             guard_module_ref: route.guard_module_ref || null,
             load_module_ref: route.load_module_ref || null,
+            action_module_ref: route.action_module_ref || null,
             has_guard: route.has_guard === true,
             has_load: route.has_load === true,
+            has_action: route.has_action === true,
             params: extractRouteParams(route.path),
             image_manifest_file: imageManifestFile,
             image_config: config?.images || {}
         };
+        if (Array.isArray(route.image_materialization) && route.image_materialization.length > 0) {
+            meta.image_materialization = route.image_materialization;
+        }
         await writeFile(join(routeDir, 'route.json'), `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
         emittedRoutes.push(meta);
     }

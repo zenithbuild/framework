@@ -25,6 +25,8 @@ struct BundlerInput {
     file: String,
     ir: CompilerIr,
     #[serde(default)]
+    image_materialization: Vec<ImageMaterializationEntry>,
+    #[serde(default)]
     router: bool,
 }
 
@@ -274,6 +276,16 @@ struct RouterRouteEntry {
     guard_module_ref: Option<String>,
     #[serde(default)]
     load_module_ref: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    image_materialization: Vec<ImageMaterializationEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImageMaterializationEntry {
+    selector: String,
+    props: serde_json::Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -351,6 +363,7 @@ fn run() -> Result<(), String> {
     let cli_options = parse_cli_options()?;
     let out_dir = cli_options.out_dir;
     let base_path = cli_options.base_path;
+    let route_check = cli_options.route_check;
     let output_mode = cli_options.output_mode;
     let rebuild_strategy = cli_options.rebuild_strategy;
     let changed_routes = cli_options.changed_routes;
@@ -388,6 +401,7 @@ fn run() -> Result<(), String> {
         manifest_json: "{}".to_string(),
         runtime_import: String::new(),
         core_import: String::new(),
+        route_check,
     })?;
     let expected_ir_version = template_assets.ir_version;
 
@@ -688,6 +702,7 @@ fn run() -> Result<(), String> {
             html_stripped.clone(),
             js_rel,
             input.ir.expressions.clone(),
+            input.image_materialization.clone(),
             input
                 .ir
                 .server_script
@@ -741,6 +756,7 @@ fn run() -> Result<(), String> {
                     manifest_json: manifest_json_str.clone(),
                     runtime_import: public_asset_path(&base_path, &runtime_rel),
                     core_import: public_asset_path(&base_path, &core_rel),
+                    route_check,
                 })?;
             let router_source = rendered_assets.router_source;
 
@@ -814,6 +830,7 @@ fn run() -> Result<(), String> {
             _html_tpl,
             js_rel,
             expressions,
+            image_materialization,
             server_script,
             server_script_path,
             prerender,
@@ -836,6 +853,7 @@ fn run() -> Result<(), String> {
                 html: route.clone(),
                 expressions: expressions.clone(),
                 page_asset: Some(js_rel.clone()),
+                image_materialization: image_materialization.clone(),
                 server_script: server_script.clone(),
                 server_script_path: server_script_path.clone(),
                 prerender: *prerender,
@@ -862,6 +880,7 @@ fn run() -> Result<(), String> {
         html_tpl,
         js_rel,
         _expressions,
+        _image_materialization,
         _server_script,
         _server_script_path,
         _prerender,
@@ -878,15 +897,22 @@ fn run() -> Result<(), String> {
         {
             continue;
         }
-        let mut html =
-            inject_stylesheet_link_once(&html_tpl, &public_asset_path(&base_path, &css_rel), &route)?;
+        let mut html = inject_stylesheet_link_once(
+            &html_tpl,
+            &public_asset_path(&base_path, &css_rel),
+            &route,
+        )?;
 
         if let Some(r_path) = &router_rel_path {
             // Router mode: single module entry point in HTML.
             html = inject_script_once(&html, r_path, "data-zx-router");
         } else {
             // Non-router mode: page module is the single module entry point.
-            html = inject_script_once(&html, &public_asset_path(&base_path, &js_rel), "data-zx-page");
+            html = inject_script_once(
+                &html,
+                &public_asset_path(&base_path, &js_rel),
+                "data-zx-page",
+            );
         }
 
         let module_script_count = html.matches("<script type=\"module\"").count();
@@ -939,7 +965,9 @@ fn normalize_base_path(value: &str) -> Result<String, String> {
         return Ok("/".to_string());
     }
     if trimmed.contains('?') || trimmed.contains('#') {
-        return Err("invalid value for --base-path: must not include query or hash fragments".to_string());
+        return Err(
+            "invalid value for --base-path: must not include query or hash fragments".to_string(),
+        );
     }
     if !trimmed.starts_with('/') {
         return Err("invalid value for --base-path: must start with '/'".to_string());
@@ -949,7 +977,11 @@ fn normalize_base_path(value: &str) -> Result<String, String> {
         .replace_all(trimmed, "/")
         .trim_end_matches('/')
         .to_string();
-    Ok(if normalized.is_empty() { "/".to_string() } else { normalized })
+    Ok(if normalized.is_empty() {
+        "/".to_string()
+    } else {
+        normalized
+    })
 }
 
 fn prepend_base_path(base_path: &str, pathname: &str) -> String {
@@ -993,7 +1025,10 @@ fn strip_base_path(public_path: &str, base_path: &str) -> String {
 }
 
 fn public_asset_path(base_path: &str, relative_path: &str) -> String {
-    prepend_base_path(base_path, &format!("/{}", relative_path.trim_start_matches('/')))
+    prepend_base_path(
+        base_path,
+        &format!("/{}", relative_path.trim_start_matches('/')),
+    )
 }
 
 struct GlobalGraph {
@@ -1190,6 +1225,7 @@ fn sanitize_route_to_token(route: &str) -> String {
 struct BundlerCliOptions {
     out_dir: PathBuf,
     base_path: String,
+    route_check: bool,
     output_mode: OutputMode,
     rebuild_strategy: RebuildStrategy,
     changed_routes: BTreeSet<String>,
@@ -1228,6 +1264,7 @@ impl RebuildStrategy {
 fn parse_cli_options() -> Result<BundlerCliOptions, String> {
     let mut out_dir: Option<PathBuf> = None;
     let mut base_path = "/".to_string();
+    let mut route_check = false;
     let mut dev_stable_assets = false;
     let mut rebuild_strategy = RebuildStrategy::Full;
     let mut changed_routes = BTreeSet::new();
@@ -1248,6 +1285,9 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
                     .next()
                     .ok_or_else(|| "missing value for --base-path".to_string())?;
                 base_path = normalize_base_path(&value)?;
+            }
+            "--route-check" => {
+                route_check = true;
             }
             "--dev-stable-assets" => {
                 dev_stable_assets = true;
@@ -1275,7 +1315,7 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
             }
             _ => {
                 return Err(format!(
-                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path> [--base-path <path>] [--dev-stable-assets] [--rebuild-strategy <full|bundle-only|page-only>] [--changed-route <route>] [--fast-path] [--global-graph-hash <sha256>]"
+                    "unknown argument '{arg}'. usage: zenith-bundler --out-dir <path> [--base-path <path>] [--route-check] [--dev-stable-assets] [--rebuild-strategy <full|bundle-only|page-only>] [--changed-route <route>] [--fast-path] [--global-graph-hash <sha256>]"
                 ));
             }
         }
@@ -1284,6 +1324,7 @@ fn parse_cli_options() -> Result<BundlerCliOptions, String> {
     Ok(BundlerCliOptions {
         out_dir: out_dir.ok_or_else(|| "required flag missing: --out-dir <path>".to_string())?,
         base_path,
+        route_check,
         output_mode: OutputMode::from_dev_stable_flag(dev_stable_assets),
         rebuild_strategy,
         changed_routes,
@@ -3262,6 +3303,7 @@ fn generate_entry_js(
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        image_materialization: Default::default(),
     };
 
     let markers_json = serde_json::to_string(markers)
@@ -3311,7 +3353,7 @@ fn generate_entry_js(
         ir.expression_bindings.clone()
     };
     let (expr_fns_js, runtime_expression_bindings) =
-        build_expression_fns_and_bindings(&bindings_to_use);
+        build_expression_fns_and_bindings(&bindings_to_use)?;
     let expression_bindings_json = serde_json::to_string(&runtime_expression_bindings)
         .map_err(|e| format!("failed to serialize expression table: {e}"))?;
 
@@ -3517,7 +3559,7 @@ fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, S
 /// Build __zenith_expr_fns JS and bindings with fn_index for compound expressions.
 fn build_expression_fns_and_bindings(
     bindings: &[CompilerExpressionBinding],
-) -> (String, Vec<serde_json::Value>) {
+) -> Result<(String, Vec<serde_json::Value>), String> {
     let mut expr_fns = Vec::new();
     let mut fn_index_by_binding = std::collections::BTreeMap::new();
     for (i, b) in bindings.iter().enumerate() {
@@ -3532,13 +3574,8 @@ fn build_expression_fns_and_bindings(
     } else {
         let fn_defs: Vec<String> = expr_fns
             .iter()
-            .map(|e| {
-                format!(
-                    "function(__ctx) {{ const signalMap = __ctx.signalMap; const params = __ctx.params; const props = __ctx.props; const ssrData = __ctx.ssrData; const data = ssrData; const ssr = ssrData; const componentBindings = __ctx.componentBindings; const __ZENITH_INTERNAL_ZENHTML = __ctx.zenhtml; const html = __ctx.zenhtml; const __zenith_fragment = __ctx.fragment; const fragment = __ctx.fragment; return {}; }}",
-                    e
-                )
-            })
-            .collect();
+            .map(|expression| zenith_bundler::utils::emit_runtime_expression_function(expression))
+            .collect::<Result<Vec<_>, _>>()?;
         format!(
             "const __zenith_expr_fns = [\n  {}\n];\n",
             fn_defs.join(",\n  ")
@@ -3564,7 +3601,7 @@ fn build_expression_fns_and_bindings(
             obj
         })
         .collect();
-    (js, runtime_bindings)
+    Ok((js, runtime_bindings))
 }
 
 #[cfg(test)]
@@ -3573,6 +3610,22 @@ mod tests {
         build_expression_fns_and_bindings, derive_binding_tables, CompilerExpressionBinding,
         CompilerIr, CompilerSourcePosition, CompilerSourceSpan, MarkerKind,
     };
+    use oxc_allocator::Allocator;
+    use oxc_parser::Parser;
+    use oxc_span::SourceType;
+
+    fn assert_module_parses(source: &str) {
+        let allocator = Allocator::default();
+        let parser = Parser::new(&allocator, source, SourceType::default().with_module(true));
+        let result = parser.parse();
+
+        assert!(
+            result.errors.is_empty(),
+            "expected generated JS to parse, errors: {:?}\nsource:\n{}",
+            result.errors,
+            source
+        );
+    }
 
     #[test]
     fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
@@ -3612,7 +3665,8 @@ mod tests {
             },
         ];
 
-        let (js, runtime_bindings) = build_expression_fns_and_bindings(&bindings);
+        let (js, runtime_bindings) =
+            build_expression_fns_and_bindings(&bindings).expect("expression fns should emit");
         assert!(js.contains("const __zenith_expr_fns = ["));
         assert!(js.contains("const signalMap = __ctx.signalMap;"));
         assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
@@ -3625,6 +3679,53 @@ mod tests {
             serde_json::json!("src/pages/index.zen")
         );
         assert!(runtime_bindings[1].get("fn_index").is_none());
+    }
+
+    #[test]
+    fn compiled_expression_functions_parse_without_escape_cleanup() {
+        let bindings = vec![CompilerExpressionBinding {
+            marker_index: 0,
+            signal_index: Some(0),
+            signal_indices: vec![0],
+            state_index: Some(0),
+            component_instance: None,
+            component_binding: None,
+            literal: None,
+            compiled_expr: Some(
+                "(() => {\n  const note = `raw ${props.note}`;\n  return note + \" \\\\\" + \"quote\\\"\" + \"line\\u2028sep\\u2029tail\";\n})()"
+                    .to_string(),
+            ),
+            source: None,
+        }];
+
+        let (js, runtime_bindings) =
+            build_expression_fns_and_bindings(&bindings).expect("expression fns should emit");
+
+        assert!(js.contains("const __zenith_expr_fns = ["));
+        assert!(js.contains("const signalMap = __ctx.signalMap;"));
+        assert!(js.contains("const note = `raw ${props.note}`;"));
+        assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
+        assert_module_parses(&js);
+    }
+
+    #[test]
+    fn invalid_compiled_expression_functions_fail_hard() {
+        let bindings = vec![CompilerExpressionBinding {
+            marker_index: 0,
+            signal_index: None,
+            signal_indices: Vec::new(),
+            state_index: None,
+            component_instance: None,
+            component_binding: None,
+            literal: None,
+            compiled_expr: Some("props.note +".to_string()),
+            source: None,
+        }];
+
+        let err = build_expression_fns_and_bindings(&bindings)
+            .expect_err("invalid compiled expression must fail emission");
+
+        assert!(err.contains("failed to emit runtime expression function"));
     }
 
     #[test]

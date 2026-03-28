@@ -76,3 +76,11 @@ fn emits_unknown_event_warning_with_suggestion() {
     assert!(warnings[0].line >= 1);
     assert!(warnings[0].column >= 1);
 }
+
+#[test]
+fn rejects_innerhtml_binding_with_explicit_guidance() {
+    let error = compile_structured(r#"<section innerHTML={userInput}></section>"#).unwrap_err();
+
+    assert!(error.contains("innerHTML bindings are forbidden"));
+    assert!(error.contains("Use unsafeHTML={value}"));
+}

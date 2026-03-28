@@ -11,10 +11,13 @@ import {
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { createPageLoopCaches } from './build/page-loop-state.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
+import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
 import { buildImageArtifacts } from './images/service.js';
 import { createImageRuntimePayload } from './images/payload.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
+import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
+import { supportsTargetRouteCheck } from './route-check-support.js';
 import {
     createBundlerToolchain,
     createCompilerToolchain,
@@ -40,9 +43,8 @@ function createCompilerTotals() {
 function createExpressionRewriteMetrics() {
     return {
         calls: 0,
-        cacheHits: 0,
-        cacheMisses: 0,
-        templateCompileMs: 0
+        compilerOwnedBindings: 0,
+        ambiguousBindings: 0
     };
 }
 
@@ -278,6 +280,8 @@ export function createDevBuildSession(options) {
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const routerEnabled = config.router === true;
+    const { target } = resolveBuildAdapter(config);
+    const routeCheckEnabled = supportsTargetRouteCheck(target);
     const compilerOpts = {
         typescriptDefault: config.typescriptDefault === true,
         experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true,
@@ -335,6 +339,7 @@ export function createDevBuildSession(options) {
                 showBundlerInfo,
                 bundlerBin,
                 {
+                    routeCheck: routeCheckEnabled,
                     devStableAssets: true,
                     rebuildStrategy: bundlerOptions.rebuildStrategy || 'full',
                     changedRoutes: bundlerOptions.changedRoutes || [],
@@ -342,6 +347,11 @@ export function createDevBuildSession(options) {
                     globalGraphHash: bundlerOptions.globalGraphHash || ''
                 }
             ),
+            { envelopes: orderedEnvelopes.length }
+        );
+        await startupProfile.measureAsync(
+            'inject_image_materialization_manifest',
+            () => injectImageMaterializationIntoRouterManifest(outDir, orderedEnvelopes),
             { envelopes: orderedEnvelopes.length }
         );
         const assets = await startupProfile.measureAsync('collect_assets', () => collectAssets(outDir));

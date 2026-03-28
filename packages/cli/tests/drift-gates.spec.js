@@ -280,22 +280,57 @@ describe('drift gates', () => {
         expect(hits).toEqual([]);
     });
 
-    test('compiler→runtime naming contract: __ZENITH_INTERNAL_ZENHTML binding matches across packages', () => {
-        // Verify the runtime registers the internal binding
+    test('compiler→runtime naming contract uses fragment and removes legacy zenhtml plumbing', () => {
         const hydrateSource = readFileSync(
             resolve(REPO_ROOT, 'packages/runtime/src/hydrate.js'),
             'utf8'
         );
-        expect(hydrateSource).toContain('scope.__ZENITH_INTERNAL_ZENHTML');
+        expect(hydrateSource).not.toContain('__ZENITH_INTERNAL_ZENHTML');
+        expect(hydrateSource).toContain('fragment: _fragment');
 
-        // Verify the CLI rewrites the legacy identifier to the same internal name
         const buildSource = readFileSync(
-            resolve(REPO_ROOT, 'packages/cli/src/build.js'),
+            resolve(REPO_ROOT, 'packages/cli/src/build/page-ir-normalization.js'),
             'utf8'
         );
-        expect(buildSource).toContain('__ZENITH_INTERNAL_ZENHTML');
-        // Confirm the rewrite target matches what the runtime binds
-        expect(buildSource).toContain("'__ZENITH_INTERNAL_ZENHTML'");
+        expect(buildSource).toContain('markup syntax is unsupported');
+        expect(buildSource).not.toContain('__ZENITH_INTERNAL_ZENHTML');
+        expect(buildSource).not.toContain('normalizeFragmentHelperCalls');
+        expect(buildSource).not.toContain('synthesizeSignalBackedCompiledExpressions');
+        expect(buildSource).not.toContain('normalizeExpressionBindingDependencies');
+        expect(buildSource).not.toContain('applyScopedIdentifierRewrites');
+
+        const pageLoopSource = readFileSync(
+            resolve(REPO_ROOT, 'packages/cli/src/build/page-loop.js'),
+            'utf8'
+        );
+        expect(pageLoopSource).not.toContain('synthesizeSignalBackedCompiledExpressions');
+        expect(pageLoopSource).not.toContain('normalizeExpressionBindingDependencies');
+        expect(pageLoopSource).not.toContain('buildScopedIdentifierRewrite');
+        expect(pageLoopSource).not.toContain('applyScopedIdentifierRewrites');
+
+        const scopedRewriteSource = readFileSync(
+            resolve(REPO_ROOT, 'packages/cli/src/build/scoped-identifier-rewrite.js'),
+            'utf8'
+        );
+        expect(scopedRewriteSource).not.toContain('scopeRewrite');
+        expect(scopedRewriteSource).not.toContain('rewriteIdentifiersWithinExpression');
+        expect(scopedRewriteSource).not.toContain('deriveScopedIdentifierAlias');
+
+        const bundlerMainSource = readFileSync(
+            resolve(REPO_ROOT, 'packages/bundler/src/main.rs'),
+            'utf8'
+        );
+        expect(bundlerMainSource).not.toContain('const __zenith_fragment = __ctx.fragment');
+        expect(bundlerMainSource).not.toContain('const fragment = __ctx.fragment');
+
+        const bundlerUtilsSource = readFileSync(
+            resolve(REPO_ROOT, 'packages/bundler/src/utils.rs'),
+            'utf8'
+        );
+        expect(bundlerUtilsSource).toContain('serialize_js_string_literal');
+        expect(bundlerUtilsSource).toContain('serialize_js_template_literal');
+        expect(bundlerUtilsSource).not.toContain('pub fn escape_js_template_literal');
+        expect(bundlerUtilsSource).not.toContain('pub fn escape_js_string');
     });
 
     test('no site specifics or cms leakage in core tooling', () => {
@@ -464,4 +499,18 @@ describe('drift gates', () => {
             await rm(tempRoot, { recursive: true, force: true });
         }
     }, 120_000);
+
+    test('route-protection docs use data.* instead of params.* for load(ctx) payloads', () => {
+        const routeProtectionDoc = resolve(REPO_ROOT, 'docs/documentation/routing/route-protection.md');
+        if (existsSync(routeProtectionDoc)) {
+            const content = readFileSync(routeProtectionDoc, 'utf8');
+            // The template example must not mistakenly teach {params.} if it's meant to be rendering data from load()
+            // We'll enforce that "{params.user.name}" or "{params.metrics" is strictly absent,
+            // and "{data." is present in the main dashboard example block.
+            expect(content).not.toMatch(/\{params\.user\.name\}/);
+            expect(content).not.toMatch(/\{params\.metrics/);
+            expect(content).toMatch(/\{data\.user\.name\}/);
+            expect(content).toMatch(/\{data\.metrics/);
+        }
+    });
 });

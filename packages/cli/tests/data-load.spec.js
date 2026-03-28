@@ -1,5 +1,5 @@
 
-import { allow, data, deny, redirect, resolveRouteResult, resolveServerPayload, validateServerExports } from '../src/server-contract.js';
+import { allow, data, deny, invalid, redirect, resolveRouteResult, resolveServerPayload, validateServerExports } from '../src/server-contract.js';
 
 describe('Server Contract Validation and Payload Resolution', () => {
 
@@ -14,6 +14,13 @@ describe('Server Contract Validation and Payload Resolution', () => {
         test('allows new load() export', () => {
             expect(() => validateServerExports({
                 exports: { load: async (ctx) => ({}) },
+                filePath: 'test.zen'
+            })).not.toThrow();
+        });
+
+        test('allows new action() export', () => {
+            expect(() => validateServerExports({
+                exports: { action: async (ctx) => ({ ok: true }) },
                 filePath: 'test.zen'
             })).not.toThrow();
         });
@@ -62,6 +69,18 @@ describe('Server Contract Validation and Payload Resolution', () => {
                 exports: { load: async (ctx = {}) => ({}) },
                 filePath: 'test.zen'
             })).toThrow(/"load\(ctx\)" must take exactly 1 argument/);
+        });
+
+        test('ensures action is a function taking exactly 1 argument', () => {
+            expect(() => validateServerExports({
+                exports: { action: 'not a function' },
+                filePath: 'test.zen'
+            })).toThrow(/"action" must be a function/);
+
+            expect(() => validateServerExports({
+                exports: { action: () => ({}) },
+                filePath: 'test.zen'
+            })).toThrow(/"action\(ctx\)" must take exactly 1 argument/);
         });
 
         test('prevents unknown exports', () => {
@@ -193,7 +212,8 @@ describe('Server Contract Validation and Payload Resolution', () => {
             expect(calls).toEqual(['guard:42', 'load:admin']);
             expect(resolved).toEqual({
                 result: { kind: 'data', data: { ok: true, role: 'admin' } },
-                trace: { guard: 'allow', load: 'data' }
+                trace: { guard: 'allow', action: 'none', load: 'data' },
+                status: 200
             });
         });
 
@@ -214,7 +234,7 @@ describe('Server Contract Validation and Payload Resolution', () => {
             expect(loadCalls).toBe(0);
             expect(resolved).toEqual({
                 result: { kind: 'redirect', location: '/login?next=%2Fusers%2F42', status: 307 },
-                trace: { guard: 'redirect', load: 'none' }
+                trace: { guard: 'redirect', action: 'none', load: 'none' }
             });
         });
 
@@ -235,7 +255,7 @@ describe('Server Contract Validation and Payload Resolution', () => {
             expect(loadCalls).toBe(0);
             expect(resolved).toEqual({
                 result: { kind: 'deny', status: 403, message: 'Admins only' },
-                trace: { guard: 'deny', load: 'none' }
+                trace: { guard: 'deny', action: 'none', load: 'none' }
             });
         });
 
@@ -250,7 +270,8 @@ describe('Server Contract Validation and Payload Resolution', () => {
 
             expect(resolved).toEqual({
                 result: { kind: 'data', data: { id: '42', tab: 'profile' } },
-                trace: { guard: 'none', load: 'data' }
+                trace: { guard: 'none', action: 'none', load: 'data' },
+                status: 200
             });
         });
 
@@ -265,7 +286,7 @@ describe('Server Contract Validation and Payload Resolution', () => {
 
             expect(resolved).toEqual({
                 result: { kind: 'deny', status: 404, message: 'Record not found' },
-                trace: { guard: 'none', load: 'deny' }
+                trace: { guard: 'none', action: 'none', load: 'deny' }
             });
         });
 
@@ -287,7 +308,82 @@ describe('Server Contract Validation and Payload Resolution', () => {
             expect(loadCalls).toBe(0);
             expect(resolved).toEqual({
                 result: { kind: 'allow' },
-                trace: { guard: 'allow', load: 'none' }
+                trace: { guard: 'allow', action: 'none', load: 'none' }
+            });
+        });
+
+        test('post action runs between guard and load and exposes ctx.action to load', async () => {
+            const calls = [];
+            const actionRequest = new Request('http://localhost/users/42', {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: 'name='
+            });
+
+            const resolved = await resolveRouteResult({
+                exports: {
+                    guard: async (incomingCtx) => {
+                        calls.push(`guard:${incomingCtx.method}`);
+                        incomingCtx.env.role = 'editor';
+                        return allow();
+                    },
+                    action: async (incomingCtx) => {
+                        calls.push(`action:${incomingCtx.env.role}`);
+                        const formData = await incomingCtx.request.formData();
+                        if (!String(formData.get('name') || '').trim()) {
+                            return invalid({ field: 'name', message: 'Name required' }, 422);
+                        }
+                        return data({ saved: true });
+                    },
+                    load: async (incomingCtx) => {
+                        calls.push(`load:${incomingCtx.action.ok}:${incomingCtx.action.status}`);
+                        return data({ action: incomingCtx.action, role: incomingCtx.env.role });
+                    }
+                },
+                ctx: { ...ctx, env: {}, method: 'POST', request: actionRequest },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(calls).toEqual(['guard:POST', 'action:editor', 'load:false:422']);
+            expect(resolved).toEqual({
+                result: {
+                    kind: 'data',
+                    data: {
+                        action: {
+                            ok: false,
+                            status: 422,
+                            data: { field: 'name', message: 'Name required' }
+                        },
+                        role: 'editor'
+                    }
+                },
+                trace: { guard: 'allow', action: 'invalid', load: 'data' },
+                status: 422
+            });
+        });
+
+        test('post action redirects short-circuit load', async () => {
+            let loadCalls = 0;
+            const resolved = await resolveRouteResult({
+                exports: {
+                    action: async (_ctx) => redirect('/done', 303),
+                    load: async (_ctx) => {
+                        loadCalls += 1;
+                        return { ok: true };
+                    }
+                },
+                ctx: {
+                    ...ctx,
+                    method: 'POST',
+                    request: new Request('http://localhost/users/42', { method: 'POST', body: '' })
+                },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(loadCalls).toBe(0);
+            expect(resolved).toEqual({
+                result: { kind: 'redirect', location: '/done', status: 303 },
+                trace: { guard: 'none', action: 'redirect', load: 'none' }
             });
         });
     });
