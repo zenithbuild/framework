@@ -376,14 +376,11 @@ jobs:
 
       - run: bun install
 
-      - name: Build compiler and bundler meta packages
+      - name: Build release packages
         shell: bash
         run: |
           set -euo pipefail
-          export ZENITH_TRAIN_VERSION="$(tr -d '[:space:]' < TRAIN_VERSION)"
-          cargo build --release --manifest-path packages/compiler/Cargo.toml
-          bun run --cwd packages/compiler build
-          bun run --cwd packages/bundler build
+          bash ./scripts/build.sh
 
       - name: Publish target packages
         shell: bash
