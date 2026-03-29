@@ -136,17 +136,44 @@ jobs:
       - name: Run Integration Shard ${{ matrix.shard_index }}/6 (retry once)
         shell: bash
         env:
+          ZENITH_CI_HEARTBEAT_SECONDS: 30
           ZENITH_CI_PREPARE: 1
           ZENITH_CI_SHARD_INDEX: ${{ matrix.shard_index }}
           ZENITH_CI_SHARD_TOTAL: 6
         run: |
           set -euo pipefail
-          if bash ./scripts/ci-integration.sh; then
+          timestamp() {
+            date -u +"%Y-%m-%dT%H:%M:%SZ"
+          }
+
+          log_retry() {
+            printf '[integration-retry][%s] shard=%s/%s attempt=%s event=%s exit=%s\n' \
+              "$(timestamp)" \
+              "${ZENITH_CI_SHARD_INDEX}" \
+              "${ZENITH_CI_SHARD_TOTAL}" \
+              "$1" \
+              "$2" \
+              "${3:-n/a}"
+          }
+
+          log_retry 1 start
+          if ZENITH_CI_RETRY_ATTEMPT=1 bash ./scripts/ci-integration.sh; then
+            log_retry 1 end 0
+            exit 0
+          fi
+          retry_exit=$?
+          log_retry 1 end "$retry_exit"
+
+          echo "Integration shard failed on first attempt; retrying once..."
+          log_retry 2 start
+          if ZENITH_CI_RETRY_ATTEMPT=2 bash ./scripts/ci-integration.sh; then
+            log_retry 2 end 0
             exit 0
           fi
 
-          echo "Integration shard failed on first attempt; retrying once..."
-          bash ./scripts/ci-integration.sh
+          retry_exit=$?
+          log_retry 2 end "$retry_exit"
+          exit "$retry_exit"
 
   smoke:
     runs-on: ubuntu-latest
