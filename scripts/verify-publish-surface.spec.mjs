@@ -227,6 +227,55 @@ test('verifyPublishSurface fails when manifest targets are not packed', () => {
     }
 });
 
+test('verifyPublishSurface reports npm pack failures even when stdio is omitted', () => {
+    const root = makeTempRoot('zenith-publish-surface-pack-fail-');
+    const matrix = [
+        {
+            dir: 'packages/windows-only',
+            name: '@acme/windows-only',
+            stage: 'platform',
+            requiredPackFiles: ['bin/example.exe']
+        }
+    ];
+
+    try {
+        createPackage(
+            root,
+            'packages/windows-only',
+            {
+                name: '@acme/windows-only',
+                version: '1.0.0',
+                files: ['bin', 'package.json'],
+                repository: {
+                    type: 'git',
+                    url: 'https://github.com/zenithbuild/framework'
+                }
+            },
+            {
+                'bin/example.exe': 'not-a-real-binary\n'
+            }
+        );
+
+        assert.throws(
+            () =>
+                verifyPublishSurface({
+                    root,
+                    matrix,
+                    selection: 'platform',
+                    spawn: () => ({
+                        status: 1,
+                        stdout: undefined,
+                        stderr: undefined,
+                        error: new Error('spawn failed')
+                    })
+                }),
+            /npm pack --dry-run failed for packages\/windows-only[\s\S]*error:\nspawn failed[\s\S]*stdout:\n[\s\S]*stderr:\n/
+        );
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test('matrix stays aligned with expected publish targets', () => {
     assert.equal(PUBLISH_SURFACE_MATRIX.length, 17);
 });

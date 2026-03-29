@@ -44,18 +44,29 @@ function normalizePath(value) {
         .replace(/^\/+/, '');
 }
 
+function readSpawnText(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (value == null) {
+        return '';
+    }
+    return String(value);
+}
+
 function readJson(path) {
     return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 function extractJsonPayload(raw, description) {
-    const objectStart = raw.indexOf('{');
-    const arrayStart = raw.indexOf('[');
+    const text = readSpawnText(raw);
+    const objectStart = text.indexOf('{');
+    const arrayStart = text.indexOf('[');
     const start = objectStart === -1 ? arrayStart : arrayStart === -1 ? objectStart : Math.min(objectStart, arrayStart);
     if (start === -1) {
         throw new Error(`No JSON payload found in npm output for ${description}`);
     }
-    const payload = raw.slice(start).trim();
+    const payload = text.slice(start).trim();
     return JSON.parse(payload);
 }
 
@@ -280,7 +291,7 @@ export function listPublishMatrixLines(options = {}) {
     return selectPublishMatrixEntries(options).map((item) => `${item.dir}|${item.name}`);
 }
 
-function verifyPackagePublishSurface({ root, entry, npmBin }) {
+function verifyPackagePublishSurface({ root, entry, npmBin, spawn = spawnSync }) {
     const packageRoot = join(root, entry.dir);
     const manifestPath = join(packageRoot, 'package.json');
     if (!existsSync(manifestPath)) {
@@ -302,18 +313,27 @@ function verifyPackagePublishSurface({ root, entry, npmBin }) {
         throw new Error(`Package name mismatch in ${manifestPath}: expected ${entry.name}, found ${pkg.name || '(empty)'}`);
     }
 
-    const result = spawnSync(npmBin, ['pack', '--dry-run', '--json', '.'], {
+    const result = spawn(npmBin, ['pack', '--dry-run', '--json', '.'], {
         cwd: packageRoot,
         encoding: 'utf8',
         env: process.env
     });
-    if (result.status !== 0) {
+    const stdout = readSpawnText(result.stdout);
+    const stderr = readSpawnText(result.stderr);
+    const spawnError = result.error instanceof Error ? result.error.message : '';
+    if (result.status !== 0 || result.error) {
+        const details = [
+            `npm pack --dry-run failed for ${entry.dir}`,
+            spawnError ? `error:\n${spawnError}` : '',
+            `stdout:\n${stdout.trim()}`,
+            `stderr:\n${stderr.trim()}`
+        ].filter(Boolean);
         throw new Error(
-            `npm pack --dry-run failed for ${entry.dir}\nstdout:\n${result.stdout.trim()}\nstderr:\n${result.stderr.trim()}`
+            details.join('\n')
         );
     }
 
-    const payload = extractJsonPayload(result.stdout, `${entry.name} pack`);
+    const payload = extractJsonPayload(stdout, `${entry.name} pack`);
     const files = Array.isArray(payload) && payload[0]?.files ? payload[0].files : [];
     const packedFiles = files.map((item) => normalizePath(item.path)).filter(Boolean);
     const packedSet = new Set(packedFiles);
@@ -358,9 +378,10 @@ export function verifyPublishSurface({
     matrix = PUBLISH_SURFACE_MATRIX,
     selection = 'all',
     filter = '',
-    npmBin = DEFAULT_NPM_BIN
+    npmBin = DEFAULT_NPM_BIN,
+    spawn = spawnSync
 } = {}) {
     assertPublishSurfaceMatrixCoverage({ root, matrix });
     const entries = selectPublishMatrixEntries({ selection, filter, matrix });
-    return entries.map((entryValue) => verifyPackagePublishSurface({ root, entry: entryValue, npmBin }));
+    return entries.map((entryValue) => verifyPackagePublishSurface({ root, entry: entryValue, npmBin, spawn }));
 }
