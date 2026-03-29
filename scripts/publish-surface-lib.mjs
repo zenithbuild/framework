@@ -54,6 +54,10 @@ function readSpawnText(value) {
     return String(value);
 }
 
+function shouldUseShellForNpm(platform, npmBin) {
+    return platform === 'win32' && /(?:^|[\\/])npm(?:\.cmd)?$/i.test(String(npmBin || ''));
+}
+
 function readJson(path) {
     return JSON.parse(readFileSync(path, 'utf8'));
 }
@@ -291,7 +295,7 @@ export function listPublishMatrixLines(options = {}) {
     return selectPublishMatrixEntries(options).map((item) => `${item.dir}|${item.name}`);
 }
 
-function verifyPackagePublishSurface({ root, entry, npmBin, spawn = spawnSync }) {
+function verifyPackagePublishSurface({ root, entry, npmBin, spawn = spawnSync, platform = process.platform }) {
     const packageRoot = join(root, entry.dir);
     const manifestPath = join(packageRoot, 'package.json');
     if (!existsSync(manifestPath)) {
@@ -316,7 +320,8 @@ function verifyPackagePublishSurface({ root, entry, npmBin, spawn = spawnSync })
     const result = spawn(npmBin, ['pack', '--dry-run', '--json', '.'], {
         cwd: packageRoot,
         encoding: 'utf8',
-        env: process.env
+        env: process.env,
+        shell: shouldUseShellForNpm(platform, npmBin)
     });
     const stdout = readSpawnText(result.stdout);
     const stderr = readSpawnText(result.stderr);
@@ -379,9 +384,10 @@ export function verifyPublishSurface({
     selection = 'all',
     filter = '',
     npmBin = DEFAULT_NPM_BIN,
-    spawn = spawnSync
+    spawn = spawnSync,
+    platform = process.platform
 } = {}) {
     assertPublishSurfaceMatrixCoverage({ root, matrix });
     const entries = selectPublishMatrixEntries({ selection, filter, matrix });
-    return entries.map((entryValue) => verifyPackagePublishSurface({ root, entry: entryValue, npmBin, spawn }));
+    return entries.map((entryValue) => verifyPackagePublishSurface({ root, entry: entryValue, npmBin, spawn, platform }));
 }

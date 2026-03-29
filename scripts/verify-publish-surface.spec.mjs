@@ -276,6 +276,65 @@ test('verifyPublishSurface reports npm pack failures even when stdio is omitted'
     }
 });
 
+test('verifyPublishSurface uses shell mode for npm pack on win32', () => {
+    const root = makeTempRoot('zenith-publish-surface-win-shell-');
+    const matrix = [
+        {
+            dir: 'packages/windows-shell',
+            name: '@acme/windows-shell',
+            stage: 'platform',
+            requiredPackFiles: ['bin/example.exe']
+        }
+    ];
+    let observedShell = null;
+
+    try {
+        createPackage(
+            root,
+            'packages/windows-shell',
+            {
+                name: '@acme/windows-shell',
+                version: '1.0.0',
+                files: ['bin', 'package.json'],
+                repository: {
+                    type: 'git',
+                    url: 'https://github.com/zenithbuild/framework'
+                }
+            },
+            {
+                'bin/example.exe': 'not-a-real-binary\n'
+            }
+        );
+
+        verifyPublishSurface({
+            root,
+            matrix,
+            selection: 'platform',
+            npmBin: 'npm.cmd',
+            platform: 'win32',
+            spawn: (_command, _args, options) => {
+                observedShell = options.shell;
+                return {
+                    status: 0,
+                    stdout: JSON.stringify([
+                        {
+                            files: [
+                                { path: 'package.json' },
+                                { path: 'bin/example.exe' }
+                            ]
+                        }
+                    ]),
+                    stderr: ''
+                };
+            }
+        });
+
+        assert.equal(observedShell, true);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test('matrix stays aligned with expected publish targets', () => {
     assert.equal(PUBLISH_SURFACE_MATRIX.length, 17);
 });
