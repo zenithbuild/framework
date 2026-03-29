@@ -33,6 +33,29 @@ test('publish surface matrix covers every top-level publishable package', () => 
     assert.doesNotThrow(() => assertPublishSurfaceMatrixCoverage({ root: REPO_ROOT }));
 });
 
+test('publish surface matrix coverage normalizes Windows-style manifest candidate paths', () => {
+    const matrix = [
+        {
+            dir: 'packages/compiler-win32-x64',
+            name: '@zenithbuild/compiler-win32-x64',
+            stage: 'platform',
+            requiredPackFiles: ['bin/zenith-compiler.exe']
+        }
+    ];
+
+    assert.doesNotThrow(() =>
+        assertPublishSurfaceMatrixCoverage({
+            matrix,
+            manifestEntries: [
+                {
+                    dir: 'packages\\compiler-win32-x64',
+                    name: '@zenithbuild/compiler-win32-x64'
+                }
+            ]
+        })
+    );
+});
+
 test('framework and scaffolder selections resolve from one matrix', () => {
     const framework = selectPublishMatrixEntries({ selection: 'framework' });
     const scaffolder = selectPublishMatrixEntries({ selection: 'scaffolder' });

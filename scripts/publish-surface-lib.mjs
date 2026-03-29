@@ -11,7 +11,7 @@ export const EXPECTED_REPOSITORY_URL = 'https://github.com/zenithbuild/framework
 export const DEFAULT_NPM_BIN = process.env.NPM_BIN || (process.platform === 'win32' ? 'npm.cmd' : 'npm');
 
 function entry(dir, name, stage, requiredPackFiles = []) {
-    return { dir, name, stage, requiredPackFiles };
+    return { dir: normalizePath(dir), name, stage, requiredPackFiles };
 }
 
 export const PUBLISH_SURFACE_MATRIX = [
@@ -37,7 +37,11 @@ export const PUBLISH_SURFACE_MATRIX = [
 const FORBIDDEN_PACKED_PREFIXES = ['src/', 'tests/', 'test/', '__tests__/', '.github/', 'coverage/'];
 
 function normalizePath(value) {
-    return String(value || '').replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/^\/+/, '');
+    return String(value || '')
+        .replaceAll('\\', '/')
+        .replace(/\/+/g, '/')
+        .replace(/^\.\/+/, '')
+        .replace(/^\/+/, '');
 }
 
 function readJson(path) {
@@ -167,7 +171,7 @@ function collectTopLevelPublishCandidates(root = REPO_ROOT) {
         .sort();
     const candidates = [];
     for (const directory of directories) {
-        const packageDir = join('packages', directory);
+        const packageDir = normalizePath(join('packages', directory));
         const manifestPath = join(root, packageDir, 'package.json');
         if (!existsSync(manifestPath)) {
             continue;
@@ -181,14 +185,25 @@ function collectTopLevelPublishCandidates(root = REPO_ROOT) {
     return candidates;
 }
 
-export function assertPublishSurfaceMatrixCoverage({ root = REPO_ROOT, matrix = PUBLISH_SURFACE_MATRIX } = {}) {
-    const manifestEntries = collectTopLevelPublishCandidates(root);
+export function assertPublishSurfaceMatrixCoverage({
+    root = REPO_ROOT,
+    matrix = PUBLISH_SURFACE_MATRIX,
+    manifestEntries = collectTopLevelPublishCandidates(root)
+} = {}) {
+    const normalizedManifestEntries = manifestEntries.map((item) => ({
+        ...item,
+        dir: normalizePath(item.dir)
+    }));
+    const normalizedMatrix = matrix.map((item) => ({
+        ...item,
+        dir: normalizePath(item.dir)
+    }));
     const matrixByDir = new Map();
     const duplicateDirs = new Set();
     const duplicateNames = new Set();
     const names = new Set();
 
-    for (const item of matrix) {
+    for (const item of normalizedMatrix) {
         if (matrixByDir.has(item.dir)) {
             duplicateDirs.add(item.dir);
         }
@@ -199,9 +214,9 @@ export function assertPublishSurfaceMatrixCoverage({ root = REPO_ROOT, matrix = 
         names.add(item.name);
     }
 
-    const missing = manifestEntries.filter((item) => !matrixByDir.has(item.dir));
-    const extra = matrix.filter((item) => !manifestEntries.some((entryValue) => entryValue.dir === item.dir));
-    const mismatchedNames = manifestEntries
+    const missing = normalizedManifestEntries.filter((item) => !matrixByDir.has(item.dir));
+    const extra = normalizedMatrix.filter((item) => !normalizedManifestEntries.some((entryValue) => entryValue.dir === item.dir));
+    const mismatchedNames = normalizedManifestEntries
         .filter((item) => matrixByDir.has(item.dir) && matrixByDir.get(item.dir).name !== item.name)
         .map((item) => `${item.dir}: matrix=${matrixByDir.get(item.dir).name}, manifest=${item.name}`);
 
@@ -244,7 +259,7 @@ export function selectPublishMatrixEntries({ selection = 'all', filter = '', mat
 
     const tokens = String(filter || '')
         .split(',')
-        .map((value) => value.trim())
+        .map((value) => normalizePath(value.trim()))
         .filter(Boolean);
     if (tokens.length === 0) {
         return entries;
