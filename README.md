@@ -30,3 +30,11 @@ Topics to add:
 - `ui-framework`
 - `rust`
 - `typescript`
+
+## Support Zenith
+
+Zenith is an open source project built around compiler-first UI, deterministic output, explicit contracts, and minimal runtime behavior.
+
+If you use Zenith in your work or want to support its continued development, consider sponsoring the project on GitHub: [Sponsor Zenith](https://github.com/sponsors/zenithbuild). Sponsorship helps fund core engineering, tooling, documentation, and long-term maintenance.
+
+A limited number of design partner and implementation/advisory relationships are also available for teams exploring Zenith seriously.
