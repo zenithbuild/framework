@@ -35,6 +35,8 @@ Topics to add:
 
 Zenith is an open source project built around compiler-first UI, deterministic output, explicit contracts, and minimal runtime behavior.
 
-If you use Zenith in your work or want to support its continued development, consider sponsoring the project on GitHub: [Sponsor Zenith](https://github.com/sponsors/zenithbuild). Sponsorship helps fund core engineering, tooling, documentation, and long-term maintenance.
+If you use Zenith or want to support its continued development, you can help fund core engineering, tooling, documentation, and long-term maintenance:
+- **[GitHub Sponsors](https://github.com/sponsors/zenithbuild)**: For direct individual sponsorship.
+- **[Open Collective](https://opencollective.com/zenithbuild)**: For broader open-source contributions and organizational funding.
 
-A limited number of design partner and implementation/advisory relationships are also available for teams exploring Zenith seriously.
+A limited number of design partner and implementation/advisory relationships are also available for teams exploring Zenith seriously via our Open Collective organizational tiers.
