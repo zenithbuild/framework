@@ -29,6 +29,8 @@
     "/docs/reactivity/reactivity-model",
     "/docs/reactivity/effects-vs-mount",
     "/docs/reactivity/dom-and-environment",
+    "/docs/reactivity/presence",
+    "/docs/reactivity/overlay-sheet-pattern",
     "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",
@@ -46,6 +48,7 @@
     "/docs/zenith-contract",
     "/docs/cli-contract",
     "/docs/install-compatibility",
+    "/docs/routing/navigation-shell",
     "/docs/routing/route-protection",
     "/blog/routing-awareness",
     "/blog/runtime-expression-integrity"

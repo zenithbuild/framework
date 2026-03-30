@@ -7,7 +7,7 @@ import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCh
 import { handleImageRequest } from '../images/service.js';
 import { createTrustedOriginResolver } from '../request-origin.js';
 import { defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
-import { executeRouteRequest, renderRouteRequest } from './route-render.js';
+import { executeRouteRequest, renderResourceRouteRequest, renderRouteRequest } from './route-render.js';
 import { resolveRequestRoute } from './resolve-request-route.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -106,9 +106,24 @@ async function createWebRequest(req, url) {
     return new Request(url.toString(), init);
 }
 
+function getSetCookieValues(response) {
+    if (typeof response?.headers?.getSetCookie === 'function') {
+        return response.headers.getSetCookie();
+    }
+    const value = response?.headers?.get?.('set-cookie');
+    return typeof value === 'string' && value.length > 0 ? [value] : [];
+}
+
 async function sendFetchResponse(res, response, method) {
     res.statusCode = response.status;
+    const setCookies = getSetCookieValues(response);
+    if (setCookies.length > 0) {
+        res.setHeader('set-cookie', setCookies);
+    }
     for (const [key, value] of response.headers.entries()) {
+        if (key.toLowerCase() === 'set-cookie') {
+            continue;
+        }
         res.setHeader(key, value);
     }
 
@@ -170,6 +185,7 @@ async function loadRuntimeContext(options = {}) {
             base_path: '/'
         });
         const serverManifest = await readJson(join(serverDir, 'manifest.json'), { routes: [] });
+        const allServerRoutes = Array.isArray(serverManifest.routes) ? serverManifest.routes : [];
 
         return {
             distDir,
@@ -177,7 +193,9 @@ async function loadRuntimeContext(options = {}) {
             staticDir: resolve(serverDir, config.static_dir || '../static'),
             buildManifest,
             buildRoutes: Array.isArray(buildManifest.routes) ? buildManifest.routes : [],
-            serverRoutes: Array.isArray(serverManifest.routes) ? serverManifest.routes : [],
+            serverRoutes: allServerRoutes,
+            pageServerRoutes: allServerRoutes.filter((route) => route?.route_kind !== 'resource'),
+            resourceServerRoutes: allServerRoutes.filter((route) => route?.route_kind === 'resource'),
             images: config.images || {},
             basePath: normalizeBasePath(config.base_path || '/')
         };
@@ -229,7 +247,7 @@ async function handleRouteCheck(req, res, url, context) {
 
     let result = { kind: 'allow' };
     let routeId = buildResolved.route.path || '';
-    const serverResolved = resolveRequestRoute(canonicalTargetUrl, context.serverRoutes);
+    const serverResolved = resolveRequestRoute(canonicalTargetUrl, context.pageServerRoutes);
     if (serverResolved.matched && serverResolved.route) {
         routeId = serverResolved.route.route_id || serverResolved.route.name || serverResolved.route.path || routeId;
         try {
@@ -305,7 +323,21 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
         return;
     }
 
-    const serverResolved = resolveRequestRoute(canonicalUrl, context.serverRoutes);
+    const resourceResolved = resolveRequestRoute(canonicalUrl, context.resourceServerRoutes);
+    if (resourceResolved.matched && resourceResolved.route) {
+        const routeDir = join(context.serverDir, 'routes', resourceResolved.route.name);
+        const request = await createWebRequest(req, url);
+        const response = await renderResourceRouteRequest({
+            request,
+            route: resourceResolved.route,
+            params: resourceResolved.params,
+            routeModulePath: join(routeDir, 'route', 'entry.js')
+        });
+        await sendFetchResponse(res, response, req.method);
+        return;
+    }
+
+    const serverResolved = resolveRequestRoute(canonicalUrl, context.pageServerRoutes);
     if (serverResolved.matched && serverResolved.route) {
         const routeDir = join(context.serverDir, 'routes', serverResolved.route.name);
         const request = await createWebRequest(req, url);

@@ -75,12 +75,12 @@ function classifyInlineServerSource(source) {
 /**
  * @param {{
  *   sourceFile: string,
- *   inlineServerScript?: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null,
+ *   inlineServerScript?: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string, export_paths?: string[] } | null,
  *   adjacentGuardPath?: string | null,
  *   adjacentLoadPath?: string | null,
  *   adjacentActionPath?: string | null
  * }} input
- * @returns {{ serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null, guardPath: string | null, loadPath: string | null, actionPath: string | null }}
+ * @returns {{ serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string, export_paths?: string[] } | null, guardPath: string | null, loadPath: string | null, actionPath: string | null }}
  */
 export function composeServerScriptEnvelope({
     sourceFile,
@@ -159,7 +159,10 @@ export function composeServerScriptEnvelope({
             has_guard: inlineHasGuard || Boolean(adjacentGuardPath),
             has_load: inlineHasLoad || Boolean(adjacentLoadPath),
             has_action: inlineHasAction || Boolean(adjacentActionPath),
-            source_path: sourceFile
+            source_path: sourceFile,
+            export_paths: Array.isArray(inlineServerScript?.export_paths)
+                ? [...inlineServerScript.export_paths]
+                : []
         },
         guardPath: adjacentGuardPath,
         loadPath: adjacentLoadPath,

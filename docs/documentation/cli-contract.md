@@ -1,9 +1,9 @@
 ---
 title: "CLI Contract"
 description: "Public CLI guarantees for command behavior, exit semantics, and deployment-aware build outputs."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-24"
+last_updated: "2026-03-29"
 tags: ["contracts", "cli", "commands"]
 ---
 
@@ -39,6 +39,7 @@ Invariant: CLI must not implement compiler semantics, runtime behavior, or hidde
 Today the supported target names are:
 
 - `static`
+- `static-export`
 - `vercel-static`
 - `netlify-static`
 - `vercel`

@@ -25,7 +25,7 @@ function buildRuntimeModuleSource() {
     const segments = [
         'reactivity-core.js', 'side-effect-scope.js', 'effect-utils.js', 'effect-scheduler.js',
         'effect-runtime.js', 'mount-runtime.js', 'zeneffect.js', 'ref.js', 'env.js',
-        'platform.js', 'signal.js', 'state.js',
+        'platform.js', 'presence.js', 'signal.js', 'state.js',
         'diagnostics.js', 'cleanup.js', 'template-parser.js', 'markup.js', 'payload.js',
         'expressions.js', 'render.js', 'fragment-patch.js', 'scanner.js', 'events.js', 'hydrate.js'
     ].map((fileName) => stripImports(readRuntimeSourceFile(fileName))).filter(Boolean);

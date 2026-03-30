@@ -2,8 +2,10 @@ import {
     signal,
     effect,
     mount,
+    presence,
     window as zenWindowFn,
     document as zenDocumentFn,
+    zenPresence,
     zeneffect,
     zenEffect,
     zenMount
@@ -24,6 +26,7 @@ describe('Runtime Contract Truth', () => {
         test('canonical public DX names are exported', () => {
             expect(typeof zeneffect).toBe('function');
             expect(typeof zenMount).toBe('function');
+            expect(typeof zenPresence).toBe('function');
             expect(typeof zenWindowFn).toBe('function');
             expect(typeof zenDocumentFn).toBe('function');
         });
@@ -31,6 +34,8 @@ describe('Runtime Contract Truth', () => {
         test('legacy or standard aliases exist but wrap canonical names', () => {
             expect(typeof effect).toBe('function');
             expect(typeof mount).toBe('function');
+            expect(typeof presence).toBe('function');
+            expect(presence).toBe(zenPresence);
             expect(typeof zenEffect).toBe('function'); // Legacy camelCase
         });
     });

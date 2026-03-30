@@ -2,16 +2,26 @@
 // navigate.spec.js — Navigation API tests
 // ---------------------------------------------------------------------------
 
-import { navigate, back, forward, getCurrentPath, _setNavigationResolver } from '../dist/navigate.js';
+import {
+    navigate,
+    refreshCurrentRoute,
+    back,
+    forward,
+    getCurrentPath,
+    _setNavigationResolver,
+    _setRefreshResolver
+} from '../dist/navigate.js';
 
 describe('Navigation API', () => {
     afterEach(() => {
         _setNavigationResolver(null);
+        _setRefreshResolver(null);
+        delete globalThis.__zenith_refresh_current_route;
     });
 
     test('navigate pushes path to history', async () => {
         await navigate('/about');
-        expect(window.location.pathname).toBe('/about');
+        expect(getCurrentPath()).toBe('/about');
     });
 
     test('navigate triggers resolver if set', async () => {
@@ -26,7 +36,37 @@ describe('Navigation API', () => {
     test('navigate works without resolver', async () => {
         // No resolver set — should not throw
         await navigate('/safe');
-        expect(window.location.pathname).toBe('/safe');
+        expect(getCurrentPath()).toBe('/safe');
+    });
+
+    test('refreshCurrentRoute triggers explicit refresh resolver if set', async () => {
+        const calls = [];
+        _setRefreshResolver(async () => {
+            calls.push(getCurrentPath());
+        });
+
+        history.pushState({}, '', '/refresh-me');
+        await refreshCurrentRoute();
+
+        expect(calls).toEqual(['/refresh-me']);
+    });
+
+    test('refreshCurrentRoute falls back to the template bridge on global scope', async () => {
+        const calls = [];
+        globalThis.__zenith_refresh_current_route = async () => {
+            calls.push(getCurrentPath());
+        };
+
+        history.pushState({}, '', '/from-template');
+        await refreshCurrentRoute();
+
+        expect(calls).toEqual(['/from-template']);
+    });
+
+    test('refreshCurrentRoute fails clearly without a current route bridge', async () => {
+        await expect(refreshCurrentRoute()).rejects.toThrow(
+            '[Zenith Router] refreshCurrentRoute() requires a current matched Zenith page route'
+        );
     });
 
     test('getCurrentPath returns current pathname', () => {

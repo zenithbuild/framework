@@ -6,16 +6,51 @@ Phase 2 is the first feature-forward phase built on top of the locked contracts 
 ## 2. Track Overview
 - **Track A** — Server Actions & Data Mutation (Complete)
 - **Track B** — Native Asset Pipeline & Image Materialization (Complete — scoped milestone; optional continuation deferred)
-- **Track C** — Adapter Target Expansion & SSG
-- **Track D** — High-Fidelity UI / Transition Primitive
+- **Track C** — Adapter Target Expansion & SSG (Complete — first target `static-export`)
+- **Track D** — High-Fidelity UI / Transition Primitive (Complete — first target `zenPresence`)
 
 ## 3. Active Item
-### Phase 2 Track C — Adapter Target Expansion & SSG
-**Status:** Next (not started here)
+### Phase 2 Track D — High-Fidelity UI / Transition Primitive
+**Status:** Complete
+
+**Approved first target:** `zenPresence(ref, options)`
+
+**Outcome:** Zenith now ships one narrow canonical presence helper that:
+- owns always-mounted visibility on a ref-bound node
+- starts entry only after the mount boundary via `presence.mount()` inside `zenMount(...)`
+- exposes deterministic `hidden | entering | present | exiting` phase truth on `data-zen-presence`
+- settles through owned `transitionend` / `animationend` listeners with timeout fallback
+- clears listeners/timers on rerun and cleanup with no ghost work
+- does not retain fragments, delay conditional unmount, or couple to router lifecycle
+
+**Next:** Phase 2 first-target track scope is complete. Any broader transition shell, route orchestration, or delayed-unmount work requires a separate milestone decision.
 
 **Note:** Track B image pipeline work for static props + compiler artifacts + registry train is closed; further image scope (bundler HTML materialization, CDN, dynamic props) remains **deferred** and is not required to reopen Track B unless a new milestone is chartered.
 
 ## 4. Completed Items
+### Phase 2 Track D — High-Fidelity UI / Transition Primitive
+**Status:** Complete
+
+**What shipped:**
+- [x] `zenPresence(ref, options)` exported from the runtime as a narrow explicit import surface.
+- [x] Canonical usage is `zenMount((ctx) => ctx.cleanup(presence.mount()))` plus reactive `presence.setPresent(next)`.
+- [x] Presence phases are explicit and stable: `hidden`, `entering`, `present`, `exiting`.
+- [x] Phase completion uses owned `transitionend` / `animationend` listeners with deterministic timeout fallback.
+- [x] Reruns and cleanup cancel pending listeners/timers with no ghost work.
+- [x] Docs/examples explicitly keep the scope narrow: always-mounted nodes only, no fragment retention, no router coupling, no compiler/global keyword expansion.
+
+### Phase 2 Track C — Adapter Target Expansion & SSG
+**Status:** Complete
+
+**What shipped:**
+- [x] New explicit `target: 'static-export'` recognized in config truth, adapter resolution, and canonical docs.
+- [x] `static-export` consumes existing manifest route truth (`render_mode`, `path_kind`, canonical route path) without redefining route meaning inside the adapter.
+- [x] Dynamic prerender routes may declare `export const exportPaths = [...]` as a literal concrete export-path contract.
+- [x] `static-export` fails hard on `render_mode: 'server'` routes.
+- [x] `static-export` fails hard on dynamic prerender routes without explicit `exportPaths`.
+- [x] Final output is rewrite-free and directly serveable by a plain static file server, including base-path-nested public assets and HTML files.
+- [x] Route-check and image endpoint support remain out of scope and unsupported for this target.
+
 ### Phase 2 Track B — Native Asset Pipeline & Image Materialization
 **Status:** Complete (scoped)
 
@@ -60,6 +95,6 @@ Phase 2 is the first feature-forward phase built on top of the locked contracts 
 ## 6. Exit Criteria
 - [x] **Track A:** A single, secure, canonical mutation primitive successfully manages client-to-server form data.
 - [x] **Track B (scoped):** Static `Image` props use compiler-owned `image_materialization` + bundler route transport; optional CLI reinjection for covered cases removed; train `0.7.4` aligns npm compiler packages with `--merge-image-materialization`. Broader exit (all assets / bundler-final HTML) remains **deferred** per Track B non-goals above.
-- [ ] **Track C:** One new explicit deployment target correctly processes SSG/prerender output via verified compilation.
-- [ ] **Track D:** A narrow, predictable transition/presence pattern integrates cleanly into the established DOM deterministic patch loop.
+- [x] **Track C:** One new explicit deployment target correctly processes SSG/prerender output via verified compilation.
+- [x] **Track D:** A narrow, predictable transition/presence pattern integrates cleanly into the established DOM deterministic patch loop.
 - [ ] None of the structural rules, safety bounds, or compiler assumptions guaranteed in Phase 0 and 1 have been bypassed.

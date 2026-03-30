@@ -1,5 +1,6 @@
 export const KNOWN_TARGETS = [
     'static',
+    'static-export',
     'vercel-static',
     'netlify-static',
     'vercel',
@@ -8,7 +9,7 @@ export const KNOWN_TARGETS = [
 ];
 
 /**
- * @typedef {'static' | 'vercel-static' | 'netlify-static' | 'vercel' | 'netlify' | 'node'} ZenithTarget
+ * @typedef {'static' | 'static-export' | 'vercel-static' | 'netlify-static' | 'vercel' | 'netlify' | 'node'} ZenithTarget
  */
 
 /**
@@ -25,7 +26,8 @@ export const KNOWN_TARGETS = [
  *   file: string,
  *   path_kind: ZenithPathKind,
  *   render_mode: ZenithRenderMode,
- *   params: string[]
+ *   params: string[],
+ *   export_paths?: string[]
  * }} RouteManifestEntry
  */
 
@@ -43,6 +45,7 @@ export const KNOWN_TARGETS = [
  *     render_mode: ZenithRenderMode,
  *     requires_hydration: boolean,
  *     params: string[],
+ *     export_paths?: string[],
  *     html: string,
  *     assets: string[]
  *   }>,

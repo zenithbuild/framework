@@ -1,9 +1,9 @@
 ---
 title: "zenEffect vs zenMount"
 description: "When to use zenEffect vs zenMount for side effects and lifecycle."
-version: "0.3"
+version: "0.4"
 status: "canonical"
-last_updated: "2026-02-28"
+last_updated: "2026-03-29"
 tags: ["reactivity", "effects", "mount", "lifecycle"]
 nav:
   order: 11
@@ -80,6 +80,53 @@ zenMount((ctx) => {
   tl.to(el, { opacity: 1 });
   ctx.cleanup(() => tl.kill());
 });
+```
+
+### `zenPresence` for always-mounted node visibility
+
+`zenPresence` is the canonical name. `presence` is an optional convenience alias.
+
+`zenPresence` is a normal runtime import. It is not a compiler-owned built-in:
+
+```ts
+import { zenPresence } from "@zenithbuild/runtime";
+
+const open = signal(false);
+const panelRef = ref<HTMLElement>();
+const presence = zenPresence(panelRef, { timeoutMs: 220 });
+
+zenMount((ctx) => {
+  ctx.cleanup(presence.mount());
+});
+
+zeneffect([open], () => {
+  presence.setPresent(open.get());
+});
+```
+
+Style the phase on the node itself:
+
+```css
+[data-zen-presence="hidden"] { opacity: 0; pointer-events: none; }
+[data-zen-presence="entering"],
+[data-zen-presence="present"] { opacity: 1; transition: opacity 220ms ease; }
+[data-zen-presence="exiting"] { opacity: 0; transition: opacity 220ms ease; }
+```
+
+This helper is intentionally narrow:
+- always-mounted nodes only
+- no fragment retention
+- no route transition shell
+- no GSAP/timeline abstraction
+
+For overlay focus follow-through, keep focus local to explicit refs and use `onPhaseChange` on the presence controller rather than selector scans or tabbable searching.
+
+Optional alias:
+
+```ts
+import { presence } from "@zenithbuild/runtime";
+
+const toastPresence = presence(toastRef, { timeoutMs: 180 });
 ```
 
 ### Resize-driven state (zenResize + state)

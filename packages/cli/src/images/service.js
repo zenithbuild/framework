@@ -252,7 +252,32 @@ function remoteCachePaths(cacheDir, cacheKey) {
     };
 }
 
-export async function handleImageRequest(req, res, options) {
+function createJsonResponse(status, payload) {
+    return new Response(JSON.stringify(payload), {
+        status,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+}
+
+function createBufferResponse(status, contentType, buffer, cacheSeconds) {
+    return new Response(buffer, {
+        status,
+        headers: {
+            'Content-Type': contentType,
+            'Cache-Control': `public, max-age=${cacheSeconds}`
+        }
+    });
+}
+
+async function sendResponse(res, response) {
+    res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+    const body = await response.arrayBuffer();
+    res.end(Buffer.from(body));
+}
+
+async function createImageResponse(options) {
     const {
         requestUrl,
         projectRoot,
@@ -267,14 +292,10 @@ export async function handleImageRequest(req, res, options) {
     const quality = Number.isInteger(requestedQuality) && requestedQuality > 0 ? requestedQuality : config.quality;
 
     if (!remoteUrl) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'missing_url' }));
-        return true;
+        return createJsonResponse(400, { error: 'missing_url' });
     }
     if (!Number.isInteger(width) || width <= 0) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid_width' }));
-        return true;
+        return createJsonResponse(400, { error: 'invalid_width' });
     }
 
     try {
@@ -291,8 +312,7 @@ export async function handleImageRequest(req, res, options) {
             const contentType = typeof parsedMeta?.contentType === 'string'
                 ? parsedMeta.contentType
                 : mimeTypeForFormat(format || 'jpg');
-            sendBuffer(res, 200, contentType, cached, config.minimumCacheTTL);
-            return true;
+            return createBufferResponse(200, contentType, cached, config.minimumCacheTTL);
         }
 
         const response = await fetch(remote, {
@@ -330,14 +350,29 @@ export async function handleImageRequest(req, res, options) {
                 format: targetFormat
             }, null, 2)}\n`, 'utf8')
         ]);
-        sendBuffer(res, 200, mimeTypeForFormat(targetFormat), output, config.minimumCacheTTL);
-        return true;
+        return createBufferResponse(200, mimeTypeForFormat(targetFormat), output, config.minimumCacheTTL);
     } catch (error) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
+        return createJsonResponse(400, {
             error: 'image_request_failed',
             message: error instanceof Error ? error.message : String(error)
-        }));
-        return true;
+        });
     }
+}
+
+/**
+ * @param {Request | { url?: string } | null | undefined} request
+ * @param {{ requestUrl?: URL | string, projectRoot: string, config?: Record<string, unknown> }} options
+ * @returns {Promise<Response>}
+ */
+export async function handleImageFetchRequest(request, options) {
+    return createImageResponse({
+        ...options,
+        requestUrl: request?.url || options?.requestUrl
+    });
+}
+
+export async function handleImageRequest(_req, res, options) {
+    const response = await createImageResponse(options);
+    await sendResponse(res, response);
+    return true;
 }

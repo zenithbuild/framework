@@ -23,6 +23,7 @@ It does not define a public virtual-DOM framework API.
 - **Fine-Grained Reactivity**: signal/state/effect primitives used by emitted code.
 - **Hydration**: deterministic client-side hydration for server-rendered HTML.
 - **Lifecycle Cleanup**: explicit mount/effect cleanup semantics.
+- **Narrow Presence Helper**: canonical `zenPresence(...)` plus optional `presence(...)` alias for ref-owned always-mounted nodes when app code explicitly imports the runtime package.
 
 ## Usage
 This package is installed as an internal framework dependency. App code should normally use the public Zenith surface instead of importing `@zenithbuild/runtime` directly.

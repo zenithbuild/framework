@@ -108,6 +108,20 @@ describe('public contract truth', () => {
         }
     });
 
+    test('server export docs keep exportPaths scoped to the static-export prerender contract', () => {
+        const files = [
+            'docs/documentation/contracts/server-data.md',
+            'docs/documentation/reference/script-server.md',
+            'docs/documentation/reference/server-data-api.md'
+        ];
+
+        for (const rel of files) {
+            const source = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+            expect(source).toMatch(/exportPaths/);
+            expect(source).toMatch(/static-export/);
+        }
+    });
+
     test('runtime and bundler package READMEs do not advertise removed public APIs', () => {
         const runtimeReadme = readFileSync(resolve(REPO_ROOT, 'packages/runtime/README.md'), 'utf8');
         const bundlerReadme = readFileSync(resolve(REPO_ROOT, 'packages/bundler/README.md'), 'utf8');

@@ -1,10 +1,11 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { normalizeBasePath } from './base-path.js';
 import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from './base-path-html.js';
 import { writeBuildOutputManifest } from './build-output-manifest.js';
 import { generateManifest } from './manifest.js';
+import { writeResourceRouteManifest } from './resource-manifest.js';
 import { buildComponentRegistry } from './resolve-components.js';
 import {
     collectAssets,
@@ -13,7 +14,6 @@ import {
 } from './build/compiler-runtime.js';
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
-import { materializeImageMarkupInHtmlFiles } from './images/materialize.js';
 import { buildImageArtifacts } from './images/service.js';
 import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
@@ -62,6 +62,7 @@ export async function build(options) {
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
     const coreOutputDir = join(projectRoot, '.zenith-output');
     const staticOutputDir = join(coreOutputDir, 'static');
+    const imageStageDir = join(coreOutputDir, 'image-materialization-stage');
     const srcDir = resolve(pagesDir, '..');
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
@@ -94,11 +95,12 @@ export async function build(options) {
         'generate_manifest',
         () => generateManifest(pagesDir, '.zen', { compilerOpts })
     );
+    const pageManifest = manifest.filter((entry) => entry?.route_kind !== 'resource');
     if (mode !== 'legacy') {
         adapter.validateRoutes(manifest);
     }
     await startupProfile.measureAsync('ensure_zenith_type_declarations', () => ensureZenithTypeDeclarations({
-        manifest,
+        manifest: pageManifest,
         pagesDir
     }));
     await startupProfile.measureAsync('reset_core_output', () => rm(coreOutputDir, { recursive: true, force: true }));
@@ -113,7 +115,7 @@ export async function build(options) {
     });
 
     const { envelopes, expressionRewriteMetrics } = await buildPageEnvelopes({
-        manifest,
+        manifest: pageManifest,
         pagesDir,
         srcDir,
         registry,
@@ -125,6 +127,21 @@ export async function build(options) {
         emitCompilerWarning
     });
 
+    const { manifest: imageManifest } = await startupProfile.measureAsync(
+        'build_image_artifacts',
+        () => buildImageArtifacts({
+            projectRoot,
+            outDir: imageStageDir,
+            config: config.images
+        })
+    );
+    const imageRuntimePayload = createImageRuntimePayload(
+        config.images,
+        imageManifest,
+        'passthrough',
+        basePath
+    );
+
     if (envelopes.length > 0) {
         await startupProfile.measureAsync(
             'run_bundler',
@@ -135,7 +152,11 @@ export async function build(options) {
                 logger,
                 showBundlerInfo,
                 bundlerBin,
-                { basePath, routeCheck: routeCheckEnabled }
+                {
+                    basePath,
+                    routeCheck: routeCheckEnabled,
+                    imageRuntimePayload
+                }
             ),
             { envelopes: envelopes.length }
         );
@@ -146,30 +167,24 @@ export async function build(options) {
         );
     }
     await startupProfile.measureAsync(
+        'write_resource_manifest',
+        () => writeResourceRouteManifest(staticOutputDir, manifest, basePath)
+    );
+    await startupProfile.measureAsync(
         'rewrite_soft_navigation_base_path',
         () => rewriteSoftNavigationHrefBasePathInHtmlFiles(staticOutputDir, basePath)
     );
-
-    const { manifest: imageManifest } = await startupProfile.measureAsync(
-        'build_image_artifacts',
-        () => buildImageArtifacts({
-            projectRoot,
-            outDir: staticOutputDir,
-            config: config.images
-        })
-    );
-    const imageRuntimePayload = createImageRuntimePayload(
-        config.images,
-        imageManifest,
-        'passthrough',
-        basePath
-    );
     await startupProfile.measureAsync(
-        'materialize_image_markup',
-        () => materializeImageMarkupInHtmlFiles({
-            distDir: staticOutputDir,
-            payload: imageRuntimePayload
-        })
+        'stage_image_artifacts_into_static_output',
+        async () => {
+            if (Object.keys(imageManifest).length === 0) {
+                return;
+            }
+            await cp(join(imageStageDir, '_zenith'), join(staticOutputDir, '_zenith'), {
+                recursive: true,
+                force: true
+            });
+        }
     );
     await startupProfile.measureAsync(
         'inject_image_runtime_payload',
@@ -182,7 +197,7 @@ export async function build(options) {
             coreOutputDir,
             staticDir: staticOutputDir,
             target,
-            routeManifest: manifest,
+            routeManifest: pageManifest,
             basePath
         })
     );
@@ -202,11 +217,11 @@ export async function build(options) {
     );
     const assets = await startupProfile.measureAsync('collect_assets', () => collectAssets(outDir));
     startupProfile.emit('build_complete', {
-        pages: manifest.length,
+        pages: pageManifest.length,
         assets: assets.length,
         target,
         compilerTotals,
         expressionRewriteMetrics
     });
-    return { pages: manifest.length, assets };
+    return { pages: pageManifest.length, assets };
 }

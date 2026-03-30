@@ -53,8 +53,8 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 - `basePath` defaults to `/`.
 - Canonical route paths stay base-path free in manifests and route classification.
-- Public app URLs, bundled asset URLs, router URLs, `/_zenith/image`, and `/__zenith/route-check` are prefixed with `basePath`.
-- Static emitted files stay adapter-neutral; adapters map the public base path to those canonical outputs.
+- Public app URLs, bundled asset URLs, router URLs, and any framework endpoints exposed by the selected target are prefixed with `basePath`.
+- Canonical `.zenith-output` files stay adapter-neutral; final adapter output may still nest public files under `basePath` when direct-file serving requires it.
 
 `router` behavior:
 
@@ -66,6 +66,7 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 - `target` is the shorthand deployment target. Phase 1 defaults loaded config to `target: 'static'`.
 - `adapter` is the explicit adapter object form and is mutually exclusive with `target`.
+- `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes.
 - `vercel-static` emits a Vercel Build Output API layout rooted at `outDir`.
 - `netlify-static` emits a Netlify publish directory rooted at `outDir`, including generated `_redirects` rewrites for dynamic prerendered routes.
 - `vercel` emits a Vercel Build Output API layout with packaged route functions for server-classified routes and static rewrites for prerendered dynamic routes.
@@ -81,8 +82,9 @@ Server-capable target contract:
 Current limitations:
 
 - There is no separate `assetPrefix` knob. Assets intentionally follow `basePath`.
+- `static-export` does not expose deployed `/_zenith/image` or `/__zenith/route-check` endpoints. A plain static file server is the contract.
 - `vercel` and `netlify` do not yet emit a deployed `/_zenith/image` endpoint. The `node` target does.
-- Image materialization is route-artifact-driven. Build, preview, and server render consume structured `image_materialization` metadata instead of executing page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
+- Image materialization is route-artifact-driven. Bundler owns final build/static HTML image materialization, while preview and server render still materialize at runtime from structured `image_materialization` metadata. No path executes page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
 - There is no shipped plugin install/remove command surface in this CLI.
 
 ## Commands

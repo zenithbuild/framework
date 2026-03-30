@@ -40,6 +40,14 @@
       "route": "/__docs-demo/form-validation",
       "height": 460,
       "contracts": ["ZEN-RULE-001", "ZEN-RULE-023"]
+    },
+    {
+      "id": "navigation-shell",
+      "name": "NavigationShell",
+      "source": "demos/NavigationShell.zen",
+      "route": "/__docs-demo/navigation-shell",
+      "height": 360,
+      "contracts": ["ZEN-RULE-109"]
     }
   ]
 }

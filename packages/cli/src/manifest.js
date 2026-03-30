@@ -19,15 +19,24 @@ import { readFileSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join, relative, sep, basename, extname, dirname } from 'node:path';
 import { extractServerScript } from './build/server-script.js';
+import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
+import { validateStaticExportPaths } from './static-export-paths.js';
 
 /**
  * @typedef {{
  *   path: string,
  *   file: string,
+ *   route_kind?: 'page' | 'resource',
  *   path_kind: 'static' | 'dynamic',
  *   render_mode: 'prerender' | 'server',
- *   params: string[]
+ *   params: string[],
+ *   server_script?: string,
+ *   server_script_path?: string,
+ *   has_guard?: boolean,
+ *   has_load?: boolean,
+ *   has_action?: boolean,
+ *   export_paths?: string[]
  * }} ManifestEntry
  */
 
@@ -83,19 +92,21 @@ async function _scanDir(dir, root, ext, compilerOpts) {
             entries.push(...nested);
         } else if (item.endsWith(ext)) {
             const routePath = _fileToRoute(fullPath, root, ext);
-            entries.push(buildManifestEntry({
+            entries.push(buildPageManifestEntry({
                 fullPath,
                 root,
                 routePath,
                 compilerOpts
             }));
+        } else if (isResourceRouteFile(item)) {
+            entries.push(analyzeResourceRouteModule(fullPath, root));
         }
     }
 
     return entries;
 }
 
-function buildManifestEntry({ fullPath, root, routePath, compilerOpts }) {
+function buildPageManifestEntry({ fullPath, root, routePath, compilerOpts }) {
     const rawSource = readFileSync(fullPath, 'utf8');
     const inlineServerScript = extractServerScript(rawSource, fullPath, compilerOpts).serverScript;
     const { guardPath, loadPath, actionPath } = resolveAdjacentServerModules(fullPath);
@@ -107,12 +118,18 @@ function buildManifestEntry({ fullPath, root, routePath, compilerOpts }) {
         adjacentActionPath: actionPath
     });
 
+    const exportPaths = Array.isArray(composed.serverScript?.export_paths)
+        ? validateStaticExportPaths(routePath, composed.serverScript.export_paths, fullPath)
+        : [];
+
     return {
         path: routePath,
         file: relative(root, fullPath),
+        route_kind: 'page',
         path_kind: _isDynamic(routePath) ? 'dynamic' : 'static',
         render_mode: composed.serverScript && composed.serverScript.prerender !== true ? 'server' : 'prerender',
-        params: extractRouteParams(routePath)
+        params: extractRouteParams(routePath),
+        ...(exportPaths.length > 0 ? { export_paths: exportPaths } : {})
     };
 }
 
@@ -361,7 +378,9 @@ function segmentWeight(segment) {
  * @returns {string}
  */
 export function serializeManifest(entries) {
-    const lines = entries.map((e) => {
+    const lines = entries
+        .filter((entry) => entry?.route_kind !== 'resource')
+        .map((e) => {
         const hasParams = _isDynamic(e.path);
         const loader = hasParams
             ? `(params) => import('./pages/${e.file}')`

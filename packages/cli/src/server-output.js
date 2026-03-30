@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadResourceRouteManifest } from './resource-manifest.js';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const RELATIVE_SPECIFIER_RE = /((?:import|export)\s+(?:[^'"]*?\s+from\s+)?|import\s*\()\s*(['"])([^'"]+)\2/g;
@@ -14,6 +15,10 @@ const SERVER_RUNTIME_FILES = [
     {
         from: new URL('./server-contract.js', import.meta.url),
         to: 'server-contract.js'
+    },
+    {
+        from: new URL('./auth/route-auth.js', import.meta.url),
+        to: 'auth/route-auth.js'
     },
     {
         from: new URL('./base-path.js', import.meta.url),
@@ -36,10 +41,26 @@ const SERVER_RUNTIME_FILES = [
         to: 'images/runtime.js'
     },
     {
+        from: new URL('./images/service.js', import.meta.url),
+        to: 'images/service.js'
+    },
+    {
         from: new URL('./server-error.js', import.meta.url),
         to: 'server-error.js'
+    },
+    {
+        from: new URL('./resource-response.js', import.meta.url),
+        to: 'resource-response.js'
+    },
+    {
+        from: new URL('./download-result.js', import.meta.url),
+        to: 'download-result.js'
     }
 ];
+const SPECIAL_SERVER_SPECIFIERS = new Map([
+    ['zenith:server-contract', 'server-contract.js'],
+    ['zenith:route-auth', 'auth/route-auth.js']
+]);
 
 function normalizeRouteName(routePath) {
     if (routePath === '/') {
@@ -173,6 +194,7 @@ function outputPathForSource(projectRoot, modulesRoot, sourcePath) {
 async function compileImportedModule({
     projectRoot,
     modulesRoot,
+    serverDir,
     sourcePath,
     ts,
     seen
@@ -193,6 +215,16 @@ async function compileImportedModule({
     const source = await readFile(sourcePath, 'utf8');
     let output = transpileSource(ts, source, sourcePath);
     for (const specifier of gatherSpecifiers(output)) {
+        const specialSpecifierPath = SPECIAL_SERVER_SPECIFIERS.get(specifier);
+        if (specialSpecifierPath) {
+            const nextSpecifier = relative(dirname(outPath), join(serverDir, specialSpecifierPath)).replaceAll('\\', '/');
+            output = replaceSpecifier(
+                output,
+                specifier,
+                nextSpecifier.startsWith('.') ? nextSpecifier : `./${nextSpecifier}`
+            );
+            continue;
+        }
         if (!isRelativeSpecifier(specifier)) {
             continue;
         }
@@ -203,6 +235,7 @@ async function compileImportedModule({
         const compiledDependencyPath = await compileImportedModule({
             projectRoot,
             modulesRoot,
+            serverDir,
             sourcePath: resolvedPath,
             ts,
             seen
@@ -221,6 +254,7 @@ async function compileImportedModule({
 
 async function writeRouteModulePackage({
     projectRoot,
+    serverDir,
     routeDir,
     route
 }) {
@@ -230,6 +264,16 @@ async function writeRouteModulePackage({
     let entryOutput = transpileSource(ts, route.server_script || '', route.server_script_path || 'route-entry.ts');
 
     for (const specifier of gatherSpecifiers(entryOutput)) {
+        const specialSpecifierPath = SPECIAL_SERVER_SPECIFIERS.get(specifier);
+        if (specialSpecifierPath) {
+            const nextSpecifier = relative(join(routeDir, 'route'), join(serverDir, specialSpecifierPath)).replaceAll('\\', '/');
+            entryOutput = replaceSpecifier(
+                entryOutput,
+                specifier,
+                nextSpecifier.startsWith('.') ? nextSpecifier : `./${nextSpecifier}`
+            );
+            continue;
+        }
         if (!isRelativeSpecifier(specifier)) {
             continue;
         }
@@ -240,6 +284,7 @@ async function writeRouteModulePackage({
         const compiledDependencyPath = await compileImportedModule({
             projectRoot,
             modulesRoot,
+            serverDir,
             sourcePath: resolvedPath,
             ts,
             seen
@@ -286,9 +331,18 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
     } catch {
         routerManifest = { routes: [] };
     }
+    const resourceManifest = await loadResourceRouteManifest(staticDir, basePath);
 
-    const routes = Array.isArray(routerManifest.routes) ? routerManifest.routes : [];
-    const serverRoutes = routes.filter((route) => route.server_script && route.prerender !== true);
+    const pageRoutes = Array.isArray(routerManifest.routes) ? routerManifest.routes : [];
+    const serverRoutes = pageRoutes
+        .filter((route) => route.server_script && route.prerender !== true)
+        .map((route) => ({ ...route, route_kind: 'page' }))
+        .concat(
+            (Array.isArray(resourceManifest.routes) ? resourceManifest.routes : []).map((route) => ({
+                ...route,
+                route_kind: 'resource'
+            }))
+        );
 
     await mkdir(serverDir, { recursive: true });
     await copyRuntimeFiles(serverDir);
@@ -301,8 +355,10 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
         const routeDir = join(serverDir, 'routes', name);
         await mkdir(routeDir, { recursive: true });
 
-        const htmlSourcePath = join(staticDir, String(route.output || '').replace(/^\//, ''));
-        await copyOptionalFile(htmlSourcePath, join(routeDir, 'route', 'page.html'));
+        if (route.route_kind !== 'resource') {
+            const htmlSourcePath = join(staticDir, String(route.output || '').replace(/^\//, ''));
+            await copyOptionalFile(htmlSourcePath, join(routeDir, 'route', 'page.html'));
+        }
 
         let pageAssetFile = null;
         if (typeof route.page_asset === 'string' && route.page_asset.length > 0) {
@@ -314,12 +370,13 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
         }
 
         let imageManifestFile = null;
-        if (await copyOptionalFile(imageManifestSource, join(routeDir, 'route', 'image-manifest.json'))) {
+        if (route.route_kind !== 'resource' && await copyOptionalFile(imageManifestSource, join(routeDir, 'route', 'image-manifest.json'))) {
             imageManifestFile = 'image-manifest.json';
         }
 
         await writeRouteModulePackage({
             projectRoot,
+            serverDir,
             routeDir,
             route
         });
@@ -327,7 +384,8 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
         const meta = {
             name,
             path: route.path,
-            output: route.output,
+            route_kind: route.route_kind || 'page',
+            output: route.output || null,
             base_path: basePath,
             page_asset: route.page_asset || null,
             page_asset_file: pageAssetFile,
@@ -339,11 +397,13 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
             has_guard: route.has_guard === true,
             has_load: route.has_load === true,
             has_action: route.has_action === true,
-            params: extractRouteParams(route.path),
-            image_manifest_file: imageManifestFile,
+            params: Array.isArray(route.params) && route.params.length > 0
+                ? [...route.params]
+                : extractRouteParams(route.path),
+            image_manifest_file: route.route_kind === 'resource' ? null : imageManifestFile,
             image_config: config?.images || {}
         };
-        if (Array.isArray(route.image_materialization) && route.image_materialization.length > 0) {
+        if (route.route_kind !== 'resource' && Array.isArray(route.image_materialization) && route.image_materialization.length > 0) {
             meta.image_materialization = route.image_materialization;
         }
         await writeFile(join(routeDir, 'route.json'), `${JSON.stringify(meta, null, 2)}\n`, 'utf8');

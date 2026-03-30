@@ -190,7 +190,7 @@ export function createTimedCompilerRunner(startupProfile, compilerTotals) {
  * @param {object | null} [logger]
  * @param {boolean} [showInfo]
  * @param {string|object} [bundlerBin]
- * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string, basePath?: string, routeCheck?: boolean }} [bundlerOptions]
+ * @param {{ devStableAssets?: boolean, rebuildStrategy?: 'full'|'bundle-only'|'page-only', changedRoutes?: string[], fastPath?: boolean, globalGraphHash?: string, basePath?: string, routeCheck?: boolean, imageRuntimePayload?: object }} [bundlerOptions]
  * @returns {Promise<void>}
  */
 
@@ -329,7 +329,13 @@ export function runBundler(
             rejectPromise(new Error(`Bundler failed with exit code ${code}`));
         });
 
-        child.stdin.write(JSON.stringify(envelope));
+        const bundlerPayload = bundlerOptions.imageRuntimePayload
+            ? {
+                inputs: Array.isArray(envelope) ? envelope : [envelope],
+                image_runtime_payload: bundlerOptions.imageRuntimePayload
+            }
+            : envelope;
+        child.stdin.write(JSON.stringify(bundlerPayload));
         child.stdin.end();
     });
 }

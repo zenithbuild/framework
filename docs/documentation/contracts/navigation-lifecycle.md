@@ -1,9 +1,9 @@
 ---
 title: "Navigation Lifecycle Contract"
 description: "Canonical Phase 2 navigation lifecycle: deterministic client-side orchestration points layered on top of server-authoritative routing truth."
-version: "0.5"
+version: "0.6"
 status: "canonical"
-last_updated: "2026-03-12"
+last_updated: "2026-03-30"
 tags: ["navigation", "routing", "lifecycle", "contracts"]
 ---
 
@@ -19,6 +19,7 @@ Non-negotiable rules:
 - Pathname selects route identity. Query affects server data. Hash is post-commit scroll behavior.
 - Redirects, denies, 404s, non-HTML responses, and runtime failures remain server-authoritative outcomes.
 - Lifecycle hooks do not cancel or rewrite those outcomes.
+- `refreshCurrentRoute()` reuses this same lifecycle for the current matched page route only; it does not introduce a second refresh protocol.
 
 ## Lifecycle Order
 
@@ -29,7 +30,7 @@ Successful client-managed navigation order:
 4. `navigation:before-leave`
 5. `navigation:leave-complete`
 6. `navigation:before-swap`
-7. history commit (`pushState` for forward soft nav, `replaceState` bookkeeping for popstate)
+7. history commit (`pushState` for forward soft nav, `replaceState` bookkeeping for popstate, no new history write for `refreshCurrentRoute()`)
 8. DOM/module mount
 9. `navigation:content-swapped`
 10. `zx-router-scroll` phase `apply`
@@ -42,6 +43,12 @@ Failure order:
 - Any navigation that emitted `navigation:request` and later stops being client-managed emits `navigation:abort`.
 - Unexpected runtime or hook errors emit `navigation:error`.
 - `navigation:error` does not reinterpret redirect/deny/404 behavior; browser fallback still follows the Phase 1 contract.
+
+Explicit refresh note:
+- `refreshCurrentRoute()` is manual and router-owned.
+- It is the intended bridge after a resource write or resource-route auth change when the current page needs fresh HTML route truth.
+- It fails explicitly when there is no current matched Zenith page route.
+- Resource responses still do not auto-refresh pages.
 
 ## Hook Semantics
 
@@ -114,7 +121,7 @@ Failure order:
 
 All Phase 2 lifecycle hooks receive a payload with:
 - `navigationId`
-- `navigationType` (`"push"` or `"pop"`)
+- `navigationType` (`"push"`, `"pop"`, or `"refresh"`)
 - `to`
 - `from`
 - `routeId`
@@ -139,6 +146,7 @@ Rules:
 
 Allowed:
 - Visual orchestration layered on top of `before-leave`, `before-swap`, `content-swapped`, `before-enter`, and `enter-complete`
+- A tiny shell utility such as `zenNavigationShell(...)` that maps those lifecycle steps into visual shell state only
 - Prototype-scoped soft navigation surfaces such as a dedicated transition rail
 - Cleanup through `navigation:abort` and `navigation:error`
 - Route-entry rollout steps that explicitly exclude deeper hash-target variants until separately proven

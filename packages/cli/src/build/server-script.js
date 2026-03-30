@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { findNextKnownComponentTag } from '../component-tag-parser.js';
+import { extractStaticExportPaths } from '../static-export-paths.js';
 
 /**
  * @param {string} source
  * @param {string} sourceFile
  * @param {object} [compilerOpts]
- * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string } | null }}
+ * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string, export_paths?: string[] } | null }}
  */
 export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
@@ -209,6 +210,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         }
         prerender = rawValue.startsWith('true');
     }
+    const exportPaths = extractStaticExportPaths(serverSource, sourceFile) || [];
 
     const start = match.index ?? -1;
     if (start < 0) {
@@ -220,7 +222,8 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
                 has_guard: hasGuard,
                 has_load: hasLoad,
                 has_action: hasAction,
-                source_path: sourceFile
+                source_path: sourceFile,
+                export_paths: exportPaths
             }
         };
     }
@@ -235,7 +238,8 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
             has_guard: hasGuard,
             has_load: hasLoad,
             has_action: hasAction,
-            source_path: sourceFile
+            source_path: sourceFile,
+            export_paths: exportPaths
         }
     };
 }

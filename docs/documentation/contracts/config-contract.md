@@ -1,9 +1,9 @@
 ---
 title: "Config Contract"
 description: "Formal definition of the definitive Zenith configuration contract."
-version: "0.3"
+version: "0.4"
 status: "canonical"
-last_updated: "2026-03-27"
+last_updated: "2026-03-29"
 tags: ["contracts", "config", "schema"]
 ---
 
@@ -26,7 +26,7 @@ Any unknown key present in a configuration file explicitly fails fast with a val
 | `outDir` | `string` | `'dist'` | Directory where build output is written. |
 | `pagesDir` | `string` | `'pages'` | Directory containing routing endpoints (`.zen` / `.md`). |
 | `basePath` | `string` | `'/'` | The prefix applied to all framework URLs and assets. |
-| `target` | `string` | `'static'` | Standard deployment mode (`static`, `node`, `vercel`, `netlify`, `vercel-static`, `netlify-static`). |
+| `target` | `string` | `'static'` | Standard deployment mode (`static`, `static-export`, `node`, `vercel`, `netlify`, `vercel-static`, `netlify-static`). |
 | `adapter` | `object` | `null` | **[Advanced]** Provide a custom deployment adapter. Mutually exclusive with `target`. |
 | `strictDomLints` | `boolean` | `false` | Promotes Zenith DOM AST warnings into fatal compilation errors. |
 | `images` | `object` | *See Source* | Explicit image generation, format, caching, and layout constraints. |

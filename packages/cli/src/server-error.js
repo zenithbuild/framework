@@ -2,6 +2,7 @@ export function defaultRouteDenyMessage(status) {
     if (status === 401) return 'Unauthorized';
     if (status === 403) return 'Forbidden';
     if (status === 404) return 'Not Found';
+    if (status === 405) return 'Method Not Allowed';
     return 'Internal Server Error';
 }
 

@@ -171,6 +171,7 @@ export { signal }      // Create reactive signal
 export { state }       // Create deep reactive state proxy
 export { zeneffect }   // Canonical reactive effect subscription
 export { zenMount }    // Canonical component bootstrap lifecycle hook
+export { zenPresence } // Explicit import for ref-owned always-mounted node presence
 export { zenWindow }   // Canonical SSR-safe global window access
 export { zenDocument } // Canonical SSR-safe global document access
 export { hydrate }     // Mount page module into container
@@ -182,9 +183,16 @@ For developer convenience, the runtime also exports optional, standard-named ali
 ```js
 export { effect }      // Alias for zeneffect
 export { mount }       // Alias for zenMount
+export { presence }    // Alias for zenPresence
 export { window }      // Alias for zenWindow
 export { document }    // Alias for zenDocument
 ```
+
+`zenPresence` is the canonical presence helper name. `presence` is an optional convenience alias only.
+
+`zenPresence` is intentionally not a compiler-owned implicit global. It is a narrow runtime import used with `zenMount(...)` + `zeneffect(...)` for always-mounted nodes only.
+
+Its options may include narrow node-local coordination such as `onPhaseChange`, but it does not widen into fragment retention, focus trapping, or a generalized accessibility framework.
 
 ---
 

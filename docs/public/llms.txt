@@ -34,6 +34,8 @@ Start here (ordered):
   - /docs/reactivity/reactivity-model
   - /docs/reactivity/effects-vs-mount
   - /docs/reactivity/dom-and-environment
+  - /docs/reactivity/presence
+  - /docs/reactivity/overlay-sheet-pattern
   - /docs/reactivity/controlled-uncontrolled-components
 - Guides:
   - /docs/guides/using-ai-with-zenith
@@ -56,6 +58,7 @@ Start here (ordered):
   - /docs/cli-contract
   - /docs/install-compatibility
 - Routing:
+  - /docs/routing/navigation-shell
   - /docs/routing/route-protection
 
 Machine-readable:

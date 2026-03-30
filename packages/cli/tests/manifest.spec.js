@@ -20,7 +20,10 @@ async function createPages(files) {
     for (const file of files) {
         const fullPath = join(root, file);
         await mkdir(join(fullPath, '..'), { recursive: true });
-        await writeFile(fullPath, `<!-- ${file} -->`);
+        const contents = file.includes('.resource.')
+            ? 'export async function load(ctx) { return ctx.text("ok"); }\n'
+            : `<!-- ${file} -->`;
+        await writeFile(fullPath, contents);
     }
 
     return root;
@@ -51,6 +54,23 @@ describe('generateManifest', () => {
 
         expect(manifest).toHaveLength(1);
         expect(manifest[0].path).toBe('/about');
+    });
+
+    test('resource routes map to explicit non-page paths', async () => {
+        pagesDir = await createPages([
+            'api/ping.resource.ts',
+            'settings/page.resource.ts'
+        ]);
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => ({
+            path: entry.path,
+            file: entry.file,
+            route_kind: entry.route_kind
+        }))).toEqual([
+            { path: '/api/ping', file: 'api/ping.resource.ts', route_kind: 'resource' },
+            { path: '/settings', file: 'settings/page.resource.ts', route_kind: 'resource' }
+        ]);
     });
 
     test('nested static pages', async () => {
@@ -193,6 +213,15 @@ describe('generateManifest', () => {
         pagesDir = await createPages([
             'docs.zen',
             'docs/index.zen'
+        ]);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Duplicate route path');
+    });
+
+    test('rejects page and resource routes that claim the same URL', async () => {
+        pagesDir = await createPages([
+            'account.zen',
+            'account.resource.ts'
         ]);
 
         await expect(generateManifest(pagesDir)).rejects.toThrow('Duplicate route path');

@@ -72,6 +72,7 @@ Canonical semantics:
 Phase 3 may add a transition shell on top of the lifecycle only when all of these remain true:
 - the shell is visual-only
 - the shell listens to lifecycle hooks instead of replacing them
+- a tiny utility such as `zenNavigationShell(...)` stays subordinate to `on(...)` / `off(...)` and does not introduce new router authority
 - `before-leave`, `before-swap`, and `before-enter` stay the only awaited visual barriers
 - `abort` and `error` always restore a clean shell state
 - soft navigation stays explicit opt-in at the link surface

@@ -1,4 +1,4 @@
-const ROUTE_CHECK_UNSUPPORTED_TARGETS = new Set(['vercel', 'netlify']);
+const ROUTE_CHECK_UNSUPPORTED_TARGETS = new Set(['vercel', 'netlify', 'static-export']);
 
 export function supportsTargetRouteCheck(target) {
     return !ROUTE_CHECK_UNSUPPORTED_TARGETS.has(String(target || '').trim());

@@ -16,6 +16,7 @@ describe('runtime API lock', () => {
             'effect',
             'hydrate',
             'mount',
+            'presence',
             'signal',
             'state',
             'window',
@@ -23,6 +24,7 @@ describe('runtime API lock', () => {
             'zenEffect',
             'zenMount',
             'zenOn',
+            'zenPresence',
             'zenResize',
             'zenWindow',
             'zeneffect'

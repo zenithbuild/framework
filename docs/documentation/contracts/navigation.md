@@ -1,9 +1,9 @@
 ---
 title: "Navigation Contract"
 description: "Phase 2 client-navigation contract: hard-navigation default, anchor-only opt-in soft nav, server-authoritative document fetch semantics, and deterministic lifecycle timing."
-version: "0.5"
+version: "0.6"
 status: "canonical"
-last_updated: "2026-03-12"
+last_updated: "2026-03-30"
 tags: ["navigation", "routing", "contracts"]
 ---
 
@@ -49,6 +49,26 @@ Lifecycle note:
 - Those hooks describe the existing commit pipeline; they do not invent alternate route outcomes.
 - Canonical semantics live in [Navigation Lifecycle Contract](./navigation-lifecycle.md).
 
+## Contract: Explicit Current-Route Refresh
+
+Contract: `refreshCurrentRoute()` is Zenith's one explicit freshness bridge after a non-HTML route interaction needs fresh page-route truth.
+
+Invariant: page-route HTML flows are already automatically fresh. Page `action(ctx)` already reruns `guard(ctx)` / `load(ctx)` through the normal HTML route boundary. Resource routes remain explicit direct requests and do not automatically refresh the current page.
+
+Rules:
+- `refreshCurrentRoute()` re-fetches the current matched Zenith page route as fresh HTML.
+- It reruns `guard(ctx)` and `load(ctx)` through the same page-route boundary used by soft navigation.
+- It reuses the existing client-navigation commit path and lifecycle.
+- It does not push a new history entry.
+- It preserves existing redirect and deny fallback behavior.
+- It accepts no path arguments, tags, or arbitrary options.
+
+Banned:
+- Tag invalidation.
+- Path invalidation lists.
+- Automatic page refresh after resource responses.
+- Background polling, cache, or query-client semantics.
+
 ## Contract: History, Scroll, Focus, and Hash
 
 Contract: once a soft navigation is allowed to commit, the router owns History API writes and deterministic post-commit scroll/focus behavior.
@@ -57,9 +77,11 @@ Rules:
 - Successful forward soft navigation uses `history.pushState(...)`.
 - Initial entry seeding and popstate bookkeeping use `history.replaceState(...)`.
 - Browser back/forward uses `popstate`; the router never fabricates extra entries for it.
+- `refreshCurrentRoute()` reuses the current history entry and does not push or replace a new one.
 - Hash-only same-document links are not intercepted.
 - Forward soft navigation scrolls to top unless a hash target exists.
 - Popstate restores saved scroll unless a hash target exists.
+- Explicit current-route refresh preserves the current scroll position unless a hash target exists.
 - Focus moves to the hash target when present, otherwise to `<main>` or `#app` when available.
 - `navigation:content-swapped` fires before post-commit scroll/focus are applied.
 - `navigation:before-enter` fires after scroll/focus resolution but before smooth-scroll resume.

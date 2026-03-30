@@ -5,15 +5,15 @@
 import { push, replace, listen, current } from '../src/history.js';
 
 describe('History Layer', () => {
-    test('push updates pathname', () => {
+    test('push updates the source-router current path', () => {
         push('/about');
-        expect(window.location.pathname).toBe('/about');
+        expect(current()).toBe('/about');
     });
 
-    test('replace updates pathname without new entry', () => {
+    test('replace updates the source-router current path without a new entry', () => {
         push('/first');
         replace('/replaced');
-        expect(window.location.pathname).toBe('/replaced');
+        expect(current()).toBe('/replaced');
     });
 
     test('current returns pathname', () => {

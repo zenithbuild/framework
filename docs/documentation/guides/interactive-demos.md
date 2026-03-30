@@ -35,3 +35,8 @@ These demos are sourced from `docs/demos/*.zen`, compiled in CI, and rendered th
 
 :::demo id="form-validation"
 :::
+
+## Navigation Shell
+
+:::demo id="navigation-shell"
+:::

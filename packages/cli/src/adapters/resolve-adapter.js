@@ -2,6 +2,7 @@ import { isConfigKeyExplicit, isLoadedConfig } from '../config.js';
 import { netlifyAdapter } from './adapter-netlify.js';
 import { nodeAdapter } from './adapter-node.js';
 import { netlifyStaticAdapter } from './adapter-netlify-static.js';
+import { staticExportAdapter } from './adapter-static-export.js';
 import { staticAdapter } from './adapter-static.js';
 import { KNOWN_TARGETS } from './adapter-types.js';
 import { vercelAdapter } from './adapter-vercel.js';
@@ -34,6 +35,9 @@ function validateAdapterShape(adapter) {
 function resolveTargetAdapter(target) {
     if (target === 'static') {
         return staticAdapter;
+    }
+    if (target === 'static-export') {
+        return staticExportAdapter;
     }
     if (target === 'vercel-static') {
         return vercelStaticAdapter;

@@ -13,10 +13,15 @@ use zenith_bundler::CompilerOutput;
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
+mod image_materialization;
 mod output_mode;
 mod page_runtime;
 mod template_bridge;
 mod vendor;
+
+use image_materialization::{
+    materialize_image_markup_in_build_html, ImageMaterializationEntry, ImageRuntimePayload,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,6 +33,14 @@ struct BundlerInput {
     image_materialization: Vec<ImageMaterializationEntry>,
     #[serde(default)]
     router: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BundlerBatchInput {
+    inputs: Vec<BundlerInput>,
+    #[serde(default)]
+    image_runtime_payload: Option<ImageRuntimePayload>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -281,13 +294,6 @@ struct RouterRouteEntry {
     image_materialization: Vec<ImageMaterializationEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ImageMaterializationEntry {
-    selector: String,
-    props: serde_json::Value,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum MarkerKind {
@@ -385,13 +391,26 @@ fn run() -> Result<(), String> {
 
     // 1. Parse Batch Input
     // Supports both single object (legacy/test) and array (batch)
-    let inputs: Vec<BundlerInput> = if stdin_payload.trim().starts_with('[') {
-        serde_json::from_str(&stdin_payload).map_err(|e| format!("invalid batch JSON: {e}"))?
-    } else {
-        let single: BundlerInput =
-            serde_json::from_str(&stdin_payload).map_err(|e| format!("invalid input JSON: {e}"))?;
-        vec![single]
-    };
+    let (inputs, image_runtime_payload): (Vec<BundlerInput>, Option<ImageRuntimePayload>) =
+        if stdin_payload.trim().starts_with('[') {
+            (
+                serde_json::from_str(&stdin_payload)
+                    .map_err(|e| format!("invalid batch JSON: {e}"))?,
+                None,
+            )
+        } else {
+            let parsed: serde_json::Value = serde_json::from_str(&stdin_payload)
+                .map_err(|e| format!("invalid input JSON: {e}"))?;
+            if parsed.get("inputs").is_some() {
+                let batch: BundlerBatchInput = serde_json::from_value(parsed)
+                    .map_err(|e| format!("invalid structured batch JSON: {e}"))?;
+                (batch.inputs, batch.image_runtime_payload)
+            } else {
+                let single: BundlerInput = serde_json::from_value(parsed)
+                    .map_err(|e| format!("invalid input JSON: {e}"))?;
+                (vec![single], None)
+            }
+        };
 
     if inputs.is_empty() {
         return Ok(());
@@ -929,6 +948,13 @@ fn run() -> Result<(), String> {
                 route, stylesheet_link_count
             ));
         }
+
+        html = materialize_image_markup_in_build_html(
+            &html,
+            image_runtime_payload.as_ref(),
+            &_image_materialization,
+        )
+        .map_err(|error| format!("route '{route}' failed image materialization: {error}"))?;
 
         // Output HTML
         let html_rel = route_to_output_path(&route);
@@ -1986,7 +2012,7 @@ await mod.link((specifier) => {
 });
 await mod.evaluate();
 const namespaceKeys = Object.keys(mod.namespace).filter((key) => key !== 'default');
-const allowed = new Set(['data', 'load', 'ssr_data', 'props', 'ssr', 'prerender']);
+const allowed = new Set(['data', 'load', 'ssr_data', 'props', 'ssr', 'prerender', 'exportPaths']);
 for (const key of namespaceKeys) {
   if (!allowed.has(key)) {
     throw new Error(`[zenith-bundler] unsupported server export '${key}'`);

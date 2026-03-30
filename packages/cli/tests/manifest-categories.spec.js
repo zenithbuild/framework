@@ -58,11 +58,12 @@ describe('manifest categories', () => {
         });
     });
 
-    test('prerender=true keeps inline server routes in prerender mode', async () => {
+    test('prerender=true keeps inline server routes in prerender mode and preserves exportPaths', async () => {
         pagesDir = await createPages({
             'docs/[slug].zen': [
                 '<script server lang="ts">',
                 'export const prerender = true;',
+                'export const exportPaths = ["/docs/guide", "/docs/api"];',
                 'export const data = { section: "docs" };',
                 '</script>',
                 '<main>{params.slug}</main>'
@@ -75,7 +76,8 @@ describe('manifest categories', () => {
             path: '/docs/:slug',
             path_kind: 'dynamic',
             render_mode: 'prerender',
-            params: ['slug']
+            params: ['slug'],
+            export_paths: ['/docs/guide', '/docs/api']
         });
     });
 

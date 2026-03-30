@@ -122,6 +122,7 @@ describe("build manifest contract", () => {
           path_kind: "dynamic",
           render_mode: "prerender",
           params: ["slug"],
+          export_paths: ["/docs/guide", "/docs/api"],
         },
       ],
     });
@@ -178,6 +179,10 @@ describe("build manifest contract", () => {
          {
            "assets": [
              "/docs/assets/docs_slug.contract.js",
+           ],
+           "export_paths": [
+             "/docs/guide",
+             "/docs/api",
            ],
            "file": "docs/[slug].zen",
            "html": "/docs/__param_slug/index.html",

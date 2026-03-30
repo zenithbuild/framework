@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { attachRouteAuth } from '../auth/route-auth.js';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
 import { materializeImageMarkup } from '../images/materialize.js';
+import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException } from '../server-error.js';
-import { allow, data, deny, invalid, redirect, resolveRouteResult } from '../server-contract.js';
+import { allow, data, deny, download, invalid, json, redirect, resolveRouteResult, text } from '../server-contract.js';
 
 const MODULE_CACHE = new Map();
 const INTERNAL_QUERY_PREFIX = '__zenith_param_';
@@ -44,12 +46,31 @@ function escapeInlineJson(payload) {
         .replace(/\u2029/g, '\\u2029');
 }
 
-function createTextResponse(status, message) {
+function appendSetCookieHeaders(headers, setCookies = []) {
+    for (const value of Array.isArray(setCookies) ? setCookies : []) {
+        headers.append('Set-Cookie', value);
+    }
+    return headers;
+}
+
+function createTextResponse(status, message, setCookies = []) {
+    const headers = new Headers({
+        'Content-Type': 'text/plain; charset=utf-8'
+    });
+    appendSetCookieHeaders(headers, setCookies);
     return new Response(message || defaultRouteDenyMessage(status), {
         status,
-        headers: {
-            'Content-Type': 'text/plain; charset=utf-8'
-        }
+        headers
+    });
+}
+
+function createResourceResponse(result, basePath, setCookies = []) {
+    const descriptor = buildResourceResponseDescriptor(result, basePath, setCookies);
+    const headers = new Headers(descriptor.headers);
+    appendSetCookieHeaders(headers, descriptor.setCookies);
+    return new Response(descriptor.body, {
+        status: descriptor.status,
+        headers
     });
 }
 
@@ -153,9 +174,9 @@ async function loadRouteExports(routeModulePath) {
     return value;
 }
 
-function createRouteContext({ request, route, params, publicUrl }) {
+function createRouteContext({ request, route, params, publicUrl, guardOnly = false }) {
     const requestHeaders = Object.fromEntries(request.headers.entries());
-    return {
+    const ctx = {
         params: { ...params },
         url: publicUrl,
         headers: { ...requestHeaders },
@@ -169,20 +190,22 @@ function createRouteContext({ request, route, params, publicUrl }) {
         },
         env: {},
         action: null,
-        auth: {
-            async getSession() {
-                return null;
-            },
-            async requireSession() {
-                throw redirect('/login', 302);
-            }
-        },
         allow,
         redirect,
         deny,
         invalid,
-        data
+        data,
+        json,
+        text,
+        download
     };
+    attachRouteAuth(ctx, {
+        requestUrl: publicUrl,
+        guardOnly,
+        redirect,
+        deny
+    });
+    return ctx;
 }
 
 /**
@@ -193,7 +216,7 @@ function createRouteContext({ request, route, params, publicUrl }) {
  *   routeModulePath: string,
  *   guardOnly?: boolean
  * }} options
- * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number }>}
+ * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
  */
 export async function executeRouteRequest(options) {
     const {
@@ -205,20 +228,22 @@ export async function executeRouteRequest(options) {
     } = options;
 
     const publicUrl = buildPublicUrl(request.url, route, params);
-    const ctx = createRouteContext({ request, route, params, publicUrl });
+    const ctx = createRouteContext({ request, route, params, publicUrl, guardOnly });
     const exports = await loadRouteExports(routeModulePath);
     const resolved = await resolveRouteResult({
         exports,
         ctx,
         filePath: route.file || route.server_script_path || route.path,
-        guardOnly
+        guardOnly,
+        routeKind: route.route_kind === 'resource' ? 'resource' : 'page'
     });
 
     return {
         publicUrl,
         result: resolved.result,
         trace: resolved.trace,
-        status: resolved.status
+        status: resolved.status,
+        setCookies: Array.isArray(resolved.setCookies) ? resolved.setCookies : []
     };
 }
 
@@ -249,7 +274,8 @@ export async function renderRouteRequest(options) {
         const {
             publicUrl,
             result,
-            status
+            status,
+            setCookies = []
         } = await executeRouteRequest({
             request,
             route,
@@ -258,18 +284,20 @@ export async function renderRouteRequest(options) {
         });
 
         if (result.kind === 'redirect') {
+            const headers = new Headers({
+                Location: appLocalRedirectLocation(result.location, route.base_path || '/'),
+                'Cache-Control': 'no-store'
+            });
+            appendSetCookieHeaders(headers, setCookies);
             return new Response('', {
                 status: Number.isInteger(result.status) ? result.status : 302,
-                headers: {
-                    Location: appLocalRedirectLocation(result.location, route.base_path || '/'),
-                    'Cache-Control': 'no-store'
-                }
+                headers
             });
         }
 
         if (result.kind === 'deny') {
             const status = Number.isInteger(result.status) ? result.status : 403;
-            return createTextResponse(status, clientFacingRouteMessage(status, result.message));
+            return createTextResponse(status, clientFacingRouteMessage(status, result.message), setCookies);
         }
 
         const ssrPayload = result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)
@@ -295,14 +323,47 @@ export async function renderRouteRequest(options) {
         html = injectSsrPayload(html, ssrPayload);
         html = injectImageRuntimePayload(html, imagePayload);
 
+        const headers = new Headers({
+            'Content-Type': 'text/html; charset=utf-8'
+        });
+        appendSetCookieHeaders(headers, setCookies);
         return new Response(html, {
             status: Number.isInteger(status) ? status : 200,
-            headers: {
-                'Content-Type': 'text/html; charset=utf-8'
-            }
+            headers
         });
     } catch (error) {
         logServerException('node route render failed', error);
+        return createTextResponse(500, defaultRouteDenyMessage(500));
+    }
+}
+
+/**
+ * @param {{
+ *   request: Request,
+ *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null, route_kind?: string | null, base_path?: string | null },
+ *   params: Record<string, string>,
+ *   routeModulePath: string
+ * }} options
+ * @returns {Promise<Response>}
+ */
+export async function renderResourceRouteRequest(options) {
+    const {
+        request,
+        route,
+        params,
+        routeModulePath
+    } = options;
+
+    try {
+        const { result, setCookies = [] } = await executeRouteRequest({
+            request,
+            route: { ...route, route_kind: 'resource' },
+            params,
+            routeModulePath
+        });
+        return createResourceResponse(result, route.base_path || '/', setCookies);
+    } catch (error) {
+        logServerException('node resource route render failed', error);
         return createTextResponse(500, defaultRouteDenyMessage(500));
     }
 }

@@ -39,8 +39,11 @@ Definition of Done:
 | guides/deployment-targets | Deployment Targets Guide | guide | keep | Canonical target matrix, preview behavior, and deployment limits |
 | guides/troubleshooting | Troubleshooting Guide | guide | keep | Operational diagnosis |
 | contributing/drift-gates | Drift Gates | contributing | keep | CI + docs integrity checks |
+| routing/navigation-shell | Navigation Shell | routing | keep | Canonical tiny visual shell utility on existing lifecycle |
 | reactivity/dom-and-environment | DOM and Environment | reactivity | keep | Refs, zenWindow/zenDocument, zenOn, zenResize, collectRefs |
 | reactivity/effects-vs-mount | zenEffect vs zenMount | reactivity | keep | When to use zenEffect vs zenMount |
+| reactivity/presence | Presence | reactivity | keep | Canonical ref-owned presence helper and phase model |
+| reactivity/overlay-sheet-pattern | Overlay and Sheet Pattern | reactivity | keep | Canonical always-mounted overlay and sheet composition pattern |
 
 ## Legacy Docs (Deleted)
 

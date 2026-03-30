@@ -332,6 +332,28 @@
           "source_path": "documentation/reactivity/dom-and-environment.md"
         },
         {
+          "slug": "reactivity/presence",
+          "title": "Presence",
+          "label": "Presence",
+          "url": "/docs/reactivity/presence",
+          "order": 13,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/presence.md"
+        },
+        {
+          "slug": "reactivity/overlay-sheet-pattern",
+          "title": "Overlay and Sheet Pattern",
+          "label": "Overlay and Sheet Pattern",
+          "url": "/docs/reactivity/overlay-sheet-pattern",
+          "order": 14,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-pattern.md"
+        },
+        {
           "slug": "reactivity/controlled-uncontrolled-components",
           "title": "Controlled vs Uncontrolled Components",
           "label": "Controlled vs Uncontrolled Components",
@@ -559,6 +581,17 @@
       "order": null,
       "docs": [
         {
+          "slug": "routing/navigation-shell",
+          "title": "Navigation Shell",
+          "label": "Navigation Shell",
+          "url": "/docs/routing/navigation-shell",
+          "order": 42,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/routing/navigation-shell.md"
+        },
+        {
           "slug": "routing/route-protection",
           "title": "Route Protection (guard/load)",
           "label": "Route Protection (guard/load)",
@@ -601,6 +634,8 @@
     "/docs/reactivity/reactivity-model",
     "/docs/reactivity/effects-vs-mount",
     "/docs/reactivity/dom-and-environment",
+    "/docs/reactivity/presence",
+    "/docs/reactivity/overlay-sheet-pattern",
     "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",
@@ -618,6 +653,7 @@
     "/docs/zenith-contract",
     "/docs/cli-contract",
     "/docs/install-compatibility",
+    "/docs/routing/navigation-shell",
     "/docs/routing/route-protection"
   ]
 }

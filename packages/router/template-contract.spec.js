@@ -81,6 +81,11 @@ assert.ok(
     sourceA.includes('new FormData(form'),
     'enhanced form flow must submit browser-native FormData payloads'
 );
+assert.equal(
+    sourceA.includes('multipart/form-data'),
+    false,
+    'enhanced form flow must not bail out on multipart form submissions'
+);
 
 const preventDefaultIndex = sourceA.indexOf('event.preventDefault();', clickStart);
 const fetchIndex = sourceA.indexOf('fetch(targetUrl.href');
@@ -142,6 +147,18 @@ assert.ok(
 assert.ok(
     sourceA.includes('const __ZENITH_RUNTIME_ROUTE_HTML_KEY = "__zenith_route_html";'),
     'router template must expose the runtime route HTML override channel'
+);
+assert.ok(
+    sourceA.includes('const __ZENITH_REFRESH_CURRENT_ROUTE_KEY = "__zenith_refresh_current_route";'),
+    'router template must expose the refresh-current-route bridge key'
+);
+assert.ok(
+    sourceA.includes('async function refreshCurrentRouteInternal()'),
+    'router template must define a refreshCurrentRoute internal bridge'
+);
+assert.ok(
+    sourceA.includes('await performNavigation(targetUrl, "refresh", null);'),
+    'refreshCurrentRoute must reuse the existing navigation pipeline with refresh mode'
 );
 assert.ok(
     sourceA.includes('parsed.getElementById("zenith-ssr-data")'),

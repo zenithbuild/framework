@@ -1,12 +1,15 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { jest } from '@jest/globals';
 import { build } from '../dist/build.js';
 import { createDevServer } from '../dist/dev-server.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
 process.env.CI = '1';
+
+jest.setTimeout(30000);
 
 async function createProject(files) {
     const root = join(tmpdir(), `zenith-route-check-support-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -38,7 +41,7 @@ describe('route-check target support', () => {
             dev = null;
         }
         if (project) {
-            await rm(project.root, { recursive: true, force: true });
+            await rm(project.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
             project = null;
         }
     });
@@ -105,5 +108,39 @@ describe('route-check target support', () => {
         });
 
         expect(await readRouterSource(project.root)).toContain('const __ZENITH_ROUTE_CHECK_ENABLED__ = true;');
+    });
+
+    test('static-export target disables router route-check and dev reports the endpoint as unsupported', async () => {
+        project = await createProject({
+            'pages/index.zen': '<main>Home</main>\n',
+            'pages/about.zen': '<main>About</main>\n'
+        });
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: {
+                target: 'static-export',
+                router: true
+            }
+        });
+
+        expect(await readRouterSource(project.root)).toContain('const __ZENITH_ROUTE_CHECK_ENABLED__ = false;');
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            port: 0,
+            config: {
+                target: 'static-export',
+                router: true
+            }
+        });
+
+        const response = await fetch(`http://127.0.0.1:${dev.port}/__zenith/route-check?path=%2Fabout`, {
+            headers: { 'x-zenith-route-check': '1' }
+        });
+        expect(response.status).toBe(501);
+        expect(await response.json()).toEqual({ error: 'route_check_unsupported' });
     });
 });

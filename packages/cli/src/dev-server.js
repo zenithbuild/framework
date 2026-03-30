@@ -23,13 +23,14 @@ import { createStartupProfiler } from './startup-profile.js';
 import { createSilentLogger } from './ui/logger.js';
 import { readChangeFingerprint } from './dev-watch.js';
 import { createTrustedOriginResolver, publicHost } from './request-origin.js';
-import { encodeRequestBodyBase64, readRequestBodyBuffer } from './request-body.js';
+import { readRequestBodyBuffer } from './request-body.js';
+import { buildResourceResponseDescriptor } from './resource-response.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from './server-error.js';
 import {
     executeServerRoute,
     injectSsrPayload,
-    loadRouteManifest,
+    loadRouteSurfaceState,
     resolveWithinDist,
     toStaticFilePath
 } from './preview.js';
@@ -59,6 +60,13 @@ const IMAGE_RUNTIME_TAG_RE = new RegExp(
 const EVENT_STREAM_MIME = ['text', 'event-stream'].join('/');
 const LEGACY_DEV_STREAM_PATH = ['/__zenith', '_hmr'].join('');
 
+function appendSetCookieHeaders(headers, setCookies = []) {
+    if (Array.isArray(setCookies) && setCookies.length > 0) {
+        headers['Set-Cookie'] = setCookies.slice();
+    }
+    return headers;
+}
+
 // Note: V0 HMR script injection has been moved to the runtime client.
 // This server purely hosts the V1 HMR contract endpoints.
 
@@ -81,7 +89,9 @@ export async function createDevServer(options) {
     const logger = providedLogger || createSilentLogger();
     const buildSession = createDevBuildSession({ pagesDir, outDir, config, logger });
     const configuredBasePath = normalizeBasePath(config.basePath || '/');
-    const routeCheckEnabled = supportsTargetRouteCheck(resolveBuildAdapter(config).target);
+    const resolvedTarget = resolveBuildAdapter(config).target;
+    const routeCheckEnabled = supportsTargetRouteCheck(resolvedTarget);
+    const isStaticExportTarget = resolvedTarget === 'static-export';
 
     const resolvedPagesDir = resolve(pagesDir);
     const resolvedOutDir = resolve(outDir);
@@ -126,7 +136,7 @@ export async function createDevServer(options) {
         getPort: () => actualPort,
         label: 'dev server'
     });
-    let currentRoutes = [];
+    let currentRouteState = { pageRoutes: [], resourceRoutes: [] };
     const rebuildDebounceMs = 5;
     const queuedRebuildDebounceMs = 5;
 
@@ -411,21 +421,33 @@ export async function createDevServer(options) {
     }
 
     async function _loadRoutesForRequests() {
-        if (buildStatus === 'building' && Array.isArray(currentRoutes) && currentRoutes.length > 0) {
-            return currentRoutes;
+        if (
+            buildStatus === 'building' &&
+            (
+                (Array.isArray(currentRouteState.pageRoutes) && currentRouteState.pageRoutes.length > 0) ||
+                (Array.isArray(currentRouteState.resourceRoutes) && currentRouteState.resourceRoutes.length > 0)
+            )
+        ) {
+            return currentRouteState;
         }
         try {
-            const routes = await loadRouteManifest(outDir);
-            if (Array.isArray(routes) && routes.length > 0) {
-                currentRoutes = routes;
-                return routes;
+            const routeState = await loadRouteSurfaceState(outDir, configuredBasePath);
+            if (
+                (Array.isArray(routeState.pageRoutes) && routeState.pageRoutes.length > 0) ||
+                (Array.isArray(routeState.resourceRoutes) && routeState.resourceRoutes.length > 0)
+            ) {
+                currentRouteState = routeState;
+                return routeState;
             }
         } catch (error) {
-            if (!(Array.isArray(currentRoutes) && currentRoutes.length > 0)) {
+            if (
+                !(Array.isArray(currentRouteState.pageRoutes) && currentRouteState.pageRoutes.length > 0) &&
+                !(Array.isArray(currentRouteState.resourceRoutes) && currentRouteState.resourceRoutes.length > 0)
+            ) {
                 throw error;
             }
         }
-        return currentRoutes;
+        return currentRouteState;
     }
 
     function _broadcastEvent(type, payload = {}) {
@@ -459,7 +481,7 @@ export async function createDevServer(options) {
             logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
             const initialBuild = await buildSession.build();
             const cssReady = await _syncCssStateFromBuild(initialBuild, buildId);
-            currentRoutes = await loadRouteManifest(outDir);
+            currentRouteState = await loadRouteSurfaceState(outDir, configuredBasePath);
             buildStatus = 'ok';
             buildError = null;
             lastBuildMs = Date.now();
@@ -478,7 +500,8 @@ export async function createDevServer(options) {
                 status: buildStatus,
                 durationMs,
                 cssReady,
-                routes: Array.isArray(currentRoutes) ? currentRoutes.length : 0
+                routes: (Array.isArray(currentRouteState.pageRoutes) ? currentRouteState.pageRoutes.length : 0) +
+                    (Array.isArray(currentRouteState.resourceRoutes) ? currentRouteState.resourceRoutes.length : 0)
             });
         } catch (err) {
             buildStatus = 'error';
@@ -620,6 +643,9 @@ export async function createDevServer(options) {
         }
 
         if (pathname === imageEndpointPath(configuredBasePath)) {
+            if (isStaticExportTarget) {
+                throw new Error('not found');
+            }
             await handleImageRequest(req, res, {
                 requestUrl: url,
                 projectRoot,
@@ -676,7 +702,7 @@ export async function createDevServer(options) {
                 canonicalTargetUrl.pathname = canonicalTargetPath;
 
                 const routes = await _loadRoutesForRequests();
-                const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, routes);
+                const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, routes.pageRoutes || []);
                 if (!resolvedCheck.matched || !resolvedCheck.route) {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'route_not_found' }));
@@ -772,9 +798,14 @@ export async function createDevServer(options) {
 
             const requestExt = extname(canonicalPath);
             if (requestExt && requestExt !== '.html') {
-                const assetPath = join(outDir, canonicalPath);
+                const assetPath = isStaticExportTarget
+                    ? resolveWithinDist(outDir, pathname)
+                    : join(outDir, canonicalPath);
                 resolvedPathFor404 = assetPath;
                 staticRootFor404 = outDir;
+                if (!assetPath) {
+                    throw new Error('not found');
+                }
                 const asset = await _readFileForRequest(assetPath);
                 const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
                 res.writeHead(200, { 'Content-Type': mime });
@@ -785,10 +816,45 @@ export async function createDevServer(options) {
             const routes = await _loadRoutesForRequests();
             const canonicalUrl = new URL(url.toString());
             canonicalUrl.pathname = canonicalPath;
-            const resolved = resolveRequestRoute(canonicalUrl, routes);
+            const resolvedResource = resolveRequestRoute(canonicalUrl, routes.resourceRoutes || []);
+            if (resolvedResource.matched && resolvedResource.route) {
+                const requestMethod = req.method || 'GET';
+                const requestBodyBuffer =
+                    requestMethod === 'GET' || requestMethod === 'HEAD'
+                        ? null
+                        : await readRequestBodyBuffer(req);
+                const execution = await executeServerRoute({
+                    source: resolvedResource.route.server_script || '',
+                    sourcePath: resolvedResource.route.server_script_path || '',
+                    params: resolvedResource.params,
+                    requestUrl: url.toString(),
+                    requestMethod,
+                    requestHeaders: req.headers,
+                    requestBodyBuffer,
+                    routePattern: resolvedResource.route.path,
+                    routeFile: resolvedResource.route.server_script_path || '',
+                    routeId: resolvedResource.route.route_id || '',
+                    routeKind: 'resource'
+                });
+                const descriptor = buildResourceResponseDescriptor(
+                    execution?.result,
+                    configuredBasePath,
+                    Array.isArray(execution?.setCookies) ? execution.setCookies : []
+                );
+                res.writeHead(descriptor.status, appendSetCookieHeaders(descriptor.headers, descriptor.setCookies));
+                if ((req.method || 'GET').toUpperCase() === 'HEAD') {
+                    res.end();
+                    return;
+                }
+                res.end(descriptor.body);
+                return;
+            }
+            const resolved = resolveRequestRoute(canonicalUrl, routes.pageRoutes || []);
             let filePath = null;
 
-            if (resolved.matched && resolved.route) {
+            if (isStaticExportTarget) {
+                filePath = toStaticFilePath(outDir, pathname);
+            } else if (resolved.matched && resolved.route) {
                 if (verboseLogging) {
                     logger.router(
                         `${req.method || 'GET'} ${pathname} -> ${resolved.route.path} params=${JSON.stringify(resolved.params)}`
@@ -825,7 +891,7 @@ export async function createDevServer(options) {
                         requestUrl: url.toString(),
                         requestMethod,
                         requestHeaders: req.headers,
-                        requestBodyBase64: encodeRequestBodyBase64(requestBodyBuffer),
+                        requestBodyBuffer,
                         routePattern: resolved.route.path,
                         routeFile: resolved.route.server_script_path || '',
                         routeId: resolved.route.route_id || ''
@@ -843,6 +909,7 @@ export async function createDevServer(options) {
 
                 const trace = routeExecution?.trace || { guard: 'none', action: 'none', load: 'none' };
                 const routeId = resolved.route.route_id || '';
+                const setCookies = Array.isArray(routeExecution?.setCookies) ? routeExecution.setCookies : [];
                 if (verboseLogging) {
                     logger.router(
                         `${routeId || resolved.route.path} guard=${trace.guard} action=${trace.action} load=${trace.load}`
@@ -852,16 +919,16 @@ export async function createDevServer(options) {
                 const result = routeExecution?.result;
                 if (result && result.kind === 'redirect') {
                     const status = Number.isInteger(result.status) ? result.status : 302;
-                    res.writeHead(status, {
+                    res.writeHead(status, appendSetCookieHeaders({
                         Location: appLocalRedirectLocation(result.location, configuredBasePath),
                         'Cache-Control': 'no-store'
-                    });
+                    }, setCookies));
                     res.end('');
                     return;
                 }
                 if (result && result.kind === 'deny') {
                     const status = Number.isInteger(result.status) ? result.status : 403;
-                    res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.writeHead(status, appendSetCookieHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }, setCookies));
                     res.end(clientFacingRouteMessage(status, result.message));
                     return;
                 }
@@ -886,9 +953,9 @@ export async function createDevServer(options) {
             if (!IMAGE_RUNTIME_TAG_RE.test(content)) {
                 content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
             }
-            res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
+            res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, appendSetCookieHeaders({
                 'Content-Type': 'text/html'
-            });
+            }, Array.isArray(routeExecution?.setCookies) ? routeExecution.setCookies : []));
             res.end(content);
         } catch (error) {
             const category = _classifyNotFound(pathname);
@@ -1019,7 +1086,7 @@ export async function createDevServer(options) {
                 const buildResult = await buildSession.build({ changedFiles, logger });
                 const cssReady = await _syncCssStateFromBuild(buildResult, cycleBuildId);
                 if (!onlyCss) {
-                    currentRoutes = await loadRouteManifest(outDir);
+                    currentRouteState = await loadRouteSurfaceState(outDir, configuredBasePath);
                 }
                 const cssChanged = cssReady && (
                     currentCssAssetPath !== previousCssAssetPath ||

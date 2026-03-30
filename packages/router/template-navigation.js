@@ -98,6 +98,10 @@ function navigateViaBrowser(targetUrl, replace) {
   window.location.assign(targetUrl.href);
 }
 
+function shouldReplaceBrowserNavigation(historyMode) {
+  return historyMode === "pop";
+}
+
 function dispatchNavigationFallback(context, detail) {
   emitNavigationAbort(context, detail);
 }
@@ -231,7 +235,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: checkResult.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (checkResult.kind === "deny") {
@@ -239,7 +243,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "server-deny",
         status: checkResult.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -259,7 +263,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: response.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -270,7 +274,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "http-status",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (!isHtmlResponse(response)) {
@@ -278,7 +282,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "non-html",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -287,7 +291,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
       dispatchNavigationFallback(context, {
         reason: "document-parse"
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     const committed = await commitNavigationDocument(
@@ -317,7 +321,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "runtime-failure",
         historyCommitted
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop" || historyCommitted);
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode) || historyCommitted);
       return true;
     }
     dispatchNavigationFallback(context, context.abortReason || {

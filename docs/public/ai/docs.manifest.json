@@ -25,7 +25,7 @@
         "title": "Reactivity",
         "summary": "State, memoization, and reactive execution model.",
         "order": 30,
-        "count": 4
+        "count": 6
       },
       {
         "slug": "guides",
@@ -60,7 +60,7 @@
         "title": "Routing",
         "summary": "",
         "order": null,
-        "count": 1
+        "count": 2
       }
     ]
   },
@@ -803,6 +803,61 @@
     },
     {
       "kind": "doc",
+      "slug": "reactivity/presence",
+      "title": "Presence",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "presence",
+        "transitions",
+        "runtime"
+      ],
+      "source_path": "documentation/reactivity/presence.md",
+      "url": "/docs/reactivity/presence",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 13,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-pattern",
+      "title": "Overlay and Sheet Pattern",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "presence"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-pattern.md",
+      "url": "/docs/reactivity/overlay-sheet-pattern",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 14,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
       "slug": "reactivity/controlled-uncontrolled-components",
       "title": "Controlled vs Uncontrolled Components",
       "status": "canonical",
@@ -1229,6 +1284,33 @@
       "category_path": [],
       "category_titles": [],
       "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/navigation-shell",
+      "title": "Navigation Shell",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "navigation",
+        "shell",
+        "transitions"
+      ],
+      "source_path": "documentation/routing/navigation-shell.md",
+      "url": "/docs/routing/navigation-shell",
+      "category": "routing",
+      "category_title": "Routing",
+      "category_order": null,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 42,
       "level": null,
       "hidden": false,
       "prerequisites": []

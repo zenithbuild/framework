@@ -362,6 +362,78 @@ describe('Server Contract Validation and Payload Resolution', () => {
             });
         });
 
+        test('post multipart action exposes native fields and files through ctx.request.formData()', async () => {
+            const form = new FormData();
+            form.set('title', 'Upload brief');
+            form.set('attachment', new File(['hello upload'], 'hello.txt', { type: 'text/plain' }));
+
+            const actionRequest = new Request('http://localhost/users/42', {
+                method: 'POST',
+                body: form
+            });
+
+            const resolved = await resolveRouteResult({
+                exports: {
+                    action: async (incomingCtx) => {
+                        const requestForm = await incomingCtx.request.formData();
+                        const file = requestForm.get('attachment');
+                        return data({
+                            title: String(requestForm.get('title') || '').trim(),
+                            fileName: file instanceof File ? file.name : null,
+                            fileType: file instanceof File ? file.type : null,
+                            fileSize: file instanceof File ? file.size : null
+                        });
+                    },
+                    load: async (incomingCtx) => {
+                        return data({ action: incomingCtx.action });
+                    }
+                },
+                ctx: { ...ctx, env: {}, method: 'POST', request: actionRequest },
+                filePath: 'users/[id].zen'
+            });
+
+            expect(resolved).toEqual({
+                result: {
+                    kind: 'data',
+                    data: {
+                        action: {
+                            ok: true,
+                            status: 200,
+                            data: {
+                                title: 'Upload brief',
+                                fileName: 'hello.txt',
+                                fileType: 'text/plain',
+                                fileSize: 12
+                            }
+                        }
+                    }
+                },
+                trace: { guard: 'none', action: 'data', load: 'data' },
+                status: 200
+            });
+        });
+
+        test('post action still rejects File objects in returned payloads', async () => {
+            const form = new FormData();
+            form.set('attachment', new File(['hello upload'], 'hello.txt', { type: 'text/plain' }));
+
+            const actionRequest = new Request('http://localhost/users/42', {
+                method: 'POST',
+                body: form
+            });
+
+            await expect(resolveRouteResult({
+                exports: {
+                    action: async (incomingCtx) => {
+                        const requestForm = await incomingCtx.request.formData();
+                        return data({ attachment: requestForm.get('attachment') });
+                    }
+                },
+                ctx: { ...ctx, env: {}, method: 'POST', request: actionRequest },
+                filePath: 'users/[id].zen'
+            })).rejects.toThrow(/non-plain object at \$\.attachment/);
+        });
+
         test('post action redirects short-circuit load', async () => {
             let loadCalls = 0;
             const resolved = await resolveRouteResult({

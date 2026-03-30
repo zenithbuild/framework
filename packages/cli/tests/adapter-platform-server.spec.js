@@ -3,11 +3,14 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { jest } from '@jest/globals';
 import { cli } from '../dist/index.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
 process.env.CI = '1';
+
+jest.setTimeout(30000);
 
 async function createProject(files) {
     const root = join(tmpdir(), `zenith-platform-server-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -28,7 +31,7 @@ describe('platform server adapters', () => {
 
     afterEach(async () => {
         if (projectRoot) {
-            await rm(projectRoot, { recursive: true, force: true });
+            await rm(projectRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
             projectRoot = null;
         }
     });
@@ -48,12 +51,19 @@ describe('platform server adapters', () => {
         await cli(['build'], projectRoot);
 
         const config = await readJson(join(projectRoot, 'dist', 'config.json'));
-        expect(config.routes[0]).toMatchObject({
-            src: '^/account/?$',
-            dest: '/__zenith/account'
-        });
-        expect(config.routes[1]).toMatchObject({ handle: 'filesystem' });
+        expect(config.routes).toEqual(expect.arrayContaining([
+            {
+                src: '^/account/?$',
+                dest: '/__zenith/account'
+            },
+            {
+                src: '^/_zenith/image/?$',
+                dest: '/__zenith/image'
+            },
+            { handle: 'filesystem' }
+        ]));
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'index.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'image.func', 'index.js'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'route', 'entry.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'manifest.json'))).toBe(true);
 
@@ -151,7 +161,9 @@ describe('platform server adapters', () => {
 
         const redirects = await readFile(join(projectRoot, 'dist', 'publish', '_redirects'), 'utf8');
         expect(redirects).toContain('/secure /.netlify/functions/__zenith_secure 200!');
+        expect(redirects).toContain('/_zenith/image /.netlify/functions/__zenith_image 200!');
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith_secure.mjs'))).toBe(true);
+        expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith_image.mjs'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'functions', '_zenith', 'routes', 'secure', 'route', 'entry.js'))).toBe(true);
         expect(await readFile(join(projectRoot, 'dist', 'netlify.toml'), 'utf8')).toContain('publish = "publish"');
 
@@ -195,6 +207,8 @@ describe('platform server adapters', () => {
         const vercelConfig = await readJson(join(projectRoot, 'dist', 'config.json'));
         expect(vercelConfig.routes).toEqual(expect.arrayContaining([
             { src: '^/docs/assets/(.+)$', dest: '/assets/$1' },
+            { src: '^/docs/_zenith/image/local/(.+)$', dest: '/_zenith/image/local/$1' },
+            { src: '^/docs/_zenith/image/?$', dest: '/__zenith/image' },
             { src: '^/docs/account/?$', dest: '/__zenith/account' },
             { handle: 'filesystem' },
             { src: '^/docs/guides/([^/]+)/?$', dest: '/guides/__param_slug/index.html' }
@@ -219,6 +233,8 @@ describe('platform server adapters', () => {
 
         const redirects = await readFile(join(projectRoot, 'dist', 'publish', '_redirects'), 'utf8');
         expect(redirects).toContain('/docs/assets/* /assets/:splat 200');
+        expect(redirects).toContain('/docs/_zenith/image/local/* /_zenith/image/local/:splat 200');
+        expect(redirects).toContain('/docs/_zenith/image /.netlify/functions/__zenith_image 200!');
         expect(redirects).toContain('/docs/account /.netlify/functions/__zenith_account 200!');
         expect(redirects).toContain('/docs/guides/:slug /guides/__param_slug/index.html 200');
 

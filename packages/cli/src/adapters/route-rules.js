@@ -26,6 +26,10 @@ export function createNetlifyBasePathAssetRules(basePath) {
     ];
 }
 
+export function createNetlifyImageEndpointRule(basePath) {
+    return `${prependBasePath(basePath, '/_zenith/image')} /.netlify/functions/__zenith_image 200!`;
+}
+
 export function createNetlifyRewriteRules(route, basePath = '/') {
     const segments = splitRouteSegments(route.path);
     if (segments.length === 0) {
@@ -70,6 +74,13 @@ export function createVercelBasePathAssetRoutes(basePath) {
             dest: '/_zenith/image/local/$1'
         }
     ];
+}
+
+export function createVercelImageEndpointRoute(basePath) {
+    return {
+        src: createVercelRouteSource('/_zenith/image', basePath),
+        dest: '/__zenith/image'
+    };
 }
 
 export function createVercelRouteSource(routePath, basePath = '/') {

@@ -2,11 +2,13 @@
 // ---------------------------------------------------------------------------
 // Shared validation and payload resolution logic for <script server> blocks.
 
-const NEW_KEYS = new Set(['data', 'load', 'guard', 'action', 'prerender']);
-const LEGACY_KEYS = new Set(['ssr_data', 'props', 'ssr', 'prerender']);
-const ALLOWED_KEYS = new Set(['data', 'load', 'guard', 'action', 'prerender', 'ssr_data', 'props', 'ssr']);
+import { assertValidDownloadResult, createDownloadResult } from './download-result.js';
 
-const ROUTE_RESULT_KINDS = new Set(['allow', 'redirect', 'deny', 'data', 'invalid']);
+const ALLOWED_KEYS = new Set(['data', 'load', 'guard', 'action', 'prerender', 'exportPaths', 'ssr_data', 'props', 'ssr']);
+const RESOURCE_ALLOWED_KEYS = new Set(['load', 'guard', 'action']);
+const ROUTE_RESULT_KINDS = new Set(['allow', 'redirect', 'deny', 'data', 'invalid', 'json', 'text', 'download']);
+const AUTH_CONTROL_FLOW_FLAG = '__zenith_auth_control_flow';
+const STAGED_SET_COOKIES_KEY = '__zenith_staged_set_cookies';
 
 export function allow() {
     return { kind: 'allow' };
@@ -38,6 +40,26 @@ export function invalid(payload, status = 400) {
         data: payload,
         status: Number.isInteger(status) ? status : 400
     };
+}
+
+export function json(payload, status = 200) {
+    return {
+        kind: 'json',
+        data: payload,
+        status: Number.isInteger(status) ? status : 200
+    };
+}
+
+export function text(body, status = 200) {
+    return {
+        kind: 'text',
+        body: typeof body === 'string' ? body : String(body ?? ''),
+        status: Number.isInteger(status) ? status : 200
+    };
+}
+
+export function download(body, options = {}) {
+    return createDownloadResult(body, options);
 }
 
 function isRouteResultLike(value) {
@@ -85,6 +107,19 @@ function assertValidRouteResultShape(value, where, allowedKinds) {
             throw new Error(`[Zenith] ${where}: invalid status must be 400 or 422.`);
         }
     }
+
+    if (kind === 'json' || kind === 'text') {
+        if (!Number.isInteger(value.status) || value.status < 200 || value.status > 599 || (value.status >= 300 && value.status <= 399)) {
+            throw new Error(`[Zenith] ${where}: ${kind} status must be an integer between 200-599 and may not be 3xx.`);
+        }
+        if (kind === 'text' && typeof value.body !== 'string') {
+            throw new Error(`[Zenith] ${where}: text body must be a string.`);
+        }
+    }
+
+    if (kind === 'download') {
+        assertValidDownloadResult(value, where);
+    }
 }
 
 function assertOneArgRouteFunction({ filePath, exportName, value }) {
@@ -122,9 +157,45 @@ function buildActionState(result) {
     return null;
 }
 
-export function validateServerExports({ exports, filePath }) {
+function unwrapAuthControlFlow(error, where, allowedKinds) {
+    if (!error || typeof error !== 'object' || error[AUTH_CONTROL_FLOW_FLAG] !== true) {
+        return null;
+    }
+    const result = error.result;
+    assertValidRouteResultShape(result, where, allowedKinds);
+    return result;
+}
+
+async function invokeRouteStage({ fn, ctx, where, allowedKinds }) {
+    try {
+        return await fn(ctx);
+    } catch (error) {
+        const authResult = unwrapAuthControlFlow(error, where, allowedKinds);
+        if (authResult) {
+            return authResult;
+        }
+        throw error;
+    }
+}
+
+function buildResolvedEnvelope({ result, trace, status, ctx }) {
+    const envelope = { result, trace };
+    if (status !== undefined) {
+        envelope.status = status;
+    }
+    const setCookies = Array.isArray(ctx?.[STAGED_SET_COOKIES_KEY])
+        ? ctx[STAGED_SET_COOKIES_KEY].slice()
+        : [];
+    if (setCookies.length > 0) {
+        envelope.setCookies = setCookies;
+    }
+    return envelope;
+}
+
+export function validateServerExports({ exports, filePath, routeKind = 'page' }) {
     const exportKeys = Object.keys(exports);
-    const illegalKeys = exportKeys.filter(k => !ALLOWED_KEYS.has(k));
+    const allowedKeys = routeKind === 'resource' ? RESOURCE_ALLOWED_KEYS : ALLOWED_KEYS;
+    const illegalKeys = exportKeys.filter(k => !allowedKeys.has(k));
 
     if (illegalKeys.length > 0) {
         throw new Error(`[Zenith] ${filePath}: illegal export(s): ${illegalKeys.join(', ')}`);
@@ -138,18 +209,32 @@ export function validateServerExports({ exports, filePath }) {
     const hasNew = hasData || hasLoad || hasAction;
     const hasLegacy = ('ssr_data' in exports) || ('props' in exports) || ('ssr' in exports);
 
+    if (routeKind === 'resource') {
+        if (hasData) {
+            throw new Error(`[Zenith] ${filePath}: resource routes may not export "data". Use load(ctx) or action(ctx) with ctx.json()/ctx.text().`);
+        }
+        if (!hasLoad && !hasAction) {
+            throw new Error(`[Zenith] ${filePath}: resource routes must export load(ctx), action(ctx), or both.`);
+        }
+    }
+
     if (hasData && hasLoad) {
         throw new Error(`[Zenith] ${filePath}: cannot export both "data" and "load". Choose one.`);
     }
 
-    if (hasNew && hasLegacy) {
+    if (routeKind === 'page' && hasNew && hasLegacy) {
         throw new Error(
             `[Zenith] ${filePath}: cannot mix new ("data"/"load") with legacy ("ssr_data"/"props"/"ssr") exports.`
         );
     }
 
-    if ('prerender' in exports && typeof exports.prerender !== 'boolean') {
+    if (routeKind === 'page' && 'prerender' in exports && typeof exports.prerender !== 'boolean') {
         throw new Error(`[Zenith] ${filePath}: "prerender" must be a boolean.`);
+    }
+    if (routeKind === 'page' && 'exportPaths' in exports) {
+        if (!Array.isArray(exports.exportPaths) || exports.exportPaths.some((value) => typeof value !== 'string')) {
+            throw new Error(`[Zenith] ${filePath}: "exportPaths" must be an array of string pathnames.`);
+        }
     }
 
     if (hasLoad) {
@@ -226,8 +311,12 @@ export function assertJsonSerializable(value, where = 'payload') {
     walk(value, '$');
 }
 
-export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = false }) {
-    validateServerExports({ exports, filePath });
+export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = false, routeKind = 'page' }) {
+    validateServerExports({ exports, filePath, routeKind });
+
+    if (routeKind === 'resource') {
+        return resolveResourceRouteResult({ exports, ctx, filePath, guardOnly });
+    }
 
     const trace = {
         guard: 'none',
@@ -242,7 +331,12 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
     }
 
     if ('guard' in exports) {
-        const guardRaw = await exports.guard(ctx);
+        const guardRaw = await invokeRouteStage({
+            fn: exports.guard,
+            ctx,
+            where: `${filePath}: guard(ctx)`,
+            allowedKinds: new Set(['allow', 'redirect', 'deny'])
+        });
         const guardResult = guardRaw == null ? allow() : guardRaw;
         if (guardResult.kind === 'data') {
             throw new Error(`[Zenith] ${filePath}: guard(ctx) returned data(payload) which is a critical invariant violation. guard() can only return allow(), redirect(), or deny(). Use load(ctx) for data injection.`);
@@ -254,16 +348,21 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
         );
         trace.guard = guardResult.kind;
         if (guardResult.kind === 'redirect' || guardResult.kind === 'deny') {
-            return { result: guardResult, trace };
+            return buildResolvedEnvelope({ result: guardResult, trace, ctx });
         }
     }
 
     if (guardOnly) {
-        return { result: allow(), trace };
+        return buildResolvedEnvelope({ result: allow(), trace, ctx });
     }
 
     if (isActionRequest && 'action' in exports) {
-        const actionRaw = await exports.action(ctx);
+        const actionRaw = await invokeRouteStage({
+            fn: exports.action,
+            ctx,
+            where: `${filePath}: action(ctx)`,
+            allowedKinds: new Set(['data', 'invalid', 'redirect', 'deny'])
+        });
         let actionResult = null;
         if (isRouteResultLike(actionRaw)) {
             actionResult = actionRaw;
@@ -281,7 +380,7 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
         }
         trace.action = actionResult.kind;
         if (actionResult.kind === 'redirect' || actionResult.kind === 'deny') {
-            return { result: actionResult, trace };
+            return buildResolvedEnvelope({ result: actionResult, trace, ctx });
         }
         const actionState = buildActionState(actionResult);
         if (ctx && typeof ctx === 'object') {
@@ -294,7 +393,12 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
 
     let payload;
     if ('load' in exports) {
-        const loadRaw = await exports.load(ctx);
+        const loadRaw = await invokeRouteStage({
+            fn: exports.load,
+            ctx,
+            where: `${filePath}: load(ctx)`,
+            allowedKinds: new Set(['data', 'redirect', 'deny'])
+        });
         let loadResult = null;
         if (isRouteResultLike(loadRaw)) {
             loadResult = loadRaw;
@@ -308,13 +412,18 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
             loadResult = data(loadRaw);
         }
         trace.load = loadResult.kind;
-        return { result: loadResult, trace, status: loadResult.kind === 'data' ? responseStatus : undefined };
+        return buildResolvedEnvelope({
+            result: loadResult,
+            trace,
+            status: loadResult.kind === 'data' ? responseStatus : undefined,
+            ctx
+        });
     }
     if ('data' in exports) {
         payload = exports.data;
         assertJsonSerializable(payload, `${filePath}: data export`);
         trace.load = 'data';
-        return { result: data(payload), trace, status: responseStatus };
+        return buildResolvedEnvelope({ result: data(payload), trace, status: responseStatus, ctx });
     }
 
     // legacy fallback
@@ -322,31 +431,132 @@ export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = f
         payload = exports.ssr_data;
         assertJsonSerializable(payload, `${filePath}: ssr_data export`);
         trace.load = 'data';
-        return { result: data(payload), trace, status: responseStatus };
+        return buildResolvedEnvelope({ result: data(payload), trace, status: responseStatus, ctx });
     }
     if ('props' in exports) {
         payload = exports.props;
         assertJsonSerializable(payload, `${filePath}: props export`);
         trace.load = 'data';
-        return { result: data(payload), trace, status: responseStatus };
+        return buildResolvedEnvelope({ result: data(payload), trace, status: responseStatus, ctx });
     }
     if ('ssr' in exports) {
         payload = exports.ssr;
         assertJsonSerializable(payload, `${filePath}: ssr export`);
         trace.load = 'data';
-        return { result: data(payload), trace, status: responseStatus };
+        return buildResolvedEnvelope({ result: data(payload), trace, status: responseStatus, ctx });
     }
 
     if (isActionRequest && ctx?.action) {
         trace.load = 'data';
-        return {
+        return buildResolvedEnvelope({
             result: data({ action: ctx.action }),
             trace,
-            status: responseStatus
-        };
+            status: responseStatus,
+            ctx
+        });
     }
 
-    return { result: data({}), trace, status: responseStatus };
+    return buildResolvedEnvelope({ result: data({}), trace, status: responseStatus, ctx });
+}
+
+async function resolveResourceRouteResult({ exports, ctx, filePath, guardOnly = false }) {
+    const trace = {
+        guard: 'none',
+        action: 'none',
+        load: 'none'
+    };
+    const requestMethod = String(ctx?.method || ctx?.request?.method || 'GET').toUpperCase();
+    if (ctx && typeof ctx === 'object') {
+        ctx.action = null;
+    }
+
+    if ('guard' in exports) {
+        const guardRaw = await invokeRouteStage({
+            fn: exports.guard,
+            ctx,
+            where: `${filePath}: guard(ctx)`,
+            allowedKinds: new Set(['allow', 'redirect', 'deny'])
+        });
+        const guardResult = guardRaw == null ? allow() : guardRaw;
+        assertValidRouteResultShape(guardResult, `${filePath}: guard(ctx) return`, new Set(['allow', 'redirect', 'deny']));
+        trace.guard = guardResult.kind;
+        if (guardResult.kind === 'redirect' || guardResult.kind === 'deny') {
+            return buildResolvedEnvelope({ result: guardResult, trace, ctx });
+        }
+    }
+
+    if (guardOnly) {
+        return buildResolvedEnvelope({ result: allow(), trace, ctx });
+    }
+
+    if (requestMethod === 'GET' || requestMethod === 'HEAD') {
+        if (!('load' in exports)) {
+            trace.load = 'text';
+            return buildResolvedEnvelope({ result: text('Method Not Allowed', 405), trace, status: 405, ctx });
+        }
+        const loadResult = await resolveResourceStage({
+            exports,
+            exportName: 'load',
+            ctx,
+            filePath,
+            trace,
+            traceKey: 'load'
+        });
+        return buildResolvedEnvelope({
+            result: loadResult,
+            trace,
+            status: loadResult.status,
+            ctx
+        });
+    }
+
+    if (requestMethod === 'POST') {
+        if (!('action' in exports)) {
+            trace.action = 'text';
+            return buildResolvedEnvelope({ result: text('Method Not Allowed', 405), trace, status: 405, ctx });
+        }
+        const actionResult = await resolveResourceStage({
+            exports,
+            exportName: 'action',
+            ctx,
+            filePath,
+            trace,
+            traceKey: 'action'
+        });
+        return buildResolvedEnvelope({
+            result: actionResult,
+            trace,
+            status: actionResult.status,
+            ctx
+        });
+    }
+
+    return buildResolvedEnvelope({
+        result: text('Method Not Allowed', 405),
+        trace,
+        status: 405,
+        ctx
+    });
+}
+
+async function resolveResourceStage({ exports, exportName, ctx, filePath, trace, traceKey }) {
+    const raw = await invokeRouteStage({
+        fn: exports[exportName],
+        ctx,
+        where: `${filePath}: ${exportName}(ctx)`,
+        allowedKinds: new Set(['json', 'text', 'download', 'redirect', 'deny'])
+    });
+    if (!isRouteResultLike(raw)) {
+        throw new Error(
+            `[Zenith] ${filePath}: ${exportName}(ctx) on a resource route must return json(...), text(...), download(...), redirect(...), or deny(...).`
+        );
+    }
+    assertValidRouteResultShape(raw, `${filePath}: ${exportName}(ctx) return`, new Set(['json', 'text', 'download', 'redirect', 'deny']));
+    if (raw.kind === 'json') {
+        assertJsonSerializable(raw.data, `${filePath}: ${exportName}(ctx) return`);
+    }
+    trace[traceKey] = raw.kind;
+    return raw;
 }
 
 export async function resolveServerPayload({ exports, ctx, filePath }) {

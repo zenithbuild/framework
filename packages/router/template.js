@@ -3,6 +3,7 @@ import { renderRouterDocumentSource } from './template-document.js';
 import { renderRouterFormSource } from './template-form.js';
 import { renderRouterLifecycleSource } from './template-lifecycle.js';
 import { renderRouterNavigationSource } from './template-navigation.js';
+import { renderRouterRefreshSource } from './template-refresh.js';
 
 function normalizeManifestJson(manifestJson) {
     return manifestJson.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -36,5 +37,5 @@ export function renderRouterModule(opts) {
     const runtimeSpec = sanitizeImportSpecifier(runtimeImport);
     const coreSpec = sanitizeImportSpecifier(coreImport);
 
-    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck })}\n\n${renderRouterDocumentSource()}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterNavigationSource()}\n\n${renderRouterFormSource()}\n`;
+    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck })}\n\n${renderRouterDocumentSource()}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterRefreshSource()}\n\n${renderRouterNavigationSource()}\n\n${renderRouterFormSource()}\n`;
 }

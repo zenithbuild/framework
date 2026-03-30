@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-03-30
+
+### Changed
+
+- Added the rewrite-free `static-export` deployment target with explicit `exportPaths`, base-path-aware public output, and target-aware preview behavior on the existing manifest/server contract.
+- Added `zenPresence(...)`, the optional `presence(...)` alias, `zenNavigationShell(...)`, and the canonical always-mounted overlay/sheet pattern so Zenith now ships one documented UI composition path on top of the existing lifecycle.
+- Added route-owned multipart uploads, truthful cookie sessions on `ctx.auth`, explicit resource routes with `json(...)`, `text(...)`, and `download(...)`, and the router-side `refreshCurrentRoute()` bridge for re-running the current page route after non-HTML writes.
+- Moved final build/static HTML image materialization into bundler-owned truth while keeping runtime/server image materialization explicit, and tightened tests/docs around that build/runtime split.
+- Restored and expanded hosted parity on `vercel` and `netlify` for packaged page-route execution, page-route cookie sessions, hosted resource `json(...)` / `text(...)` routes with redirect/deny/auth/cookie behavior, and the `/_zenith/image` runtime endpoint.
+
 ## [0.7.4] - 2026-03-28
 
 ### Changed

@@ -72,15 +72,19 @@ describe('image materialization trust boundary', () => {
         }
     });
 
-    test('active CLI image materialization stays on route-scoped artifacts instead of page assets', () => {
+    test('build/static materialization is bundler-owned while runtime materialization stays route-artifact-driven', () => {
         const materializeSource = fs.readFileSync(path.resolve(__dirname, '../src/images/materialize.ts'), 'utf8');
+        const buildSource = fs.readFileSync(path.resolve(__dirname, '../src/build.js'), 'utf8');
         const previewSource = fs.readFileSync(path.resolve(__dirname, '../src/preview.js'), 'utf8');
         const devServerSource = fs.readFileSync(path.resolve(__dirname, '../src/dev-server.js'), 'utf8');
         const routeRenderSource = fs.readFileSync(path.resolve(__dirname, '../src/server-runtime/route-render.js'), 'utf8');
         const toolchainSource = fs.readFileSync(path.resolve(__dirname, '../src/toolchain-paths.ts'), 'utf8');
+        const bundlerSource = fs.readFileSync(path.resolve(__dirname, '../../bundler/src/main.rs'), 'utf8');
 
         expect(materializeSource).toContain("router-manifest.json");
         expect(materializeSource).toContain('route.image_materialization');
+        expect(buildSource.includes('materializeImageMarkupInHtmlFiles')).toBe(false);
+        expect(bundlerSource).toContain('materialize_image_markup_in_build_html');
         expect(previewSource).toContain('resolved.route.image_materialization');
         expect(devServerSource).toContain('resolved.route.image_materialization');
         expect(routeRenderSource).toContain('route.image_materialization');
@@ -103,10 +107,10 @@ describe('image materialization trust boundary', () => {
             'utf8'
         );
 
-        expect(cliContract).toContain('route-scoped `image_materialization` entries');
-        expect(cliContract).toContain('must not execute emitted page assets');
+        expect(cliContract).toContain('Final build/static HTML image materialization is bundler-owned');
+        expect(cliContract).toContain('Neither bundler nor CLI runtime paths may execute emitted page assets');
         expect(cliReadme).toContain('route-artifact-driven');
-        expect(deploymentGuide).toContain('does not execute page assets during build, preview, or server render');
+        expect(deploymentGuide).toContain('bundler-owned final build/static HTML image materialization');
         expect(legacyIndex).toContain('Legacy v1 bundler surface only');
     });
 });

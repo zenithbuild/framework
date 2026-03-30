@@ -70,7 +70,11 @@ export function applyServerEnvelopeToPageIr({
     sourceFile
 }) {
     if (composedServer.serverScript) {
-        const { has_action: _unusedHasAction, ...serverScript } = composedServer.serverScript;
+        const {
+            has_action: _unusedHasAction,
+            export_paths: _unusedExportPaths,
+            ...serverScript
+        } = composedServer.serverScript;
         pageIr.server_script = serverScript;
         pageIr.prerender = composedServer.serverScript.prerender === true;
         if (pageIr.ssr_data === undefined) {

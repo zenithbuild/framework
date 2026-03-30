@@ -20,8 +20,10 @@ import { isConfigKeyExplicit, isLoadedConfig, loadConfig, validateConfig } from 
 import { materializeImageMarkup } from './images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from './images/payload.js';
 import { handleImageRequest } from './images/service.js';
-import { encodeRequestBodyBase64, readRequestBodyBuffer } from './request-body.js';
+import { readRequestBodyBuffer } from './request-body.js';
 import { createTrustedOriginResolver } from './request-origin.js';
+import { buildResourceResponseDescriptor } from './resource-response.js';
+import { loadResourceRouteManifest } from './resource-manifest.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from './server-error.js';
 import { createSilentLogger } from './ui/logger.js';
@@ -49,6 +51,13 @@ const MIME_TYPES = {
 
 const IMAGE_RUNTIME_TAG_RE = /<script\b[^>]*\bid=(["'])zenith-image-runtime\1[^>]*>[\s\S]*?<\/script>/i;
 
+function appendSetCookieHeaders(headers, setCookies = []) {
+  if (Array.isArray(setCookies) && setCookies.length > 0) {
+    headers['Set-Cookie'] = setCookies.slice();
+  }
+  return headers;
+}
+
 const SERVER_SCRIPT_RUNNER = String.raw`
 import vm from 'node:vm';
 import fs from 'node:fs/promises';
@@ -64,6 +73,7 @@ const requestHeaders = JSON.parse(process.env.ZENITH_SERVER_REQUEST_HEADERS || '
 const routePattern = process.env.ZENITH_SERVER_ROUTE_PATTERN || '';
 const routeFile = process.env.ZENITH_SERVER_ROUTE_FILE || sourcePath || '';
 const routeId = process.env.ZENITH_SERVER_ROUTE_ID || routePattern || '';
+const routeKind = process.env.ZENITH_SERVER_ROUTE_KIND || 'page';
 const guardOnly = process.env.ZENITH_SERVER_GUARD_ONLY === '1';
 
 if (!source.trim()) {
@@ -231,14 +241,39 @@ function ctxData(payload) {
     data: payload
   };
 }
+function ctxJson(payload, status = 200) {
+  return {
+    kind: 'json',
+    data: payload,
+    status: Number.isInteger(status) ? status : 200
+  };
+}
+function ctxText(body, status = 200) {
+  return {
+    kind: 'text',
+    body: typeof body === 'string' ? body : String(body ?? ''),
+    status: Number.isInteger(status) ? status : 200
+  };
+}
+
+async function readStdinBuffer() {
+  const chunks = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 const requestInit = {
   method: requestMethod,
   headers: new Headers(safeRequestHeaders)
 };
-const requestBodyBase64 = String(process.env.ZENITH_SERVER_REQUEST_BODY_BASE64 || '');
-if (requestMethod !== 'GET' && requestMethod !== 'HEAD' && requestBodyBase64.length > 0) {
-  requestInit.body = Buffer.from(requestBodyBase64, 'base64');
+const requestBodyBuffer =
+  requestMethod !== 'GET' && requestMethod !== 'HEAD'
+    ? await readStdinBuffer()
+    : Buffer.alloc(0);
+if (requestMethod !== 'GET' && requestMethod !== 'HEAD' && requestBodyBuffer.length > 0) {
+  requestInit.body = requestBodyBuffer;
   requestInit.duplex = 'half';
 }
 const requestSnapshot = new Request(requestUrl, requestInit);
@@ -258,28 +293,27 @@ const routeContext = {
   route: routeMeta,
   env: {},
   action: null,
-  auth: {
-    async getSession(_ctx) {
-      return null;
-    },
-    async requireSession(_ctx) {
-      throw ctxRedirect('/login', 302);
-    }
-  },
   allow: ctxAllow,
   redirect: ctxRedirect,
   deny: ctxDeny,
   invalid: ctxInvalid,
-  data: ctxData
+  data: ctxData,
+  json: ctxJson,
+  text: ctxText
 };
 
 const context = vm.createContext({
   params: routeParams,
   ctx: routeContext,
   fetch: globalThis.fetch,
+  Blob: globalThis.Blob,
+  File: globalThis.File,
+  FormData: globalThis.FormData,
   Headers: globalThis.Headers,
   Request: globalThis.Request,
   Response: globalThis.Response,
+  TextEncoder: globalThis.TextEncoder,
+  TextDecoder: globalThis.TextDecoder,
   URL,
   URLSearchParams,
   Buffer,
@@ -323,23 +357,31 @@ async function loadFileModule(moduleUrl) {
   if (moduleCache.has(moduleUrl)) {
     return moduleCache.get(moduleUrl);
   }
+  const modulePromise = (async () => {
+    const filename = fileURLToPath(moduleUrl);
+    let code = await fs.readFile(filename, 'utf8');
+    code = await transpileIfNeeded(filename, code);
+    const module = new vm.SourceTextModule(code, {
+      context,
+      identifier: moduleUrl,
+      initializeImportMeta(meta) {
+        meta.url = moduleUrl;
+      }
+    });
 
-  const filename = fileURLToPath(moduleUrl);
-  let code = await fs.readFile(filename, 'utf8');
-  code = await transpileIfNeeded(filename, code);
-  const module = new vm.SourceTextModule(code, {
-    context,
-    identifier: moduleUrl,
-    initializeImportMeta(meta) {
-      meta.url = moduleUrl;
-    }
-  });
+    await module.link((specifier, referencingModule) => {
+      return linkModule(specifier, referencingModule.identifier);
+    });
+    return module;
+  })();
 
-  moduleCache.set(moduleUrl, module);
-  await module.link((specifier, referencingModule) => {
-    return linkModule(specifier, referencingModule.identifier);
-  });
-  return module;
+  moduleCache.set(moduleUrl, modulePromise);
+  try {
+    return await modulePromise;
+  } catch (error) {
+    moduleCache.delete(moduleUrl);
+    throw error;
+  }
 }
 
 async function linkModule(specifier, parentIdentifier) {
@@ -350,11 +392,14 @@ async function linkModule(specifier, parentIdentifier) {
   return loadFileModule(resolvedUrl);
 }
 
-const allowed = new Set(['data', 'load', 'guard', 'action', 'ssr_data', 'props', 'ssr', 'prerender']);
+const allowed = new Set(['data', 'load', 'guard', 'action', 'ssr_data', 'props', 'ssr', 'prerender', 'exportPaths']);
 const prelude = "const params = globalThis.params;\n" +
   "const ctx = globalThis.ctx;\n" +
-  "import { resolveRouteResult } from 'zenith:server-contract';\n" +
-  "globalThis.resolveRouteResult = resolveRouteResult;\n";
+  "import { download, resolveRouteResult } from 'zenith:server-contract';\n" +
+  "import { attachRouteAuth } from 'zenith:route-auth';\n" +
+  "ctx.download = download;\n" +
+  "globalThis.resolveRouteResult = resolveRouteResult;\n" +
+  "globalThis.attachRouteAuth = attachRouteAuth;\n";
 const entryIdentifier = sourcePath
   ? pathToFileURL(sourcePath).href
   : 'zenith:server-script';
@@ -375,14 +420,35 @@ moduleCache.set(entryIdentifier, entryModule);
 await entryModule.link((specifier, referencingModule) => {
   if (specifier === 'zenith:server-contract') {
     const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'server-contract.js');
-    const contractUrl = pathToFileURL(process.env.ZENITH_SERVER_CONTRACT_PATH || defaultPath).href;
-    return loadFileModule(contractUrl).catch(() => 
+    const configuredPath = process.env.ZENITH_SERVER_CONTRACT_PATH || '';
+    const contractUrl = pathToFileURL(configuredPath || defaultPath).href;
+    if (configuredPath) {
+      return loadFileModule(contractUrl);
+    }
+    return loadFileModule(contractUrl).catch(() =>
+      loadFileModule(pathToFileURL(defaultPath).href)
+    );
+  }
+  if (specifier === 'zenith:route-auth') {
+    const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'auth', 'route-auth.js');
+    const configuredPath = process.env.ZENITH_SERVER_ROUTE_AUTH_PATH || '';
+    const authUrl = pathToFileURL(configuredPath || defaultPath).href;
+    if (configuredPath) {
+      return loadFileModule(authUrl);
+    }
+    return loadFileModule(authUrl).catch(() =>
       loadFileModule(pathToFileURL(defaultPath).href)
     );
   }
   return linkModule(specifier, referencingModule.identifier);
 });
 await entryModule.evaluate();
+context.attachRouteAuth(routeContext, {
+  requestUrl: routeContext.url,
+  guardOnly,
+  redirect: ctxRedirect,
+  deny: ctxDeny
+});
 
 const namespaceKeys = Object.keys(entryModule.namespace);
 for (const key of namespaceKeys) {
@@ -397,7 +463,8 @@ try {
     exports: exported,
     ctx: context.ctx,
     filePath: sourcePath || 'server_script',
-    guardOnly: guardOnly
+    guardOnly: guardOnly,
+    routeKind: routeKind
   });
 
   process.stdout.write(JSON.stringify(resolved || null));
@@ -451,7 +518,9 @@ export async function createPreviewServer(options) {
   const logger = providedLogger || createSilentLogger();
   const verboseLogging = logger.mode?.logLevel === 'verbose';
   const configuredBasePath = normalizeBasePath(config.basePath || '/');
-  const routeCheckEnabled = supportsTargetRouteCheck(resolveBuildAdapter(config).target);
+  const resolvedTarget = resolveBuildAdapter(config).target;
+  const routeCheckEnabled = supportsTargetRouteCheck(resolvedTarget);
+  const isStaticExportTarget = resolvedTarget === 'static-export';
   let actualPort = port;
   const resolveServerOrigin = createTrustedOriginResolver({
     host,
@@ -471,7 +540,7 @@ export async function createPreviewServer(options) {
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, resolveServerOrigin());
-    const { basePath, routes } = await loadRouteManifestState(distDir, configuredBasePath);
+    const { basePath, pageRoutes, resourceRoutes } = await loadRouteSurfaceState(distDir, configuredBasePath);
     const canonicalPath = stripBasePath(url.pathname, basePath);
 
     try {
@@ -511,7 +580,7 @@ export async function createPreviewServer(options) {
         }
         const canonicalTargetUrl = new URL(targetUrl.toString());
         canonicalTargetUrl.pathname = canonicalTargetPath;
-        const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, routes);
+        const resolvedCheck = resolveRequestRoute(canonicalTargetUrl, pageRoutes);
         if (!resolvedCheck.matched || !resolvedCheck.route) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'route_not_found' }));
@@ -562,6 +631,9 @@ export async function createPreviewServer(options) {
       }
 
       if (url.pathname === imageEndpointPath(basePath)) {
+        if (isStaticExportTarget) {
+          throw new Error('not found');
+        }
         await handleImageRequest(req, res, {
           requestUrl: url,
           projectRoot,
@@ -575,7 +647,9 @@ export async function createPreviewServer(options) {
       }
 
       if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
-        const staticPath = resolveWithinDist(distDir, canonicalPath);
+        const staticPath = isStaticExportTarget
+          ? resolveWithinDist(distDir, url.pathname)
+          : resolveWithinDist(distDir, canonicalPath);
         if (!staticPath || !(await fileExists(staticPath))) {
           throw new Error('not found');
         }
@@ -586,9 +660,50 @@ export async function createPreviewServer(options) {
         return;
       }
 
+      if (isStaticExportTarget) {
+        const directHtmlPath = toStaticFilePath(distDir, url.pathname);
+        if (!directHtmlPath || !(await fileExists(directHtmlPath))) {
+          throw new Error('not found');
+        }
+        const html = await readFile(directHtmlPath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(html);
+        return;
+      }
+
       const canonicalUrl = new URL(url.toString());
       canonicalUrl.pathname = canonicalPath;
-      const resolved = resolveRequestRoute(canonicalUrl, routes);
+      const resolvedResource = resolveRequestRoute(canonicalUrl, resourceRoutes);
+      if (resolvedResource.matched && resolvedResource.route) {
+        const requestMethod = req.method || 'GET';
+        const requestBodyBuffer =
+          requestMethod === 'GET' || requestMethod === 'HEAD'
+            ? null
+            : await readRequestBodyBuffer(req);
+        const execution = await executeServerRoute({
+          source: resolvedResource.route.server_script || '',
+          sourcePath: resolvedResource.route.server_script_path || '',
+          params: resolvedResource.params,
+          requestUrl: url.toString(),
+          requestMethod,
+          requestHeaders: req.headers,
+          requestBodyBuffer,
+          routePattern: resolvedResource.route.path,
+          routeFile: resolvedResource.route.server_script_path || '',
+          routeId: resolvedResource.route.route_id || routeIdFromSourcePath(resolvedResource.route.server_script_path || ''),
+          routeKind: 'resource'
+        });
+        const descriptor = buildResourceResponseDescriptor(execution?.result, basePath, Array.isArray(execution?.setCookies) ? execution.setCookies : []);
+        res.writeHead(descriptor.status, appendSetCookieHeaders(descriptor.headers, descriptor.setCookies));
+        if ((req.method || 'GET').toUpperCase() === 'HEAD') {
+          res.end();
+          return;
+        }
+        res.end(descriptor.body);
+        return;
+      }
+
+      const resolved = resolveRequestRoute(canonicalUrl, pageRoutes);
       let htmlPath = null;
 
       if (resolved.matched && resolved.route) {
@@ -625,7 +740,7 @@ export async function createPreviewServer(options) {
             requestUrl: url.toString(),
             requestMethod,
             requestHeaders: req.headers,
-            requestBodyBase64: encodeRequestBodyBase64(requestBodyBuffer),
+            requestBodyBuffer,
             routePattern: resolved.route.path,
             routeFile: resolved.route.server_script_path || '',
             routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '')
@@ -643,6 +758,7 @@ export async function createPreviewServer(options) {
 
         const trace = routeExecution?.trace || { guard: 'none', action: 'none', load: 'none' };
         const routeId = resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '');
+        const setCookies = Array.isArray(routeExecution?.setCookies) ? routeExecution.setCookies : [];
         if (verboseLogging) {
           logger.router(`${routeId} guard=${trace.guard} action=${trace.action} load=${trace.load}`);
         }
@@ -650,16 +766,16 @@ export async function createPreviewServer(options) {
         const result = routeExecution?.result;
         if (result && result.kind === 'redirect') {
           const status = Number.isInteger(result.status) ? result.status : 302;
-          res.writeHead(status, {
+          res.writeHead(status, appendSetCookieHeaders({
             Location: appLocalRedirectLocation(result.location, basePath),
             'Cache-Control': 'no-store'
-          });
+          }, setCookies));
           res.end('');
           return;
         }
         if (result && result.kind === 'deny') {
           const status = Number.isInteger(result.status) ? result.status : 403;
-          res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.writeHead(status, appendSetCookieHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }, setCookies));
           res.end(clientFacingRouteMessage(status, result.message));
           return;
         }
@@ -688,9 +804,9 @@ export async function createPreviewServer(options) {
         );
       }
 
-      res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, {
+      res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, appendSetCookieHeaders({
         'Content-Type': 'text/html'
-      });
+      }, Array.isArray(routeExecution?.setCookies) ? routeExecution.setCookies : []));
       res.end(html);
     } catch {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -734,31 +850,35 @@ export async function createPreviewServer(options) {
  * @returns {Promise<PreviewRoute[]>}
  */
 export async function loadRouteManifest(distDir) {
-  const state = await loadRouteManifestState(distDir, '/');
-  return state.routes;
+  const state = await loadRouteSurfaceState(distDir, '/');
+  return state.pageRoutes;
 }
 
-async function loadRouteManifestState(distDir, fallbackBasePath = '/') {
+export async function loadRouteSurfaceState(distDir, fallbackBasePath = '/') {
   const manifestPath = join(distDir, 'assets', 'router-manifest.json');
+  const resourceState = await loadResourceRouteManifest(distDir, normalizeBasePath(fallbackBasePath || '/'));
   try {
     const source = await readFile(manifestPath, 'utf8');
     const parsed = JSON.parse(source);
     const routes = Array.isArray(parsed?.routes) ? parsed.routes : [];
+    const basePath = normalizeBasePath(parsed?.base_path || resourceState.basePath || fallbackBasePath || '/');
     return {
-      basePath: normalizeBasePath(parsed?.base_path || fallbackBasePath || '/'),
-      routes: routes
+      basePath,
+      pageRoutes: routes
         .filter((entry) =>
         entry &&
         typeof entry === 'object' &&
         typeof entry.path === 'string' &&
         typeof entry.output === 'string'
       )
-        .sort((a, b) => compareRouteSpecificity(a.path, b.path))
+        .sort((a, b) => compareRouteSpecificity(a.path, b.path)),
+      resourceRoutes: Array.isArray(resourceState.routes) ? resourceState.routes : []
     };
   } catch {
     return {
-      basePath: normalizeBasePath(fallbackBasePath || '/'),
-      routes: []
+      basePath: normalizeBasePath(resourceState.basePath || fallbackBasePath || '/'),
+      pageRoutes: [],
+      resourceRoutes: Array.isArray(resourceState.routes) ? resourceState.routes : []
     };
   }
 }
@@ -766,8 +886,8 @@ async function loadRouteManifestState(distDir, fallbackBasePath = '/') {
 export const matchRoute = matchManifestRoute;
 
 /**
- * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, routePattern?: string, routeFile?: string, routeId?: string }} input
- * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number }>}
+ * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, requestBodyBuffer?: Buffer | null, routePattern?: string, routeFile?: string, routeId?: string, routeKind?: 'page' | 'resource' }} input
+ * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
  */
 export async function executeServerRoute({
   source,
@@ -776,10 +896,11 @@ export async function executeServerRoute({
   requestUrl,
   requestMethod,
   requestHeaders,
-  requestBodyBase64,
+  requestBodyBuffer,
   routePattern,
   routeFile,
   routeId,
+  routeKind = 'page',
   guardOnly = false
 }) {
   if (!source || !String(source).trim()) {
@@ -796,10 +917,11 @@ export async function executeServerRoute({
     requestUrl: requestUrl || 'http://localhost/',
     requestMethod: requestMethod || 'GET',
     requestHeaders: sanitizeRequestHeaders(requestHeaders || {}),
-    requestBodyBase64: requestBodyBase64 || '',
+    requestBodyBuffer: Buffer.isBuffer(requestBodyBuffer) ? requestBodyBuffer : null,
     routePattern: routePattern || '',
     routeFile: routeFile || sourcePath || '',
     routeId: routeId || routeIdFromSourcePath(sourcePath || ''),
+    routeKind,
     guardOnly
   });
 
@@ -837,7 +959,10 @@ export async function executeServerRoute({
           load: String(trace.load || 'none')
         }
         : { guard: 'none', action: 'none', load: 'none' },
-      status: Number.isInteger(payload.status) ? payload.status : undefined
+      status: Number.isInteger(payload.status) ? payload.status : undefined,
+      setCookies: Array.isArray(payload.setCookies)
+        ? payload.setCookies.filter((value) => typeof value === 'string' && value.length > 0)
+        : []
     };
   }
 
@@ -889,7 +1014,7 @@ export async function executeServerScript(input) {
 }
 
 /**
- * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl: string, requestMethod: string, requestHeaders: Record<string, string>, routePattern: string, routeFile: string, routeId: string }} input
+ * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl: string, requestMethod: string, requestHeaders: Record<string, string>, requestBodyBuffer?: Buffer | null, routePattern: string, routeFile: string, routeId: string, routeKind?: 'page' | 'resource' }} input
  * @returns {Promise<unknown>}
  */
 function spawnNodeServerRunner(input) {
@@ -906,16 +1031,23 @@ function spawnNodeServerRunner(input) {
           ZENITH_SERVER_REQUEST_URL: input.requestUrl || 'http://localhost/',
           ZENITH_SERVER_REQUEST_METHOD: input.requestMethod || 'GET',
           ZENITH_SERVER_REQUEST_HEADERS: JSON.stringify(input.requestHeaders || {}),
-          ZENITH_SERVER_REQUEST_BODY_BASE64: input.requestBodyBase64 || '',
           ZENITH_SERVER_ROUTE_PATTERN: input.routePattern || '',
           ZENITH_SERVER_ROUTE_FILE: input.routeFile || input.sourcePath || '',
           ZENITH_SERVER_ROUTE_ID: input.routeId || '',
+          ZENITH_SERVER_ROUTE_KIND: input.routeKind || 'page',
           ZENITH_SERVER_GUARD_ONLY: input.guardOnly ? '1' : '',
-          ZENITH_SERVER_CONTRACT_PATH: join(__dirname, 'server-contract.js')
+          ZENITH_SERVER_CONTRACT_PATH: join(__dirname, 'server-contract.js'),
+          ZENITH_SERVER_ROUTE_AUTH_PATH: join(__dirname, 'auth', 'route-auth.js')
         },
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe']
       }
     );
+
+    const runnerRequestBody = Buffer.isBuffer(input.requestBodyBuffer) ? input.requestBodyBuffer : null;
+    child.stdin.on('error', () => {
+      // ignore broken pipes when the runner exits before consuming stdin
+    });
+    child.stdin.end(runnerRequestBody && runnerRequestBody.length > 0 ? runnerRequestBody : undefined);
 
     let stdout = '';
     let stderr = '';

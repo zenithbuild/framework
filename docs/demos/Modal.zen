@@ -1,46 +1,182 @@
 <script setup="ts">
-const open = signal(false);
-const modalOverlayRef = ref<HTMLElement>();
+import { zenPresence } from "@zenithbuild/runtime";
 
-function renderModal() {
-  if (modalOverlayRef.current) {
-    modalOverlayRef.current.className = open.get()
-      ? "fixed inset-0 z-10 flex items-center justify-center bg-black/40 p-6"
-      : "hidden";
+const open = signal(false);
+const modalTitleId = "demo-overlay-sheet-title";
+const modalDescriptionId = "demo-overlay-sheet-description";
+const modalOpenButtonRef = ref<HTMLButtonElement>();
+const modalOverlayRef = ref<HTMLElement>();
+const modalPanelRef = ref<HTMLElement>();
+const modalPrimaryActionRef = ref<HTMLButtonElement>();
+
+function focusIfAvailable(node: HTMLElement | null | undefined) {
+  if (!node || !node.isConnected || typeof node.focus !== "function") {
+    return;
+  }
+
+  try {
+    node.focus({ preventScroll: true });
+  } catch {
+    try {
+      node.focus();
+    } catch {
+    }
   }
 }
 
+const modalPresence = zenPresence(modalOverlayRef, {
+  timeoutMs: 220,
+  onPhaseChange(phase, context) {
+    if (phase === "present" && context.previousPhase === "entering") {
+      focusIfAvailable(modalPrimaryActionRef.current);
+    }
+
+    if (phase === "hidden" && context.previousPhase === "exiting") {
+      focusIfAvailable(modalOpenButtonRef.current);
+    }
+  },
+});
+
 function showModal() {
   open.set(true);
-  renderModal();
 }
 
 function hideModal() {
   open.set(false);
-  renderModal();
 }
 
-zenMount(() => {
-  renderModal();
+zenMount((ctx) => {
+  const overlay = modalOverlayRef.current;
+  const doc = zenDocument();
+
+  ctx.cleanup(modalPresence.mount());
+
+  if (overlay) {
+    const offBackdrop = zenOn(overlay, "click", (event) => {
+      if (!open.get()) {
+        return;
+      }
+
+      const panel = modalPanelRef.current;
+      if (panel && event.target instanceof Node && !panel.contains(event.target)) {
+        hideModal();
+      }
+    });
+    ctx.cleanup(offBackdrop);
+  }
+
+  if (doc) {
+    const offEscape = zenOn(doc, "keydown", (event) => {
+      if (event.key === "Escape" && open.get()) {
+        hideModal();
+      }
+    });
+    ctx.cleanup(offEscape);
+  }
 });
 
 zeneffect([open], () => {
-  renderModal();
+  modalPresence.setPresent(open.get());
 });
 </script>
 
+<style>
+[data-demo-modal-overlay-runtime] {
+  transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+[data-demo-modal-overlay-runtime][data-zen-presence="hidden"] {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+[data-demo-modal-overlay-runtime][data-zen-presence="entering"],
+[data-demo-modal-overlay-runtime][data-zen-presence="present"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+[data-demo-modal-overlay-runtime][data-zen-presence="exiting"] {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+[data-demo-modal-card] {
+  transform: translateY(16px) scale(0.98);
+  transition: transform 220ms ease;
+}
+
+[data-demo-modal-overlay-runtime][data-zen-presence="entering"] [data-demo-modal-card],
+[data-demo-modal-overlay-runtime][data-zen-presence="present"] [data-demo-modal-card] {
+  transform: translateY(0) scale(1);
+}
+
+[data-demo-modal-overlay-runtime][data-zen-presence="exiting"] [data-demo-modal-card] {
+  transform: translateY(16px) scale(0.98);
+}
+</style>
+
 <section class="p-6 font-sans">
-  <h1 class="text-2xl font-semibold">Modal Demo</h1>
-  <p class="mt-2 text-sm text-zinc-600">Visibility is controlled by explicit state transitions.</p>
+  <h1 class="text-2xl font-semibold">Overlay / Sheet Pattern Demo</h1>
+  <p class="mt-2 text-sm text-zinc-600">
+    One always-mounted overlay root and one always-mounted panel. Backdrop click and Escape close through `zenMount(...)`
+    cleanup. This example stays intentionally short, so it uses footer `Cancel` instead of adding a second header close control or a long introductory summary.
+  </p>
 
-  <button class="mt-4 rounded-md bg-indigo-600 px-4 py-2 text-white" on:click={showModal}>Open modal</button>
+  <div class="mt-4 flex flex-wrap gap-3">
+    <button ref={modalOpenButtonRef} class="rounded-md bg-sky-600 px-4 py-2 text-white" on:click={showModal}>Archive workspace</button>
+  </div>
 
-  <div ref={modalOverlayRef} data-demo-modal-overlay-runtime class="hidden">
-    <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
-      <h2 class="text-xl font-semibold">Deterministic Modal</h2>
-      <p class="mt-2 text-sm text-zinc-600">No framework magic. No runtime parser.</p>
-      <div class="mt-4 flex justify-end">
-        <button class="rounded-md border border-zinc-300 px-4 py-2" on:click={hideModal}>Close</button>
+  <div
+    ref={modalOverlayRef}
+    data-demo-modal-overlay-runtime
+    class="fixed inset-0 z-10 flex items-end justify-center bg-zinc-950/55 p-4 backdrop-blur-sm md:items-center md:p-6"
+  >
+    <div
+      ref={modalPanelRef}
+      data-demo-modal-card
+      class="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl md:rounded-3xl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={modalTitleId}
+      aria-describedby={modalDescriptionId}
+    >
+      <div>
+        <h2 id={modalTitleId} class="text-xl font-semibold text-zinc-950">Archive workspace</h2>
+        <p id={modalDescriptionId} class="mt-2 text-sm text-zinc-600">
+          You can restore this workspace later from archived items.
+        </p>
+      </div>
+
+      <div class="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+        <p class="text-sm text-zinc-700">Check the narrow dismissal and confirmation rules:</p>
+        <ul class="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-600">
+          <li>Open the archive dialog and watch focus land on the primary action.</li>
+          <li>Inspect the panel: this demo uses the visible-heading path, so `aria-labelledby` and `aria-describedby` point at local in-surface content.</li>
+          <li>This simple confirm surface uses footer `Cancel` as its single explicit dismissal control.</li>
+          <li>If this were a long settings sheet, a header close could be added for navigation convenience while footer `Cancel` still owned the decision row.</li>
+          <li>Dense long-form sheets should keep the header brief and move detailed explanation into section headings and body content.</li>
+          <li>Settings sheets should group related fields under one heading, split sections only when scanning cost grows, and order sections from broad choices toward advanced details.</li>
+          <li>Advanced settings should stay in their own final section when they are optional, while one-off clarifications should stay as short inline copy instead of another subsection.</li>
+          <li>Only add a short pre-footer summary when a long settings sheet makes the save scope easy to lose; otherwise the body content is already enough.</li>
+          <li>Ordinary reversible settings can usually end with `Save changes`, but immediate or hard-to-undo settings should use stronger footer language that matches the real consequence.</li>
+          <li>For settings sheets, `Cancel` should mean “close without applying unsaved in-sheet edits,” not “roll back everything everywhere.”</li>
+          <li>The supporting copy stays short because the action is reversible.</li>
+          <li>The footer uses only `Cancel` + one primary action because no secondary choice is needed.</li>
+          <li>Keep footer button copy brief and specific to the surface instead of turning the action row into a second explanation block.</li>
+          <li>As the body gets denser, keep the footer action row stable and decision-focused instead of expanding the intro copy.</li>
+          <li>Short surfaces should avoid duplicating both a header close and footer `Cancel` when one dismissal surface is enough.</li>
+          <li>Click the backdrop.</li>
+          <li>Press Escape.</li>
+          <li>Close it and watch focus return to the opener.</li>
+        </ul>
+      </div>
+
+      <div class="mt-4 flex justify-end gap-3">
+        <button class="rounded-md border border-zinc-300 px-4 py-2 text-zinc-700" on:click={hideModal}>Cancel</button>
+        <button ref={modalPrimaryActionRef} class="rounded-md bg-sky-600 px-4 py-2 text-white" on:click={hideModal}>Archive workspace</button>
       </div>
     </div>
   </div>

@@ -38,12 +38,15 @@ describe('adapter config', () => {
     });
 
     test('deployment targets resolve to concrete adapters', () => {
+        const staticExport = resolveBuildAdapter(validateConfig({ target: 'static-export' }));
         const vercel = resolveBuildAdapter(validateConfig({ target: 'vercel-static' }));
         const netlify = resolveBuildAdapter(validateConfig({ target: 'netlify-static' }));
         const vercelServer = resolveBuildAdapter(validateConfig({ target: 'vercel' }));
         const netlifyServer = resolveBuildAdapter(validateConfig({ target: 'netlify' }));
         const nodeServer = resolveBuildAdapter(validateConfig({ target: 'node' }));
 
+        expect(staticExport.target).toBe('static-export');
+        expect(staticExport.adapter.name).toBe('static-export');
         expect(vercel.target).toBe('vercel-static');
         expect(vercel.adapter.name).toBe('vercel-static');
         expect(netlify.target).toBe('netlify-static');

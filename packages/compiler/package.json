@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/compiler",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -31,10 +31,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@zenithbuild/compiler-darwin-arm64": "0.7.4",
-    "@zenithbuild/compiler-darwin-x64": "0.7.4",
-    "@zenithbuild/compiler-linux-x64": "0.7.4",
-    "@zenithbuild/compiler-win32-x64": "0.7.4"
+    "@zenithbuild/compiler-darwin-arm64": "0.7.5",
+    "@zenithbuild/compiler-darwin-x64": "0.7.5",
+    "@zenithbuild/compiler-linux-x64": "0.7.5",
+    "@zenithbuild/compiler-win32-x64": "0.7.5"
   },
   "devDependencies": {
     "@types/node": "latest",

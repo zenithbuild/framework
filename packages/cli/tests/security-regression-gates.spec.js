@@ -307,12 +307,16 @@ describe('Track A security regression gates', () => {
         expect(html).toContain('data-zenith-image=');
         expect(html).toContain('/docs/_zenith/image/local/');
 
+        const buildSource = await readFile(resolve(__dirname, '../src/build.js'), 'utf8');
         const materializeSource = await readFile(resolve(__dirname, '../src/images/materialize.ts'), 'utf8');
         const previewSource = await readFile(resolve(__dirname, '../src/preview.js'), 'utf8');
         const routeRenderSource = await readFile(resolve(__dirname, '../src/server-runtime/route-render.js'), 'utf8');
+        const bundlerSource = await readFile(resolve(__dirname, '../../bundler/src/main.rs'), 'utf8');
 
         expect(materializeSource).toContain('router-manifest.json');
         expect(materializeSource).toContain('route.image_materialization');
+        expect(buildSource.includes('materializeImageMarkupInHtmlFiles')).toBe(false);
+        expect(bundlerSource).toContain('materialize_image_markup_in_build_html');
         expect(previewSource).toContain('resolved.route.image_materialization');
         expect(routeRenderSource).toContain('route.image_materialization');
         expect(materializeSource.includes('page_asset')).toBe(false);
@@ -356,8 +360,8 @@ describe('Track A security regression gates', () => {
             'utf8'
         );
 
-        expect(cliContract).toContain('must not execute emitted page assets');
-        expect(deploymentGuide).toContain('does not execute page assets during build, preview, or server render');
+        expect(cliContract).toContain('Neither bundler nor CLI runtime paths may execute emitted page assets');
+        expect(deploymentGuide).toContain('bundler-owned final build/static HTML image materialization');
         expect(deploymentGuide).toContain('Hosted `vercel` and `netlify` targets currently skip advisory route-check');
         expect(routeProtectionDoc).toContain('/__zenith/route-check` does not grant security');
         expect(routeProtectionDoc).toContain('Internal Server Error');

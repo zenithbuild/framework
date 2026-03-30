@@ -36,15 +36,6 @@ function resolveFormMethod(form, submitter) {
   );
 }
 
-function resolveFormEnctype(form, submitter) {
-  return String(
-    readSubmitOverride(submitter, "formenctype", "formEnctype") ||
-    form.getAttribute("enctype") ||
-    form.enctype ||
-    "application/x-www-form-urlencoded"
-  ).toLowerCase();
-}
-
 function createFormSubmissionPayload(form, submitter) {
   try {
     return submitter ? new FormData(form, submitter) : new FormData(form);
@@ -63,7 +54,6 @@ function shouldEnhanceForm(form, submitter) {
   const target = resolveFormTargetValue(form, submitter);
   if (target && target !== "_self") return false;
   if (resolveFormMethod(form, submitter) !== "POST") return false;
-  if (resolveFormEnctype(form, submitter).includes("multipart/form-data")) return false;
 
   const targetUrl = resolveFormTargetUrl(form, submitter);
   if (targetUrl.origin !== window.location.origin) return false;

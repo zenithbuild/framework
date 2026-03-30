@@ -75,6 +75,9 @@ export async function writeBuildOutputManifest({ coreOutputDir, staticDir, targe
             render_mode: entry.render_mode,
             requires_hydration: /<script\b[^>]*type="module"/i.test(html),
             params: [...entry.params],
+            ...(Array.isArray(entry.export_paths) && entry.export_paths.length > 0
+                ? { export_paths: [...entry.export_paths] }
+                : {}),
             html: htmlPath,
             assets
         });

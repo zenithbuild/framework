@@ -447,6 +447,14 @@ function resolveScrollTarget(targetUrl, historyMode, popstateState) {
     const saved = readStoredScroll(popstateState);
     return { mode: "restore", x: saved.x, y: saved.y, focusTarget: null };
   }
+  if (historyMode === "refresh") {
+    return {
+      mode: "restore",
+      x: window.scrollX || window.pageXOffset || 0,
+      y: window.scrollY || window.pageYOffset || 0,
+      focusTarget: null
+    };
+  }
   return { mode: "top", x: 0, y: 0, focusTarget: null };
 }
 
@@ -655,6 +663,19 @@ function ensureCurrentNavigation(context) {
   return false;
 }
 
+const __ZENITH_REFRESH_CURRENT_ROUTE_KEY = "__zenith_refresh_current_route";
+
+async function refreshCurrentRouteInternal() {
+  const targetUrl = new URL(window.location.href);
+  const resolved = resolveRoute(targetUrl.pathname);
+  if (!resolved) {
+    throw new Error("[Zenith Router] refreshCurrentRoute() requires a current matched Zenith page route");
+  }
+  await performNavigation(targetUrl, "refresh", null);
+}
+
+zenithScope()[__ZENITH_REFRESH_CURRENT_ROUTE_KEY] = refreshCurrentRouteInternal;
+
 async function requestRouteCheck(context, resolved, targetUrl, signal) {
   if (!__ZENITH_ROUTE_CHECK_ENABLED__) {
     return { kind: "allow" };
@@ -752,6 +773,10 @@ function navigateViaBrowser(targetUrl, replace) {
     return;
   }
   window.location.assign(targetUrl.href);
+}
+
+function shouldReplaceBrowserNavigation(historyMode) {
+  return historyMode === "pop";
 }
 
 function dispatchNavigationFallback(context, detail) {
@@ -887,7 +912,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: checkResult.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (checkResult.kind === "deny") {
@@ -895,7 +920,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "server-deny",
         status: checkResult.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -915,7 +940,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: response.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -926,7 +951,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "http-status",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (!isHtmlResponse(response)) {
@@ -934,7 +959,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "non-html",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -943,7 +968,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
       dispatchNavigationFallback(context, {
         reason: "document-parse"
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     const committed = await commitNavigationDocument(
@@ -973,7 +998,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "runtime-failure",
         historyCommitted
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop" || historyCommitted);
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode) || historyCommitted);
       return true;
     }
     dispatchNavigationFallback(context, context.abortReason || {
@@ -1134,15 +1159,6 @@ function resolveFormMethod(form, submitter) {
   );
 }
 
-function resolveFormEnctype(form, submitter) {
-  return String(
-    readSubmitOverride(submitter, "formenctype", "formEnctype") ||
-    form.getAttribute("enctype") ||
-    form.enctype ||
-    "application/x-www-form-urlencoded"
-  ).toLowerCase();
-}
-
 function createFormSubmissionPayload(form, submitter) {
   try {
     return submitter ? new FormData(form, submitter) : new FormData(form);
@@ -1161,7 +1177,6 @@ function shouldEnhanceForm(form, submitter) {
   const target = resolveFormTargetValue(form, submitter);
   if (target && target !== "_self") return false;
   if (resolveFormMethod(form, submitter) !== "POST") return false;
-  if (resolveFormEnctype(form, submitter).includes("multipart/form-data")) return false;
 
   const targetUrl = resolveFormTargetUrl(form, submitter);
   if (targetUrl.origin !== window.location.origin) return false;

@@ -3800,10 +3800,11 @@ dependencies = [
 
 [[package]]
 name = "zenith-bundler"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "anyhow",
  "arcstr",
+ "base64",
  "dashmap 6.1.0",
  "hex",
  "log",
@@ -3823,12 +3824,13 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "url",
  "zenith_compiler",
 ]
 
 [[package]]
 name = "zenith_compiler"
-version = "0.7.4"
+version = "0.7.5"
 dependencies = [
  "regex",
  "serde",

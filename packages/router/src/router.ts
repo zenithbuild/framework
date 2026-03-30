@@ -15,7 +15,7 @@
 import { _dispatchRouteChange } from './events.js';
 import { current, listen } from './history.js';
 import { matchRoute } from './match.js';
-import { _setNavigationResolver } from './navigate.js';
+import { _setNavigationResolver, _setRefreshResolver } from './navigate.js';
 
 type RouteParams = Record<string, string>;
 type RouteLoader = (params: RouteParams) => unknown | Promise<unknown>;
@@ -56,10 +56,13 @@ export function createRouter(config: RouterConfig): RouterInstance {
     let started = false;
     let hasMounted = false;
 
-    async function resolvePath(path: string): Promise<void> {
+    async function resolvePath(path: string, options: { failOnUnmatched?: boolean } = {}): Promise<void> {
         const result = matchRoute(routes, path);
 
         if (!result) {
+            if (options.failOnUnmatched) {
+                throw new Error('[Zenith Router] refreshCurrentRoute() requires a current matched Zenith page route');
+            }
             _dispatchRouteChange({ path, matched: false });
             return;
         }
@@ -86,6 +89,9 @@ export function createRouter(config: RouterConfig): RouterInstance {
         started = true;
 
         _setNavigationResolver(resolvePath);
+        _setRefreshResolver(async () => {
+            await resolvePath(current(), { failOnUnmatched: true });
+        });
         unlisten = listen((path) => {
             void resolvePath(path);
         });
@@ -99,6 +105,7 @@ export function createRouter(config: RouterConfig): RouterInstance {
             unlisten = null;
         }
         _setNavigationResolver(null);
+        _setRefreshResolver(null);
         started = false;
     }
 

@@ -66,6 +66,7 @@ export default {
 - Canonical route identities remain base-path free
 - `.zenith-output/manifest.json` carries `base_path`
 - Adapters map public base-path URLs onto canonical emitted output
+- Final adapter output may still nest public files under `basePath` when direct-file serving requires it
 - There is no separate `assetPrefix` knob
 
 ---
@@ -145,9 +146,10 @@ Each stage is a discrete function call. No implicit chaining.
 
 ### Image Materialization Boundary
 
-- Build, preview, and packaged server rendering consume route-scoped `image_materialization` entries from router-manifest or packaged route metadata.
+- Final build/static HTML image materialization is bundler-owned and consumes route-scoped `image_materialization` entries plus the normalized image runtime payload.
+- Preview and packaged server rendering continue to consume route-scoped `image_materialization` entries from router-manifest or packaged route metadata at runtime.
 - Image HTML materialization consumes compiler-owned static `data-zenith-image` payloads already present in emitted HTML.
-- CLI image materialization must not execute emitted page assets to recover image props or HTML.
+- Neither bundler nor CLI runtime paths may execute emitted page assets to recover image props or HTML.
 - Dynamic or non-literal `Image` props are unsupported until the compiler/bundler emits a structured image materialization artifact.
 
 ---
@@ -171,8 +173,9 @@ Each stage is a discrete function call. No implicit chaining.
 - No compilation
 - No bundling
 - Static targets serve built files
+- `static-export` serves concrete exported files directly, with no rewrite dependency
 - `node` boots the built Node artifact
-- Honors `basePath` for public app routes, asset URLs, and framework endpoints
+- Honors `basePath` for public app routes, asset URLs, and framework endpoints that the selected target exposes
 - Verifies build output is independent of dev mode
 
 ---

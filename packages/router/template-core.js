@@ -437,6 +437,14 @@ function resolveScrollTarget(targetUrl, historyMode, popstateState) {
     const saved = readStoredScroll(popstateState);
     return { mode: "restore", x: saved.x, y: saved.y, focusTarget: null };
   }
+  if (historyMode === "refresh") {
+    return {
+      mode: "restore",
+      x: window.scrollX || window.pageXOffset || 0,
+      y: window.scrollY || window.pageYOffset || 0,
+      focusTarget: null
+    };
+  }
   return { mode: "top", x: 0, y: 0, focusTarget: null };
 }
 
