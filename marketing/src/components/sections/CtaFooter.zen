@@ -1,0 +1,229 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+
+export interface Props {
+    headline: string;
+    subline: string;
+    ctaPrimaryLabel: string;
+    ctaPrimaryHref: string;
+    ctaSecondaryLabel: string;
+    ctaSecondaryHref: string;
+}
+
+const incoming = props as Props;
+const ctaHeadline = incoming.headline || "";
+const ctaSubline = incoming.subline || "";
+const primaryLabel = incoming.ctaPrimaryLabel || "";
+const primaryHref = incoming.ctaPrimaryHref || "";
+const secondaryLabel = incoming.ctaSecondaryLabel || "";
+const secondaryHref = incoming.ctaSecondaryHref || "";
+
+const ctaFooterSectionRef = ref<HTMLElement>();
+const ctaFooterHeadlineRef = ref<HTMLHeadingElement>();
+const ctaFooterSublineRef = ref<HTMLParagraphElement>();
+const ctaFooterActionsRef = ref<HTMLDivElement>();
+const ctaFooterAccentRef = ref<HTMLDivElement>();
+
+gsap.registerPlugin(ScrollTrigger, SplitText);
+
+interface TextRevealOptions {
+    trigger?: HTMLElement;
+    start?: string;
+    immediate?: boolean;
+    delay?: number;
+}
+
+function prefersReducedMotion() {
+    return zenWindow()?.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true;
+}
+
+function revealHeadline(element: HTMLElement, options: TextRevealOptions = {}): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "words, chars",
+        mask: "chars",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+
+            const tweenConfig: gsap.TweenVars = {
+                yPercent: 110,
+                stagger: 0.03,
+                duration: 0.9,
+                ease: "power4.out",
+                delay: options.delay || 0,
+            };
+
+            if (options.immediate !== true) {
+                tweenConfig.scrollTrigger = {
+                    trigger: options.trigger || element,
+                    start: options.start || "top 85%",
+                    toggleActions: "play none none none",
+                };
+            }
+
+            return gsap.from(self.chars, tweenConfig);
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+function revealParagraph(element: HTMLElement, options: TextRevealOptions = {}): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "lines",
+        mask: "lines",
+        linesClass: "line-inner++",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+
+            const tweenConfig: gsap.TweenVars = {
+                yPercent: 100,
+                stagger: 0.06,
+                duration: 0.75,
+                ease: "power3.out",
+                delay: options.delay || 0,
+            };
+
+            if (options.immediate !== true) {
+                tweenConfig.scrollTrigger = {
+                    trigger: options.trigger || element,
+                    start: options.start || "top 85%",
+                    toggleActions: "play none none none",
+                };
+            }
+
+            return gsap.from(self.lines, tweenConfig);
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+zenMount((ctx) => {
+    const cleanups: (() => void)[] = [];
+
+    if (ctaFooterHeadlineRef.current) {
+        cleanups.push(revealHeadline(ctaFooterHeadlineRef.current));
+    }
+    if (ctaFooterSublineRef.current) {
+        cleanups.push(revealParagraph(ctaFooterSublineRef.current));
+    }
+    if (ctaFooterActionsRef.current && ctaFooterSectionRef.current) {
+        const tween = gsap.from(ctaFooterActionsRef.current, {
+            y: 24,
+            autoAlpha: 0,
+            duration: 0.7,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ctaFooterSectionRef.current,
+                start: "top 60%",
+                toggleActions: "play none none none",
+            },
+        });
+        cleanups.push(() => {
+            tween.scrollTrigger?.kill();
+            tween.kill();
+        });
+    }
+    if (ctaFooterAccentRef.current && ctaFooterSectionRef.current) {
+        const tween = gsap.fromTo(
+            ctaFooterAccentRef.current,
+            { scale: 0.6, autoAlpha: 0 },
+            {
+                scale: 1,
+                autoAlpha: 0.4,
+                duration: 1.5,
+                ease: "power2.out",
+                scrollTrigger: {
+                    trigger: ctaFooterSectionRef.current,
+                    start: "top 70%",
+                    toggleActions: "play none none none",
+                },
+            },
+        );
+        cleanups.push(() => {
+            tween.scrollTrigger?.kill();
+            tween.kill();
+        });
+    }
+
+    ctx.cleanup(() => cleanups.forEach((fn) => fn()));
+});
+</script>
+
+<section
+    ref={ctaFooterSectionRef}
+    class="relative overflow-hidden border-t border-border/20 py-32 lg:py-48"
+>
+    <!-- Ambient gradient -->
+    <div
+        ref={ctaFooterAccentRef}
+        aria-hidden="true"
+        class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-gradient-to-br from-brand-purple/25 via-brand-magenta/15 to-brand-blue/10 blur-[100px] opacity-0"
+    ></div>
+
+    <div class="relative z-10 mx-auto max-w-4xl px-6 text-center">
+        <h2
+            ref={ctaFooterHeadlineRef}
+            class="text-4xl font-heading font-bold tracking-tight text-foreground sm:text-5xl lg:text-7xl invisible"
+        >
+            {ctaHeadline}
+        </h2>
+
+        <p
+            ref={ctaFooterSublineRef}
+            class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground invisible"
+        >
+            {ctaSubline}
+        </p>
+
+        <div
+            ref={ctaFooterActionsRef}
+            class="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center invisible"
+        >
+            <a
+                href={primaryHref}
+                class="inline-flex items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground px-8 py-3.5 text-[10px] font-mono uppercase tracking-[0.18em] transition-colors duration-200"
+            >
+                {primaryLabel}
+            </a>
+            <a
+                href={secondaryHref}
+                class="inline-flex items-center justify-center rounded-full border border-border bg-transparent text-foreground px-8 py-3.5 text-[10px] font-mono uppercase tracking-[0.18em] transition-colors duration-200 hover:border-primary/50"
+            >
+                {secondaryLabel}
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="relative z-10 mx-auto mt-32 max-w-7xl border-t border-border/20 px-6 pt-10">
+        <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <span class="text-xs font-mono tracking-wider text-muted-foreground/50">
+                Zenith Framework
+            </span>
+            <div class="flex gap-6">
+                <a href="https://github.com/zenithbuild/framework" class="text-xs font-mono text-muted-foreground/40 hover:text-foreground transition-colors">GitHub</a>
+                <a href="/docs" class="text-xs font-mono text-muted-foreground/40 hover:text-foreground transition-colors">Docs</a>
+                <a href="https://github.com/sponsors/zenithbuild" class="text-xs font-mono text-muted-foreground/40 hover:text-foreground transition-colors">Sponsor</a>
+            </div>
+        </div>
+    </div>
+</section>

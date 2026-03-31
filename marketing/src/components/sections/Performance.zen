@@ -1,0 +1,254 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+import type { StatItem } from "../../lib/sanity/types";
+
+export interface Props {
+    eyebrow: string;
+    headline: string;
+    body: string;
+    stats: StatItem[];
+}
+
+const incoming = props as Props;
+const perfEyebrow = incoming.eyebrow || "";
+const perfHeadline = incoming.headline || "";
+const perfBody = incoming.body || "";
+const perfStats = Array.isArray(incoming.stats) ? incoming.stats : [];
+
+const performanceSectionRef = ref<HTMLElement>();
+const performanceHeadlineRef = ref<HTMLHeadingElement>();
+const performanceBodyRef = ref<HTMLParagraphElement>();
+const performanceGridRef = ref<HTMLDivElement>();
+
+gsap.registerPlugin(ScrollTrigger, SplitText);
+
+interface TextRevealOptions {
+    trigger?: HTMLElement;
+    start?: string;
+    immediate?: boolean;
+    delay?: number;
+}
+
+function prefersReducedMotion() {
+    return zenWindow()?.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true;
+}
+
+function revealHeadline(element: HTMLElement, options: TextRevealOptions = {}): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "words, chars",
+        mask: "chars",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+
+            const tweenConfig: gsap.TweenVars = {
+                yPercent: 110,
+                stagger: 0.03,
+                duration: 0.9,
+                ease: "power4.out",
+                delay: options.delay || 0,
+            };
+
+            if (options.immediate !== true) {
+                tweenConfig.scrollTrigger = {
+                    trigger: options.trigger || element,
+                    start: options.start || "top 85%",
+                    toggleActions: "play none none none",
+                };
+            }
+
+            return gsap.from(self.chars, tweenConfig);
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+function revealParagraph(element: HTMLElement, options: TextRevealOptions = {}): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "lines",
+        mask: "lines",
+        linesClass: "line-inner++",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+
+            const tweenConfig: gsap.TweenVars = {
+                yPercent: 100,
+                stagger: 0.06,
+                duration: 0.75,
+                ease: "power3.out",
+                delay: options.delay || 0,
+            };
+
+            if (options.immediate !== true) {
+                tweenConfig.scrollTrigger = {
+                    trigger: options.trigger || element,
+                    start: options.start || "top 85%",
+                    toggleActions: "play none none none",
+                };
+            }
+
+            return gsap.from(self.lines, tweenConfig);
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+function revealCards(
+    trigger: HTMLElement,
+    cards: HTMLElement[],
+    options: { y?: number; stagger?: number; duration?: number; start?: string } = {},
+): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(cards, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const tween = gsap.from(cards, {
+        y: options.y ?? 60,
+        autoAlpha: 0,
+        stagger: options.stagger ?? 0.12,
+        duration: options.duration ?? 0.9,
+        ease: "power3.out",
+        scrollTrigger: {
+            trigger,
+            start: options.start || "top 75%",
+            toggleActions: "play none none none",
+        },
+    });
+
+    return () => {
+        tween.scrollTrigger?.kill();
+        tween.kill();
+    };
+}
+
+zenMount((ctx) => {
+    const cleanups: (() => void)[] = [];
+
+    if (performanceHeadlineRef.current) {
+        cleanups.push(revealHeadline(performanceHeadlineRef.current));
+    }
+    if (performanceBodyRef.current) {
+        cleanups.push(revealParagraph(performanceBodyRef.current));
+    }
+    if (performanceGridRef.current && performanceSectionRef.current) {
+        const cards = Array.from(performanceGridRef.current.children) as HTMLElement[];
+        cleanups.push(revealCards(performanceSectionRef.current, cards, {
+            y: 50,
+            stagger: 0.1,
+            start: "top 65%",
+        }));
+    }
+
+    ctx.cleanup(() => cleanups.forEach((fn) => fn()));
+});
+
+const accentBorders = [
+    "border-brand-purple/20",
+    "border-brand-blue/20",
+    "border-brand-gold/20",
+    "border-brand-magenta/20",
+];
+const valueColors = [
+    "text-brand-purple",
+    "text-brand-blue",
+    "text-brand-gold",
+    "text-brand-magenta",
+];
+</script>
+
+<section
+    ref={performanceSectionRef}
+    class="relative py-32 lg:py-40 border-t border-border/20"
+>
+    <div class="mx-auto max-w-7xl px-6">
+        <!-- Header -->
+        <div class="mb-20 max-w-2xl">
+            <span class="mb-5 block text-xs font-mono tracking-[0.3em] uppercase text-brand-purple">
+                {perfEyebrow}
+            </span>
+            <h2
+                ref={performanceHeadlineRef}
+                class="text-4xl font-heading font-bold tracking-tight text-foreground sm:text-5xl invisible"
+            >
+                {perfHeadline}
+            </h2>
+            <p
+                ref={performanceBodyRef}
+                class="mt-6 text-lg leading-relaxed text-muted-foreground invisible"
+            >
+                {perfBody}
+            </p>
+        </div>
+
+        <!-- Stats grid -->
+        <div ref={performanceGridRef} class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div class={"rounded-2xl border p-8 bg-surface-1/30 invisible " + (accentBorders[0] || "")}>
+                <span class={"block text-4xl font-display font-bold mb-2 " + (valueColors[0] || "")}>
+                    {perfStats.length > 0 ? perfStats[0].value : "0"}
+                </span>
+                <span class="block text-sm font-mono uppercase tracking-wider text-foreground mb-3">
+                    {perfStats.length > 0 ? perfStats[0].label : ""}
+                </span>
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                    {perfStats.length > 0 ? perfStats[0].description : ""}
+                </p>
+            </div>
+
+            <div class={"rounded-2xl border p-8 bg-surface-1/30 invisible " + (accentBorders[1] || "")}>
+                <span class={"block text-4xl font-display font-bold mb-2 " + (valueColors[1] || "")}>
+                    {perfStats.length > 1 ? perfStats[1].value : "0"}
+                </span>
+                <span class="block text-sm font-mono uppercase tracking-wider text-foreground mb-3">
+                    {perfStats.length > 1 ? perfStats[1].label : ""}
+                </span>
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                    {perfStats.length > 1 ? perfStats[1].description : ""}
+                </p>
+            </div>
+
+            <div class={"rounded-2xl border p-8 bg-surface-1/30 invisible " + (accentBorders[2] || "")}>
+                <span class={"block text-4xl font-display font-bold mb-2 " + (valueColors[2] || "")}>
+                    {perfStats.length > 2 ? perfStats[2].value : "0"}
+                </span>
+                <span class="block text-sm font-mono uppercase tracking-wider text-foreground mb-3">
+                    {perfStats.length > 2 ? perfStats[2].label : ""}
+                </span>
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                    {perfStats.length > 2 ? perfStats[2].description : ""}
+                </p>
+            </div>
+
+            <div class={"rounded-2xl border p-8 bg-surface-1/30 invisible " + (accentBorders[3] || "")}>
+                <span class={"block text-4xl font-display font-bold mb-2 " + (valueColors[3] || "")}>
+                    {perfStats.length > 3 ? perfStats[3].value : "0"}
+                </span>
+                <span class="block text-sm font-mono uppercase tracking-wider text-foreground mb-3">
+                    {perfStats.length > 3 ? perfStats[3].label : ""}
+                </span>
+                <p class="text-xs leading-relaxed text-muted-foreground">
+                    {perfStats.length > 3 ? perfStats[3].description : ""}
+                </p>
+            </div>
+        </div>
+    </div>
+</section>

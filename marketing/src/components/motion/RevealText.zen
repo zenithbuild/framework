@@ -1,0 +1,31 @@
+<script lang="ts">
+import { splitParagraph } from "../../lib/motion/splitParagraph";
+
+export interface Props {
+    class?: string;
+    immediate?: boolean;
+    delay?: number;
+}
+
+const incoming = props as Props;
+const textClass = typeof incoming.class === "string" ? incoming.class : "";
+const isImmediate = incoming.immediate === true;
+const textDelay = typeof incoming.delay === "number" ? incoming.delay : 0;
+const textRef = ref<HTMLElement>();
+
+zenMount((ctx) => {
+    if (!textRef.current) return;
+    const cleanup = splitParagraph(textRef.current, {
+        immediate: isImmediate,
+        delay: textDelay,
+    });
+    ctx.cleanup(cleanup);
+});
+</script>
+
+<div
+    ref={textRef}
+    class={"invisible " + textClass}
+>
+    <slot />
+</div>

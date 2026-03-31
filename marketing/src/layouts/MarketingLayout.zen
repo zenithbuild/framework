@@ -1,0 +1,28 @@
+<script lang="ts">
+import "../styles/globals.css";
+</script>
+
+<html lang="en" class="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fonts: Bricolage Grotesque, Sora, IBM Plex Mono, Rajdhani -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@500;600;700&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+    <title>Zenith — Compiler-First UI Framework</title>
+    <meta name="description" content="A reactive framework built to formalize UI architecture. Deterministic output, explicit contracts, minimal runtime." />
+    <meta name="theme-color" content="#1a1a2e" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Zenith — Compiler-First UI Framework" />
+    <meta property="og:description" content="Deterministic output, explicit contracts, minimal runtime." />
+    <meta property="og:site_name" content="Zenith" />
+</head>
+<body class="bg-background text-foreground antialiased">
+    <slot />
+</body>
+</html>

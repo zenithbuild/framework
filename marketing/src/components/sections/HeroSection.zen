@@ -1,0 +1,205 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { SplitText } from "gsap/SplitText";
+
+export interface Props {
+    eyebrow: string;
+    headline: string;
+    subline: string;
+    ctaPrimaryLabel: string;
+    ctaPrimaryHref: string;
+    ctaSecondaryLabel: string;
+    ctaSecondaryHref: string;
+}
+
+const incoming = props as Props;
+const heroEyebrow = incoming.eyebrow || "";
+const heroHeadline = incoming.headline || "";
+const heroSubline = incoming.subline || "";
+const primaryLabel = incoming.ctaPrimaryLabel || "";
+const primaryHref = incoming.ctaPrimaryHref || "";
+const secondaryLabel = incoming.ctaSecondaryLabel || "";
+const secondaryHref = incoming.ctaSecondaryHref || "";
+
+const heroSectionRef = ref<HTMLElement>();
+const heroEyebrowRef = ref<HTMLSpanElement>();
+const heroHeadlineRef = ref<HTMLHeadingElement>();
+const heroSublineRef = ref<HTMLParagraphElement>();
+const heroCtaRef = ref<HTMLDivElement>();
+const heroAccentRef = ref<HTMLDivElement>();
+
+gsap.registerPlugin(SplitText);
+
+function prefersReducedMotion() {
+    return zenWindow()?.matchMedia("(prefers-reduced-motion: reduce)")?.matches === true;
+}
+
+function revealHeadlineNow(element: HTMLElement, delay = 0): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "words, chars",
+        mask: "chars",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+            return gsap.from(self.chars, {
+                yPercent: 110,
+                stagger: 0.03,
+                duration: 0.9,
+                ease: "power4.out",
+                delay,
+            });
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+function revealParagraphNow(element: HTMLElement, delay = 0): () => void {
+    if (prefersReducedMotion()) {
+        gsap.set(element, { autoAlpha: 1 });
+        return () => {};
+    }
+
+    const split = SplitText.create(element, {
+        type: "lines",
+        mask: "lines",
+        linesClass: "line-inner++",
+        autoSplit: true,
+        onSplit(self) {
+            gsap.set(element, { autoAlpha: 1 });
+            return gsap.from(self.lines, {
+                yPercent: 100,
+                stagger: 0.06,
+                duration: 0.75,
+                ease: "power3.out",
+                delay,
+            });
+        },
+    });
+
+    return () => {
+        split.revert();
+    };
+}
+
+zenMount((ctx) => {
+    if (!heroHeadlineRef.current) return;
+
+    const tl = gsap.timeline({ delay: 0.3 });
+
+    /* 1. Eyebrow fade-slide */
+    if (heroEyebrowRef.current) {
+        tl.fromTo(
+            heroEyebrowRef.current,
+            { y: 12, autoAlpha: 0 },
+            { y: 0, autoAlpha: 1, duration: 0.5, ease: "power3.out" },
+            0,
+        );
+    }
+
+    /* 2. Headline char-masked reveal */
+    const cleanupHeadline = revealHeadlineNow(heroHeadlineRef.current, 0.5);
+
+    /* 3. Subline line-masked reveal */
+    let cleanupSubline = () => {};
+    if (heroSublineRef.current) {
+        cleanupSubline = revealParagraphNow(heroSublineRef.current, 0.9);
+    }
+
+    /* 4. CTA slide-up */
+    if (heroCtaRef.current) {
+        tl.fromTo(
+            heroCtaRef.current,
+            { y: 24, autoAlpha: 0 },
+            { y: 0, autoAlpha: 1, duration: 0.7, ease: "power3.out" },
+            1.1,
+        );
+    }
+
+    /* 5. Accent glow pulse */
+    if (heroAccentRef.current) {
+        tl.fromTo(
+            heroAccentRef.current,
+            { scale: 0.7, autoAlpha: 0 },
+            { scale: 1, autoAlpha: 0.5, duration: 1.6, ease: "power2.out" },
+            0.2,
+        );
+    }
+
+    ctx.cleanup(() => {
+        tl.kill();
+        cleanupHeadline();
+        cleanupSubline();
+    });
+});
+</script>
+
+<section
+    ref={heroSectionRef}
+    class="relative min-h-[100dvh] flex items-center justify-center overflow-hidden"
+>
+    <!-- Ambient gradient accent -->
+    <div
+        ref={heroAccentRef}
+        aria-hidden="true"
+        class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-gradient-to-br from-brand-purple/30 via-brand-blue/20 to-brand-magenta/15 blur-[120px] opacity-0"
+    ></div>
+
+    <div class="relative z-10 mx-auto max-w-5xl px-6 py-32 text-center">
+        <!-- Eyebrow -->
+        <span
+            ref={heroEyebrowRef}
+            class="mb-6 inline-block text-xs font-mono tracking-[0.3em] uppercase text-brand-purple invisible"
+        >
+            {heroEyebrow}
+        </span>
+
+        <!-- Headline -->
+        <h1
+            ref={heroHeadlineRef}
+            class="mx-auto max-w-4xl text-5xl leading-[1.05] font-heading font-bold tracking-tight text-foreground sm:text-7xl lg:text-8xl invisible"
+        >
+            {heroHeadline}
+        </h1>
+
+        <!-- Subline -->
+        <p
+            ref={heroSublineRef}
+            class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl invisible"
+        >
+            {heroSubline}
+        </p>
+
+        <!-- CTAs -->
+        <div
+            ref={heroCtaRef}
+            class="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center invisible"
+        >
+            <a
+                href={primaryHref}
+                class="group relative isolate overflow-hidden inline-flex items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground px-8 py-3.5 text-[10px] font-mono uppercase tracking-[0.18em] transition-colors duration-200"
+            >
+                {primaryLabel}
+            </a>
+            <a
+                href={secondaryHref}
+                class="inline-flex items-center justify-center rounded-full border border-border bg-transparent text-foreground px-8 py-3.5 text-[10px] font-mono uppercase tracking-[0.18em] transition-colors duration-200 hover:border-primary/50"
+            >
+                {secondaryLabel}
+            </a>
+        </div>
+    </div>
+
+    <!-- Bottom edge gradient -->
+    <div
+        aria-hidden="true"
+        class="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent"
+    ></div>
+</section>
