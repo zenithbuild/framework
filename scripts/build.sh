@@ -16,6 +16,18 @@ bun run --cwd packages/create-zenith build
 bun run --cwd packages/language-server build
 bun run --cwd packages/language build
 
+# Ensure workspace bin links exist for freshly-built CLI.
+# Bun skips .bin symlinks when the target file is absent during initial install;
+# re-linking after building the CLI restores the `zenith` command for downstream
+# workspace scripts (e.g. apps/smoke-test `zenith build`).
+CLI_BIN="$ROOT/packages/cli/dist/index.js"
+if [[ -f "$CLI_BIN" ]]; then
+  for bindir in "$ROOT/node_modules/.bin" "$ROOT/apps/smoke-test/node_modules/.bin"; do
+    mkdir -p "$bindir"
+    ln -sf "$CLI_BIN" "$bindir/zenith"
+  done
+fi
+
 # Clean workspace crates to prevent stale binaries from CI cache fallback.
 # This only removes local crate artifacts (~1s), not cached dependencies.
 cargo clean --release -p zenith_compiler -p zenith_cli --manifest-path packages/compiler/Cargo.toml 2>/dev/null || true
