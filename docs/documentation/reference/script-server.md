@@ -1,9 +1,9 @@
 ---
 title: "Script Server Reference"
 description: "Public contract for `<script server>` exports and context access."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-30"
+last_updated: "2026-04-01"
 tags: ["reference", "server", "script-server"]
 ---
 
@@ -49,11 +49,12 @@ Page routes return HTML-oriented route results:
 - `redirect(...)`
 - `deny(...)`
 
-Page routes do **not** support `json(...)` or `text(...)`.
+Page routes do **not** support `json(...)`, `text(...)`, `stream(...)`, or `sse(...)`.
 
 ### Resource Routes
 
 Resource routes live in dedicated modules:
+- `src/api/ping.resource.ts` (preferred when the project uses `src/` layout)
 - `pages/api/ping.resource.ts`
 - `pages/settings/page.resource.ts`
 
@@ -68,11 +69,13 @@ Resource routes return non-HTML route results:
 - `json(payload, status = 200)`
 - `text(body, status = 200)`
 - `download(body, { filename, contentType? })`
+- `stream(body, { status?, contentType? })`
+- `sse(events)`
 - `redirect(...)`
 - `deny(...)`
 
 Resource routes do **not** support `data(...)`, `invalid(...)`, `prerender`, or `exportPaths`.
-This milestone also does **not** support arbitrary `Response`, `file(...)`, inline serving, streams, `Blob`, `File`, range requests, or filesystem-path helper APIs.
+This milestone also does **not** support arbitrary `Response`, `file(...)`, inline serving, page-route streaming, `Blob`, `File`, range requests, or filesystem-path helper APIs.
 
 ## Contract: Context Shape
 
@@ -96,6 +99,29 @@ Evidence:
 `ctx.request` is the canonical request input for route-owned mutations. In `action(ctx)`, standard HTML form posts, including `multipart/form-data`, are read through native `await ctx.request.formData()`. Fields and uploaded files stay as native Web Platform values on the request side; returned route payloads must remain JSON-safe.
 
 The same `ctx` shape is used for dedicated resource routes. Resource `action(ctx)` reads multipart uploads through the same native `await ctx.request.formData()` path and keeps `ctx.auth`, `ctx.cookies`, and staged cookie mutation semantics identical to page routes.
+
+`stream(...)` and `sse(...)` are standalone helpers imported from `zenith:server-contract`. They are not exposed as `ctx.stream(...)` or `ctx.sse(...)`.
+
+`withMiddleware(...)` is also imported from `zenith:server-contract` for explicit route-level composition.
+
+## Contract: Explicit Middleware Composition
+
+Contract: middleware composition is explicit and server-only.
+
+Invariant:
+- route modules compose middleware directly with `withMiddleware(handler, ...middleware)`
+- `withMiddleware(handler, a, b)` composes as `a(b(handler))`
+- middleware is route-owned; there is no root/global or inherited middleware surface in this milestone
+
+Definition of Done:
+- middleware returns a wrapped handler function
+- wrapped handlers return only valid result helpers for the route kind (`data/invalid/...` for page routes, `json/text/download/stream/sse/...` for resource routes)
+- middleware may short-circuit by returning a valid route result or by throwing
+
+Failure Modes:
+- middleware appears as `ctx.middleware` or `ctx.withMiddleware`
+- docs imply implicit route-tree middleware inheritance
+- middleware is described as `req/res/next` chain semantics
 
 ## Contract: Freshness Bridge
 
@@ -122,6 +148,8 @@ Definition of Done:
 - `json(payload, status?)` returns `application/json`.
 - `text(body, status?)` returns `text/plain; charset=utf-8`.
 - `download(body, { filename, contentType? })` returns an attachment-style response with fixed `Content-Disposition: attachment`.
+- `stream(body, { status?, contentType? })` streams a `ReadableStream` or `AsyncIterable` body and may set an explicit content type.
+- `sse(events)` returns `text/event-stream; charset=utf-8` with standard SSE framing.
 - `redirect(...)` and `deny(...)` behave the same way they do on page routes.
 - `json(payload)` reuses the existing JSON-safe top-level plain-object contract.
 - `download(...)` accepts only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes and enforces a 5 MiB payload cap.
@@ -129,11 +157,11 @@ Definition of Done:
 Failure Modes:
 - `json(...)` or `text(...)` are documented as valid on page routes.
 - `data(...)` or `invalid(...)` are documented as valid on resource routes.
-- Resource examples imply `file(...)`, inline serving, streaming, range requests, or a generic binary/media platform.
+- Resource examples imply arbitrary `Response`, page-route streaming, range requests, or a generic binary/media platform.
 - Router docs imply resource routes participate in soft-nav HTML commits or `data-zen-form` HTML enhancement.
 
 Evidence:
-- Dev, preview, and packaged-node tests cover JSON, text, attachment downloads, auth, cookies, and multipart POSTs on dedicated resource routes.
+- Dev, preview, packaged-node, and hosted parity tests cover JSON, text, attachment downloads, stream, SSE, auth, cookies, and multipart POSTs on dedicated resource routes.
 
 ## Contract: Route-Owned Cookie Sessions
 

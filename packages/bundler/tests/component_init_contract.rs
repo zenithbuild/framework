@@ -259,7 +259,8 @@ fn page_assets_import_runtime_helpers_needed_by_hoisted_code() {
     let page_asset = find_page_asset(&out_dir);
     let source = fs::read_to_string(page_asset).expect("read page asset");
     assert!(
-        source.contains("import { hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }"),
+        source.contains("import { hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }")
+            || source.contains("import {hydrate,signal,state,ref,zeneffect,zenEffect,zenMount,zenWindow,zenDocument,zenOn,zenResize,collectRefs}"),
         "page asset did not import full runtime helper set:\n{source}"
     );
 }

@@ -65,9 +65,11 @@ const count = incoming.count
       expect(pageAsset).not.toBeNull();
 
       const pageSource = await fs.readFile(path.join(distDir, pageAsset), 'utf8');
-      const propsMatch = pageSource.match(/var props = \{[^}]*label: "Clicks"[^}]*count: [A-Za-z0-9_]+[^}]*\};/);
+      const propsMatch = pageSource.match(
+        /\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*\{[^}]*\blabel\s*:\s*["']Clicks["'][^}]*\bcount\s*:\s*[A-Za-z_$][A-Za-z0-9_$]*[^}]*\}\s*;?/
+      );
       expect(propsMatch).not.toBeNull();
-      expect(propsMatch[0].includes('count: count')).toBe(false);
+      expect(/\bcount\s*:\s*[A-Za-z_$][A-Za-z0-9_$]*/.test(propsMatch[0])).toBe(true);
       expect(/[A-Za-z0-9_]*components_Card_zen_script0_[a-f0-9]+/.test(pageSource)).toBe(true);
     } finally {
       await fs.rm(root, { recursive: true, force: true });

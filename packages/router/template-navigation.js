@@ -1,5 +1,6 @@
-export function renderRouterNavigationSource() {
-    return `async function requestRouteCheck(context, resolved, targetUrl, signal) {
+export function renderRouterNavigationSource({ routeCheck = false, formsEnabled = true } = {}) {
+    const routeCheckSource = routeCheck
+        ? `async function requestRouteCheck(context, resolved, targetUrl, signal) {
   if (!__ZENITH_ROUTE_CHECK_ENABLED__) {
     return { kind: "allow" };
   }
@@ -79,7 +80,12 @@ export function renderRouterNavigationSource() {
     });
     return { kind: "allow" };
   }
-}
+}`
+        : `async function requestRouteCheck() {
+  return { kind: "allow" };
+}`;
+
+    return `${routeCheckSource}
 
 function resolveRedirectUrl(location, fallbackUrl) {
   try {
@@ -365,7 +371,7 @@ function start() {
     currentUrl = new URL(window.location.href);
     queueScrollSnapshot();
   });
-  installEnhancedFormHandling();
+${formsEnabled ? "  installEnhancedFormHandling();\n" : ""}
 
   document.addEventListener("click", function(event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

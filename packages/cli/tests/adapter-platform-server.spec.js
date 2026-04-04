@@ -64,7 +64,7 @@ describe('platform server adapters', () => {
         ]));
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'index.js'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'image.func', 'index.js'))).toBe(true);
-        expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'route', 'entry.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'routes', 'account', 'route', 'entry.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'manifest.json'))).toBe(true);
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'index.js')).href);

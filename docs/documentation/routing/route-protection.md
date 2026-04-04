@@ -1,9 +1,9 @@
 ---
 title: "Route Protection (guard/load)"
 description: "How to securely protect Zenith routes using server-enforced guard and load exports."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-30"
+last_updated: "2026-04-01"
 tags: ["routing", "security", "guard", "load"]
 nav:
   order: 50
@@ -19,7 +19,7 @@ Zenith enforces this principle by executing `guard`, `action`, and `load` on the
 
 Zenith now has two explicit server route kinds:
 - page routes, which own HTML
-- dedicated resource routes (`*.resource.ts` / `page.resource.ts`), which own JSON and plain-text direct responses
+- dedicated resource routes (`*.resource.ts` / `page.resource.ts`), which own explicit non-HTML direct responses (for `src/` layout projects, prefer `src/api/**`)
 
 ## The Contract
 
@@ -35,7 +35,8 @@ They must return a canonical `RouteResult`:
 - `data(payload)`
 - `invalid(payload, 400|422)` for expected action validation failures
 
-Dedicated resource routes live in sibling modules only:
+Dedicated resource routes live in dedicated modules:
+- `src/api/<route>.resource.ts` (preferred when the project uses `src/` layout)
 - `<route>.resource.ts`
 - `page.resource.ts`
 
@@ -43,6 +44,8 @@ They return:
 - `json(payload, status?)`
 - `text(body, status?)`
 - `download(body, { filename, contentType? })`
+- `stream(body, { status?, contentType? })`
+- `sse(events)`
 - `redirect(location, status?)`
 - `deny(status?, message?)`
 
@@ -68,9 +71,9 @@ Resource routes keep the same `guard(ctx)` and `ctx.auth` meaning, but do not re
 
 1. **`guard(ctx)`**: Optional. Runs first and may return `allow()`, `redirect()`, or `deny()`.
 2. **`load(ctx)`**: Handles `GET` and `HEAD`.
-   - **Allowed Returns:** `json(...)`, `text(...)`, `download(...)`, `redirect()`, `deny()`.
+   - **Allowed Returns:** `json(...)`, `text(...)`, `download(...)`, `stream(...)`, `sse(...)`, `redirect()`, `deny()`.
 3. **`action(ctx)`**: Handles `POST`.
-   - **Allowed Returns:** `json(...)`, `text(...)`, `download(...)`, `redirect()`, `deny()`.
+   - **Allowed Returns:** `json(...)`, `text(...)`, `download(...)`, `stream(...)`, `sse(...)`, `redirect()`, `deny()`.
 
 Resource routes do **not** support:
 - `data(...)`
@@ -80,7 +83,6 @@ Resource routes do **not** support:
 - arbitrary `Response`
 - `file(...)`
 - inline serving
-- streams
 - range requests
 - `Blob`, `File`, or filesystem-path public helpers
 
@@ -139,6 +141,8 @@ Resource routes do **not** support:
 - `{ ok: false, status: 400|422, data }`
 
 Resource routes still receive the same `ctx` shape. They simply return `json(...)`, `text(...)`, or `download(...)` instead of HTML-oriented `data(...)` / `invalid(...)`.
+
+`stream(...)` and `sse(...)` are standalone helpers imported from `zenith:server-contract`. They are not exposed as `ctx.stream(...)` or `ctx.sse(...)`.
 
 ## Cookie Sessions (`ctx.auth`)
 
@@ -200,7 +204,7 @@ export async function action(ctx) {
 
 ## Resource Routes
 
-Use dedicated resource modules when the route should answer direct requests with JSON, plain text, or attachment downloads instead of HTML.
+Use dedicated resource modules when the route should answer direct requests with JSON, plain text, streamed bodies, SSE, or attachment downloads instead of HTML.
 
 ### Example: JSON Resource Route
 
@@ -262,6 +266,12 @@ export async function load(ctx) {
 - fixed status `200`
 - only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes
 - 5 MiB payload cap
+
+`stream(...)` and `sse(...)` stay narrow too:
+- resource-route only
+- imported from `zenith:server-contract`
+- no arbitrary `Response` escape hatch
+- no page-route streaming
 
 ## Routing Behavior
 
@@ -338,4 +348,6 @@ For dedicated resource routes:
 - `json(payload, status?)` returns `application/json`
 - `text(body, status?)` returns `text/plain`
 - `download(body, { filename, contentType? })` returns an attachment-style response with `Content-Disposition: attachment`
+- `stream(body, { status?, contentType? })` streams the response body with `Cache-Control: no-cache`
+- `sse(events)` returns `text/event-stream; charset=utf-8` with standard SSE framing
 - unsupported methods in this first milestone return `405 Method Not Allowed`

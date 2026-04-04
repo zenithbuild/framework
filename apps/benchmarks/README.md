@@ -15,6 +15,12 @@ Current slice:
 
 This workspace is methodology-first. It writes raw benchmark artifacts under `results/` and does not publish public benchmark claims.
 
+## Publication policy (Phase 12)
+
+- Zenith determinism is a hard publication gate.
+- External framework determinism is recorded as metadata/caveat and is not a hard publication blocker.
+- Hydration/runtime, timeout, and empty-result failures remain hard blockers for all frameworks.
+
 ## Commands
 
 ```bash

@@ -11,13 +11,26 @@ pub struct RenderAssetsRequest {
     pub runtime_import: String,
     pub core_import: String,
     pub route_check: bool,
+    pub forms_enabled: bool,
+    pub runtime_profile: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeContributor {
+    pub id: String,
+    pub source_file: String,
+    pub bytes: usize,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RenderAssetsResponse {
     pub ir_version: u32,
+    pub runtime_profile: String,
     pub runtime_source: String,
+    pub runtime_contributors: Vec<RuntimeContributor>,
+    pub runtime_coverage_bytes: usize,
     pub router_source: String,
 }
 

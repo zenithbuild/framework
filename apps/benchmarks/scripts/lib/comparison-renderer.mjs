@@ -13,6 +13,53 @@ function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function policyValue(value) {
+  return value ? `\`${value}\`` : "-";
+}
+
+function collectPublicationPolicies(results) {
+  return results.map((result) => {
+    const policy = result.publication_policy || {};
+    return {
+      frameworkId: uniqueValues((result.results || []).map((entry) => entry.frameworkId))[0] || "-",
+      benchmarkProfile: policy.benchmarkProfile || result.benchmark_profile || "-",
+      zenithDeterminismGate: policy.zenithDeterminismGate || "-",
+      externalFrameworkDeterminismGate: policy.externalFrameworkDeterminismGate || "-",
+      policyVersion: policy.policyVersion || "-",
+    };
+  });
+}
+
+function collectExternalDeterminismCaveats(results) {
+  const caveats = [];
+  for (const result of results) {
+    const frameworkId = uniqueValues((result.results || []).map((entry) => entry.frameworkId))[0] || "-";
+    const assessment = result.publication_assessment || {};
+    for (const caveat of assessment.caveats || []) {
+      if (caveat.caveatType !== "external-framework-determinism") {
+        continue;
+      }
+      caveats.push({
+        frameworkId,
+        runner: caveat.runner || "-",
+        failureKind: caveat.failureKind || "-",
+        detail: caveat.detailSummary || caveat.detail || "-",
+        publicationImpact: caveat.publicationImpact || "-",
+        stderrPath: caveat.stderrPath || "",
+      });
+    }
+  }
+  return caveats;
+}
+
+function truncate(value, limit = 220) {
+  const text = String(value || "");
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit)}...`;
+}
+
 function formatMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "-";
@@ -163,6 +210,21 @@ function renderTrackCaseTable(track, entries) {
     );
   }
 
+  if (track === "bundle-analysis") {
+    return markdownTable(
+      ["Framework", "JS Files", "JS Bytes", "Inline Scripts", "Inline Bytes", "JS + Inline Bytes", "Status"],
+      entries.map((entry) => [
+        entry.frameworkId,
+        String(entry.stats?.jsCount ?? "-"),
+        formatBytes(entry.stats?.totalJsSize),
+        String(entry.assetRefs?.inlineScriptCount ?? "-"),
+        formatBytes(entry.assetRefs?.inlineScriptBytes),
+        formatBytes(entry.totalJsPlusInlineBytes),
+        entry.status || "-",
+      ]),
+    );
+  }
+
   return markdownTable(
     ["Framework", "Mutation Track", "Samples", "Median", "Spread", "Restore Match"],
     entries.map((entry) => [
@@ -197,6 +259,8 @@ export function renderComparativeReport(page, results, options = {}) {
   const tracks = context.tracks;
   const cases = context.cases;
   const checks = buildComparabilityChecks(page, results, context);
+  const publicationPolicies = collectPublicationPolicies(results);
+  const externalDeterminismCaveats = collectExternalDeterminismCaveats(results);
 
   const sections = [
     `# ${page.title}`,
@@ -207,6 +271,34 @@ export function renderComparativeReport(page, results, options = {}) {
     "- This page is generated from multiple validated benchmark result files listed below.",
     "- Tables show recorded samples, medians, and spread only. They do not add ranking or winner language.",
     "- If a requested track or case is missing from one or more runs, the page shows the available rows and the overlap checks instead of filling missing values.",
+    "- Publication policy: Zenith determinism is a hard publication gate; external framework determinism is recorded as caveat metadata and not treated as a publication blocker.",
+    "",
+    "## Publication Policy",
+    markdownTable(
+      ["Framework", "Profile", "Zenith Determinism Gate", "External Determinism Gate", "Policy Version"],
+      publicationPolicies.map((entry) => [
+        entry.frameworkId,
+        policyValue(entry.benchmarkProfile),
+        policyValue(entry.zenithDeterminismGate),
+        policyValue(entry.externalFrameworkDeterminismGate),
+        policyValue(entry.policyVersion),
+      ]),
+    ),
+    "",
+    "## External Determinism Caveats",
+    externalDeterminismCaveats.length === 0
+      ? "_No external determinism caveats were recorded for these runs._"
+      : markdownTable(
+          ["Framework", "Runner", "Failure Kind", "Publication Impact", "Detail", "Artifacts"],
+          externalDeterminismCaveats.map((entry) => [
+            entry.frameworkId,
+            entry.runner,
+            entry.failureKind,
+            entry.publicationImpact,
+            truncate(entry.detail),
+            markdownLink("stderr", outputPath, entry.stderrPath) || "-",
+          ]),
+        ),
     "",
     "## Compared Runs",
     markdownTable(
@@ -249,6 +341,10 @@ export function renderComparativeReport(page, results, options = {}) {
     if (track === "hydration-runtime") {
       sections.push(
         "Comparable metrics in this section come from the shared browser runtime contract. Framework-specific sidecars remain in artifact links and raw metric files.",
+      );
+    } else if (track === "bundle-analysis") {
+      sections.push(
+        "Bundle-analysis rows report emitted JS asset bytes and inline-script bytes separately. Use `JS + Inline Bytes` for mixed delivery comparisons.",
       );
     } else if (track === "rebuild") {
       sections.push(

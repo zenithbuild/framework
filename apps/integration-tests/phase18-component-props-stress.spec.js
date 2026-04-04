@@ -114,10 +114,10 @@ const childIndex = incoming.childIndex
     expect(componentAssets).toHaveLength(0);
 
     const pageJs = await readRoutePageBundle(dist, '/');
-    expect(pageJs.includes('const __zenith_components = [];')).toBe(true);
-    const signalTableMatch = pageJs.match(/const __zenith_signals = (?:Object\.freeze\()?(\[[\s\S]*?\])\)?;/);
+    expect(pageJs).toMatch(/const __zenith_components\s*=\s*\[\s*\]/);
+    const signalTableMatch = pageJs.match(/const __zenith_signals\s*=\s*(?:Object\.freeze\()?(\[[\s\S]*?\])\)?;/);
     expect(signalTableMatch).toBeTruthy();
-    const signalTable = JSON.parse(signalTableMatch[1]);
+    const signalTable = Function(`"use strict";return (${signalTableMatch[1]});`)();
     expect(signalTable.length).toBe(1);
 
     const { preview, port } = await startPreview(root);

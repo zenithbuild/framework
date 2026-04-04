@@ -1,4 +1,5 @@
 import { resolveStateKeyFromBindings } from './expression-rewrites.js';
+import { transpileTypeScriptToJs } from './hoisted-code-transforms.js';
 import {
     expandScopedShorthandPropertiesInSource,
     normalizeTypeScriptExpression
@@ -104,7 +105,12 @@ export function normalizeExpressionPayload(pageIr) {
     }
 }
 
-export function normalizeHoistedSourcePayload(pageIr) {
+export function normalizeHoistedSourcePayload(
+    pageIr,
+    sourceFile = 'component.zen',
+    transformCache = null,
+    mergeMetrics = null
+) {
     const declarations = Array.isArray(pageIr?.hoisted?.declarations) ? pageIr.hoisted.declarations : null;
     if (declarations) {
         pageIr.hoisted.declarations = declarations.map((entry) => {
@@ -117,11 +123,60 @@ export function normalizeHoistedSourcePayload(pageIr) {
 
     const codeBlocks = Array.isArray(pageIr?.hoisted?.code) ? pageIr.hoisted.code : null;
     if (codeBlocks) {
-        pageIr.hoisted.code = codeBlocks.map((entry) => {
+        pageIr.hoisted.code = codeBlocks.map((entry, index) => {
             if (typeof entry !== 'string') {
                 return entry;
             }
-            return expandScopedShorthandPropertiesInSource(entry);
+            const expanded = expandScopedShorthandPropertiesInSource(entry);
+            return transpileTypeScriptToJs(
+                expanded,
+                `${sourceFile}#hoisted-${index}.ts`,
+                transformCache,
+                mergeMetrics,
+                { target: 'esnext' }
+            );
+        });
+    }
+
+    const componentScripts = pageIr?.components_scripts && typeof pageIr.components_scripts === 'object'
+        ? pageIr.components_scripts
+        : null;
+    if (componentScripts) {
+        for (const [hoistId, script] of Object.entries(componentScripts)) {
+            if (!script || typeof script !== 'object' || typeof script.code !== 'string') {
+                continue;
+            }
+            const expanded = expandScopedShorthandPropertiesInSource(script.code);
+            script.code = transpileTypeScriptToJs(
+                expanded,
+                `${sourceFile}#component-${hoistId}.ts`,
+                transformCache,
+                mergeMetrics,
+                { target: 'esnext' }
+            );
+        }
+    }
+
+    const modules = Array.isArray(pageIr?.modules) ? pageIr.modules : null;
+    if (modules) {
+        pageIr.modules = modules.map((module, index) => {
+            if (!module || typeof module !== 'object' || typeof module.source !== 'string') {
+                return module;
+            }
+            const moduleId = typeof module.id === 'string' && module.id.length > 0
+                ? module.id
+                : `${sourceFile}#module-${index}.ts`;
+            const expanded = expandScopedShorthandPropertiesInSource(module.source);
+            return {
+                ...module,
+                source: transpileTypeScriptToJs(
+                    expanded,
+                    moduleId,
+                    transformCache,
+                    mergeMetrics,
+                    { target: 'esnext' }
+                )
+            };
         });
     }
 }

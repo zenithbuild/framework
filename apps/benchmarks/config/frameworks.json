@@ -6,7 +6,7 @@
       "label": "Zenith Workspace Head",
       "fixtureSubdir": "zenith",
       "packageManager": "npm",
-      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "supportedTracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild", "reactive-update"],
       "rebuildSettle": {
         "mode": "dev-state"
       },
@@ -18,6 +18,7 @@
       "commands": {
         "install": ["npm", "install", "--silent"],
         "build": ["npm", "run", "build", "--silent"],
+        "preview": ["npm", "run", "preview", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"],
         "dev": ["npm", "run", "dev", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"]
       },
       "readyProbe": {
@@ -32,7 +33,7 @@
       "label": "Astro",
       "fixtureSubdir": "astro",
       "packageManager": "npm",
-      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "supportedTracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild", "reactive-update"],
       "rebuildSettle": {
         "mode": "browser-probe"
       },
@@ -44,6 +45,7 @@
       "commands": {
         "install": ["npm", "install", "--silent"],
         "build": ["npm", "run", "build", "--silent"],
+        "preview": ["npm", "run", "preview", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"],
         "dev": ["npm", "run", "dev", "--silent", "--", "--host", "127.0.0.1", "--port", "$PORT"]
       },
       "readyProbe": {
@@ -58,7 +60,7 @@
       "label": "Next App Router",
       "fixtureSubdir": "next-app-router",
       "packageManager": "npm",
-      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "supportedTracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild"],
       "rebuildSettle": {
         "mode": "browser-probe"
       },
@@ -84,7 +86,7 @@
       "label": "Nuxt",
       "fixtureSubdir": "nuxt",
       "packageManager": "npm",
-      "supportedTracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "supportedTracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild"],
       "rebuildSettle": {
         "mode": "browser-probe"
       },

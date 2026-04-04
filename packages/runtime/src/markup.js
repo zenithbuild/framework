@@ -38,7 +38,7 @@ export function _fragment(strings, ...values) {
             phase: 'render',
             code: 'NON_RENDERABLE_VALUE',
             message: '__zenith_fragment must be called as a tagged template literal',
-            hint: 'This helper only accepts tagged template syntax.'
+            hint: 'This helper only accepts tagged templates.'
         });
     }
 
@@ -56,7 +56,7 @@ export function _fragment(strings, ...values) {
             phase: 'render',
             code: 'NON_RENDERABLE_VALUE',
             message: 'Embedded markup expression contains forbidden <script> tag',
-            hint: 'Script tags are not allowed in embedded markup expressions.'
+            hint: 'Script tags are not allowed in embedded markup.'
         });
     }
     if (_FRAGMENT_EVENT_ATTR_RE.test(result)) {
@@ -64,7 +64,7 @@ export function _fragment(strings, ...values) {
             phase: 'render',
             code: 'NON_RENDERABLE_VALUE',
             message: 'Embedded markup expression contains inline event handler (on*=)',
-            hint: 'Use on:event={handler} bindings instead of inline event attributes.'
+            hint: 'Use on:event={handler} instead of inline event attributes.'
         });
     }
     if (_FRAGMENT_JS_URL_RE.test(result)) {
@@ -72,7 +72,7 @@ export function _fragment(strings, ...values) {
             phase: 'render',
             code: 'NON_RENDERABLE_VALUE',
             message: 'Embedded markup expression contains javascript: URL',
-            hint: 'javascript: URLs are forbidden in embedded markup.'
+            hint: 'javascript: URLs are forbidden.'
         });
     }
 
@@ -112,7 +112,7 @@ function _fragmentInterpolate(val, interpolationIndex) {
                     phase: 'render',
                     code: 'NON_RENDERABLE_VALUE',
                     message: `Embedded markup interpolation[${interpolationIndex}] contains forbidden key "${keys[k]}"`,
-                    hint: 'Prototype pollution keys are forbidden in embedded markup expressions.'
+                    hint: 'Prototype pollution keys are forbidden in embedded markup.'
                 });
             }
         }
@@ -120,14 +120,14 @@ function _fragmentInterpolate(val, interpolationIndex) {
             phase: 'render',
             code: 'NON_RENDERABLE_VALUE',
             message: `Embedded markup interpolation[${interpolationIndex}] resolved to a non-renderable object`,
-            hint: 'Only strings, numbers, booleans, null, undefined, arrays, and compiler-owned fragments are allowed.'
+            hint: 'Only primitives, arrays, and compiler-owned fragments are allowed.'
         });
     }
     throwZenithRuntimeError({
         phase: 'render',
         code: 'NON_RENDERABLE_VALUE',
         message: `Embedded markup interpolation[${interpolationIndex}] resolved to type "${typeof val}"`,
-        hint: 'Only strings, numbers, booleans, null, undefined, arrays, and compiler-owned fragments are allowed.'
+        hint: 'Only primitives, arrays, and compiler-owned fragments are allowed.'
     });
 }
 

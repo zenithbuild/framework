@@ -2,6 +2,7 @@ import { throwZenithRuntimeError, DOCS_LINKS } from './diagnostics.js';
 import { _fragment } from './markup.js';
 
 export const UNRESOLVED_LITERAL = Symbol('unresolved_literal');
+const OWN = Object.prototype.hasOwnProperty;
 
 export const STRICT_MEMBER_CHAIN_LITERAL_RE = /^(?:true|false|null|undefined|[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*)$/;
 export const CANONICAL_MEMBER_CHAIN_BASES = new Set(['props', 'params', 'data', 'ssr']);
@@ -33,132 +34,77 @@ export function _evaluateExpression(
     markerBinding = null,
     eventBinding = null
 ) {
-    if (binding.fn_index != null && binding.fn_index !== undefined) {
-        const fns = Array.isArray(exprFns) ? exprFns : [];
-        const fn = fns[binding.fn_index];
+    const runtimeProps = props || {};
+    if (binding.fn_index != null) {
+        const fn = Array.isArray(exprFns) ? exprFns[binding.fn_index] : undefined;
         if (typeof fn === 'function') {
-            try {
-                return fn({
-                    signalMap,
-                    params,
-                    ssrData,
-                    props: props || {},
-                    componentBindings,
-                    fragment: _fragment
-                });
-            } catch (fnErr) {
-                throw fnErr;
-            }
+            return fn({
+                signalMap,
+                params,
+                ssrData,
+                props: runtimeProps,
+                componentBindings,
+                fragment: _fragment
+            });
         }
     }
-    if (binding.signal_index !== null && binding.signal_index !== undefined) {
+    if (binding.signal_index != null) {
         const signalValue = signalMap.get(binding.signal_index);
         if (!signalValue || typeof signalValue.get !== 'function') {
             throw new Error('[Zenith Runtime] expression.signal_index did not resolve to a signal');
         }
-        return mode === 'event' ? signalValue : signalValue.get();
+        return _rvm(signalValue, mode);
     }
 
-    if (binding.state_index !== null && binding.state_index !== undefined) {
-        const resolved = stateValues[binding.state_index];
-        if (
-            mode !== 'event' &&
-            resolved &&
-            typeof resolved === 'object' &&
-            typeof resolved.get === 'function'
-        ) {
-            return resolved.get();
-        }
-        if (mode !== 'event' && typeof resolved === 'function') {
-            return resolved();
-        }
-        return resolved;
+    if (binding.state_index != null) {
+        return _rvm(stateValues[binding.state_index], mode);
     }
 
     if (typeof binding.component_instance === 'string' && typeof binding.component_binding === 'string') {
-        const instanceBindings = componentBindings[binding.component_instance];
-        const resolved =
-            instanceBindings && Object.prototype.hasOwnProperty.call(instanceBindings, binding.component_binding)
-                ? instanceBindings[binding.component_binding]
-                : undefined;
-        if (
-            mode !== 'event' &&
-            resolved &&
-            typeof resolved === 'object' &&
-            typeof resolved.get === 'function'
-        ) {
-            return resolved.get();
-        }
-        if (mode !== 'event' && typeof resolved === 'function') {
-            return resolved();
-        }
-        return resolved;
+        return _rvm(
+            _rcb(binding, componentBindings),
+            mode
+        );
     }
 
-    if (binding.literal !== null && binding.literal !== undefined) {
-        if (typeof binding.literal === 'string') {
-            const trimmedLiteral = binding.literal.trim();
-
-            // 1. Static primitives (true, false, null, undefined, numbers, quoted strings)
-            const primitiveValue = _resolvePrimitiveLiteral(trimmedLiteral);
-            if (primitiveValue !== UNRESOLVED_LITERAL) {
-                return primitiveValue;
-            }
-
-            // 2. Canonical payload roots
-            if (trimmedLiteral === 'data' || trimmedLiteral === 'ssr') {
-                return ssrData;
-            }
-            if (trimmedLiteral === 'params') {
-                return params;
-            }
-            if (trimmedLiteral === 'props') {
-                return props || {};
-            }
-
-            // 3. Bounded canonical member chains (props.*, params.*, data.*, ssr.*, exact stateKeys)
-            const strictMemberValue = _resolveStrictMemberChainLiteral(
-                trimmedLiteral,
-                stateValues,
-                stateKeys,
-                params,
-                ssrData,
-                mode,
-                props,
-                binding.marker_index,
-                _resolveBindingSource(binding, markerBinding, eventBinding)
-            );
-            if (strictMemberValue !== UNRESOLVED_LITERAL) {
-                return strictMemberValue;
-            }
-
-            // 4. Anything else is a literal that was not lowered by the compiler.
-            //    No heuristic guessing, no identifier extraction, no alias recovery.
-            throwZenithRuntimeError({
-                phase: 'bind',
-                code: 'EXPRESSION_NOT_LOWERED',
-                message: `Expression literal was not lowered by the compiler: ${_truncateLiteralForError(trimmedLiteral)}`,
-                marker: {
-                    type: _markerTypeForError(mode),
-                    id: binding.marker_index
-                },
-                path: `expression[${binding.marker_index}]`,
-                hint: 'This expression must be lowered to fn_index, signal_index, or state_index by the compiler. Literal string interpretation is restricted to static primitives and canonical member chains (props.*, params.*, data.*, ssr.*).',
-                docsLink: DOCS_LINKS.expressionScope,
-                source: _resolveBindingSource(binding, markerBinding, eventBinding)
-            });
-        }
+    if (binding.literal == null) {
+        return '';
+    }
+    if (typeof binding.literal !== 'string') {
         return binding.literal;
     }
-
-    return '';
+    const trimmedLiteral = binding.literal.trim();
+    const primitiveValue = _resolvePrimitiveLiteral(trimmedLiteral);
+    if (primitiveValue !== UNRESOLVED_LITERAL) {
+        return primitiveValue;
+    }
+    const canonicalRootValue = _rcr(trimmedLiteral, params, ssrData, runtimeProps);
+    if (canonicalRootValue !== UNRESOLVED_LITERAL) {
+        return canonicalRootValue;
+    }
+    const source = _resolveBindingSource(binding, markerBinding, eventBinding);
+    const strictMemberValue = _resolveStrictMemberChainLiteral(
+        trimmedLiteral,
+        stateValues,
+        stateKeys,
+        params,
+        ssrData,
+        mode,
+        runtimeProps,
+        binding.marker_index,
+        source
+    );
+    if (strictMemberValue !== UNRESOLVED_LITERAL) {
+        return strictMemberValue;
+    }
+    _tenl(trimmedLiteral, binding.marker_index, mode, source);
 }
 
 export function _throwUnresolvedMemberChainError(literal, markerIndex, mode, pathSuffix, hint, source) {
     throwZenithRuntimeError({
         phase: 'bind',
         code: 'UNRESOLVED_EXPRESSION',
-        message: `Failed to resolve expression literal: ${_truncateLiteralForError(literal)}`,
+        message: `Failed to resolve literal: ${_truncateLiteralForError(literal)}`,
         marker: {
             type: _markerTypeForError(mode),
             id: markerIndex
@@ -185,93 +131,59 @@ export function _resolveStrictMemberChainLiteral(
     if (typeof literal !== 'string' || !STRICT_MEMBER_CHAIN_LITERAL_RE.test(literal)) {
         return UNRESOLVED_LITERAL;
     }
-
-    // Primitives are handled by _resolvePrimitiveLiteral before this function
     if (literal === 'true' || literal === 'false' || literal === 'null' || literal === 'undefined') {
         return UNRESOLVED_LITERAL;
     }
 
     const segments = literal.split('.');
     const baseIdentifier = segments[0];
-
-    // Bounded resolution: only canonical payload prefixes and exact state keys
-    const isCanonicalBase = CANONICAL_MEMBER_CHAIN_BASES.has(baseIdentifier);
-    const isExactStateKey = !isCanonicalBase && Array.isArray(stateKeys) && stateKeys.includes(baseIdentifier);
-
-    if (!isCanonicalBase && !isExactStateKey) {
-        // Not a canonical base and not an exact state key — this literal was not lowered
+    const baseValue = _resolveStrictBase(baseIdentifier, stateValues, stateKeys, params, ssrData, props);
+    if (baseValue === UNRESOLVED_LITERAL) {
         return UNRESOLVED_LITERAL;
     }
-
-    const scope = _buildLiteralScope(stateValues, stateKeys, params, ssrData, mode, props);
-
-    if (!Object.prototype.hasOwnProperty.call(scope, baseIdentifier)) {
-        _throwUnresolvedMemberChainError(
-            literal,
-            markerIndex,
-            mode,
-            `expression.${baseIdentifier}`,
-            `Base identifier "${baseIdentifier}" is not bound. Check props/data/params and declared state keys.`,
-            source
-        );
-    }
-
-    let cursor = scope[baseIdentifier];
+    const failResolve = (suffix, hint) => _throwUnresolvedMemberChainError(
+        literal,
+        markerIndex,
+        mode,
+        `expression.${suffix}`,
+        hint,
+        source
+    );
+    let cursor = baseValue;
     let traversedPath = baseIdentifier;
 
     for (let i = 1; i < segments.length; i++) {
         const segment = segments[i];
         if (UNSAFE_MEMBER_KEYS.has(segment)) {
-            throwZenithRuntimeError({
-                phase: 'bind',
-                code: 'UNSAFE_MEMBER_ACCESS',
-                message: `Blocked unsafe member access: ${segment} in path "${literal}"`,
-                path: `marker[${markerIndex}].expression.${literal}`,
-                hint: 'Property access to __proto__, prototype, and constructor is forbidden.',
-                docsLink: DOCS_LINKS.expressionScope,
-                source
-            });
+            _tuma(literal, markerIndex, segment, source);
         }
-
         if (cursor === null || cursor === undefined) {
-            _throwUnresolvedMemberChainError(
-                literal,
-                markerIndex,
-                mode,
-                `expression.${traversedPath}.${segment}`,
-                `Cannot read "${segment}" from ${traversedPath} because it is null or undefined.`,
-                source
-            );
+            failResolve(`${traversedPath}.${segment}`, `Cannot read "${segment}" from ${traversedPath}; value is null/undefined.`);
         }
-
         const cursorType = typeof cursor;
         if (cursorType !== 'object' && cursorType !== 'function') {
-            _throwUnresolvedMemberChainError(
-                literal,
-                markerIndex,
-                mode,
-                `expression.${traversedPath}.${segment}`,
-                `Cannot read "${segment}" from ${traversedPath} because it resolved to a ${cursorType}.`,
-                source
-            );
+            failResolve(`${traversedPath}.${segment}`, `Cannot read "${segment}" from ${traversedPath}; value is ${cursorType}.`);
         }
-
-        if (!Object.prototype.hasOwnProperty.call(cursor, segment)) {
-            _throwUnresolvedMemberChainError(
-                literal,
-                markerIndex,
-                mode,
-                `expression.${traversedPath}.${segment}`,
-                `Missing member "${segment}" on ${traversedPath}. Check your bindings.`,
-                source
-            );
+        if (!OWN.call(cursor, segment)) {
+            failResolve(`${traversedPath}.${segment}`, `Missing member "${segment}" on ${traversedPath}.`);
         }
-
         cursor = cursor[segment];
         traversedPath = `${traversedPath}.${segment}`;
     }
 
     return cursor;
+}
+
+function _resolveStrictBase(baseIdentifier, stateValues, stateKeys, params, ssrData, props) {
+    if (baseIdentifier === '__zenith_fragment') return _fragment;
+    if (CANONICAL_MEMBER_CHAIN_BASES.has(baseIdentifier)) {
+        if (baseIdentifier === 'props') return props || {};
+        if (baseIdentifier === 'params') return params;
+        return ssrData;
+    }
+    if (!Array.isArray(stateKeys)) return UNRESOLVED_LITERAL;
+    const stateIndex = stateKeys.indexOf(baseIdentifier);
+    return stateIndex === -1 ? UNRESOLVED_LITERAL : stateValues[stateIndex];
 }
 
 export function _resolvePrimitiveLiteral(literal) {
@@ -309,48 +221,18 @@ export function _resolvePrimitiveLiteral(literal) {
     return UNRESOLVED_LITERAL;
 }
 
-export function _buildLiteralScope(stateValues, stateKeys, params, ssrData, mode, props) {
-    const scope = Object.create(null);
-    scope.params = params;
-    scope.data = ssrData;
-    scope.ssr = ssrData;
-    scope.props = props || {};
-    scope.__zenith_fragment = _fragment;
-
-    // Exact state keys only — no alias derivation, no mangled-name recovery
-    if (Array.isArray(stateKeys)) {
-        for (let i = 0; i < stateKeys.length; i++) {
-            const key = stateKeys[i];
-            if (typeof key !== 'string' || key.length === 0) {
-                continue;
-            }
-            if (Object.prototype.hasOwnProperty.call(scope, key)) {
-                continue;
-            }
-            scope[key] = stateValues[i];
-        }
-    }
-
-    return scope;
+export function _resolveBindingSource(binding, markerBinding, eventBinding) {
+    const source = binding?.source;
+    if (_isSourceSpan(source)) return source;
+    const eventSource = eventBinding?.source;
+    if (_isSourceSpan(eventSource)) return eventSource;
+    const markerSource = markerBinding?.source;
+    if (_isSourceSpan(markerSource)) return markerSource;
+    return undefined;
 }
 
-// _isLikelyExpressionLiteral and _extractMissingIdentifier removed:
-// Runtime no longer performs heuristic identifier extraction or expression
-// shape guessing. Unresolved literals throw EXPRESSION_NOT_LOWERED directly.
-
-export function _resolveBindingSource(binding, markerBinding, eventBinding) {
-    const candidates = [
-        binding?.source,
-        eventBinding?.source,
-        markerBinding?.source
-    ];
-    for (let i = 0; i < candidates.length; i++) {
-        const candidate = candidates[i];
-        if (candidate && typeof candidate === 'object' && typeof candidate.file === 'string') {
-            return candidate;
-        }
-    }
-    return undefined;
+function _isSourceSpan(value) {
+    return Boolean(value) && typeof value === 'object' && typeof value.file === 'string';
 }
 
 export function _describeBindingExpression(binding) {
@@ -383,10 +265,62 @@ export function _truncateLiteralForError(str) {
     if (typeof str !== 'string') return String(str);
     const sanitized = str
         .replace(/[A-Za-z]:\\[^\s"'`]+/g, '<path>')
-        .replace(/\/Users\/[^\s"'`]+/g, '<path>')
-        .replace(/\/home\/[^\s"'`]+/g, '<path>')
-        .replace(/\/private\/[^\s"'`]+/g, '<path>')
-        .replace(/\/tmp\/[^\s"'`]+/g, '<path>')
-        .replace(/\/var\/folders\/[^\s"'`]+/g, '<path>');
+        .replace(/\/(?:Users|home|private|tmp|var\/folders)\/[^\s"'`]+/g, '<path>');
     return sanitized.length > 100 ? `${sanitized.substring(0, 97)}...` : sanitized;
+}
+
+function _rvm(value, mode) {
+    if (mode === 'event') {
+        return value;
+    }
+    if (value && typeof value === 'object' && typeof value.get === 'function') {
+        return value.get();
+    }
+    if (typeof value === 'function') {
+        return value();
+    }
+    return value;
+}
+
+function _rcb(binding, componentBindings) {
+    const instanceBindings = componentBindings[binding.component_instance];
+    if (!instanceBindings || !OWN.call(instanceBindings, binding.component_binding)) {
+        return undefined;
+    }
+    return instanceBindings[binding.component_binding];
+}
+
+function _rcr(literal, params, ssrData, props) {
+    if (literal === 'data' || literal === 'ssr') return ssrData;
+    if (literal === 'params') return params;
+    if (literal === 'props') return props;
+    return UNRESOLVED_LITERAL;
+}
+
+function _tenl(literal, markerIndex, mode, source) {
+    throwZenithRuntimeError({
+        phase: 'bind',
+        code: 'EXPRESSION_NOT_LOWERED',
+        message: `Expression literal was not lowered by the compiler: ${_truncateLiteralForError(literal)}`,
+        marker: {
+            type: _markerTypeForError(mode),
+            id: markerIndex
+        },
+        path: `expression[${markerIndex}]`,
+        hint: 'Lower expression to fn_index/signal_index/state_index.',
+        docsLink: DOCS_LINKS.expressionScope,
+        source
+    });
+}
+
+function _tuma(literal, markerIndex, member, source) {
+    throwZenithRuntimeError({
+        phase: 'bind',
+        code: 'UNSAFE_MEMBER_ACCESS',
+        message: `Blocked unsafe member access: ${member} in path "${literal}"`,
+        path: `marker[${markerIndex}].expression.${literal}`,
+        hint: 'Property access to __proto__/prototype/constructor is forbidden.',
+        docsLink: DOCS_LINKS.expressionScope,
+        source
+    });
 }

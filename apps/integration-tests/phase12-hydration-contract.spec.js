@@ -40,7 +40,7 @@ function parseScripts(html) {
   return scripts;
 }
 
-function parseJsonConst(source, name) {
+function parseConstValue(source, name) {
   const patterns = [
     new RegExp(`const\\s+${name}\\s*=\\s*Object\\.freeze\\((\\[[\\s\\S]*?\\]|\\{[\\s\\S]*?\\})\\);`),
     new RegExp(`const\\s+${name}\\s*=\\s*(\\[[\\s\\S]*?\\]|\\{[\\s\\S]*?\\});`)
@@ -53,7 +53,46 @@ function parseJsonConst(source, name) {
   if (!match) {
     throw new Error(`missing const ${name}`);
   }
-  return JSON.parse(match[1]);
+  return Function(`"use strict";return (${match[1]});`)();
+}
+
+function markerKindFromCode(kindCode) {
+  if (kindCode === 1) return 'attr';
+  if (kindCode === 2) return 'event';
+  return 'text';
+}
+
+function inflateExpressionRows(rows) {
+  return rows.map((tuple) => {
+    const binding = {
+      marker_index: tuple[0],
+      signal_index: tuple.length > 5 && typeof tuple[5] === 'number' ? tuple[5] : null,
+      signal_indices: tuple.length > 4 && Array.isArray(tuple[4]) ? tuple[4] : [],
+      state_index: tuple.length > 3 && typeof tuple[3] === 'number' ? tuple[3] : null,
+      component_instance: tuple.length > 7 ? tuple[7] : null,
+      component_binding: tuple.length > 8 ? tuple[8] : null,
+      literal: tuple.length > 1 ? tuple[1] : null,
+      source: null
+    };
+    if (tuple.length > 6 && tuple[6] != null) {
+      binding.fn_index = tuple[6];
+    }
+    return binding;
+  });
+}
+
+function inflateMarkerRows(rows) {
+  return rows.map((tuple) => {
+    const marker = {
+      index: tuple[0],
+      kind: markerKindFromCode(tuple[1]),
+      selector: tuple[2]
+    };
+    if (tuple.length > 4 && tuple[4] != null) {
+      marker.attr = tuple[4];
+    }
+    return marker;
+  });
 }
 
 async function buildFixture() {
@@ -93,9 +132,9 @@ describe('Phase 12: hydration contract lock', () => {
     const { root, dist } = await buildFixture();
 
     const { pageSource: pageJs } = await readPageBundle(dist);
-    const expr = parseJsonConst(pageJs, '__zenith_expression_bindings');
-    const markers = parseJsonConst(pageJs, '__zenith_markers');
-    const events = parseJsonConst(pageJs, '__zenith_events');
+    const expr = parseConstValue(pageJs, '__zenith_payload_expression_rows');
+    const markers = parseConstValue(pageJs, '__zenith_payload_marker_rows');
+    const events = parseConstValue(pageJs, '__zenith_events');
 
     expect(Array.isArray(expr)).toBe(true);
     expect(Array.isArray(markers)).toBe(true);
@@ -103,7 +142,7 @@ describe('Phase 12: hydration contract lock', () => {
 
     expect(markers.length).toBe(expr.length);
 
-    const indices = markers.map((item) => item.index);
+    const indices = markers.map((item) => item[0]);
     expect(new Set(indices).size).toBe(indices.length);
 
     for (let i = 0; i < indices.length; i++) {
@@ -126,14 +165,14 @@ describe('Phase 12: hydration contract lock', () => {
       const { pageSource: source } = await readPageBundle(dist);
       return {
         source,
-        expr: parseJsonConst(source, '__zenith_expression_bindings')
+        expr: parseConstValue(source, '__zenith_payload_expression_rows')
       };
     };
 
     const first = await readCurrentPageBundle();
     expect((first.source.match(/hydrate\s*\(\s*\{/g) || []).length).toBe(1);
-    expect(first.source.includes('const __zenith_ir_version = 1;')).toBe(true);
-    expect(first.source.includes('ir_version: __zenith_ir_version')).toBe(true);
+    expect(first.source).toMatch(/const __zenith_ir_version\s*=\s*1;/);
+    expect(first.source).toMatch(/ir_version:\s*__zenith_ir_version/);
 
     assertSuccess(runCli(root, ['build']), 'zenith build (repeat)');
     const second = await readCurrentPageBundle();
@@ -150,9 +189,11 @@ describe('Phase 12: hydration contract lock', () => {
     const runtimePath = extractRuntimeModulePath(pagePath, pageSource);
     const runtimeSource = await fs.readFile(runtimePath, 'utf8');
 
-    const expressions = parseJsonConst(pageSource, '__zenith_expression_bindings');
-    const markers = parseJsonConst(pageSource, '__zenith_markers');
-    const events = parseJsonConst(pageSource, '__zenith_events');
+    const expressionRows = parseConstValue(pageSource, '__zenith_payload_expression_rows');
+    const markerRows = parseConstValue(pageSource, '__zenith_payload_marker_rows');
+    const expressions = inflateExpressionRows(expressionRows);
+    const markers = inflateMarkerRows(markerRows);
+    const events = parseConstValue(pageSource, '__zenith_events');
     const mutatedExpressions = [...expressions].reverse();
     const mutatedMarkers = [...markers].reverse();
 

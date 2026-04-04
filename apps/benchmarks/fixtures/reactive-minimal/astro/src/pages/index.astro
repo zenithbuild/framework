@@ -1,0 +1,41 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Astro Reactive Minimal Benchmark">
+  <section class="stack">
+    <h1>Astro Reactive Minimal</h1>
+    
+    <div class="metrics">
+      <p>Count: <span data-testid="count">0</span></p>
+      <button data-testid="increment-button" type="button">Increment</button>
+    </div>
+
+    <div class="list">
+       <article data-testid="row-0">
+         <span data-testid="row-name">Item 1</span>
+       </article>
+       <button data-testid="update-row-button" type="button">Update Row</button>
+    </div>
+  </section>
+
+  <script is:inline>
+    const countNode = document.querySelector('[data-testid="count"]');
+    const incrementBtn = document.querySelector('[data-testid="increment-button"]');
+    const rowNameNode = document.querySelector('[data-testid="row-name"]');
+    const updateRowBtn = document.querySelector('[data-testid="update-row-button"]');
+    
+    let count = 0;
+    let name = "Item 1";
+
+    incrementBtn.addEventListener("click", () => {
+      count += 1;
+      countNode.textContent = String(count);
+    });
+
+    updateRowBtn.addEventListener("click", () => {
+      name = "Updated " + count;
+      rowNameNode.textContent = name;
+    });
+  </script>
+</BaseLayout>

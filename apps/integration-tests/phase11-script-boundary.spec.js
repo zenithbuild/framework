@@ -81,7 +81,7 @@ async function buildFixture(options) {
 }
 
 describe('Phase 11: script boundary lock', () => {
-  test('router=false: each page gets one page module and the inline image runtime payload', async () => {
+  test('router=false: each page gets one page module and image runtime only when required', async () => {
     const { root, dist } = await buildFixture({ router: false });
 
     const indexHtml = await fs.readFile(path.join(dist, 'index.html'), 'utf8');
@@ -90,21 +90,17 @@ describe('Phase 11: script boundary lock', () => {
     const indexScripts = extractScripts(indexHtml);
     const aboutScripts = extractScripts(aboutHtml);
 
-    expect(indexScripts.length).toBe(2);
+    expect(indexScripts.length).toBe(1);
     expect(indexScripts.filter((s) => s.isPage).length).toBe(1);
     expect(indexScripts.filter((s) => s.isRouter).length).toBe(0);
-    expect(indexScripts.filter((s) => s.src === null).length).toBe(1);
-    expect(indexScripts.find((s) => s.src === null)?.attrs).toContain('id="zenith-image-runtime"');
+    expect(indexScripts.filter((s) => s.src === null).length).toBe(0);
 
-    expect(aboutScripts.length).toBe(2);
-    expect(aboutScripts.filter((s) => s.isPage).length).toBe(1);
-    expect(aboutScripts.filter((s) => s.isRouter).length).toBe(0);
-    expect(aboutScripts.filter((s) => s.src === null).length).toBe(1);
+    expect(aboutScripts.length).toBe(0);
 
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  test('router=true: each page gets one router module plus the inline image runtime payload', async () => {
+  test('router=true: each page gets one router module and image runtime only when required', async () => {
     const { root, dist } = await buildFixture({ router: true });
 
     const htmlFiles = ['index.html', 'about/index.html'];
@@ -123,11 +119,10 @@ describe('Phase 11: script boundary lock', () => {
       const srcs = scripts.map((s) => s.src);
       expect(new Set(srcs).size).toBe(srcs.length);
 
-      expect(scripts.filter((s) => s.src === null).length).toBe(1);
-      expect(scripts.find((s) => s.src === null)?.attrs).toContain('id="zenith-image-runtime"');
+      expect(scripts.filter((s) => s.src === null).length).toBe(0);
       expect(scripts.filter((s) => s.isRouter).length).toBe(1);
       expect(scripts.filter((s) => s.isPage).length).toBe(0);
-      expect(scripts.length).toBe(2);
+      expect(scripts.length).toBe(1);
     }
 
     await fs.rm(root, { recursive: true, force: true });

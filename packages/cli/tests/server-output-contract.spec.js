@@ -101,8 +101,8 @@ describe('server output contract', () => {
                     route_kind: 'page',
                     output: '/secure/index.html',
                     base_path: '/docs',
-                    page_asset: 'assets/secure.[hash].js',
-                    page_asset_file: 'secure.[hash].js',
+                    page_asset: null,
+                    page_asset_file: null,
                     route_id: null,
                     server_script_path: '<project>/pages/secure/index.zen',
                     guard_module_ref: null,
@@ -165,6 +165,7 @@ describe('server output contract', () => {
 
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'runtime', 'route-render.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-contract.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-middleware.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-error.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'payload.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'materialize.js'))).toBe(true);
@@ -175,5 +176,45 @@ describe('server output contract', () => {
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'api_session', 'route', 'page.html'))).toBe(false);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.action.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.load.js'))).toBe(true);
+    });
+
+    test('server middleware helpers stay server-only and are not importable in client route scripts', async () => {
+        projectRoot = await createProject({
+            'pages/index.zen': [
+                '<script lang="ts">',
+                "import { withMiddleware } from 'zenith:server-contract';",
+                'console.log(withMiddleware);',
+                '</script>',
+                '<main>home</main>'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await expect(cli(['build'], projectRoot)).rejects.toThrow('Bundler failed with exit code 1');
+    });
+
+    test('build discovers src/api resource aliases for src layout projects without changing route kind semantics', async () => {
+        projectRoot = await createProject({
+            'src/pages/index.zen': '<main>home</main>\n',
+            'src/api/ping.resource.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.text("ok");',
+                '}'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await cli(['build'], projectRoot);
+
+        const manifest = await readJson(join(projectRoot, '.zenith-output', 'server', 'manifest.json'));
+        expect(manifest.routes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    path: '/api/ping',
+                    route_kind: 'resource'
+                })
+            ])
+        );
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'api_ping', 'route', 'entry.js'))).toBe(true);
     });
 });

@@ -47,7 +47,7 @@ describe('Track E side-effect maintainability locks', () => {
     });
 
     test('runtime template bundle includes extracted side-effect modules', () => {
-        const templateSource = readSource('template.js');
+        const templateSource = `${readSource('template.js')}\n${readSource('runtime-template-profile.js')}`;
 
         for (let i = 0; i < SIDE_EFFECT_FILES.length; i++) {
             expect(templateSource).toContain(`'${SIDE_EFFECT_FILES[i].replace(/\.ts$/, '.js')}'`);

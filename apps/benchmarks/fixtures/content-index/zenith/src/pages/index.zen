@@ -1,6 +1,6 @@
 <DefaultLayout>
   <section class="stack">
-    <p data-benchmark-copy="lead">Content index benchmark fixture for Zenith.</p>
+    <p data-benchmark-copy="lead">Content index benchmark fixture for Zenith. <!-- benchmark-point: template-text --></p>
     <h1>Repeated content surfaces with separate detail pages.</h1>
     <p>This case adds a small route tree of content pages without client interactivity.</p>
   </section>

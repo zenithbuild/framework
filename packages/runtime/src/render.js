@@ -14,20 +14,21 @@ export function _applyMarkerValue(nodes, marker, value) {
         try {
             const node = nodes[i];
             if (marker.kind === 'text') {
+                const textPath = `${markerPath}.text`;
                 if (node && node.nodeType === 8) {
-                    _applyCommentMarkerValue(node, value, `${markerPath}.text`);
+                    _applyCommentMarkerValue(node, value, textPath);
                     continue;
                 }
                 if (_isStructuralFragment(value)) {
-                    _mountStructuralFragment(node, value, `${markerPath}.text`);
+                    _mountStructuralFragment(node, value, textPath);
                     continue;
                 }
 
-                const html = _renderFragmentValue(value, `${markerPath}.text`);
+                const html = _renderFragmentValue(value, textPath);
                 if (html !== null) {
                     node.innerHTML = html;
                 } else {
-                    node.textContent = _coerceText(value, `${markerPath}.text`);
+                    node.textContent = _coerceText(value, textPath);
                 }
                 continue;
             }
@@ -47,7 +48,7 @@ export function _applyMarkerValue(nodes, marker, value) {
                 path: marker.kind === 'attr'
                     ? `${markerPath}.attr.${marker.attr}`
                     : `${markerPath}.${marker.kind}`,
-                hint: 'Check the binding value type and marker mapping.',
+                hint: 'Check binding value and marker mapping.',
                 docsLink: DOCS_LINKS.markerTable,
                 source: marker.source
             });
@@ -117,15 +118,7 @@ function _ensureCommentPlaceholderEnd(anchor) {
 }
 
 function _clearCommentPlaceholderContent(anchor) {
-    if (anchor.__z_unmounts) {
-        for (let i = 0; i < anchor.__z_unmounts.length; i++) {
-            try {
-                anchor.__z_unmounts[i]();
-            } catch {
-            }
-        }
-    }
-    anchor.__z_unmounts = [];
+    _runUnmounts(anchor);
 
     const end = _ensureCommentPlaceholderEnd(anchor);
     if (!end) {
@@ -144,21 +137,7 @@ function _clearCommentPlaceholderContent(anchor) {
 }
 
 function _mountStructuralFragmentIntoCommentRange(anchor, value, rootPath = 'renderable') {
-    let region = anchor.__z_fragment_region;
-
-    if (region && anchor.__z_fragment_region_active) {
-        try {
-            region.update(value, { parent: anchor.parentNode, insertBefore: anchor.__z_range_end, rootPath });
-        } catch (error) {
-            rethrowZenithRuntimeError(error, {
-                phase: 'render',
-                code: 'FRAGMENT_MOUNT_FAILED',
-                message: 'Fragment update failed',
-                path: rootPath,
-                hint: 'Verify fragment values and nested renderable arrays.',
-                docsLink: DOCS_LINKS.markerTable
-            });
-        }
+    if (_tryUpdateFragmentTarget(anchor, value, anchor.parentNode, anchor.__z_range_end, rootPath)) {
         return;
     }
 
@@ -167,80 +146,17 @@ function _mountStructuralFragmentIntoCommentRange(anchor, value, rootPath = 'ren
     if (!parent) {
         return;
     }
-
-    region = createFragmentRegion();
-    anchor.__z_fragment_region = region;
-    anchor.__z_fragment_region_active = true;
-
-    try {
-        region.mount(value, { parent, insertBefore: end, rootPath });
-    } catch (error) {
-        rethrowZenithRuntimeError(error, {
-            phase: 'render',
-            code: 'FRAGMENT_MOUNT_FAILED',
-            message: 'Fragment mount failed',
-            path: rootPath,
-            hint: 'Verify fragment values and nested renderable arrays.',
-            docsLink: DOCS_LINKS.markerTable
-        });
-    }
-
-    anchor.__z_unmounts = [() => {
-        anchor.__z_fragment_region_active = false;
-        region.destroy();
-    }];
+    _mountFragmentRegion(anchor, value, parent, end, rootPath);
 }
 
 function _mountStructuralFragment(container, value, rootPath = 'renderable') {
-    let region = container.__z_fragment_region;
-
-    if (region && container.__z_fragment_region_active) {
-        try {
-            region.update(value, { parent: container, insertBefore: null, rootPath });
-        } catch (error) {
-            rethrowZenithRuntimeError(error, {
-                phase: 'render',
-                code: 'FRAGMENT_MOUNT_FAILED',
-                message: 'Fragment update failed',
-                path: rootPath,
-                hint: 'Verify fragment values and nested renderable arrays.',
-                docsLink: DOCS_LINKS.markerTable
-            });
-        }
+    if (_tryUpdateFragmentTarget(container, value, container, null, rootPath)) {
         return;
     }
 
-    if (container.__z_unmounts) {
-        for (let i = 0; i < container.__z_unmounts.length; i++) {
-            try {
-                container.__z_unmounts[i]();
-            } catch {
-            }
-        }
-    }
-
+    _runUnmounts(container);
     container.innerHTML = '';
-    region = createFragmentRegion();
-    container.__z_fragment_region = region;
-    container.__z_fragment_region_active = true;
-
-    try {
-        region.mount(value, { parent: container, insertBefore: null, rootPath });
-    } catch (error) {
-        rethrowZenithRuntimeError(error, {
-            phase: 'render',
-            code: 'FRAGMENT_MOUNT_FAILED',
-            message: 'Fragment mount failed',
-            path: rootPath,
-            hint: 'Verify fragment values and nested renderable arrays.',
-            docsLink: DOCS_LINKS.markerTable
-        });
-    }
-
-    container.__z_unmounts = [() => {
-        container.__z_fragment_region_active = false;
-        region.destroy();
-    }];
+    _mountFragmentRegion(container, value, container, null, rootPath);
 }
 
 export function _coerceText(value, path = 'renderable') {
@@ -253,7 +169,7 @@ export function _coerceText(value, path = 'renderable') {
             code: 'NON_RENDERABLE_VALUE',
             message: `Zenith Render Error: non-renderable function at ${path}. Use map() to render fields.`,
             path,
-            hint: 'Convert functions into explicit event handlers or renderable text.',
+            hint: 'Convert functions to handlers or text.',
             docsLink: DOCS_LINKS.expressionScope
         });
     }
@@ -263,7 +179,7 @@ export function _coerceText(value, path = 'renderable') {
             code: 'NON_RENDERABLE_VALUE',
             message: `Zenith Render Error: non-renderable object at ${path}. Use map() to render fields.`,
             path,
-            hint: 'Use map() to render object fields into nodes.',
+            hint: 'Use map() to render object fields.',
             docsLink: DOCS_LINKS.expressionScope
         });
     }
@@ -303,23 +219,24 @@ function _escapeHtml(input) {
 }
 
 function _applyAttribute(node, attrName, value) {
-    if (typeof attrName === 'string' && attrName.toLowerCase() === 'innerhtml') {
+    const normalizedAttrName = typeof attrName === 'string' ? attrName.toLowerCase() : '';
+    if (normalizedAttrName === 'innerhtml') {
         throwZenithRuntimeError({
             phase: 'bind',
             code: 'UNSAFE_HTML_REQUIRES_EXPLICIT_BOUNDARY',
             message: 'innerHTML bindings are forbidden in Zenith',
             path: `attr:${attrName}`,
-            hint: 'Use unsafeHTML={value} for explicit raw HTML insertion, or embedded markup expressions for compiler-owned fragments.'
+            hint: 'Use unsafeHTML={value} or compiler-owned markup fragments.'
         });
     }
 
-    if (typeof attrName === 'string' && attrName.toLowerCase() === 'unsafehtml') {
+    if (normalizedAttrName === 'unsafehtml') {
         node.innerHTML = value === null || value === undefined || value === false ? '' : String(value);
         return;
     }
 
     if (attrName === 'class' || attrName === 'className') {
-        const classValue = value === null || value === undefined || value === false ? '' : String(value);
+        const classValue = _isEmptyAttrValue(value) ? '' : String(value);
         if (node && node.namespaceURI === SVG_NAMESPACE && typeof node.setAttribute === 'function') {
             node.setAttribute('class', classValue);
             return;
@@ -329,28 +246,12 @@ function _applyAttribute(node, attrName, value) {
     }
 
     if (attrName === 'style') {
-        if (value === null || value === undefined || value === false) {
+        const styleValue = _resolveStyleAttributeValue(value);
+        if (styleValue === null) {
             node.removeAttribute('style');
-            return;
+        } else {
+            node.setAttribute('style', styleValue);
         }
-
-        if (typeof value === 'string') {
-            node.setAttribute('style', value);
-            return;
-        }
-
-        if (typeof value === 'object') {
-            const entries = Object.entries(value);
-            let styleText = '';
-            for (let i = 0; i < entries.length; i++) {
-                const [key, rawValue] = entries[i];
-                styleText += `${key}: ${rawValue};`;
-            }
-            node.setAttribute('style', styleText);
-            return;
-        }
-
-        node.setAttribute('style', String(value));
         return;
     }
 
@@ -363,10 +264,89 @@ function _applyAttribute(node, attrName, value) {
         return;
     }
 
-    if (value === null || value === undefined || value === false) {
+    if (_isEmptyAttrValue(value)) {
         node.removeAttribute(attrName);
         return;
     }
 
     node.setAttribute(attrName, String(value));
+}
+
+function _runUnmounts(target) {
+    if (!target.__z_unmounts) {
+        return;
+    }
+    for (let i = 0; i < target.__z_unmounts.length; i++) {
+        try {
+            target.__z_unmounts[i]();
+        } catch {
+        }
+    }
+    target.__z_unmounts = [];
+}
+
+function _updateFragmentRegion(region, value, parent, insertBefore, rootPath) {
+    try {
+        region.update(value, { parent, insertBefore, rootPath });
+    } catch (error) {
+        _throwFragmentMountFailure(error, rootPath, 'Fragment update failed');
+    }
+}
+
+function _mountFragmentRegion(target, value, parent, insertBefore, rootPath) {
+    const region = createFragmentRegion();
+    target.__z_fragment_region = region;
+    target.__z_fragment_region_active = true;
+    try {
+        region.mount(value, { parent, insertBefore, rootPath });
+    } catch (error) {
+        _throwFragmentMountFailure(error, rootPath, 'Fragment mount failed');
+    }
+    target.__z_unmounts = [() => {
+        target.__z_fragment_region_active = false;
+        region.destroy();
+    }];
+}
+
+function _tryUpdateFragmentTarget(target, value, parent, insertBefore, rootPath) {
+    const region = target.__z_fragment_region;
+    if (!region || !target.__z_fragment_region_active) {
+        return false;
+    }
+    _updateFragmentRegion(region, value, parent, insertBefore, rootPath);
+    return true;
+}
+
+function _throwFragmentMountFailure(error, path, message) {
+    rethrowZenithRuntimeError(error, {
+        phase: 'render',
+        code: 'FRAGMENT_MOUNT_FAILED',
+        message,
+        path,
+        hint: 'Verify fragment values and nested arrays.',
+        docsLink: DOCS_LINKS.markerTable
+    });
+}
+
+function _resolveStyleAttributeValue(value) {
+    if (_isEmptyAttrValue(value)) {
+        return null;
+    }
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (value && typeof value === 'object') {
+        const entries = Object.entries(value);
+        let styleText = '';
+        for (let i = 0; i < entries.length; i++) {
+            const [key, rawValue] = entries[i];
+            styleText += `${key}: ${rawValue};`;
+        }
+        return styleText;
+    }
+    return String(value);
+}
+
+function _isEmptyAttrValue(value) {
+    return value === null || value === undefined || value === false;
 }

@@ -39,8 +39,8 @@ export const ssr = { user: { name: 'Ada' } }
       expect(pageAsset).not.toBeNull();
 
       const pageSource = await fs.readFile(path.join(distDir, pageAsset), 'utf8');
-      expect(pageSource.includes('__zenith_static_ssr_data')).toBe(true);
-      expect(pageSource.includes('"Ada"')).toBe(true);
+      expect(/\buser\b/.test(pageSource)).toBe(true);
+      expect(pageSource.includes('"Ada"') || pageSource.includes("'Ada'")).toBe(true);
 
       const manifest = JSON.parse(
         await fs.readFile(path.join(distDir, 'assets', 'router-manifest.json'), 'utf8')

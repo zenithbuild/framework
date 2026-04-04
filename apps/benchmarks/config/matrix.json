@@ -7,7 +7,7 @@
       "label": "Static Marketing",
       "fixtureBaseDir": "fixtures/static-marketing",
       "frameworkIds": ["zenith", "astro", "next-app-router", "nuxt"],
-      "tracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "tracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild"],
       "rebuildMutations": ["template-text", "style"],
       "startupPath": "/"
     },
@@ -16,7 +16,7 @@
       "label": "Content Index",
       "fixtureBaseDir": "fixtures/content-index",
       "frameworkIds": ["zenith", "astro", "next-app-router", "nuxt"],
-      "tracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "tracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild"],
       "rebuildMutations": ["template-text", "style"],
       "startupPath": "/"
     },
@@ -25,8 +25,16 @@
       "label": "Interactive Filter",
       "fixtureBaseDir": "fixtures/interactive-filter",
       "frameworkIds": ["zenith", "astro", "next-app-router", "nuxt"],
-      "tracks": ["cold-build", "dev-startup", "hydration-runtime", "rebuild"],
+      "tracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "rebuild"],
       "rebuildMutations": ["template-text", "style", "interactive-logic"],
+      "startupPath": "/"
+    },
+    {
+      "id": "reactive-minimal",
+      "label": "Reactive Minimal",
+      "fixtureBaseDir": "fixtures/reactive-minimal",
+      "frameworkIds": ["zenith", "astro"],
+      "tracks": ["determinism", "bundle-analysis", "cold-build", "dev-startup", "hydration-runtime", "reactive-update"],
       "startupPath": "/"
     }
   ]

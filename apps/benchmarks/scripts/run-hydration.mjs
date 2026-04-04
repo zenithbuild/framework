@@ -29,6 +29,10 @@ import {
 function readFlag(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) {
+    const prefixMatch = process.argv.find(arg => arg.startsWith(`${name}=`));
+    if (prefixMatch) {
+      return prefixMatch.split("=")[1];
+    }
     return "";
   }
   return process.argv[index + 1] || "";
@@ -105,6 +109,8 @@ async function runBrowserSample({
     await page.waitForTimeout(environmentConfig.browserSettleWindowMs);
     const wallDurationMs = Number((performance.now() - startedAt).toFixed(2));
     const metrics = await captureRuntimeMetrics(page);
+    const routeStatus = response ? response.status() : null;
+    const consoleErrors = consoleMessages.filter((message) => message.type === "error");
 
     await writeJson(stdoutPath, consoleMessages);
     await writeJson(pageErrorsPath, pageErrors);
@@ -117,11 +123,34 @@ async function runBrowserSample({
       await context.tracing.stop().catch(() => {});
     }
 
+    const runtimeFailures = [];
+    if (routeStatus === null || routeStatus >= 400) {
+      runtimeFailures.push(`route status ${routeStatus === null ? "null" : routeStatus}`);
+    }
+    if (pageErrors.length > 0) {
+      runtimeFailures.push(`${pageErrors.length} page error(s)`);
+    }
+    if (consoleErrors.length > 0) {
+      runtimeFailures.push(`${consoleErrors.length} console error message(s)`);
+    }
+    if (runtimeFailures.length > 0) {
+      throw new Error(
+        `Hydration runtime failure for ${frameworkId}/${caseConfig.id}/${sampleLabel}: ${runtimeFailures.join(", ")}`
+      );
+    }
+
+    const comparable = metrics.comparable;
+    const durationMs = comparable.browserReadyCaptureMs;
+    const markerCount = comparable.zenithMarkers?.count || 0;
+    const msPerMarker = markerCount > 0 ? Number((durationMs / markerCount).toFixed(4)) : 0;
+
     return {
       label: sampleLabel,
       status: "passed",
-      durationMs: metrics.comparable.browserReadyCaptureMs,
+      durationMs,
       wallDurationMs,
+      marker_count: markerCount,
+      ms_per_marker: msPerMarker,
       consolePath: stdoutPath,
       pageErrorsPath,
       metricsPath,
@@ -132,12 +161,12 @@ async function runBrowserSample({
         url: routeUrl,
         status: response ? response.status() : null,
       },
-      comparableMetrics: metrics.comparable,
+      comparableMetrics: comparable,
       frameworkSpecific: {
+        ...metrics.frameworkSpecific,
         frameworkId,
         consoleMessageCount: consoleMessages.length,
         pageErrorCount: pageErrors.length,
-        metricsPath,
       },
     };
   } finally {
@@ -149,6 +178,8 @@ async function main() {
   const frameworkId = readFlag("--framework") || "zenith";
   const caseId = readFlag("--case");
   const requestedRunId = readFlag("--run-id");
+  const profile = readFlag("--profile") || "fast";
+  const resultsQuality = profile === "publication" ? "publishable" : "fast_non_publishable";
 
   const environmentConfig = await loadEnvironmentConfig();
   const frameworksConfig = await loadFrameworksConfig();
@@ -161,6 +192,18 @@ async function main() {
   });
   const cleanPaths = resolveCleanPaths(environmentConfig, frameworkConfig);
 
+  // Profile overrides
+  let warmupCount = environmentConfig.warmupCount;
+  let sampleCount = environmentConfig.sampleCount;
+
+  if (profile === "fast") {
+    warmupCount = 1;
+    sampleCount = 2;
+  } else if (profile === "publication") {
+    warmupCount = 1;
+    sampleCount = 5;
+  }
+
   const runId = requestedRunId || createRunId("hydration-runtime");
   const { runDir, runnerDir } = await ensureRunPaths(runId, "hydration-runtime");
   const fixtureDirs = selectedCases.map((entry) => ({
@@ -168,10 +211,11 @@ async function main() {
     frameworkId,
     fixtureDir: resolveFixtureDir(entry, frameworkConfig),
   }));
+  
   const environment = await captureEnvironmentMetadata({
     host: environmentConfig.host,
-    warmupCount: environmentConfig.warmupCount,
-    sampleCount: environmentConfig.sampleCount,
+    warmupCount,
+    sampleCount,
     fixtureDirs,
   });
 
@@ -209,10 +253,14 @@ async function main() {
         const ready = await waitForReadyState(readyUrl, frameworkConfig, environmentConfig);
         await writeJson(sessionReadyStatePath, ready.state);
 
+        console.log(`\n[Hydration] ${caseConfig.id} (${frameworkId}) [Profile: ${profile}]`);
+
         const samples = [];
-        for (let index = 0; index < environmentConfig.warmupCount + environmentConfig.sampleCount; index += 1) {
-          const isWarmup = index < environmentConfig.warmupCount;
-          const sampleLabel = isWarmup ? `warmup-${index + 1}` : `sample-${index + 1 - environmentConfig.warmupCount}`;
+        for (let index = 0; index < warmupCount + sampleCount; index += 1) {
+          const isWarmup = index < warmupCount;
+          const sampleLabel = isWarmup ? `warmup-${index + 1}` : `sample-${index + 1 - warmupCount}`;
+          console.log(`  ${sampleLabel}...`);
+          
           const sample = await runBrowserSample({
             caseConfig,
             frameworkId,
@@ -232,13 +280,17 @@ async function main() {
 
         results.push({
           frameworkId,
+          framework_kind: frameworkConfig.kind || frameworkId.split("-")[0],
           caseId: caseConfig.id,
           track: "hydration-runtime",
+          benchmark_profile: profile,
+          results_quality: resultsQuality,
           fixtureDir,
           install,
-          warmupCount: environmentConfig.warmupCount,
-          sampleCount: environmentConfig.sampleCount,
+          warmupCount,
+          sampleCount,
           measurementContract,
+          correlation_scope: frameworkId === "zenith" ? "zenith_internal" : "external-unlabeled",
           session: {
             origin,
             routeUrl,
@@ -260,6 +312,8 @@ async function main() {
     schemaVersion: 1,
     runner: "hydration-runtime",
     runId,
+    benchmark_profile: profile,
+    results_quality: resultsQuality,
     generatedAt: new Date().toISOString(),
     environment,
     measurementContract,
@@ -268,7 +322,7 @@ async function main() {
 
   const outputPath = join(runDir, "hydration-runtime.json");
   await writeJson(outputPath, output);
-  console.log(outputPath);
+  console.log(`\nResults written to: ${outputPath}`);
 }
 
 main().catch((error) => {

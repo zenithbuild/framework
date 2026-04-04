@@ -22,7 +22,7 @@ export function renderRouterModule(opts) {
         throw new Error('renderRouterModule(opts) requires an options object');
     }
 
-    const { manifestJson, runtimeImport, coreImport, routeCheck = false } = opts;
+    const { manifestJson, runtimeImport, coreImport, routeCheck = false, formsEnabled = true } = opts;
     if (typeof manifestJson !== 'string' || manifestJson.length === 0) {
         throw new Error('renderRouterModule(opts) requires opts.manifestJson string');
     }
@@ -37,5 +37,5 @@ export function renderRouterModule(opts) {
     const runtimeSpec = sanitizeImportSpecifier(runtimeImport);
     const coreSpec = sanitizeImportSpecifier(coreImport);
 
-    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck })}\n\n${renderRouterDocumentSource()}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterRefreshSource()}\n\n${renderRouterNavigationSource()}\n\n${renderRouterFormSource()}\n`;
+    return `${renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck })}\n\n${renderRouterDocumentSource()}\n\n${renderRouterLifecycleSource()}\n\n${renderRouterRefreshSource()}\n\n${renderRouterNavigationSource({ routeCheck, formsEnabled })}${formsEnabled ? `\n\n${renderRouterFormSource()}` : ""}\n`;
 }

@@ -96,8 +96,8 @@ function inc() {
 
     const pageJs = await readPageBundle(distDir);
     expect((pageJs.match(/hydrate\s*\(\s*\{/g) || []).length).toBe(1);
-    expect(pageJs.includes('const __zenith_component_bootstraps = [];')).toBe(true);
-    expect(pageJs.includes('const __zenith_components = [];')).toBe(true);
+    expect(pageJs).toMatch(/const __zenith_component_bootstraps\s*=\s*\[\s*\]/);
+    expect(pageJs).toMatch(/const __zenith_components\s*=\s*\[\s*\]/);
     expect(hasInlinedComponentScope(pageJs, 'Card')).toBe(true);
     expect(pageJs.includes('signal(0)')).toBe(true);
     expect(pageJs.includes('@zenithbuild/')).toBe(false);
@@ -177,8 +177,8 @@ import CardB from '../components/CardB.zen'
     const aboutJs = await readPageBundle(distDir, 'about/index.html');
     expect(hasInlinedComponentScope(indexJs, 'CardA')).toBe(true);
     expect(hasInlinedComponentScope(aboutJs, 'CardB')).toBe(true);
-    expect(indexJs.includes('const __zenith_components = [];')).toBe(true);
-    expect(aboutJs.includes('const __zenith_components = [];')).toBe(true);
+    expect(indexJs).toMatch(/const __zenith_components\s*=\s*\[\s*\]/);
+    expect(aboutJs).toMatch(/const __zenith_components\s*=\s*\[\s*\]/);
 
     await fs.rm(root, { recursive: true, force: true });
   });
@@ -221,7 +221,7 @@ const count = incoming.count
     expect(second).toEqual(first);
 
     const pageJs = await readPageBundle(path.join(root, 'dist'));
-    const propsPrelude = pageJs.match(/var props = \{[^}]*label: "Clicks"[^}]*count: [A-Za-z0-9_]+[^}]*\};/);
+    const propsPrelude = pageJs.match(/var\s+props\s*=\s*\{[^}]*label:\s*['"]Clicks['"][^}]*count:\s*[^,}]+[^}]*\};/);
     expect(propsPrelude).not.toBeNull();
     expect(propsPrelude[0].includes('count: count')).toBe(false);
     expect(hasInlinedComponentScope(pageJs, 'Card')).toBe(true);

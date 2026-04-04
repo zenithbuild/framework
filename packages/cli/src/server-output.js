@@ -17,6 +17,15 @@ const SERVER_RUNTIME_FILES = [
         to: 'server-contract.js'
     },
     {
+        from: new URL('./server-contract', import.meta.url),
+        to: 'server-contract',
+        recursive: true
+    },
+    {
+        from: new URL('./server-middleware.js', import.meta.url),
+        to: 'server-middleware.js'
+    },
+    {
         from: new URL('./auth/route-auth.js', import.meta.url),
         to: 'auth/route-auth.js'
     },
@@ -306,7 +315,10 @@ async function copyRuntimeFiles(serverDir) {
     for (const file of SERVER_RUNTIME_FILES) {
         const targetPath = join(serverDir, file.to);
         await mkdir(dirname(targetPath), { recursive: true });
-        await cp(file.from, targetPath, { force: true });
+        await cp(file.from, targetPath, {
+            force: true,
+            recursive: file.recursive === true
+        });
     }
 }
 

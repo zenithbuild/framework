@@ -17,8 +17,8 @@ export function createNodeResolver(root) {
                 marker: { type: kind, id: index },
                 path: `selector:${selector}`,
                 hint: isRef
-                    ? 'Use ref + zenMount and ensure the ref is bound in markup before mount.'
-                    : 'Confirm SSR marker attributes and runtime selector tables match.',
+                    ? 'Use ref + zenMount and bind the ref in markup before mount.'
+                    : 'Confirm SSR marker attributes and selector tables match.',
                 docsLink: isRef ? DOCS_LINKS.refs : DOCS_LINKS.markerTable,
                 source
             });

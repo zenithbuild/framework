@@ -1044,6 +1044,7 @@ function start() {
   });
   installEnhancedFormHandling();
 
+
   document.addEventListener("click", function(event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = event.target && event.target.closest ? event.target.closest("a[data-zen-link]") : null;

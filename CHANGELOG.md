@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-04-03
+
+### Changed
+
+- Added resource-route streaming (`stream(...)`) and SSE (`sse(...)`) helpers as resource-only standalone contract results, with local/hosted parity and Node runtime streaming behavior aligned to the same server contract.
+- Added `src/api/**` resource-route DX aliasing and explicit route-level middleware composition (`withMiddleware(...)`) while preserving the single non-HTML server model and existing server/runtime contracts.
+- Hardened publication benchmark truth gates so empty/timeouts/runtime-error categories fail explicitly, and locked publication policy to keep Zenith determinism as a hard gate with external-framework determinism reported as caveat metadata.
+- Reduced emitted interactive payload materially across the optimization lane, including production-only runtime/router/page compaction and deterministic production runtime/router/page minification, while keeping determinism, zero-JS static omission, and hosted parity green.
+- Completed structural decomposition on bundler/compiler/CLI hot paths (`main.rs`, compiler/parser/script, dev-server/preview/server-contract/dev-build-session) and added file-size audit governance with scoped CI enforcement.
+
 ## [0.7.5] - 2026-03-30
 
 ### Changed

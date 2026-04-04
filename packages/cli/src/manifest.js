@@ -17,7 +17,7 @@
 
 import { readFileSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { join, relative, sep, basename, extname, dirname } from 'node:path';
+import { join, relative, sep, basename, extname, dirname, resolve } from 'node:path';
 import { extractServerScript } from './build/server-script.js';
 import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
@@ -50,6 +50,11 @@ import { validateStaticExportPaths } from './static-export-paths.js';
  */
 export async function generateManifest(pagesDir, extension = '.zen', options = {}) {
     const entries = await _scanDir(pagesDir, pagesDir, extension, options.compilerOpts || {});
+    const apiAliasState = _resolveSrcApiAliasState(pagesDir);
+    if (apiAliasState) {
+        const aliasEntries = await _scanResourceDir(apiAliasState.aliasDir, apiAliasState.srcDir);
+        entries.push(...aliasEntries);
+    }
 
     // Validate: no repeated param names in any single route
     for (const entry of entries) {
@@ -104,6 +109,53 @@ async function _scanDir(dir, root, ext, compilerOpts) {
     }
 
     return entries;
+}
+
+async function _scanResourceDir(dir, root) {
+    /** @type {ManifestEntry[]} */
+    const entries = [];
+    let items;
+    try {
+        items = await readdir(dir);
+    } catch {
+        return entries;
+    }
+
+    items.sort();
+
+    for (const item of items) {
+        const fullPath = join(dir, item);
+        const info = await stat(fullPath);
+        if (info.isDirectory()) {
+            const nested = await _scanResourceDir(fullPath, root);
+            entries.push(...nested);
+        } else if (isResourceRouteFile(item)) {
+            entries.push(analyzeResourceRouteModule(fullPath, root));
+        }
+    }
+
+    return entries;
+}
+
+function _resolveSrcApiAliasState(pagesDir) {
+    const resolvedPagesDir = resolve(pagesDir);
+    const srcDir = dirname(resolvedPagesDir);
+    if (basename(srcDir) !== 'src') {
+        return null;
+    }
+
+    const aliasDir = join(srcDir, 'api');
+    if (
+        aliasDir === resolvedPagesDir ||
+        aliasDir.startsWith(`${resolvedPagesDir}${sep}`)
+    ) {
+        return null;
+    }
+
+    return {
+        aliasDir,
+        srcDir
+    };
 }
 
 function buildPageManifestEntry({ fullPath, root, routePath, compilerOpts }) {

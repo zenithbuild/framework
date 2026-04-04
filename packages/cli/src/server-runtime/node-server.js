@@ -127,13 +127,32 @@ async function sendFetchResponse(res, response, method) {
         res.setHeader(key, value);
     }
 
-    if (String(method || 'GET').toUpperCase() === 'HEAD') {
+    if (String(method || 'GET').toUpperCase() === 'HEAD' || !response.body) {
         res.end();
         return;
     }
 
-    const body = await response.arrayBuffer();
-    res.end(Buffer.from(body));
+    try {
+        const bodyStream = Readable.fromWeb(response.body);
+        bodyStream.pipe(res);
+        bodyStream.on('error', (err) => {
+            logServerException('node response stream failed', err);
+            if (!res.headersSent) {
+                res.statusCode = 500;
+                res.end();
+            } else {
+                res.destroy();
+            }
+        });
+    } catch (err) {
+        logServerException('node response pipe creation failed', err);
+        if (!res.headersSent) {
+            res.statusCode = 500;
+            res.end();
+        } else {
+            res.destroy();
+        }
+    }
 }
 
 async function sendStaticFile(res, filePath, method) {

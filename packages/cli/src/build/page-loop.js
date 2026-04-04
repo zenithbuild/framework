@@ -273,7 +273,7 @@ export async function buildPageEnvelopes(input) {
         pagePhase.expressionApplyMs = startupProfile.roundMs(performance.now() - expressionApplyStartedAt);
         const normalizeStartedAt = performance.now();
         normalizeExpressionPayload(pageIr);
-        normalizeHoistedSourcePayload(pageIr);
+        normalizeHoistedSourcePayload(pageIr, sourceFile, hoistedCodeTransformCache, expressionRewriteMetrics);
         if (Array.isArray(pageIr?.hoisted?.code) && pageIr.hoisted.code.length > 0) {
             pageIr.hoisted.code = pageIr.hoisted.code
                 .map((entry) => deferComponentRuntimeBlock(entry, hoistedCodeTransformCache, expressionRewriteMetrics))
@@ -282,6 +282,20 @@ export async function buildPageEnvelopes(input) {
         rewriteLegacyMarkupIdentifiers(pageIr);
         rewriteRefBindingIdentifiers(pageIr, knownRefKeys);
         pagePhase.normalizeMs = startupProfile.roundMs(performance.now() - normalizeStartedAt);
+
+        const requiresJs = detectRequiresJs(pageIr, routerEnabled);
+        if (!requiresJs) {
+            console.log(`[DEBUG] Route ${entry.path} is STATIC (no JS required)`);
+        } else {
+            const reasons = [];
+            if (routerEnabled) reasons.push('routerEnabled');
+            if (pageIr.signals.length > 0) reasons.push('signals');
+            if (pageIr.event_bindings.length > 0) reasons.push('event_bindings');
+            if (pageIr.marker_bindings.length > 0) reasons.push('marker_bindings');
+            if (pageIr.component_instances.length > 0) reasons.push('component_instances');
+            if (pageIr.hoisted?.code?.length > 0) reasons.push('hoisted.code');
+            console.log(`[DEBUG] Route ${entry.path} is INTERACTIVE. Reasons: ${reasons.join(', ')}`);
+        }
 
         addBreakdown(pagePhaseTotals, pagePhase);
         addBreakdown(occurrenceApplyPhaseTotals, pageOccurrenceApplyBreakdown);
@@ -296,7 +310,8 @@ export async function buildPageEnvelopes(input) {
             image_materialization: Array.isArray(pageIr.image_materialization)
                 ? pageIr.image_materialization
                 : [],
-            router: routerEnabled
+            router: routerEnabled,
+            requires_js: requiresJs
         });
         recordPageProfile({
             pageProfiles,
@@ -330,4 +345,42 @@ export async function buildPageEnvelopes(input) {
     });
 
     return { envelopes, expressionRewriteMetrics };
+}
+
+/**
+ * Detects if a page requires client-side JavaScript based on its IR.
+ * This is a conservative pass used for Static Route Omission.
+ * 
+ * @param {object} pageIr 
+ * @param {boolean} routerEnabled 
+ * @returns {boolean}
+ */
+function detectRequiresJs(pageIr, routerEnabled) {
+    if (routerEnabled === true) {
+        return true;
+    }
+
+    const {
+        signals = [],
+        event_bindings = [],
+        ref_bindings = [],
+        marker_bindings = [],
+        component_instances = [],
+        hoisted = {}
+    } = pageIr;
+
+    const requiresJs = (
+        signals.length > 0 ||
+        event_bindings.length > 0 ||
+        ref_bindings.length > 0 ||
+        (Array.isArray(hoisted.signals) && hoisted.signals.length > 0) ||
+        (Array.isArray(hoisted.state) && hoisted.state.length > 0) ||
+        (Array.isArray(hoisted.code) && hoisted.code.filter(c => String(c).trim().length > 0).length > 0) ||
+        component_instances.some(instance =>
+            Array.isArray(instance.props) &&
+            instance.props.some(prop => prop.type === 'signal' || prop.type === 'binding' || prop.type === 'callback' || prop.type === 'reactive')
+        )
+    );
+
+    return requiresJs;
 }

@@ -21,6 +21,12 @@ export async function ensureRunPaths(runId, runnerName) {
   return { runDir, runnerDir };
 }
 
+export async function ensureBaselinePath() {
+  const baselineDir = join(resultsRoot, "baselines");
+  await mkdir(baselineDir, { recursive: true });
+  return baselineDir;
+}
+
 export async function writeJson(filePath, value) {
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -113,18 +119,27 @@ export async function collectBuildArtifacts(rootDir, relativePaths) {
 
 export function summarizeSamples(samples) {
   const durations = samples.map((sample) => sample.durationMs).sort((left, right) => left - right);
-  const minMs = durations[0] || 0;
-  const maxMs = durations[durations.length - 1] || 0;
+  if (durations.length === 0) {
+    return { status: "failed", minMs: 0, maxMs: 0, medianMs: 0, p95Ms: 0 };
+  }
+
+  const minMs = durations[0];
+  const maxMs = durations[durations.length - 1];
   const middle = Math.floor(durations.length / 2);
   const medianMs = durations.length % 2 === 0
     ? Number(((durations[middle - 1] + durations[middle]) / 2).toFixed(2))
-    : durations[middle] || 0;
+    : durations[middle];
+
+  // P95 calculation
+  const p95Index = Math.ceil(durations.length * 0.95) - 1;
+  const p95Ms = durations[Math.max(0, p95Index)];
 
   return {
     status: samples.every((sample) => sample.status === "passed") ? "passed" : "failed",
     minMs,
     maxMs,
     medianMs,
+    p95Ms,
   };
 }
 

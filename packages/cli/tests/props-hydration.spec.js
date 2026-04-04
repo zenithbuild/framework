@@ -85,10 +85,10 @@ describe('props hydration', () => {
         const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
         expect(indexHtml).toContain('data-zx-aria-label=');
-        expect(pageJs).toContain('ariaLabel: "alpha"');
-        expect(pageJs).toContain('ariaLabel: "beta"');
-        expect(pageJs).toContain('label: "A"');
-        expect(pageJs).toContain('label: "B"');
+        expect(pageJs).toMatch(/ariaLabel:\s*['"]alpha['"]/);
+        expect(pageJs).toMatch(/ariaLabel:\s*['"]beta['"]/);
+        expect(pageJs).toMatch(/label:\s*['"]A['"]/);
+        expect(pageJs).toMatch(/label:\s*['"]B['"]/);
     });
 
     test('T3 — client module does not throw ReferenceError: props is not defined', async () => {
@@ -113,11 +113,11 @@ describe('props hydration', () => {
 
         // Strip ES module syntax (import/export) for vm evaluation
         const evalSource = pageJs
-            .replace(/^\s*import\b[^;]*;?\s*$/gm, '')
-            .replace(/^\s*export\s+default\s+function\b/gm, 'function')
-            .replace(/^\s*export\s+function\b/gm, 'function')
-            .replace(/^\s*export\s+(const|let|var)\b/gm, '$1')
-            .replace(/^\s*export\s+\{[^}]*\}\s*;?\s*$/gm, '');
+            .replace(/\bimport\s*\{[^}]*\}\s*from\s*['"][^'"]+['"];\s*/g, '')
+            .replace(/\bexport\s+default\s+function\b/g, 'function')
+            .replace(/\bexport\s+function\b/g, 'function')
+            .replace(/\bexport\s+(const|let|var)\b/g, '$1')
+            .replace(/\bexport\s+\{[^}]*\}\s*;?/g, '');
 
         // Execute in a sandboxed context — must NOT throw ReferenceError
         const sandbox = {
@@ -167,7 +167,7 @@ describe('props hydration', () => {
         const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
         // The props prelude must be present
-        expect(pageJs).toMatch(/(?:var|let|const) props = /);
+        expect(pageJs).toMatch(/\b(?:var|let|const)\s+props\s*=/);
         expect(pageJs).toContain('myvalue');
     });
 
@@ -196,7 +196,7 @@ describe('props hydration', () => {
         const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
         const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
-        expect(pageJs).toMatch(/var props = \{ variant: "ghost", ariaLabel: "Toggle menu" \};/);
+        expect(pageJs).toMatch(/var\s+props\s*=\s*\{\s*variant:\s*['"]ghost['"],\s*ariaLabel:\s*['"]Toggle menu['"]\s*\};/);
     });
 
     test('T6 — nested component usage rewrites function-valued props to owner scope', async () => {
@@ -226,7 +226,7 @@ describe('props hydration', () => {
         const pageJs = await readFile(join(project.outDir, scriptPath), 'utf8');
 
         expect(pageJs).not.toContain('onPress: toggleMenu');
-        expect(pageJs).toMatch(/onPress:\s*___.*toggleMenu/);
+        expect(pageJs).toMatch(/onPress:\s*__\w*toggleMenu/);
     });
 
     test('T7 — root page component props resolve scoped identifiers and compiled expressions', async () => {
@@ -277,10 +277,10 @@ describe('props hydration', () => {
         expect(pageJs).not.toContain('currentCount: count');
         expect(pageJs).not.toContain('nextCount: count + 1');
         expect(pageJs).not.toContain('memberHandler: handlers.increment');
-        expect(pageJs).toMatch(/onPress:\s*___.*increment/);
-        expect(pageJs).toMatch(/currentCount:\s*___.*count/);
-        expect(pageJs).toMatch(/nextCount:\s*___.*count\.get\(\)\s*\+\s*1/);
-        expect(pageJs).toMatch(/memberHandler:\s*___.*handlers\.increment/);
+        expect(pageJs).toMatch(/onPress:\s*__\w*increment/);
+        expect(pageJs).toMatch(/currentCount:\s*__\w*count/);
+        expect(pageJs).toMatch(/nextCount:\s*__\w*count\.get\(\)\+1/);
+        expect(pageJs).toMatch(/memberHandler:\s*__\w*handlers\.increment/);
     });
 
     test('existing document-mode props test still works', async () => {
@@ -322,6 +322,6 @@ describe('props hydration', () => {
         expect(scriptMatch).toBeTruthy();
         const scriptPath = String(scriptMatch[1]).replace(/^\//, '');
         const pageAsset = await readFile(join(outDir, scriptPath), 'utf8');
-        expect(pageAsset).toMatch(/(?:var|let|const) props = \{ pageTitle: "About Page" \};/);
+        expect(pageAsset).toMatch(/\b(?:var|let|const)\s+props\s*=\s*\{\s*pageTitle:\s*['"]About Page['"]\s*\};/);
     });
 });

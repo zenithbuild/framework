@@ -39,26 +39,38 @@ async function makeWorkspaceProject(files) {
     return { root, pagesDir, outDir };
 }
 
-async function readBuiltPageAsset(outDir, route = 'index.html') {
+async function readBuiltPageAsset(outDir, route = 'index.html', { allowMissing = false } = {}) {
     const html = await readFile(join(outDir, route), 'utf8');
     const scriptMatch = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
-    expect(scriptMatch).toBeTruthy();
+    if (!scriptMatch) {
+        if (allowMissing) {
+            return null;
+        }
+        expect(scriptMatch).toBeTruthy();
+        return null;
+    }
     const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
     return readFile(join(outDir, scriptPath), 'utf8');
 }
 
 async function readBuiltRuntimeAsset(outDir) {
+    const rootEntries = await readdir(outDir);
+    let runtimeFile = rootEntries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
+    if (runtimeFile) {
+        return readFile(join(outDir, runtimeFile), 'utf8');
+    }
+
     const assetsDir = join(outDir, 'assets');
-    const entries = await readdir(assetsDir);
-    const runtimeFile = entries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
+    const assetEntries = await readdir(assetsDir);
+    runtimeFile = assetEntries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
     expect(runtimeFile).toBeTruthy();
     return readFile(join(assetsDir, String(runtimeFile)), 'utf8');
 }
 
-function extractExpressionBindings(asset) {
-    const match = asset.match(/const __zenith_expression_bindings = (\[[\s\S]*?\]);/);
+function extractPayloadExpressionRows(asset) {
+    const match = asset.match(/const __zenith_payload_expression_rows\s*=\s*(\[[\s\S]*?\]);/);
     expect(match).toBeTruthy();
-    return JSON.parse(String(match?.[1] || '[]'));
+    return Function(`"use strict";return (${String(match?.[1] || '[]')});`)();
 }
 
 describe('expression pipeline regressions', () => {
@@ -115,7 +127,12 @@ describe('expression pipeline regressions', () => {
 
     test('emits fn_index expressions against __ctx.fragment tags instead of __zenith_fragment aliases', async () => {
         project = await makeWorkspaceProject({
-            'src/pages/index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'state cond = true;',
+                '</script>',
+                '<main>{cond ? (<a>Hi</a>) : null}</main>'
+            ].join('\n')
         });
 
         await build({
@@ -181,15 +198,13 @@ describe('expression pipeline regressions', () => {
 
         await build({ pagesDir: project.pagesDir, outDir: project.outDir });
         const pageAsset = await readBuiltPageAsset(project.outDir);
-        const bindings = extractExpressionBindings(pageAsset);
-
-        expect(bindings).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ state_index: expect.any(Number) })
-            ])
+        const bindings = extractPayloadExpressionRows(String(pageAsset)).filter((row) =>
+            String(Array.isArray(row) ? row[1] : '').includes('resolvedTitle')
         );
-        expect(pageAsset).toMatch(/"literal":"[^"]*resolvedTitle"/);
-        expect(pageAsset).not.toContain('"literal":"resolvedTitle"');
+
+        expect(bindings.length).toBeGreaterThan(0);
+        expect(bindings.some((row) => Number.isInteger(Array.isArray(row) ? row[3] : null))).toBe(true);
+        expect(bindings.every((row) => String(Array.isArray(row) ? row[1] : '') !== 'resolvedTitle')).toBe(true);
         expect(pageAsset).not.toContain('return resolvedTitle;');
     });
 
@@ -216,18 +231,36 @@ describe('expression pipeline regressions', () => {
             config: { embeddedMarkupExpressions: true }
         });
         const pageAsset = await readBuiltPageAsset(project.outDir);
-        const bindings = extractExpressionBindings(pageAsset).filter((binding) =>
-            /First Open|Second Open/.test(String(binding.literal || ''))
+        const bindings = extractPayloadExpressionRows(String(pageAsset)).filter((row) =>
+            /First Open|Second Open/.test(String(Array.isArray(row) ? row[1] : ''))
         );
 
         expect(bindings).toHaveLength(2);
-        expect(new Set(bindings.map((binding) => binding.signal_index)).size).toBe(2);
+        const signalIndices = bindings.flatMap((row) => {
+            if (!Array.isArray(row)) {
+                return [];
+            }
+            const indices = [];
+            if (Array.isArray(row[4])) {
+                indices.push(...row[4]);
+            }
+            if (typeof row[5] === 'number') {
+                indices.push(row[5]);
+            }
+            return indices;
+        });
+        expect(new Set(signalIndices).size).toBe(2);
         expect(pageAsset).not.toContain('return open ?');
     });
 
     test('strips temporary ZENITH_DIAG runtime logging from emitted runtime asset', async () => {
         project = await makeWorkspaceProject({
-            'src/pages/index.zen': '<main><h1>Hello</h1></main>\n'
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'state count = 1;',
+                '</script>',
+                '<main><h1>{count}</h1></main>'
+            ].join('\n')
         });
 
         await build({ pagesDir: project.pagesDir, outDir: project.outDir });

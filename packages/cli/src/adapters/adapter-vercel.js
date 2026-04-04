@@ -70,23 +70,15 @@ function createFunctionSource(route) {
         "  return new Response(message, { status: 501, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });",
         '}',
         '',
-        'function isMultipartFormData(request) {',
-        "  const contentType = request.headers.get('content-type') || '';",
-        "  return /^multipart\\/form-data(?:\\s*;|$)/i.test(contentType.trim());",
-        '}',
-        '',
         'export default {',
         '  async fetch(request) {',
         '    const params = extractInternalParams(request.url, route);',
         "    if (route.route_kind === 'resource') {",
-        '      if (isMultipartFormData(request)) {',
-        "        return createHostedUnsupportedResponse('Hosted multipart resource routes are unsupported in this milestone');",
-        '      }',
         '      const response = await renderResourceRouteRequest({',
         '        request,',
         '        route,',
         '        params,',
-        "        routeModulePath: join(__dirname, 'route', 'entry.js')",
+        `        routeModulePath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'entry.js')`,
         '      });',
         "      if (response.headers.has('content-disposition')) {",
         "        return createHostedUnsupportedResponse('Hosted resource downloads are unsupported in this milestone');",
@@ -97,10 +89,10 @@ function createFunctionSource(route) {
         '      request,',
         '      route,',
         '      params,',
-        "      routeModulePath: join(__dirname, 'route', 'entry.js'),",
-        "      shellHtmlPath: join(__dirname, 'route', 'page.html'),",
-        `      pageAssetPath: ${route.page_asset_file ? "join(__dirname, 'route', " + JSON.stringify(route.page_asset_file) + ')' : 'null'},`,
-        `      imageManifestPath: ${route.image_manifest_file ? "join(__dirname, 'route', " + JSON.stringify(route.image_manifest_file) + ')' : 'null'},`,
+        `      routeModulePath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'entry.js'),`,
+        `      shellHtmlPath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'page.html'),`,
+        `      pageAssetPath: ${route.page_asset_file ? "join(__dirname, 'routes', " + JSON.stringify(route.name) + ", 'route', " + JSON.stringify(route.page_asset_file) + ')' : 'null'},`,
+        `      imageManifestPath: ${route.image_manifest_file ? "join(__dirname, 'routes', " + JSON.stringify(route.name) + ", 'route', " + JSON.stringify(route.image_manifest_file) + ')' : 'null'},`,
         `      imageConfig: ${JSON.stringify(route.image_config || {}, null, 2)}`,
         '    });',
         '  }',
@@ -159,7 +151,11 @@ export const vercelAdapter = {
             const functionDir = join(options.outDir, 'functions', '__zenith', `${route.name}.func`);
             await mkdir(functionDir, { recursive: true });
             await copyHostedPageRuntime(options.coreOutput, functionDir);
-            await cp(join(options.coreOutput, 'server', 'routes', route.name), functionDir, { recursive: true, force: true });
+            await cp(
+                join(options.coreOutput, 'server', 'routes', route.name),
+                join(functionDir, 'routes', route.name),
+                { recursive: true, force: true }
+            );
             await writeFile(join(functionDir, 'package.json'), '{\n  "type": "module"\n}\n', 'utf8');
             await writeFile(join(functionDir, 'index.js'), createFunctionSource(route), 'utf8');
             await writeFile(join(functionDir, '.vc-config.json'), vercelFunctionConfig(), 'utf8');

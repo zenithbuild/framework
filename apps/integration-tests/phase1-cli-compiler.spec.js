@@ -41,11 +41,21 @@ describe('Phase 1: CLI -> compiler process seam', () => {
   test('CLI bridge spawns compiler binary and forwards IR unchanged', async () => {
     const fakeIR = {
       ir_version: 1,
+      schemaVersion: 1,
       graph_hash: 'deadbeef',
       graph_edges: [],
       graph_nodes: [],
       html: '<h1 data-zx-e="0"></h1>',
       expressions: ['count'],
+      signals: [],
+      marker_bindings: [],
+      event_bindings: [],
+      expression_bindings: [],
+      diagnostics: [],
+      warnings: [],
+      ref_bindings: [],
+      style_blocks: [],
+      nodes: [],
       hoisted: {
         imports: [],
         declarations: [],

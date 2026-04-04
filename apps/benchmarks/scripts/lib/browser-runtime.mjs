@@ -94,6 +94,8 @@ export async function captureRuntimeMetrics(page) {
       0,
     );
 
+    const markerCount = document.querySelectorAll("[data-zx-e]").length;
+
     return {
       comparable: {
         browserReadyCaptureMs: Number(performance.now().toFixed(2)),
@@ -122,11 +124,15 @@ export async function captureRuntimeMetrics(page) {
           totalDurationMs: Number(longTaskTotalDuration.toFixed(2)),
           maxDurationMs: Number(longTaskMaxDuration.toFixed(2)),
         },
+        zenithMarkers: {
+          count: markerCount,
+        },
       },
       frameworkSpecific: {
         documentReadyState: document.readyState,
         scriptResourceUrls: scriptEntries.map((entry) => entry.name),
         longTaskEntries: longTasks,
+        markerCount,
       },
     };
   });

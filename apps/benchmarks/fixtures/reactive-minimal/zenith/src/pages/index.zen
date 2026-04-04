@@ -1,0 +1,32 @@
+<script setup="ts">
+state count = 0;
+state list = [{ id: 1, name: "Item 1" }];
+
+function increment() {
+  count = count + 1;
+}
+
+function updateRow() {
+  // Use explicit list reassignment so the benchmark records a deterministic reactive update.
+  const current = list[0];
+  list = [{ id: current.id, name: "Updated " + count }];
+}
+</script>
+
+<DefaultLayout>
+  <section class="stack">
+    <h1>Reactive Minimal Benchmark</h1>
+    
+    <div class="metrics">
+      <p>Count: <span data-testid="count">{count}</span></p>
+      <button data-testid="increment-button" on:click={increment}>Increment</button>
+    </div>
+
+    <div class="list">
+       <article data-testid="row-0">
+         <span data-testid="row-name">{list[0].name}</span>
+       </article>
+       <button data-testid="update-row-button" on:click={updateRow}>Update Row</button>
+    </div>
+  </section>
+</DefaultLayout>

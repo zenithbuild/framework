@@ -1,10 +1,15 @@
 pub mod ast;
 pub mod codegen;
 pub mod compiler;
-pub mod image_materialization;
+mod compiler_diagnostics;
+mod compiler_expression_bindings;
+mod compiler_payload_map;
+mod compiler_profile;
+mod compiler_types;
 pub mod deterministic;
 pub mod event_contract;
 pub mod expression_scope;
+pub mod image_materialization;
 pub mod js_serialize;
 pub mod lexer;
 pub mod parser;

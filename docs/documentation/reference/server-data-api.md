@@ -1,9 +1,9 @@
 ---
 title: "Server Data API"
 description: "Public `<script server>` API for data, load context, and serialization requirements."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-30"
+last_updated: "2026-04-01"
 tags: ["reference", "server", "data"]
 ---
 
@@ -13,7 +13,7 @@ tags: ["reference", "server", "data"]
 
 Contract: Zenith exposes two explicit server route surfaces:
 - page routes in `.zen` files
-- dedicated resource routes in `*.resource.ts` or `page.resource.ts`
+- dedicated resource routes in `*.resource.ts` or `page.resource.ts` (for `src/` layout projects, prefer `src/api/**`)
 
 Invariant: A page route uses exactly one payload source (`data` or `load`). A resource route uses `load(ctx)` for `GET` / `HEAD` and `action(ctx)` for `POST`. Both route kinds share the same `ctx`, `guard(ctx)`, auth, cookie, and request boundaries.
 
@@ -53,11 +53,32 @@ Dedicated resource routes keep the non-HTML surface:
 - `json(payload, status = 200)`
 - `text(body, status = 200)`
 - `download(body, { filename, contentType? })`
+- `stream(body, { status?, contentType? })`
+- `sse(events)`
 - `redirect(...)`
 - `deny(...)`
 
 Resource routes do **not** support `data(...)` or `invalid(...)`.
-Page routes do **not** support `json(...)`, `text(...)`, or `download(...)`.
+Page routes do **not** support `json(...)`, `text(...)`, `download(...)`, `stream(...)`, or `sse(...)`.
+
+## Contract: Explicit Middleware Composition
+
+Contract: server middleware composition is explicit, route-level, and server-only.
+
+Invariant:
+- middleware is composed directly inside route exports via `withMiddleware(handler, ...middleware)`
+- composition order is deterministic: `withMiddleware(handler, a, b)` means `a(b(handler))`
+- middleware does not create a hidden global pipeline
+
+Definition of Done:
+- middleware may return any valid result for the wrapped handler kind, throw, or call `next` and return its result
+- middleware does not invent result kinds or bypass route result validation
+- route handlers stay the canonical owner of behavior (`guard`, `load`, `action`, resource handlers)
+
+Failure Modes:
+- root/global middleware files become part of the public contract
+- filesystem inheritance or automatic wrapping is implied
+- middleware is presented as generic backend `req/res/next` framework semantics
 
 ## Contract: Action Form Data
 
@@ -87,11 +108,11 @@ Evidence:
 
 Contract: dedicated resource routes are Zenith's first explicit non-HTML route surface.
 
-Invariant: the public resource surface stays intentionally narrow. Resource responses are limited to JSON, plain text, and one attachment-style `download(...)` helper, plus the existing `redirect(...)` and `deny(...)` control results.
+Invariant: the public resource surface stays intentionally narrow. Resource responses are limited to JSON, plain text, `stream(...)`, `sse(...)`, and one attachment-style `download(...)` helper, plus the existing `redirect(...)` and `deny(...)` control results.
 
 Banned:
 - returning arbitrary `Response`
-- `file(...)`, inline serving, streams, `Blob`, `File`, range requests, or filesystem-path helper APIs
+- `file(...)`, inline serving, page-route streaming, `Blob`, `File`, range requests, or filesystem-path helper APIs
 - using `json(...)` with a non-JSON-safe top-level plain object
 - treating resource routes as a generic RPC or REST framework surface
 
@@ -101,16 +122,18 @@ Definition of Done:
 - `json(payload, status?)` reuses Zenith's existing JSON serialization guard
 - `text(body, status?)` accepts strings only
 - `download(body, { filename, contentType? })` uses fixed `Content-Disposition: attachment`
+- `stream(body, { status?, contentType? })` accepts only `ReadableStream` or `AsyncIterable`
+- `sse(events)` accepts only `AsyncIterable` event sources and emits standard SSE framing
 - `download(...)` accepts only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes and enforces a 5 MiB payload cap
 - `ctx.auth` and staged `Set-Cookie` behavior match page-route behavior
 
 Failure Modes:
 - router enhancement treats a resource route like a same-route HTML re-render target
 - resource responses differ across dev, preview, and packaged node
-- docs imply `file(...)`, inline media serving, streaming, range requests, or arbitrary headers before they exist
+- docs imply arbitrary `Response`, page-route streaming, range requests, or arbitrary headers before they exist
 
 Evidence:
-- parity tests cover GET JSON, POST JSON, plain text, attachment downloads, auth/cookie staging, and multipart POST on dedicated resource routes
+- parity tests cover GET JSON, POST JSON, plain text, attachment downloads, stream, SSE, auth/cookie staging, and multipart POST on dedicated resource routes
 
 ## Contract: Freshness Boundary
 

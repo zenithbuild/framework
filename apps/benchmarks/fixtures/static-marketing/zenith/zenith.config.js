@@ -1,5 +1,5 @@
 export default {
   pagesDir: "src/pages",
-  router: true,
+  router: false,
   typescriptDefault: true,
 };

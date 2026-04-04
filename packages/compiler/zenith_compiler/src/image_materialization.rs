@@ -72,11 +72,7 @@ fn count_image_pairs_from(markers: &[MarkerPayload], start_cursor: usize) -> Res
     Ok(n)
 }
 
-fn find_attr_marker_optional(
-    markers: &[MarkerPayload],
-    start: usize,
-    attr: &str,
-) -> Option<usize> {
+fn find_attr_marker_optional(markers: &[MarkerPayload], start: usize, attr: &str) -> Option<usize> {
     for idx in start..markers.len() {
         let m = &markers[idx];
         if m.kind == "attr" && m.attr.as_deref() == Some(attr) {
@@ -86,11 +82,7 @@ fn find_attr_marker_optional(
     None
 }
 
-fn find_attr_marker(
-    markers: &[MarkerPayload],
-    start: usize,
-    attr: &str,
-) -> Result<usize, String> {
+fn find_attr_marker(markers: &[MarkerPayload], start: usize, attr: &str) -> Result<usize, String> {
     find_attr_marker_optional(markers, start, attr).ok_or_else(|| {
         format!(
             "image materialization: framework Image marker contract drifted (missing `{attr}` marker after offset {start})"
@@ -159,7 +151,6 @@ fn static_ts_to_json(node: Node<'_>, source: &str) -> Result<serde_json::Value, 
         _ => Err(dynamic_err(n, source)),
     }
 }
-
 
 fn parse_string_literal(node: Node<'_>, source: &str) -> Result<serde_json::Value, String> {
     let t = node_text(node, source).trim();

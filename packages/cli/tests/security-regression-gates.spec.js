@@ -309,7 +309,7 @@ describe('Track A security regression gates', () => {
 
         const buildSource = await readFile(resolve(__dirname, '../src/build.js'), 'utf8');
         const materializeSource = await readFile(resolve(__dirname, '../src/images/materialize.ts'), 'utf8');
-        const previewSource = await readFile(resolve(__dirname, '../src/preview.js'), 'utf8');
+        const previewSource = await readFile(resolve(__dirname, '../src/preview/request-handler.js'), 'utf8');
         const routeRenderSource = await readFile(resolve(__dirname, '../src/server-runtime/route-render.js'), 'utf8');
         const bundlerSource = await readFile(resolve(__dirname, '../../bundler/src/main.rs'), 'utf8');
 

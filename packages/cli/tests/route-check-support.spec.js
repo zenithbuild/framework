@@ -67,7 +67,7 @@ describe('route-check target support', () => {
             }
         });
 
-        expect(await readRouterSource(project.root)).toContain('const __ZENITH_ROUTE_CHECK_ENABLED__ = false;');
+        expect(await readRouterSource(project.root)).toMatch(/const\s+__ZENITH_ROUTE_CHECK_ENABLED__\s*=\s*false;/);
 
         dev = await createDevServer({
             pagesDir: project.pagesDir,
@@ -107,7 +107,7 @@ describe('route-check target support', () => {
             }
         });
 
-        expect(await readRouterSource(project.root)).toContain('const __ZENITH_ROUTE_CHECK_ENABLED__ = true;');
+        expect(await readRouterSource(project.root)).toMatch(/const\s+__ZENITH_ROUTE_CHECK_ENABLED__\s*=\s*true;/);
     });
 
     test('static-export target disables router route-check and dev reports the endpoint as unsupported', async () => {
@@ -125,7 +125,7 @@ describe('route-check target support', () => {
             }
         });
 
-        expect(await readRouterSource(project.root)).toContain('const __ZENITH_ROUTE_CHECK_ENABLED__ = false;');
+        expect(await readRouterSource(project.root)).toMatch(/const\s+__ZENITH_ROUTE_CHECK_ENABLED__\s*=\s*false;/);
 
         dev = await createDevServer({
             pagesDir: project.pagesDir,

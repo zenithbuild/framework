@@ -136,7 +136,7 @@ zenEffect(() => {
     let hoisted = hoisted_code(&output);
 
     assert!(
-        hoisted.contains("if (___tmp_zeneffect_state_read_zen_script0_"),
+        hoisted.contains("if (__tmp_zeneffect_state_read_zen_script0_"),
         "expected lowered script symbol in hoisted code: {hoisted}"
     );
     assert!(

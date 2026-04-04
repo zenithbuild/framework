@@ -33,11 +33,18 @@ const opts = { manifestJson, runtimeImport, coreImport, routeCheck: true };
 
 const sourceA = renderRouterModule(opts);
 const sourceB = renderRouterModule(opts);
+const sourceNoForms = renderRouterModule({ ...opts, formsEnabled: false });
+const sourceNoRouteCheck = renderRouterModule({ ...opts, routeCheck: false });
 
 assert.equal(typeof sourceA, 'string', 'renderRouterModule() must return a string');
 assert.ok(sourceA.length > 0, 'router template output must not be empty');
 assert.equal(sourceA, sourceB, 'same inputs must produce byte-identical output');
 assert.equal(sourceA.includes('\r'), false, 'router template must normalize line endings to \\n');
+assert.equal(
+    sourceNoRouteCheck.includes('fetch(routeCheckPath() + "?path="'),
+    false,
+    'route-check disabled output must omit route-check fetch scaffolding'
+);
 
 assert.ok(sourceA.includes(`from '${runtimeImport}'`), 'router template must import runtime via provided specifier');
 assert.ok(sourceA.includes(`from '${coreImport}'`), 'router template must import core via provided specifier');
@@ -189,6 +196,21 @@ assert.equal(
 );
 assert.equal(sourceA.includes('.zen'), false, 'router template must not contain .zen references');
 assert.equal(sourceA.includes('zenith:'), false, 'router template must not contain zenith:* specifiers');
+assert.equal(
+    sourceNoForms.includes('function installEnhancedFormHandling()'),
+    false,
+    'forms-disabled router output must omit enhanced form helper implementation'
+);
+assert.equal(
+    sourceNoForms.includes('document.addEventListener("submit"'),
+    false,
+    'forms-disabled router output must omit submit interception wiring'
+);
+assert.equal(
+    sourceNoForms.includes('installEnhancedFormHandling();'),
+    false,
+    'forms-disabled router output must not install enhanced form handling'
+);
 
 const performNavigationStart = sourceA.indexOf('async function performNavigation(targetUrl, historyMode, popstateState)');
 const commitNavigationStart = sourceA.indexOf('async function commitNavigationDocument(');

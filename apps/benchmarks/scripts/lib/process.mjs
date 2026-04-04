@@ -1,10 +1,29 @@
 import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 
+const NPM_PATH = "/opt/homebrew/bin/npm";
+const HOMEBREW_BIN = "/opt/homebrew/bin";
+
+function resolveCommand(command) {
+  if (command === "npm") {
+    return NPM_PATH;
+  }
+  return command;
+}
+
+function getEnv(optionsEnv) {
+  const env = { ...process.env, ...optionsEnv };
+  const path = env.PATH || "";
+  if (!path.includes(HOMEBREW_BIN)) {
+    env.PATH = `${HOMEBREW_BIN}:${path}`;
+  }
+  return env;
+}
+
 export function runCommand(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = spawnSync(resolveCommand(command), args, {
     cwd: options.cwd,
-    env: options.env,
+    env: getEnv(options.env),
     encoding: "utf8",
     timeout: options.timeoutMs,
     stdio: ["ignore", "pipe", "pipe"],
@@ -20,9 +39,9 @@ export function runCommand(command, args, options = {}) {
 }
 
 export function startCommand(command, args, options = {}) {
-  const proc = spawn(command, args, {
+  const proc = spawn(resolveCommand(command), args, {
     cwd: options.cwd,
-    env: options.env,
+    env: getEnv(options.env),
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -77,6 +96,25 @@ export async function getFreePort() {
       });
     });
     server.on("error", reject);
+  });
+}
+
+export async function isPortOpen(port, host = "127.0.0.1", timeoutMs = 1000) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    const onError = () => {
+      socket.destroy();
+      resolve(false);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once("error", onError);
+    socket.once("timeout", onError);
+
+    socket.connect(port, host, () => {
+      socket.end();
+      resolve(true);
+    });
   });
 }
 

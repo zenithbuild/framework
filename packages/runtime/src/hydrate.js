@@ -21,8 +21,7 @@ import { bindEventMarkers } from './events.js';
 import { _applyMarkerValue } from './render.js';
 
 export { _createContextualFragment, _coerceText } from './render.js';
-
-// Raw HTML boundary enforcement lives in render.js:
+// Raw HTML boundary lock lives in render.js:
 // attrName.toLowerCase() === 'innerhtml'
 // innerHTML bindings are forbidden in Zenith
 // attrName.toLowerCase() === 'unsafehtml'
@@ -42,7 +41,6 @@ export function hydrate(payload) {
             stateKeys,
             signals,
             components,
-            route,
             params,
             ssrData,
             props,
@@ -58,13 +56,11 @@ export function hydrate(payload) {
             components,
             signalMap,
             componentBindings,
-            route,
             resolveNodes
         });
 
-        const markerState = _hydrateMarkers({
+        const runtimeContext = {
             expressions,
-            markers,
             stateValues,
             stateKeys,
             signalMap,
@@ -74,22 +70,16 @@ export function hydrate(payload) {
             props,
             exprFns,
             resolveNodes
+        };
+        const markerState = _hydrateMarkers({
+            ...runtimeContext,
+            markers
         });
-        const renderMarkerByIndex = (index) => _renderMarker({
-            index,
-            root,
-            expressions,
-            stateValues,
-            stateKeys,
-            signalMap,
-            componentBindings,
-            params,
-            ssrData,
-            props,
-            exprFns,
-            resolveNodes,
+        const renderContext = {
+            ...runtimeContext,
             ...markerState
-        });
+        };
+        const renderMarkerByIndex = (index) => _renderMarker(renderContext, index);
 
         _bindSignalSubscriptions(expressions, signalMap, stateValues, renderMarkerByIndex);
         _bindComponentSignalSubscriptions(expressions, componentBindings, renderMarkerByIndex);
@@ -115,7 +105,7 @@ export function hydrate(payload) {
         rethrowZenithRuntimeError(error, {
             phase: 'hydrate',
             code: 'BINDING_APPLY_FAILED',
-            hint: 'Inspect marker tables, expression bindings, and the runtime overlay diagnostics.',
+            hint: 'Inspect marker tables, expression bindings, and runtime diagnostics.',
             docsLink: DOCS_LINKS.markerTable
         });
     }
@@ -159,13 +149,10 @@ function _hydrateRefs(refs, stateValues, resolveNodes) {
 }
 
 function _mountComponents(context) {
-    const { components, signalMap, componentBindings, route, resolveNodes } = context;
+    const { components, signalMap, componentBindings, resolveNodes } = context;
     for (let i = 0; i < components.length; i++) {
         const component = components[i];
-        const resolvedProps = Object.freeze(_resolveComponentProps(component.props || [], signalMap, {
-            component: component.instance,
-            route
-        }));
+        const resolvedProps = Object.freeze(_resolveComponentProps(component.props || [], signalMap));
         const hosts = resolveNodes(component.selector, i, 'component', component.source);
         for (let j = 0; j < hosts.length; j++) {
             try {
@@ -213,7 +200,7 @@ function _mountComponents(context) {
                         code: 'COMPONENT_BOOTSTRAP_FAILED',
                         message: `Component bootstrap failed for "${component.instance}"`,
                         path: `component[${component.instance}]`,
-                        hint: 'Fix the failing component and refresh; other components continue mounting.',
+                        hint: 'Fix the failing component and refresh.',
                         docsLink: DOCS_LINKS.componentBootstrap,
                         source: component.source
                     });
@@ -228,35 +215,13 @@ function _hydrateMarkers(context) {
     const {
         expressions,
         markers,
-        stateValues,
-        stateKeys,
-        signalMap,
-        componentBindings,
-        params,
-        ssrData,
-        props,
-        exprFns,
         resolveNodes
     } = context;
     const markerByIndex = new Map();
     const markerNodesByIndex = new Map();
-    const markerIndices = new Set();
-    const expressionMarkerIndices = new Set();
-
-    for (let i = 0; i < expressions.length; i++) {
-        const expression = expressions[i];
-        if (expressionMarkerIndices.has(expression.marker_index)) {
-            throw new Error(`[Zenith Runtime] duplicate expression marker_index ${expression.marker_index}`);
-        }
-        expressionMarkerIndices.add(expression.marker_index);
-    }
 
     for (let i = 0; i < markers.length; i++) {
         const marker = markers[i];
-        if (markerIndices.has(marker.index)) {
-            throw new Error(`[Zenith Runtime] duplicate marker index ${marker.index}`);
-        }
-        markerIndices.add(marker.index);
         markerByIndex.set(marker.index, marker);
 
         if (marker.kind === 'event') {
@@ -265,54 +230,30 @@ function _hydrateMarkers(context) {
 
         const nodes = resolveNodes(marker.selector, marker.index, marker.kind, marker.source);
         markerNodesByIndex.set(marker.index, nodes);
-        const value = _evaluateExpression(
+        const value = _evaluateMarkerBinding(
+            context,
             expressions[marker.index],
-            stateValues,
-            stateKeys,
-            signalMap,
-            componentBindings,
-            params,
-            ssrData,
-            marker.kind,
-            props,
-            exprFns,
-            marker,
-            null
+            marker
         );
         _applyMarkerValue(nodes, marker, value);
-    }
-
-    for (let i = 0; i < expressions.length; i++) {
-        if (!markerIndices.has(i)) {
-            throw new Error(`[Zenith Runtime] missing marker index ${i}`);
-        }
     }
 
     return { markerByIndex, markerNodesByIndex };
 }
 
-function _renderMarker(context) {
-    const marker = context.markerByIndex.get(context.index);
+function _renderMarker(context, index) {
+    const marker = context.markerByIndex.get(index);
     if (!marker || marker.kind === 'event') {
         return;
     }
 
-    const nodes = context.markerNodesByIndex.get(context.index)
+    const nodes = context.markerNodesByIndex.get(index)
         || context.resolveNodes(marker.selector, marker.index, marker.kind, marker.source);
-    context.markerNodesByIndex.set(context.index, nodes);
-    const value = _evaluateExpression(
-        context.expressions[context.index],
-        context.stateValues,
-        context.stateKeys,
-        context.signalMap,
-        context.componentBindings,
-        context.params,
-        context.ssrData,
-        marker.kind,
-        context.props,
-        context.exprFns,
-        marker,
-        null
+    context.markerNodesByIndex.set(index, nodes);
+    const value = _evaluateMarkerBinding(
+        context,
+        context.expressions[index],
+        marker
     );
     _applyMarkerValue(nodes, marker, value);
 }
@@ -356,17 +297,7 @@ function _bindSignalSubscriptions(expressions, signalMap, stateValues, renderMar
             );
         }
     }
-
-    for (const [targetSignal, markerIndexes] of dependentMarkersBySignal.entries()) {
-        const unsubscribe = targetSignal.subscribe(() => {
-            for (let i = 0; i < markerIndexes.length; i++) {
-                renderMarkerByIndex(markerIndexes[i]);
-            }
-        });
-        if (typeof unsubscribe === 'function') {
-            _registerDisposer(unsubscribe);
-        }
-    }
+    _subscribeMarkerDependencies(dependentMarkersBySignal, renderMarkerByIndex);
 }
 
 function _bindComponentSignalSubscriptions(expressions, componentBindings, renderMarkerByIndex) {
@@ -379,10 +310,7 @@ function _bindComponentSignalSubscriptions(expressions, componentBindings, rende
 
         const instanceBindings = componentBindings[expression.component_instance];
         const candidate = instanceBindings?.[expression.component_binding];
-        if (!candidate || typeof candidate !== 'object') {
-            continue;
-        }
-        if (typeof candidate.get !== 'function' || typeof candidate.subscribe !== 'function') {
+        if (!_isSignalLike(candidate)) {
             continue;
         }
         if (!dependentMarkersByComponentSignal.has(candidate)) {
@@ -390,9 +318,33 @@ function _bindComponentSignalSubscriptions(expressions, componentBindings, rende
         }
         dependentMarkersByComponentSignal.get(candidate).push(expression.marker_index);
     }
+    _subscribeMarkerDependencies(dependentMarkersByComponentSignal, renderMarkerByIndex);
+}
 
-    for (const [componentSignal, markerIndexes] of dependentMarkersByComponentSignal.entries()) {
-        const unsubscribe = componentSignal.subscribe(() => {
+function _evaluateMarkerBinding(
+    context,
+    expression,
+    marker
+) {
+    return _evaluateExpression(
+        expression,
+        context.stateValues,
+        context.stateKeys,
+        context.signalMap,
+        context.componentBindings,
+        context.params,
+        context.ssrData,
+        marker.kind,
+        context.props,
+        context.exprFns,
+        marker,
+        null
+    );
+}
+
+function _subscribeMarkerDependencies(dependencies, renderMarkerByIndex) {
+    for (const [targetSignal, markerIndexes] of dependencies.entries()) {
+        const unsubscribe = targetSignal.subscribe(() => {
             for (let i = 0; i < markerIndexes.length; i++) {
                 renderMarkerByIndex(markerIndexes[i]);
             }

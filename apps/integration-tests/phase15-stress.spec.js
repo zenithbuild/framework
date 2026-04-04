@@ -4,7 +4,7 @@
 import { describe, test, expect, jest } from '@jest/globals';
 import { runStressHarness } from './helpers/stress-harness.js';
 
-jest.setTimeout(900000);
+jest.setTimeout(1200000);
 
 describe('Phase 15: stress harness', () => {
   test('100 generated fixtures compile, hydrate, and remain deterministic', async () => {

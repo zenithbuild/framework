@@ -58,7 +58,7 @@ describe('Track E maintainability locks', () => {
     });
 
     test('runtime template bundle includes extracted hydration modules', () => {
-        const templateSource = readSource('template.js');
+        const templateSource = `${readSource('template.js')}\n${readSource('runtime-template-profile.js')}`;
 
         for (let i = 0; i < HYDRATION_RUNTIME_FILES.length - 1; i++) {
             expect(templateSource).toContain(`'${HYDRATION_RUNTIME_FILES[i]}'`);

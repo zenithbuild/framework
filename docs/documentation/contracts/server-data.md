@@ -1,9 +1,9 @@
 ---
 title: "Server Data Contract"
 description: "Allowed server exports, load context shape, and serialization constraints."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-30"
+last_updated: "2026-04-01"
 tags: ["server", "data", "contracts"]
 ---
 
@@ -13,9 +13,9 @@ tags: ["server", "data", "contracts"]
 
 Contract: Zenith has two explicit server route kinds with separate result helpers:
 - page routes
-- dedicated resource routes
+- dedicated resource routes (for `src/` layout projects, `src/api/**` is the preferred discovery convention)
 
-Invariant: `guard(ctx)` is the route-protection gate for both route kinds. Page routes own HTML payloads. Resource routes own JSON and plain-text direct responses. Legacy payload exports may not mix with the canonical surface.
+Invariant: `guard(ctx)` is the route-protection gate for both route kinds. Page routes own HTML payloads. Resource routes own explicit non-HTML direct responses. Legacy payload exports may not mix with the canonical surface.
 
 Banned:
 - Exporting both `data` and `load` in one file.
@@ -67,11 +67,32 @@ Resource routes return:
 - `json(payload, status = 200)`
 - `text(body, status = 200)`
 - `download(body, { filename, contentType? })`
+- `stream(body, { status?, contentType? })`
+- `sse(events)`
 - `redirect(...)`
 - `deny(...)`
 
 Resource routes do **not** allow `data(...)`, `invalid(...)`, `prerender`, or `exportPaths`.
-Page routes do **not** allow `json(...)`, `text(...)`, or `download(...)`.
+Page routes do **not** allow `json(...)`, `text(...)`, `download(...)`, `stream(...)`, or `sse(...)`.
+
+## Contract: Explicit Middleware Composition
+
+Contract: middleware composition is explicit and route-owned.
+
+Invariant:
+- route modules compose middleware directly with `withMiddleware(handler, ...middleware)`
+- composition order is deterministic and left-to-right by declaration (`withMiddleware(handler, a, b) = a(b(handler))`)
+- middleware remains server-contract-only and is not exposed as a route context helper
+
+Definition of Done:
+- middleware returns a wrapped handler function
+- middleware may short-circuit with any valid result kind for the wrapped handler type, throw, or call wrapped handler
+- middleware does not add new result kinds or bypass route contract validation
+
+Failure Modes:
+- root/global middleware becomes automatic
+- folder inheritance semantics appear
+- middleware drifts into generic request/response interceptor chains
 
 ## Contract: Serialization Rules
 
@@ -98,13 +119,13 @@ Evidence:
 
 ## Contract: Resource Response Rules
 
-Contract: the public non-HTML resource surface is limited to JSON, plain text, and one attachment-style `download(...)` helper.
+Contract: the public non-HTML resource surface is limited to JSON, plain text, `stream(...)`, `sse(...)`, and one attachment-style `download(...)` helper.
 
-Invariant: resource responses stay explicit, artifact-free, and route-owned. Zenith does not expose arbitrary `Response`, arbitrary headers, inline file serving, or streaming in this milestone.
+Invariant: resource responses stay explicit, artifact-free, and route-owned. Zenith does not expose arbitrary `Response`, arbitrary headers, or inline file serving in this milestone.
 
 Banned:
 - arbitrary `Response` returns
-- `file(...)`, inline serving, streams, `Blob`, `File`, range requests, or filesystem-path helper APIs
+- `file(...)`, inline serving, page-route streaming, `Blob`, `File`, range requests, or filesystem-path helper APIs
 - top-level non-object JSON payloads
 - using resource routes as a generic RPC or REST framework
 
@@ -112,6 +133,8 @@ Definition of Done:
 - `json(payload, status?)` uses the same JSON-safe top-level plain-object contract as page `data(...)`
 - `text(body, status?)` accepts string bodies only
 - `download(body, { filename, contentType? })` always emits `Content-Disposition: attachment`
+- `stream(body, { status?, contentType? })` accepts only `ReadableStream` or `AsyncIterable`
+- `sse(events)` accepts only `AsyncIterable` event sources and emits standard SSE framing
 - `download(...)` accepts only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes and enforces a 5 MiB payload cap
 - `redirect(...)` and `deny(...)` preserve existing status/control-flow meaning
 - auth, cookie staging, and multipart parsing behave identically across dev, preview, and packaged node
@@ -119,10 +142,10 @@ Definition of Done:
 Failure Modes:
 - page-route helpers and resource-route helpers blur together
 - response semantics differ by server path
-- docs imply generic file serving, binary/media platforms, or streaming before they exist
+- docs imply arbitrary `Response`, generic file serving, page-route streaming, or a broader media platform
 
 Evidence:
-- parity tests cover JSON, text, attachment downloads, cookies, auth, multipart, and misuse failures on dedicated resource routes
+- parity tests cover JSON, text, attachment downloads, stream, SSE, cookies, auth, multipart, and misuse failures on dedicated resource routes
 
 ## Contract: Route-Owned Cookie Sessions
 

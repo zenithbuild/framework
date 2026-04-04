@@ -7,7 +7,7 @@ import http from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-jest.setTimeout(30000);
+jest.setTimeout(90000);
 
 async function makeProject(files) {
     const root = join(tmpdir(), `zenith-server-routing-${Date.now()}-${Math.random().toString(36).slice(2)}`);

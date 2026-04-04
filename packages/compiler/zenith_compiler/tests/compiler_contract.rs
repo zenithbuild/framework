@@ -119,7 +119,9 @@ fn compile_structured_preserves_style_text_without_expression_markers() {
     let structured = compile_structured_ok(input);
     let full = compile(input);
 
-    assert!(structured.html.contains("<style>main{display:block;}</style>"));
+    assert!(structured
+        .html
+        .contains("<style>main{display:block;}</style>"));
     assert_eq!(structured.expressions, vec!["title"]);
     assert!(!full.contains("\"main\" + (display)"));
 }

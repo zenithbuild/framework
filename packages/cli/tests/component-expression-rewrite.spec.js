@@ -93,15 +93,15 @@ describe('component expression rewrite preservation', () => {
         const inactiveClass = extractScopedIdentifier(pageAsset, 'src_components_MiniChooser_zen_script0_', 'inactiveClass');
 
         const fnMatch = pageAsset.match(
-            /function\(__ctx\)\s*\{[^}]*return signalMap\.get\(\d+\)\.get\(\) === ['"]core['"] \? ([^:;]+) : ([^;]+);\s*\}/
+            /function\(__ctx\)\s*\{[^}]*return\s+signalMap\.get\(\d+\)\.get\(\)\s*===\s*['"]core['"]\s*\?\s*([^:;]+)\s*:\s*([^;]+);?\s*\}/
         );
         expect(fnMatch).toBeTruthy();
         const fnBody = String(fnMatch?.[0] || '');
 
-        expect(fnBody).toContain(`? ${activeClass} : ${inactiveClass};`);
-        expect(fnBody).not.toContain('? activeClass : inactiveClass;');
-        expect(fnBody).not.toContain(`? ${activeClass.replace(/\\/g, '\\\\')} : inactiveClass;`);
-        expect(fnBody).not.toContain('? activeClass :');
-        expect(fnBody).not.toContain(': inactiveClass;');
+        expect(fnBody).toMatch(new RegExp(String.raw`\?\s*${escapeRegex(activeClass)}\s*:\s*${escapeRegex(inactiveClass)}\b`));
+        expect(fnBody).not.toMatch(/\?\s*activeClass\s*:\s*inactiveClass\b/);
+        expect(fnBody).not.toMatch(new RegExp(String.raw`\?\s*${escapeRegex(activeClass)}\s*:\s*inactiveClass\b`));
+        expect(fnBody).not.toMatch(/\?\s*activeClass\s*:/);
+        expect(fnBody).not.toMatch(/:\s*inactiveClass\b/);
     });
 });

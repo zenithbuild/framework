@@ -77,16 +77,54 @@ export function readLogDelta(processHandle, checkpoint) {
   };
 }
 
-export async function waitForReadyState(url, frameworkConfig, environmentConfig) {
+import { isPortOpen, waitForHttp } from "./process.mjs";
+
+export async function waitForReadyState(url, arg2, arg3) {
+  const parsed = new URL(url);
+  const port = parseInt(parsed.port, 10);
+  const host = parsed.hostname === "localhost" ? "127.0.0.1" : (parsed.hostname || "127.0.0.1");
   const startedAt = Date.now();
 
-  while (Date.now() - startedAt < environmentConfig.startupTimeoutMs) {
-    const settled = await fetchDevState(url, frameworkConfig);
-    if (settled && settled.state.status === frameworkConfig.readyProbe.expectStateStatus) {
-      return settled;
-    }
+  // Resolve polymorphism
+  let timeoutMs = 60000;
+  let frameworkConfig = { readyProbe: { mode: "http-status", expectStatus: 200 } };
+  let environmentConfig = {};
 
-    await sleep(environmentConfig.pollIntervalMs);
+  if (typeof arg2 === "number") {
+    timeoutMs = arg2;
+  } else if (typeof arg2 === "object" && arg2 !== null) {
+    frameworkConfig = arg2;
+    environmentConfig = arg3 || {};
+    timeoutMs = environmentConfig.startupTimeoutMs || 60000;
+  }
+
+  // 1. Port open probe (The Stabilizer)
+  let opened = false;
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await isPortOpen(port, host)) {
+      opened = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  if (!opened) {
+    throw new Error(`Timed out waiting for port ${port} to open at ${host}`);
+  }
+
+  // 2. State polling (The Legacy Logic / Verification)
+  const probe = frameworkConfig.readyProbe || {};
+  while (Date.now() - startedAt < timeoutMs) {
+    const settled = await fetchDevState(url, frameworkConfig);
+    if (settled) {
+      if (probe.mode === "http-status") {
+        return settled;
+      }
+      if (settled.state.status === probe.expectStateStatus) {
+        return settled;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, environmentConfig.pollIntervalMs || 250));
   }
 
   throw new Error(`Timed out waiting for ready state at ${url}`);

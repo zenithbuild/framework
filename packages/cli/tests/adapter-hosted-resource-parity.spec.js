@@ -62,6 +62,54 @@ function resourcePages() {
             '  await ctx.auth.signOut();',
             '  return ctx.text("signed out");',
             '}'
+        ].join('\n'),
+        'pages/api/upload.resource.ts': [
+            'export async function action(ctx) {',
+            '  const form = await ctx.request.formData();',
+            '  const title = String(form.get("title") || "").trim();',
+            '  const attachment = form.get("attachment");',
+            '  return ctx.json({',
+            '    title,',
+            '    filename: attachment.name,',
+            '    type: attachment.type,',
+            '    size: attachment.size',
+            '  });',
+            '}'
+        ].join('\n'),
+        'pages/api/validate.resource.ts': [
+            'export async function action(ctx) {',
+            '  const form = await ctx.request.formData();',
+            '  const title = String(form.get("title") || "").trim();',
+            '  if (!title) return ctx.invalid({ error: "Title required" }, 422);',
+            '  return ctx.json({ title });',
+            '}'
+        ].join('\n'),
+        'pages/api/login-multipart.resource.ts': [
+            'export async function action(ctx) {',
+            '  const form = await ctx.request.formData();',
+            '  const username = String(form.get("username") || "").trim();',
+            '  await ctx.auth.signIn({ username });',
+            '  return ctx.json({ ok: true, username });',
+            '}'
+        ].join('\n'),
+        'pages/api/ticker.resource.ts': [
+            "import { stream } from 'zenith:server-contract';",
+            'export async function load(ctx) {',
+            '  async function* chunks() {',
+            '    yield "tick-1";',
+            '    yield "tick-2";',
+            '  }',
+            '  return stream(chunks(), { contentType: "text/plain" });',
+            '}'
+        ].join('\n'),
+        'pages/api/events.resource.ts': [
+            "import { sse } from 'zenith:server-contract';",
+            'export async function load(ctx) {',
+            '  async function* events() {',
+            '    yield { data: { count: 1 }, event: "ping" };',
+            '  }',
+            '  return sse(events());',
+            '}'
         ].join('\n')
     };
 }
@@ -231,29 +279,102 @@ describe('hosted resource route parity', () => {
     );
 
     test.each(['vercel', 'netlify'])(
-        '%s keeps hosted multipart resource writes deferred at runtime',
+        '%s supports hosted multipart resource writes (success, invalid, and auth)',
         async (target) => {
-            projectRoot = await createProject(target, {
-                'pages/api/upload.resource.ts': [
-                    'export async function action(ctx) {',
-                    '  const form = await ctx.request.formData();',
-                    '  return ctx.json({ title: String(form.get("title") || "").trim() });',
-                    '}'
-                ].join('\n')
-            });
+            process.env.ZENITH_SESSION_SECRET = `zenith-${target}-multipart-secret`;
+            projectRoot = await createProject(target, resourcePages());
 
             await cli(['build'], projectRoot);
 
+            // 1. Success with file metadata
             const form = new FormData();
-            form.set('title', 'Deferred upload');
-            form.set('attachment', new File(['blocked'], 'blocked.txt', { type: 'text/plain' }));
+            form.set('title', 'Multipart upload');
+            form.set('attachment', new File(['zenith-bytes'], 'test.txt', { type: 'text/plain' }));
 
-            const response = await executeHostedRoute(projectRoot, target, 'api_upload', {
+            const success = await executeHostedRoute(projectRoot, target, 'api_upload', {
                 method: 'POST',
                 body: form
             });
-            expect(response.status).toBe(501);
-            expect(await response.text()).toBe('Hosted multipart resource routes are unsupported in this milestone');
+            expect(success.status).toBe(200);
+            expect(await success.json()).toEqual({
+                title: 'Multipart upload',
+                filename: 'test.txt',
+                type: 'text/plain',
+                size: 12
+            });
+
+            // 2. Negative path (invalid())
+            const emptyForm = new FormData();
+            emptyForm.set('title', '');
+
+            const invalid = await executeHostedRoute(projectRoot, target, 'api_validate', {
+                method: 'POST',
+                body: emptyForm
+            });
+            expect(invalid.status).toBe(422);
+            expect(await invalid.json()).toEqual({ error: 'Title required' });
+
+            // 3. Auth roundtrip via multipart
+            const loginForm = new FormData();
+            loginForm.set('username', 'multipart-user');
+
+            const login = await executeHostedRoute(projectRoot, target, 'api_login_multipart', {
+                method: 'POST',
+                body: loginForm
+            });
+            expect(login.status).toBe(200);
+            
+            const setCookies = getSetCookieValues(login.headers);
+            expect(setCookies).toHaveLength(1);
+            
+            const sessionCookie = cookieHeaderFromSetCookie(setCookies[0]);
+            const me = await executeHostedRoute(projectRoot, target, 'api_me', {
+                headers: { cookie: sessionCookie }
+            });
+            expect(me.status).toBe(200);
+            expect(await me.json()).toEqual({ session: { username: 'multipart-user' } });
+        }
+    );
+    
+    test.each(['vercel', 'netlify'])(
+        '%s supports hosted resource streaming and SSE parity',
+        async (target) => {
+            projectRoot = await createProject(target, resourcePages());
+
+            await cli(['build'], projectRoot);
+
+            // 1. stream() parity
+            const ticker = await executeHostedRoute(projectRoot, target, 'api_ticker');
+            if (ticker.status === 500) {
+                console.error(`[DEBUG] ${target} ticker failure:`, await ticker.text());
+            }
+            expect(ticker.status).toBe(200);
+            expect(ticker.headers.get('content-type')).toBe('text/plain');
+            expect(ticker.headers.get('cache-control')).toBe('no-cache');
+            
+            const reader = ticker.body.getReader();
+            const chunks = [];
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                chunks.push(new TextDecoder().decode(value));
+            }
+            expect(chunks).toEqual(['tick-1', 'tick-2']);
+
+            // 2. sse() parity
+            const events = await executeHostedRoute(projectRoot, target, 'api_events');
+            expect(events.status).toBe(200);
+            expect(events.headers.get('content-type')).toBe('text/event-stream; charset=utf-8');
+            expect(events.headers.get('cache-control')).toBe('no-cache');
+
+            const eventReader = events.body.getReader();
+            const eventChunks = [];
+            while (true) {
+                const { value, done } = await eventReader.read();
+                if (done) break;
+                eventChunks.push(new TextDecoder().decode(value));
+            }
+            expect(eventChunks.join('')).toBe('event: ping\ndata: {"count":1}\n\n');
         }
     );
 });

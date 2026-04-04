@@ -31,11 +31,16 @@ async function createPages(files) {
 
 describe('generateManifest', () => {
     let pagesDir;
+    let projectRoot;
 
     afterEach(async () => {
         if (pagesDir) {
             await rm(pagesDir, { recursive: true, force: true });
             pagesDir = null;
+        }
+        if (projectRoot) {
+            await rm(projectRoot, { recursive: true, force: true });
+            projectRoot = null;
         }
     });
 
@@ -71,6 +76,53 @@ describe('generateManifest', () => {
             { path: '/api/ping', file: 'api/ping.resource.ts', route_kind: 'resource' },
             { path: '/settings', file: 'settings/page.resource.ts', route_kind: 'resource' }
         ]);
+    });
+
+    test('src layout projects discover src/api resource routes as explicit aliases', async () => {
+        projectRoot = join(tmpdir(), `zenith-manifest-src-api-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        await mkdir(join(projectRoot, 'src', 'pages'), { recursive: true });
+        await mkdir(join(projectRoot, 'src', 'api', 'users'), { recursive: true });
+        await writeFile(join(projectRoot, 'src', 'pages', 'index.zen'), '<main>home</main>\n', 'utf8');
+        await writeFile(
+            join(projectRoot, 'src', 'api', 'ping.resource.ts'),
+            'export async function load(ctx) { return ctx.text("ok"); }\n',
+            'utf8'
+        );
+        await writeFile(
+            join(projectRoot, 'src', 'api', 'users', '[id].resource.ts'),
+            'export async function load(ctx) { return ctx.text("ok"); }\n',
+            'utf8'
+        );
+        pagesDir = join(projectRoot, 'src', 'pages');
+
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => ({
+            path: entry.path,
+            file: entry.file,
+            route_kind: entry.route_kind
+        }))).toEqual([
+            { path: '/', file: 'index.zen', route_kind: 'page' },
+            { path: '/api/ping', file: 'api/ping.resource.ts', route_kind: 'resource' },
+            { path: '/api/users/:id', file: 'api/users/[id].resource.ts', route_kind: 'resource' }
+        ]);
+    });
+
+    test('non-src layout projects do not auto-discover project-level api aliases', async () => {
+        projectRoot = join(tmpdir(), `zenith-manifest-pages-only-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        await mkdir(join(projectRoot, 'pages'), { recursive: true });
+        await mkdir(join(projectRoot, 'api'), { recursive: true });
+        await writeFile(join(projectRoot, 'pages', 'index.zen'), '<main>home</main>\n', 'utf8');
+        await writeFile(
+            join(projectRoot, 'api', 'ping.resource.ts'),
+            'export async function load(ctx) { return ctx.text("ok"); }\n',
+            'utf8'
+        );
+        pagesDir = join(projectRoot, 'pages');
+
+        const manifest = await generateManifest(pagesDir);
+
+        expect(manifest.map((entry) => entry.path)).toEqual(['/']);
     });
 
     test('nested static pages', async () => {
@@ -223,6 +275,26 @@ describe('generateManifest', () => {
             'account.zen',
             'account.resource.ts'
         ]);
+
+        await expect(generateManifest(pagesDir)).rejects.toThrow('Duplicate route path');
+    });
+
+    test('rejects src/api aliases that collide with pages resource routes', async () => {
+        projectRoot = join(tmpdir(), `zenith-manifest-src-api-collision-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        await mkdir(join(projectRoot, 'src', 'pages', 'api'), { recursive: true });
+        await mkdir(join(projectRoot, 'src', 'api'), { recursive: true });
+        await writeFile(join(projectRoot, 'src', 'pages', 'index.zen'), '<main>home</main>\n', 'utf8');
+        await writeFile(
+            join(projectRoot, 'src', 'pages', 'api', 'ping.resource.ts'),
+            'export async function load(ctx) { return ctx.text("ok"); }\n',
+            'utf8'
+        );
+        await writeFile(
+            join(projectRoot, 'src', 'api', 'ping.resource.ts'),
+            'export async function load(ctx) { return ctx.text("ok"); }\n',
+            'utf8'
+        );
+        pagesDir = join(projectRoot, 'src', 'pages');
 
         await expect(generateManifest(pagesDir)).rejects.toThrow('Duplicate route path');
     });

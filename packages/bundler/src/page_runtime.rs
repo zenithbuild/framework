@@ -1,18 +1,18 @@
 pub fn render_runtime_data_helpers(ssr_json: &str) -> String {
     format!(
-        r#"const __zenith_static_ssr_data = {};
-function __zenith_read_ssr_data(staticValue) {{
+        r#"const __zss = {};
+function __zrd(staticValue) {{
   const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_ssr_data : undefined;
   if (runtimeValue && typeof runtimeValue === 'object' && !Array.isArray(runtimeValue)) {{
     return runtimeValue;
   }}
   return staticValue;
 }}
-let __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);
+let __zenith_ssr_data = __zrd(__zss);
 let data = __zenith_ssr_data;
 let ssr_data = __zenith_ssr_data;
-function __zenith_refresh_runtime_data() {{
-  __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);
+function __zrr() {{
+  __zenith_ssr_data = __zrd(__zss);
   data = __zenith_ssr_data;
   ssr_data = __zenith_ssr_data;
 }}
@@ -22,17 +22,16 @@ function __zenith_refresh_runtime_data() {{
 }
 
 pub fn render_route_html_helpers() -> &'static str {
-    r#"const __zenith_has_route_html = true;
-function __zenith_read_route_html(staticValue) {
+    r#"function __zrh() {
   const runtimeValue = typeof globalThis === 'object' ? globalThis.__zenith_route_html : undefined;
   if (typeof runtimeValue === 'string' && runtimeValue.length > 0) {
     return runtimeValue;
   }
-  return staticValue;
+  return null;
 }
-function __zenith_apply_route_html(root) {
-  const routeHtml = __zenith_read_route_html(__zenith_html);
-  if (typeof routeHtml !== 'string' || routeHtml.length === 0) {
+function __zah(root) {
+  const routeHtml = __zrh();
+  if (!routeHtml) {
     return;
   }
   if (typeof Document === 'undefined' || !(root instanceof Document)) {

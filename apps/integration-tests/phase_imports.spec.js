@@ -80,7 +80,7 @@ const label = incoming.label
       const pageSource = await fs.readFile(path.join(distDir, pageAsset), 'utf8');
 
       expect(/[A-Za-z0-9_]*components_Button_zen_script0_[a-f0-9]+/.test(pageSource)).toBe(true);
-      expect(pageSource.includes('var props = { label: "Clicks" };')).toBe(true);
+      expect(/\blabel\s*:\s*["']Clicks["']/.test(pageSource)).toBe(true);
       expect(pageSource.includes('import Button from')).toBe(false);
       expect(pageSource.includes('@zenithbuild/')).toBe(false);
     } finally {

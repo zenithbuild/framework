@@ -1,6 +1,6 @@
 <DefaultLayout>
   <section class="hero stack">
-    <p data-benchmark-copy="lead">Static marketing benchmark fixture for Zenith.</p>
+    <p data-benchmark-copy="lead">Static marketing benchmark fixture for Zenith. <!-- benchmark-point: template-text --></p>
     <h1>Compiler-first pages with no client state.</h1>
     <p>This case measures a static landing surface with multiple content sections and supporting routes.</p>
   </section>

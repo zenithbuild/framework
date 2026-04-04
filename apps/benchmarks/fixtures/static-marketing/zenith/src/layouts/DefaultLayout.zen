@@ -1,6 +1,3 @@
-<script setup="ts">
-import "../styles/global.css";
-</script>
 
 <html lang="en">
 <head>

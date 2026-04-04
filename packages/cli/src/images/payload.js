@@ -25,6 +25,11 @@ function serializeInlineScriptJson(payload) {
 }
 
 export function injectImageRuntimePayload(html, payload) {
+    // Only inject if the HTML contains Zenith image markers or unsafeHTML
+    if (!/data-zx-(data-zenith-image|unsafeHTML)/.test(html)) {
+        return html;
+    }
+
     const safePayload = createImageRuntimePayload(
         payload?.config || {},
         payload?.localImages || {},

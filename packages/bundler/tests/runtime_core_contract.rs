@@ -240,16 +240,25 @@ fn runtime_core_is_emitted_and_helper_imports_are_rewritten() {
         .expect("manifest.chunks['/'] missing");
     let page_chunk_path = from_manifest_path(&out_dir, page_chunk_rel);
     let page_chunk_source = fs::read_to_string(&page_chunk_path).expect("read page chunk");
-    let graph_hash_prefix = "const __zenith_graph_hash = \"";
-    let graph_hash_start = page_chunk_source
-        .find(graph_hash_prefix)
-        .expect("page chunk graph hash assignment missing")
-        + graph_hash_prefix.len();
-    let graph_hash_end = page_chunk_source[graph_hash_start..]
-        .find("\";")
-        .expect("page chunk graph hash terminator missing")
-        + graph_hash_start;
-    let emitted_global_graph_hash = page_chunk_source[graph_hash_start..graph_hash_end].to_string();
+    let graph_hash_assignment = page_chunk_source
+        .find("__zenith_graph_hash=")
+        .expect("page chunk graph hash assignment missing");
+    let graph_hash_value =
+        &page_chunk_source[graph_hash_assignment + "__zenith_graph_hash=".len()..];
+    let graph_hash_value = graph_hash_value.trim_start();
+    let quote_char = graph_hash_value
+        .chars()
+        .next()
+        .expect("page chunk graph hash value missing");
+    assert!(
+        quote_char == '"' || quote_char == '\'',
+        "page chunk graph hash must be quoted: {graph_hash_value}"
+    );
+    let graph_hash_tail = &graph_hash_value[1..];
+    let graph_hash_end = graph_hash_tail
+        .find(quote_char)
+        .expect("page chunk graph hash terminator missing");
+    let emitted_global_graph_hash = graph_hash_tail[..graph_hash_end].to_string();
 
     let manifest_hash = manifest["hash"]
         .as_str()

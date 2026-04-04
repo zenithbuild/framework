@@ -65,7 +65,7 @@ function _resolveEventHandler(context, expressionBinding, marker, eventBinding) 
         message: `Event binding at index ${eventBinding.index} expected a function reference. You passed: ${_describeBindingExpression(expressionBinding)}`,
         marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
         path: `event[${eventBinding.index}].${eventBinding.event}`,
-        hint: 'Use on:*={handler} or ensure the forwarded prop is a function.',
+        hint: 'Use on:*={handler}; forwarded props must be functions.',
         docsLink: DOCS_LINKS.eventBinding,
         source: _resolveBindingSource(expressionBinding, marker, eventBinding)
     });
@@ -82,7 +82,7 @@ function _createWrappedEventHandler(handler, expressionBinding, marker, eventBin
                 message: `Event handler failed for "${eventBinding.event}"`,
                 marker: { type: `data-zx-on-${eventBinding.event}`, id: eventBinding.index },
                 path: `event[${eventBinding.index}].${eventBinding.event}`,
-                hint: 'Inspect the handler body and referenced state.',
+                hint: 'Inspect handler body and referenced state.',
                 docsLink: DOCS_LINKS.eventBinding,
                 source: _resolveBindingSource(expressionBinding, marker, eventBinding)
             });

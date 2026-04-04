@@ -15,9 +15,10 @@ Phase 9 priorities:
 
 ## 2. Track Overview
 
-- **Track A** — Hosted Page-Route Runtime Packaging & Cookie Session Parity (Complete)
-- **Track B** — Hosted Resource Route Parity (Complete)
-- **Track C** — Hosted Download / Multipart Follow-Through (Reserved)
+- [x] Track A: Hosted Page Route Parity (Established)
+- [x] Track B: Hosted Resource Route Core Parity (Established)
+- [x] Track C: Hosted Multipart Resource Write Parity (Established)
+- [ ] Track D: Hosted Download Support (Deferred)
 
 ## 3. Completed Item
 
@@ -69,7 +70,6 @@ Phase 9 priorities:
 **Guardrails:**
 - no server contract changes
 - no hosted downloads in this milestone
-- no hosted multipart resource writes in this milestone
 - no hosted route-check promotion
 - no adapter-owned reinterpretation of route meaning
 
@@ -78,4 +78,14 @@ Phase 9 priorities:
 - hosted `redirect(...)` and `deny(...)` on resource routes
 - hosted auth and staged-cookie parity on supported resource responses
 - explicit deferral remains in place for hosted `download(...)`
-- explicit deferral remains in place for hosted multipart resource writes
+
+### Track C: Hosted Multipart Resource Write Parity
+**Status: Established**
+- [x] Remove `isMultipartFormData` runtime block in Vercel adapter
+- [x] Remove `isMultipartFormData` runtime block in Netlify adapter
+- [x] Extend core server contract to allow `invalid` on resource routes
+- [x] Update resource response descriptor for `invalid -> json` mapping
+- [x] Verify multipart success (fields + files) in hosted parity tests
+- [x] Verify multipart negative path (`invalid()`) in hosted parity tests
+- [x] Verify multipart auth roundtrip in hosted parity tests
+- [x] Update deployment documentation for multipart status and body limits

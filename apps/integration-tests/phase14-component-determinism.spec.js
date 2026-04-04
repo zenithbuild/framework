@@ -99,10 +99,10 @@ function inc() { count.set(count.get() + 1) }
     const pageAboutJs = await readPageBundle(distDir, 'about/index.html');
     expect((pageIndexJs.match(/hydrate\s*\(\s*\{/g) || []).length).toBe(1);
     expect((pageAboutJs.match(/hydrate\s*\(\s*\{/g) || []).length).toBe(1);
-    expect(pageIndexJs.includes('const __zenith_component_bootstraps = [];')).toBe(true);
-    expect(pageAboutJs.includes('const __zenith_component_bootstraps = [];')).toBe(true);
-    expect(pageIndexJs.includes('const __zenith_components = [];')).toBe(true);
-    expect(pageAboutJs.includes('const __zenith_components = [];')).toBe(true);
+    expect(/(?:const|let|var)\s+__zenith_component_bootstraps\s*=\s*\[\s*\]\s*;/.test(pageIndexJs)).toBe(true);
+    expect(/(?:const|let|var)\s+__zenith_component_bootstraps\s*=\s*\[\s*\]\s*;/.test(pageAboutJs)).toBe(true);
+    expect(/(?:const|let|var)\s+__zenith_components\s*=\s*\[\s*\]\s*;/.test(pageIndexJs)).toBe(true);
+    expect(/(?:const|let|var)\s+__zenith_components\s*=\s*\[\s*\]\s*;/.test(pageAboutJs)).toBe(true);
 
     const indexScope = extractComponentScope(pageIndexJs, 'Card');
     const aboutScope = extractComponentScope(pageAboutJs, 'Card');

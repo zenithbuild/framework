@@ -30,6 +30,11 @@ import {
 function readFlag(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) {
+    // Check for --flag=value format
+    const prefixMatch = process.argv.find(arg => arg.startsWith(`${name}=`));
+    if (prefixMatch) {
+      return prefixMatch.split("=")[1];
+    }
     return "";
   }
   return process.argv[index + 1] || "";
@@ -64,6 +69,7 @@ async function main() {
   const frameworkId = readFlag("--framework") || "zenith";
   const caseId = readFlag("--case");
   const requestedRunId = readFlag("--run-id");
+  const profile = readFlag("--profile") || "fast";
 
   const environmentConfig = await loadEnvironmentConfig();
   const frameworksConfig = await loadFrameworksConfig();
@@ -77,6 +83,18 @@ async function main() {
   const cleanPaths = resolveCleanPaths(environmentConfig, frameworkConfig);
   const buildArtifactPaths = resolveBuildArtifactPaths(frameworkConfig);
 
+  // Profile overrides
+  let warmupCount = environmentConfig.warmupCount;
+  let sampleCount = environmentConfig.sampleCount;
+
+  if (profile === "fast") {
+    warmupCount = 1;
+    sampleCount = 2;
+  } else if (profile === "publication") {
+    warmupCount = 1;
+    sampleCount = 5;
+  }
+
   const runId = requestedRunId || createRunId("cold-build");
   const { runDir, runnerDir } = await ensureRunPaths(runId, "cold-build");
   const fixtureDirs = selectedCases.map((entry) => ({
@@ -84,10 +102,11 @@ async function main() {
     frameworkId,
     fixtureDir: resolveFixtureDir(entry, frameworkConfig),
   }));
+  
   const environment = await captureEnvironmentMetadata({
     host: environmentConfig.host,
-    warmupCount: environmentConfig.warmupCount,
-    sampleCount: environmentConfig.sampleCount,
+    warmupCount,
+    sampleCount,
     fixtureDirs,
   });
 
@@ -106,9 +125,13 @@ async function main() {
     );
     const samples = [];
 
-    for (let index = 0; index < environmentConfig.warmupCount + environmentConfig.sampleCount; index += 1) {
-      const isWarmup = index < environmentConfig.warmupCount;
-      const sampleLabel = isWarmup ? `warmup-${index + 1}` : `sample-${index + 1 - environmentConfig.warmupCount}`;
+    console.log(`\n[Cold Build] ${caseConfig.id} (${frameworkId}) [Profile: ${profile}]`);
+
+    for (let index = 0; index < warmupCount + sampleCount; index += 1) {
+      const isWarmup = index < warmupCount;
+      const sampleLabel = isWarmup ? `warmup-${index + 1}` : `sample-${index + 1 - warmupCount}`;
+      console.log(`  ${sampleLabel}...`);
+      
       await removeFixturePaths(fixtureDir, cleanPaths);
 
       const [command, ...args] = interpolateArgs(frameworkConfig.commands.build, {});
@@ -126,6 +149,7 @@ async function main() {
         fileCount: artifactStats.fileCount,
         totalBytes: artifactStats.totalBytes,
       };
+      
       const stdoutPath = join(cellDir, `${sampleLabel}.stdout.log`);
       const stderrPath = join(cellDir, `${sampleLabel}.stderr.log`);
       const startupProfilePath = join(cellDir, `${sampleLabel}.startup-profile.json`);
@@ -158,12 +182,14 @@ async function main() {
 
     results.push({
       frameworkId,
+      framework_kind: frameworkConfig.kind || frameworkId.split("-")[0],
       caseId: caseConfig.id,
       track: "cold-build",
+      benchmark_profile: profile,
       fixtureDir,
       install,
-      warmupCount: environmentConfig.warmupCount,
-      sampleCount: environmentConfig.sampleCount,
+      warmupCount,
+      sampleCount,
       samples,
       summary: summarizeSamples(samples),
     });
@@ -173,6 +199,7 @@ async function main() {
     schemaVersion: 1,
     runner: "cold-build",
     runId,
+    benchmark_profile: profile,
     generatedAt: new Date().toISOString(),
     environment,
     results,
@@ -180,7 +207,7 @@ async function main() {
 
   const outputPath = join(runDir, "cold-build.json");
   await writeJson(outputPath, output);
-  console.log(outputPath);
+  console.log(`\nResults written to: ${outputPath}`);
 }
 
 main().catch((error) => {

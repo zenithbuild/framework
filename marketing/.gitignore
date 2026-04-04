@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.zenith/
-.zenith-output/
-.vercel/
-.env
-.env.local
-.DS_Store
-*.log

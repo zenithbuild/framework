@@ -88,11 +88,19 @@ export function rewriteStaticImportsInSource(source, fromFile, toFile) {
  * @param {string} sourceFile
  * @param {object | null} [transformCache]
  * @param {Record<string, number> | null} [mergeMetrics]
+ * @param {{ target?: 'es5' | 'esnext' }} [options]
  * @returns {string}
  */
-export function transpileTypeScriptToJs(source, sourceFile, transformCache = null, mergeMetrics = null) {
+export function transpileTypeScriptToJs(
+    source,
+    sourceFile,
+    transformCache = null,
+    mergeMetrics = null,
+    options = {}
+) {
+    const target = options?.target === 'esnext' ? 'esnext' : 'es5';
     const cacheKey = transformCache?.transpileToJs instanceof Map
-        ? `${sourceFile}\u0000${source}`
+        ? `${sourceFile}\u0000${target}\u0000${source}`
         : null;
     if (cacheKey && transformCache.transpileToJs.has(cacheKey)) {
         if (mergeMetrics && typeof mergeMetrics === 'object') {
@@ -111,7 +119,7 @@ export function transpileTypeScriptToJs(source, sourceFile, transformCache = nul
             fileName: sourceFile,
             compilerOptions: {
                 module: ts.ModuleKind.ESNext,
-                target: ts.ScriptTarget.ES5,
+                target: target === 'esnext' ? ts.ScriptTarget.ESNext : ts.ScriptTarget.ES5,
                 importsNotUsedAsValues: ts.ImportsNotUsedAsValues.Preserve,
                 verbatimModuleSyntax: true,
                 newLine: ts.NewLineKind.LineFeed,

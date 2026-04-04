@@ -1,42 +1,42 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildRuntimeTemplateProfile, RUNTIME_TEMPLATE_PROFILES, normalizeRuntimeTemplateProfile } from './runtime-template-profile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function normalizeNewlines(value) {
-    return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+function normalizeNewlines(value) { return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+function readRuntimeSourceFile(fileName) { return normalizeNewlines(readFileSync(join(__dirname, fileName), 'utf8')); }
+
+const runtimeTemplateProfileCache = new Map();
+
+function resolveRuntimeTemplateProfile(profile) {
+    const resolvedProfile = normalizeRuntimeTemplateProfile(profile);
+    if (runtimeTemplateProfileCache.has(resolvedProfile)) return runtimeTemplateProfileCache.get(resolvedProfile);
+    const built = buildRuntimeTemplateProfile({
+        profile: resolvedProfile,
+        normalizeNewlines,
+        readRuntimeSourceFile
+    });
+    runtimeTemplateProfileCache.set(resolvedProfile, built);
+    return built;
 }
 
-function readRuntimeSourceFile(fileName) {
-    const fullPath = join(__dirname, fileName);
-    return normalizeNewlines(readFileSync(fullPath, 'utf8'));
-}
-
-function stripImports(source) {
-    return source
-        .replace(/^\s*import\s+[^;]+;\s*$/gm, '')
-        .replace(/^\s*export\s+\{[^}]+\}\s+from\s+['"]\.[^'"]+['"];\s*$/gm, '')
-        .trim();
-}
-
-function buildRuntimeModuleSource() {
-    const segments = [
-        'reactivity-core.js', 'side-effect-scope.js', 'effect-utils.js', 'effect-scheduler.js',
-        'effect-runtime.js', 'mount-runtime.js', 'zeneffect.js', 'ref.js', 'env.js',
-        'platform.js', 'presence.js', 'signal.js', 'state.js',
-        'diagnostics.js', 'cleanup.js', 'template-parser.js', 'markup.js', 'payload.js',
-        'expressions.js', 'render.js', 'fragment-patch.js', 'scanner.js', 'events.js', 'hydrate.js'
-    ].map((fileName) => stripImports(readRuntimeSourceFile(fileName))).filter(Boolean);
-
-    return normalizeNewlines(segments.join('\n\n'));
-}
-
-const RUNTIME_MODULE_SOURCE = buildRuntimeModuleSource();
+const RUNTIME_MODULE_SOURCE = resolveRuntimeTemplateProfile(RUNTIME_TEMPLATE_PROFILES.DEFAULT).source;
 
 export function runtimeModuleSource() {
     return RUNTIME_MODULE_SOURCE;
+}
+
+export function runtimeModuleProfileSnapshot(profile = RUNTIME_TEMPLATE_PROFILES.DEFAULT) {
+    const resolved = resolveRuntimeTemplateProfile(profile);
+    return {
+        profile: resolved.profile,
+        source: resolved.source,
+        contributors: resolved.contributors.map((entry) => ({ ...entry })),
+        coverageBytes: resolved.coverageBytes
+    };
 }
 
 const RUNTIME_DEV_CLIENT_SOURCE = `(() => {

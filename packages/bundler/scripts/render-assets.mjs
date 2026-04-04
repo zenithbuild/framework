@@ -1,4 +1,4 @@
-import { runtimeModuleSource } from '@zenithbuild/runtime/template';
+import { runtimeModuleProfileSnapshot } from '@zenithbuild/runtime/template';
 import { renderRouterModule } from '@zenithbuild/router/template';
 
 const IR_VERSION = 1;
@@ -29,21 +29,40 @@ async function main() {
     ? parsed.coreImport
     : '/assets/core.placeholder.js';
   const routeCheck = parsed.routeCheck === true;
+  const formsEnabled = parsed.formsEnabled !== false;
+  const runtimeProfile = typeof parsed.runtimeProfile === 'string' && parsed.runtimeProfile.length > 0
+    ? parsed.runtimeProfile
+    : 'default';
 
-  const runtimeSource = normalizeNewlines(runtimeModuleSource());
+  const runtimeSnapshot = runtimeModuleProfileSnapshot(runtimeProfile);
+  const runtimeSource = normalizeNewlines(runtimeSnapshot.source || '');
+  const runtimeContributors = Array.isArray(runtimeSnapshot.contributors)
+    ? runtimeSnapshot.contributors.map((entry) => ({
+      id: String(entry?.id || ''),
+      sourceFile: String(entry?.sourceFile || ''),
+      bytes: Number.isFinite(entry?.bytes) ? Number(entry.bytes) : 0
+    }))
+    : [];
+  const runtimeCoverageBytes = Number.isFinite(runtimeSnapshot.coverageBytes)
+    ? Number(runtimeSnapshot.coverageBytes)
+    : Buffer.byteLength(runtimeSource, 'utf8');
   const routerSource = normalizeNewlines(
     renderRouterModule({
       manifestJson,
       runtimeImport,
       coreImport,
-      routeCheck
+      routeCheck,
+      formsEnabled
     })
   );
 
   // Keep output key order deterministic.
   const output = {
     irVersion: IR_VERSION,
+    runtimeProfile,
     runtimeSource,
+    runtimeContributors,
+    runtimeCoverageBytes,
     routerSource
   };
 

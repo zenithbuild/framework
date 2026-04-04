@@ -45,9 +45,15 @@ function stripDoctype(html) {
     return html.replace(/^<!doctype[^>]*>/i, '');
 }
 
-function extractPageAssetPath(html, outDir) {
+function extractPageAssetPath(html, outDir, { allowMissing = false } = {}) {
     const match = html.match(/src="([^"]+\.js)"/);
-    expect(match).toBeTruthy();
+    if (!match) {
+        if (allowMissing) {
+            return null;
+        }
+        expect(match).toBeTruthy();
+        return null;
+    }
     return join(outDir, String(match[1]).replace(/^\//, ''));
 }
 
@@ -56,10 +62,10 @@ function extractSsrPayload(html) {
     return match ? JSON.parse(match[1]) : {};
 }
 
-async function readBuiltPage(outDir) {
+async function readBuiltPage(outDir, { allowMissingAsset = false } = {}) {
     const indexHtml = await readFile(join(outDir, 'index.html'), 'utf8');
-    const assetPath = extractPageAssetPath(indexHtml, outDir);
-    const pageJs = await readFile(assetPath, 'utf8');
+    const assetPath = extractPageAssetPath(indexHtml, outDir, { allowMissing: allowMissingAsset });
+    const pageJs = assetPath ? await readFile(assetPath, 'utf8') : '';
     return { indexHtml, assetPath, pageJs };
 }
 
@@ -180,19 +186,19 @@ describe('function prop transport', () => {
         expect(pageJs).not.toContain('currentCount: incoming.currentCount');
         expect(pageJs).not.toContain('nextCount: incoming.nextCount');
 
-        expect(pageJs).toMatch(/onClick:\s*___.*increment/);
-        expect(pageJs).toMatch(/onKeydown:\s*___.*handlers\.onKeydown/);
-        expect(pageJs).toMatch(/onInput:\s*___.*handlers\.onInput/);
-        expect(pageJs).toMatch(/onSubmit:\s*(?:function\s*\(event\)\s*\{\s*return\s+___.*handlers\.onSubmit\(event\);\s*\}|\(?event\)?\s*=>\s*___.*handlers\.onSubmit\(event\))/);
-        expect(pageJs).toMatch(/currentCount:\s*___.*count/);
-        expect(pageJs).toMatch(/nextCount:\s*___.*count\.get\(\)\s*\+\s*1/);
+        expect(pageJs).toMatch(/onClick:\s*__\w*increment/);
+        expect(pageJs).toMatch(/onKeydown:\s*__\w*handlers\.onKeydown/);
+        expect(pageJs).toMatch(/onInput:\s*__\w*handlers\.onInput/);
+        expect(pageJs).toMatch(/onSubmit:\s*(?:event=>)?__\w*handlers\.onSubmit(?:\(event\))?/);
+        expect(pageJs).toMatch(/currentCount:\s*__\w*count/);
+        expect(pageJs).toMatch(/nextCount:\s*__\w*count\.get\(\)\+1/);
 
-        expect(pageJs).toMatch(/onClick:\s*___.*incoming\.onClick/);
-        expect(pageJs).toMatch(/onKeydown:\s*___.*incoming\.onKeydown/);
-        expect(pageJs).toMatch(/onInput:\s*___.*incoming\.onInput/);
-        expect(pageJs).toMatch(/onSubmit:\s*___.*incoming\.onSubmit/);
-        expect(pageJs).toMatch(/currentCount:\s*___.*incoming\.currentCount/);
-        expect(pageJs).toMatch(/nextCount:\s*___.*incoming\.nextCount/);
+        expect(pageJs).toMatch(/onClick:\s*__\w*incoming\.onClick/);
+        expect(pageJs).toMatch(/onKeydown:\s*__\w*incoming\.onKeydown/);
+        expect(pageJs).toMatch(/onInput:\s*__\w*incoming\.onInput/);
+        expect(pageJs).toMatch(/onSubmit:\s*__\w*incoming\.onSubmit/);
+        expect(pageJs).toMatch(/currentCount:\s*__\w*incoming\.currentCount/);
+        expect(pageJs).toMatch(/nextCount:\s*__\w*incoming\.nextCount/);
     });
 
     test('real hydration transports function props across direct and forwarded component hops', async () => {
@@ -248,17 +254,20 @@ describe('function prop transport', () => {
                 '<script server lang="ts">',
                 'export const data = { value: "build" };',
                 '</script>',
-                '<main><p data-testid="value">{ssr_data.value}</p></main>'
+                '<script lang="ts">',
+                'function noop() {}',
+                '</script>',
+                '<main><button data-testid="value" on:click={noop}>{ssr_data.value}</button></main>'
             ].join('\n')
         });
 
         await build({ pagesDir: project.pagesDir, outDir: project.outDir });
         const { pageJs } = await readBuiltPage(project.outDir);
 
-        expect(pageJs).toContain('let __zenith_ssr_data = __zenith_read_ssr_data(__zenith_static_ssr_data);');
-        expect(pageJs).toContain('function __zenith_refresh_runtime_data() {');
-        expect(pageJs).toContain('__zenith_refresh_runtime_data();');
-        expect(pageJs).toContain('function __zenith_read_route_html(staticValue) {');
-        expect(pageJs).toContain('const routeHtml = __zenith_read_route_html(__zenith_html);');
+        expect(pageJs).toContain('let __zenith_ssr_data=__zrd(__zss);');
+        expect(pageJs).toContain('let data=__zenith_ssr_data;');
+        expect(pageJs).toContain('let ssr_data=__zenith_ssr_data;');
+        expect(pageJs).toContain('function __zrr(){');
+        expect(pageJs).toContain('__zrr();');
     });
 });

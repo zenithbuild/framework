@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "policy": {
+    "preferredMaxLines": 500,
+    "warningBandMaxLines": 800,
+    "defaultSplitBandMaxLines": 1200,
+    "immediateSplitMinLines": 1201
+  },
+  "allowlist": [
+    {
+      "path": "packages/bundler/src/main.rs",
+      "maxLines": 5000,
+      "reason": "Phase 21 Wave 1 decomposition target",
+      "urgency": "immediate_split"
+    },
+    {
+      "path": "packages/compiler/zenith_compiler/src/compiler.rs",
+      "maxLines": 5000,
+      "reason": "First-wave follow-up decomposition target",
+      "urgency": "immediate_split"
+    },
+    {
+      "path": "packages/compiler/zenith_compiler/src/parser.rs",
+      "maxLines": 5000,
+      "reason": "First-wave follow-up decomposition target",
+      "urgency": "immediate_split"
+    },
+    {
+      "path": "packages/cli/src/dev-server.js",
+      "maxLines": 5000,
+      "reason": "First-wave follow-up decomposition target",
+      "urgency": "immediate_split"
+    },
+    {
+      "path": "packages/cli/src/preview.js",
+      "maxLines": 5000,
+      "reason": "First-wave follow-up decomposition target",
+      "urgency": "immediate_split"
+    },
+    {
+      "path": "packages/compiler/zenith_compiler/src/script.rs",
+      "maxLines": 5000,
+      "reason": "First-wave follow-up decomposition target",
+      "urgency": "immediate_split"
+    }
+  ]
+}

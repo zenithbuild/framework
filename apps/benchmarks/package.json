@@ -8,7 +8,14 @@
     "run:hydration": "node ./scripts/run-hydration.mjs",
     "run:rebuild": "node ./scripts/run-rebuild.mjs",
     "run:matrix": "node ./scripts/run-matrix.mjs",
-    "render:report": "node ./scripts/render-report.mjs"
+    "run:determinism": "node ./scripts/run-determinism.mjs",
+    "run:bundle-analysis": "node ./scripts/run-bundle-analysis.mjs",
+    "run:reactive-update": "node ./scripts/run-reactive-update.mjs",
+    "render:report": "node ./scripts/render-report.mjs",
+    "check:determinism": "npm run run:determinism",
+    "check:zero-js-static": "npm run run:bundle-analysis",
+    "bench:round1:fast": "node ./scripts/run-matrix.mjs --profile=fast --round=1",
+    "bench:round1:publication": "node ./scripts/run-matrix.mjs --profile=publication --round=1"
   },
   "devDependencies": {
     "playwright": "1.54.2"
