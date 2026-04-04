@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-04-04
+
+### Changed
+
+- Fixed release pipeline Playwright browser provisioning by aligning workflow installs to the `apps/smoke-test` workspace Playwright version, removing the revision mismatch that caused `Publish (npm)` and CI smoke failures on tagged releases.
+
 ## [0.7.6] - 2026-04-03
 
 ### Changed
