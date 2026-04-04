@@ -72,7 +72,7 @@ jobs:
       - name: File-Size Audit (Touched files >500 blocking)
         run: node ./scripts/file-size-audit.mjs --allowlist docs/maintainability/file-size-allowlist.json --enforce --max-lines 500 --git-diff-base origin/${{ github.event.repository.default_branch }} --print-limit 200
 
-      - run: bunx playwright install --with-deps chromium
+      - run: bun run --cwd apps/smoke-test playwright install --with-deps chromium
 
       - name: Run Core CI (retry once)
         shell: bash
@@ -144,7 +144,7 @@ jobs:
 
       - run: bun install
 
-      - run: bunx playwright install --with-deps chromium
+      - run: bun run --cwd apps/smoke-test playwright install --with-deps chromium
 
       - name: Run Integration Shard ${{ matrix.shard_index }}/6 (retry once)
         shell: bash
@@ -243,7 +243,7 @@ jobs:
 
       - run: bun install
 
-      - run: bunx playwright install --with-deps chromium
+      - run: bun run --cwd apps/smoke-test playwright install --with-deps chromium
 
       - name: Run Smoke CI (retry once)
         shell: bash
