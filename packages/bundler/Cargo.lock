@@ -3800,7 +3800,7 @@ dependencies = [
 
 [[package]]
 name = "zenith-bundler"
-version = "0.7.8"
+version = "0.7.9"
 dependencies = [
  "anyhow",
  "arcstr",
@@ -3830,7 +3830,7 @@ dependencies = [
 
 [[package]]
 name = "zenith_compiler"
-version = "0.7.8"
+version = "0.7.9"
 dependencies = [
  "regex",
  "serde",

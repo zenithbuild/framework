@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-04-23
+
+### Changed
+
+#### Compiler hardening follow-up
+
+- Finalized the new foreign-syntax compiler gate so it still rejects foreign DOM event spellings on native markup while preserving existing Zenith component handler props such as `onClick`, `onPress`, `onInput`, and `onSubmit` when they are passed through component boundaries.
+- This patch closes the false positive exposed by the initial `0.7.8` release candidate, where component-level function props were being misclassified as forbidden DOM event syntax.
+
+#### Diagnostics and contract stability
+
+- Added regression coverage proving event-like component props remain valid input alongside the new foreign-syntax diagnostics contract.
+- The compiler continues to reject native foreign event syntax such as `@click`, `onClick`, and `onclick` on real DOM elements with the same actionable Zenith rewrite hints.
+
+#### What this release does not change
+
+- No new syntax was added.
+- No runtime behavior changed.
+- No UI-layer workaround was introduced.
+- This is a compiler follow-up patch that narrows the invariant to the correct DOM-vs-component boundary.
+
 ## [0.7.8] - 2026-04-23
 
 ### Changed
