@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-04-23
+
+### Changed
+
+#### Compiler hardening
+
+- Guard surfaced copied foreign template/control syntax leaking into real `.zen` source. Zenith now rejects foreign control/template forms such as `@if`, `@else`, `@elseif`, `{#if}`, `{/if}`, `{#each}`, `{/each}`, `v-if`, `v-else`, and `v-for` before parser/emission can carry them into compiled output.
+- The new invariant runs as a compiler-owned pre-parse gate, so this class of foreign syntax now fails at compile time instead of reaching rendered UI as literal text.
+
+#### Event syntax enforcement
+
+- Zenith now rejects foreign event spellings inside `.zen`, including directive forms like `@click`, `@input`, `@change` and DOM prop forms like `onClick`, `onInput`, `onclick`, and other known camelCase/lowercase DOM event props.
+- Foreign event diagnostics now point authors back to the canonical Zenith event contract: `on:<event>={handler}`.
+
+#### Diagnostics and author guidance
+
+- Structured compiler diagnostics now emit stable foreign-syntax error codes, messages, ranges, docs paths, and correction hints for both control-syntax and event-syntax violations.
+- Golden compiler tests lock the diagnostic wording and hint shape so future compiler changes cannot silently regress this contract.
+- Canonical docs now show the invalid foreign tokens (`@if`, `@click`, `onClick`) alongside the correct Zenith forms, and the generated AI docs index was refreshed so the public docs surface stays aligned with the compiler contract.
+
+#### What this release does not change
+
+- No new template or event syntax was added.
+- No runtime behavior changed.
+- No UI-layer workaround was introduced.
+- This release is compiler enforcement, diagnostics, tests, and docs hardening only.
+
 ## [0.7.7] - 2026-04-04
 
 ### Changed
