@@ -5,6 +5,7 @@ use crate::compiler_payload_map::{
     map_component_instances, map_component_scripts, map_events, map_hoisted, map_markers,
     map_ref_bindings, map_signals, map_warnings, strip_html_comments,
 };
+use crate::foreign_syntax::reject_foreign_zenith_syntax;
 use crate::compiler_profile::{
     compiler_profile_enabled, emit_compiler_profile, CompileInternalTimings,
 };
@@ -166,6 +167,8 @@ fn compile_internal_result(
         timings.strip_html_comments_ms =
             strip_html_comments_started_at.elapsed().as_secs_f64() * 1000.0;
     }
+
+    reject_foreign_zenith_syntax(&preprocessed)?;
 
     let parse_started_at = Instant::now();
     let mut parser = Parser::new_with_profile_options(

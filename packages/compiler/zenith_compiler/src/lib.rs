@@ -3,6 +3,7 @@ pub mod codegen;
 pub mod compiler;
 mod compiler_diagnostics;
 mod compiler_expression_bindings;
+mod foreign_syntax;
 mod compiler_payload_map;
 mod compiler_profile;
 mod compiler_types;

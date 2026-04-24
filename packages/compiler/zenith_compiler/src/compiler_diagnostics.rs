@@ -26,6 +26,9 @@ pub(crate) fn diagnostic_from_error_message(message: &str, input: &str) -> Compi
     if let Some(diagnostic) = event_contract_diagnostic_from_message(message) {
         return diagnostic;
     }
+    if let Some(diagnostic) = foreign_syntax_diagnostic_from_message(message, input) {
+        return diagnostic;
+    }
 
     CompileDiagnostic {
         code: "ZENITH-COMPILER".to_string(),
@@ -219,6 +222,64 @@ fn event_contract_diagnostic_from_message(message: &str) -> Option<CompileDiagno
     })
 }
 
+fn foreign_syntax_diagnostic_from_message(
+    message: &str,
+    input: &str,
+) -> Option<CompileDiagnostic> {
+    let (code, docs_path) = if message.starts_with("Invalid Zenith control syntax: ") {
+        (
+            "ZEN-TPL-FOREIGN-CONTROL",
+            "docs/documentation/guides/troubleshooting.md",
+        )
+    } else if message.starts_with("Invalid Zenith event syntax: ") {
+        ("ZEN-EVT-FOREIGN-SYNTAX", "docs/documentation/syntax/events.md")
+    } else {
+        return None;
+    };
+
+    let token_re = Regex::new(r"^Invalid Zenith (?:control|event) syntax: ([^\n]+)").ok()?;
+    let token = token_re
+        .captures(message)
+        .and_then(|captures| captures.get(1))
+        .map(|m| m.as_str().trim())?;
+
+    let line_col_re = Regex::new(r"Found at line (\d+), column (\d+)\.").ok()?;
+    let captures = line_col_re.captures(message)?;
+    let line = captures
+        .get(1)
+        .and_then(|m| m.as_str().parse::<usize>().ok())
+        .unwrap_or(1);
+    let column = captures
+        .get(2)
+        .and_then(|m| m.as_str().parse::<usize>().ok())
+        .unwrap_or(1);
+
+    let suggestion = message
+        .lines()
+        .find_map(|line| line.strip_prefix("Hint: "))
+        .map(|hint| hint.trim().to_string());
+
+    let start_offset = position_to_offset(input, line, column).unwrap_or(0);
+    let range = range_from_offsets(
+        input,
+        start_offset,
+        start_offset.saturating_add(token.len()).min(input.len()),
+    );
+
+    Some(CompileDiagnostic {
+        code: code.to_string(),
+        message: message.to_string(),
+        severity: CompileDiagnosticSeverity::Error,
+        range,
+        source: "compiler".to_string(),
+        suggestion,
+        fixes: Vec::new(),
+        related_information: Vec::new(),
+        tags: Vec::new(),
+        docs_path: Some(docs_path.to_string()),
+    })
+}
+
 fn locate_script_range(input: &str, script_id: usize) -> Option<CompileDiagnosticRange> {
     let mut cursor = 0usize;
     let mut index = 0usize;
@@ -270,6 +331,34 @@ fn offset_to_position(input: &str, offset: usize) -> CompileDiagnosticPosition {
         .unwrap_or(1);
 
     CompileDiagnosticPosition { line, column }
+}
+
+fn position_to_offset(input: &str, line: usize, column: usize) -> Option<usize> {
+    if line == 0 || column == 0 {
+        return None;
+    }
+
+    let mut current_line = 1usize;
+    let mut current_column = 1usize;
+
+    for (offset, ch) in input.char_indices() {
+        if current_line == line && current_column == column {
+            return Some(offset);
+        }
+
+        if ch == '\n' {
+            current_line += 1;
+            current_column = 1;
+        } else {
+            current_column += 1;
+        }
+    }
+
+    if current_line == line && current_column == column {
+        return Some(input.len());
+    }
+
+    None
 }
 
 fn single_char_range(line: usize, column: usize) -> CompileDiagnosticRange {
