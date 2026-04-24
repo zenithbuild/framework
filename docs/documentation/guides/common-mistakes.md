@@ -11,7 +11,33 @@ nav:
 
 # Common Mistakes
 
-## 1. Unbound Identifiers in Markup
+## 1. Foreign Framework Syntax in `.zen`
+
+Problem:
+
+Zenith rejects copied template syntax from other frameworks.
+
+```text
+- @if
+- @click
+- onClick
+```
+
+Fix:
+- Use plain Zenith expressions for conditional UI.
+- Use canonical DOM event bindings as `on:<event>={handler}`.
+
+```zen
+<script lang="ts">
+state open = false
+function save() {}
+</script>
+
+<p>{open ? "Open" : "Closed"}</p>
+<button on:click={save}>Save</button>
+```
+
+## 2. Unbound Identifiers in Markup
 
 Problem:
 
@@ -25,7 +51,7 @@ Fix:
 - Declare the identifier locally.
 - Or reference an explicit source such as `props.headingText`.
 
-## 2. Direct-Call Event Handlers
+## 3. Direct-Call Event Handlers
 
 Problem:
 - Calling a handler during render instead of passing a function value.
@@ -44,7 +70,7 @@ function save() {}
 </div>
 ```
 
-## 3. Legacy Hover Event Names
+## 4. Legacy Hover Event Names
 
 Problem:
 
@@ -54,7 +80,7 @@ Fix:
 - Use `on:hoverin` / `on:hoverout` (aliases for pointer events).
 - Or use `on:pointerenter` / `on:pointerleave` directly.
 
-## 4. Component Event Forwarding Assumptions
+## 5. Component Event Forwarding Assumptions
 
 Problem:
 
@@ -64,7 +90,7 @@ Fix:
 - Bind events on DOM elements inside the component.
 - Expose explicit callback props for parent-driven behavior.
 
-## 5. Controlled vs Uncontrolled Mixing
+## 6. Controlled vs Uncontrolled Mixing
 
 Problem:
 
