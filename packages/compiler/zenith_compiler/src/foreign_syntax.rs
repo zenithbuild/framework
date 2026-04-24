@@ -24,6 +24,7 @@ pub(super) struct ForeignSyntaxViolation<'a> {
 pub(super) fn classify_attribute_violation<'a>(
     attr_name: &'a str,
     offset: usize,
+    is_component_tag: bool,
 ) -> Option<ForeignSyntaxViolation<'a>> {
     match attr_name {
         "v-if" | "v-else" => Some(control_violation(
@@ -44,13 +45,14 @@ pub(super) fn classify_attribute_violation<'a>(
             "Rewrite this conditional using the canonical Zenith conditional syntax supported by the compiler.",
             offset,
         )),
-        _ => classify_event_attribute_violation(attr_name, offset),
+        _ => classify_event_attribute_violation(attr_name, offset, is_component_tag),
     }
 }
 
 fn classify_event_attribute_violation<'a>(
     attr_name: &'a str,
     offset: usize,
+    is_component_tag: bool,
 ) -> Option<ForeignSyntaxViolation<'a>> {
     if attr_name.starts_with("on:") {
         return None;
@@ -70,6 +72,9 @@ fn classify_event_attribute_violation<'a>(
 
     if let Some(event_name) = attr_name.strip_prefix("on") {
         if attr_name.len() > 2 && attr_name.as_bytes()[2].is_ascii_uppercase() {
+            if is_component_tag {
+                return None;
+            }
             let suggested_event = event_binding_name(event_name);
             let hint = format!(
                 "Use on:{suggested_event}={{handle{}}} instead.",

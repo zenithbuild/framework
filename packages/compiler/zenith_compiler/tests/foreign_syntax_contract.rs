@@ -123,6 +123,25 @@ fn rejects_lowercase_dom_event_props() {
 }
 
 #[test]
+fn allows_component_handler_props_named_like_events() {
+    let input = [
+        "<script lang=\"ts\">",
+        "function handleClick() {}",
+        "</script>",
+        "<SharedButton onClick={handleClick} onPress={handleClick} />",
+    ]
+    .join("\n");
+
+    let report = compile_report(&input);
+    assert!(
+        report.diagnostics.is_empty(),
+        "component handler props should remain valid: {:?}",
+        report.diagnostics
+    );
+    assert!(report.output.is_some(), "component prop input should compile");
+}
+
+#[test]
 fn golden_control_foreign_syntax_diagnostic() {
     let report = compile_report("@if (ready)");
     let diagnostic = report

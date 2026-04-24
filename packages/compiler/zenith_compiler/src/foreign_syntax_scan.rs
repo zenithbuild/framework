@@ -72,7 +72,12 @@ impl<'a> ForeignSyntaxScanner<'a> {
             return Ok(());
         }
 
-        self.skip_tag_name();
+        let tag_name = self.read_tag_name();
+        let is_component_tag = tag_name
+            .chars()
+            .next()
+            .map(|ch| ch.is_ascii_uppercase())
+            .unwrap_or(false);
 
         loop {
             self.skip_whitespace();
@@ -98,7 +103,9 @@ impl<'a> ForeignSyntaxScanner<'a> {
                 continue;
             }
 
-            if let Some(violation) = classify_attribute_violation(attr_name, attr_start) {
+            if let Some(violation) =
+                classify_attribute_violation(attr_name, attr_start, is_component_tag)
+            {
                 return Err(format_violation(self.input, violation));
             }
 
@@ -266,7 +273,8 @@ impl<'a> ForeignSyntaxScanner<'a> {
         }
     }
 
-    fn skip_tag_name(&mut self) {
+    fn read_tag_name(&mut self) -> &'a str {
+        let start = self.offset;
         while let Some(ch) = self.current_char() {
             if is_tag_name_char(ch) {
                 self.advance_char();
@@ -274,6 +282,7 @@ impl<'a> ForeignSyntaxScanner<'a> {
             }
             break;
         }
+        &self.input[start..self.offset]
     }
 
     fn read_attribute_name(&mut self) -> &'a str {
