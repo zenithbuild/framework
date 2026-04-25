@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-04-25
+
+### Changed
+
+#### Router package surface
+
+- Fixed the published `@zenithbuild/router` package surface so `template-refresh.js` ships with the router template entrypoint that imports it.
+- Added a router package contract assertion that fails if the refresh helper exists in source but is omitted from the package `files` allowlist again.
+
+#### Vercel/build compatibility
+
+- Restored fresh installs of the lockstep Zenith package set for consumers building with hosted package installs, including Vercel builds that resolve `@zenithbuild/*` from npm instead of a local workspace checkout.
+- This closes the `Cannot find module ... @zenithbuild/router/template-refresh.js` failure seen when a site installed the published `0.7.9` package set.
+
+#### What this release does not change
+
+- No router runtime behavior changed.
+- No new public API or route syntax was added.
+- No site-side workaround or `node_modules` patch is required; this is a framework package-surface fix published through the monorepo train.
+
 ## [0.7.9] - 2026-04-23
 
 ### Changed

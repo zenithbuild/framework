@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler-win32-x64",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "description": "Internal win32-x64 native binary for @zenithbuild/bundler",
   "license": "MIT",
   "os": [
