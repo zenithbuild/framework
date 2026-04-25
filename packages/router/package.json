@@ -13,6 +13,7 @@
     "template-form.js",
     "template-lifecycle.js",
     "template-navigation.js",
+    "template-refresh.js",
     "index.d.ts",
     "README.md",
     "dist/**",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,9 @@ import { renderRouterModule as renderRouterModuleFromPackage } from '@zenithbuil
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const goldenPath = path.join(__dirname, 'tests', 'fixtures', 'router-template.golden.js');
+const packageJsonPath = path.join(__dirname, 'package.json');
+const templateRefreshPath = path.join(__dirname, 'template-refresh.js');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 
 const manifestJson = JSON.stringify(
     {
@@ -30,6 +33,13 @@ const manifestJson = JSON.stringify(
 const runtimeImport = '/assets/runtime.11111111.js';
 const coreImport = '/assets/core.33333333.js';
 const opts = { manifestJson, runtimeImport, coreImport, routeCheck: true };
+
+assert.equal(existsSync(templateRefreshPath), true, 'router package must keep template-refresh.js in the package root');
+assert.equal(
+    Array.isArray(packageJson.files) && packageJson.files.includes('template-refresh.js'),
+    true,
+    'router package publish surface must include template-refresh.js'
+);
 
 const sourceA = renderRouterModule(opts);
 const sourceB = renderRouterModule(opts);
