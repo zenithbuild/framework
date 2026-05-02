@@ -40,3 +40,4 @@ If you use Zenith or want to support its continued development, you can help fun
 - **[Open Collective](https://opencollective.com/zenithbuild)**: For broader open-source contributions and organizational funding.
 
 A limited number of design partner and implementation/advisory relationships are also available for teams exploring Zenith seriously via our Open Collective organizational tiers.
+<!-- GitAds-Verify: S6XFY3ERS2IGQIDEW83CGDZAMKG58ZPK -->
