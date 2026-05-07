@@ -1,8 +1,12 @@
 import { lookup } from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
 import { isIP } from 'node:net';
+import { Readable } from 'node:stream';
 import { matchRemotePattern } from './shared.js';
 
 const MAX_REMOTE_REDIRECTS = 5;
+const PINNED_REMOTE_TARGET = Symbol('zenithPinnedRemoteTarget');
 
 function parseIpv4(address) {
     if (!address) {
@@ -115,48 +119,156 @@ function isLoopbackHostname(hostname) {
     return normalized === 'localhost' || normalized.endsWith('.localhost');
 }
 
-async function assertRemoteNetworkAllowed(url, config) {
-    if (config.dangerouslyAllowLocalNetwork) {
-        return;
-    }
+async function resolveRemoteAddress(url, config, lookupImpl = lookup) {
     const hostname = normalizeHostnameAddress(url.hostname);
-    if (isLoopbackHostname(hostname) || isLocalNetworkAddress(hostname)) {
+    const allowLocalNetwork = Boolean(config.dangerouslyAllowLocalNetwork);
+    if (!allowLocalNetwork && (isLoopbackHostname(hostname) || isLocalNetworkAddress(hostname))) {
         throw new Error('[Zenith:Image] Loopback and local network image fetches are blocked');
     }
-    if (isIP(hostname)) {
-        return;
+    const literalFamily = isIP(hostname);
+    if (literalFamily) {
+        return {
+            address: hostname,
+            family: literalFamily
+        };
     }
-    const resolved = await lookup(hostname, { all: true });
-    if (resolved.some((entry) => isLocalNetworkAddress(entry.address))) {
+    const resolved = await lookupImpl(hostname, { all: true });
+    if (!Array.isArray(resolved) || resolved.length === 0) {
+        throw new Error('[Zenith:Image] Remote image hostname did not resolve');
+    }
+    if (!allowLocalNetwork && resolved.some((entry) => isLocalNetworkAddress(entry.address))) {
         throw new Error('[Zenith:Image] Private network image fetches are blocked');
     }
+    return {
+        address: resolved[0].address,
+        family: resolved[0].family || isIP(resolved[0].address)
+    };
 }
 
-export async function validateRemoteTarget(remoteUrl, config) {
+function buildPinnedUrl(url, address, family) {
+    const pinned = new URL(url.toString());
+    pinned.hostname = family === 6 ? `[${address}]` : address;
+    return pinned;
+}
+
+export async function resolveRemoteTarget(remoteUrl, config, lookupImpl = lookup) {
     const url = new URL(remoteUrl);
     if (!matchRemotePattern(url, config.remotePatterns)) {
         throw new Error('[Zenith:Image] Remote URL is not allowed by images.remotePatterns');
     }
-    await assertRemoteNetworkAllowed(url, config);
-    return url;
+    const resolved = await resolveRemoteAddress(url, config, lookupImpl);
+    return {
+        url,
+        address: resolved.address,
+        family: resolved.family,
+        requestUrl: buildPinnedUrl(url, resolved.address, resolved.family)
+    };
 }
 
-export async function fetchRemoteImage(remote, config, fetchImpl = fetch) {
+function remoteFetchHeaders(target) {
+    return {
+        'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.1',
+        'Host': target.url.host
+    };
+}
+
+function createRemoteFetchOptions(target) {
+    return {
+        headers: remoteFetchHeaders(target),
+        redirect: 'manual',
+        [PINNED_REMOTE_TARGET]: target
+    };
+}
+
+function normalizeRequestHeaders(headers = {}) {
+    if (headers instanceof Headers) {
+        return Object.fromEntries(headers.entries());
+    }
+    return { ...headers };
+}
+
+function responseHeadersFromNode(headers) {
+    const out = new Headers();
+    for (const [key, value] of Object.entries(headers || {})) {
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                out.append(key, String(item));
+            }
+            continue;
+        }
+        if (value !== undefined) {
+            out.set(key, String(value));
+        }
+    }
+    return out;
+}
+
+function nodeRequestOptions(target, options = {}) {
+    const url = target.url;
+    const protocol = url.protocol;
+    if (protocol !== 'http:' && protocol !== 'https:') {
+        throw new Error('[Zenith:Image] Remote image protocol must be http or https');
+    }
+    const headers = normalizeRequestHeaders(options.headers);
+    const requestOptions = {
+        protocol,
+        hostname: target.address,
+        port: url.port || (protocol === 'https:' ? 443 : 80),
+        method: 'GET',
+        path: `${url.pathname}${url.search}`,
+        headers
+    };
+    const originalHostname = normalizeHostnameAddress(url.hostname);
+    if (protocol === 'https:' && !isIP(originalHostname)) {
+        requestOptions.servername = originalHostname;
+    }
+    return requestOptions;
+}
+
+async function fetchPinnedRemoteUrl(requestUrl, options = {}) {
+    const target = options[PINNED_REMOTE_TARGET];
+    if (!target) {
+        return fetch(requestUrl, options);
+    }
+    const transport = target.url.protocol === 'https:' ? https : http;
+    return new Promise((resolve, reject) => {
+        const request = transport.request(nodeRequestOptions(target, options), (response) => {
+            const status = response.statusCode || 502;
+            const body = status === 204 || status === 205 || status === 304
+                ? null
+                : Readable.toWeb(response);
+            resolve(new Response(body, {
+                status,
+                statusText: response.statusMessage || '',
+                headers: responseHeadersFromNode(response.headers)
+            }));
+        });
+        request.on('error', reject);
+        request.end();
+    });
+}
+
+export async function validateRemoteTarget(remoteUrl, config) {
+    return (await resolveRemoteTarget(remoteUrl, config)).url;
+}
+
+export async function fetchRemoteImage(remote, config, fetchImpl = fetchPinnedRemoteUrl, lookupImpl = lookup) {
     let current = remote instanceof URL ? remote : new URL(String(remote));
     for (let redirectCount = 0; redirectCount <= MAX_REMOTE_REDIRECTS; redirectCount += 1) {
-        current = await validateRemoteTarget(current.toString(), config);
-        const response = await fetchImpl(current, {
-            headers: {
-                'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.1'
-            },
-            redirect: 'manual'
-        });
+        const target = await resolveRemoteTarget(current.toString(), config, lookupImpl);
+        current = target.url;
+        const response = await fetchImpl(target.requestUrl, createRemoteFetchOptions(target));
         if (response.status < 300 || response.status >= 400) {
             return response;
         }
         const location = response.headers.get('location');
         if (!location) {
             throw new Error('[Zenith:Image] Remote image redirect is missing a Location header');
+        }
+        try {
+            await response.body?.cancel?.();
+        } catch {
+            // Ignore body cancellation errors while redirecting.
         }
         current = new URL(location, current);
     }

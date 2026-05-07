@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import sharp from 'sharp';
-import { fetchRemoteImage, isLocalNetworkAddress, validateRemoteTarget } from './remote-fetch.js';
+import { fetchRemoteImage, isLocalNetworkAddress, resolveRemoteTarget, validateRemoteTarget } from './remote-fetch.js';
 import {
     buildLocalImageKey,
     buildLocalVariantAssetPath,
@@ -332,5 +332,6 @@ export async function handleImageRequest(_req, res, options) {
 export const __imageServiceTestHooks = {
     fetchRemoteImage,
     isLocalNetworkAddress,
+    resolveRemoteTarget,
     validateRemoteTarget
 };

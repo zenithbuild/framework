@@ -36,9 +36,10 @@ async function makeProject(files) {
     };
 }
 
-async function startRemoteImageServer() {
+async function startRemoteImageServer(onRequest = () => { }) {
     const png = await createPng1x1();
     const server = createServer((req, res) => {
+        onRequest(req);
         if (req.url === '/hero.png') {
             res.writeHead(200, {
                 'Content-Type': 'image/png',
@@ -314,6 +315,120 @@ describe('native image optimization', () => {
             fetchImpl
         )).rejects.toThrow(/Loopback and local network image fetches are blocked/);
         expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
+
+    test('remote image fetch pins the request to the validated address', async () => {
+        const config = {
+            remotePatterns: [
+                { protocol: 'http', hostname: 'images.example.test', pathname: '/hero.png' }
+            ]
+        };
+        const lookupImpl = jest.fn(async () => [
+            { address: '93.184.216.34', family: 4 }
+        ]);
+        const fetchImpl = jest.fn(async (requestUrl, options) => {
+            expect(requestUrl).toBeInstanceOf(URL);
+            expect(requestUrl.hostname).toBe('93.184.216.34');
+            expect(requestUrl.pathname).toBe('/hero.png');
+            expect(options.headers.Host).toBe('images.example.test');
+            expect(options.headers.Accept).toContain('image/');
+            return new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'image/png' }
+            });
+        });
+
+        const response = await __imageServiceTestHooks.fetchRemoteImage(
+            new URL('http://images.example.test/hero.png'),
+            config,
+            fetchImpl,
+            lookupImpl
+        );
+
+        expect(response.status).toBe(200);
+        expect(lookupImpl).toHaveBeenCalledWith('images.example.test', { all: true });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
+
+    test('remote image fetch default path uses the pinned address and original Host header', async () => {
+        const seenHosts = [];
+        remote = await startRemoteImageServer((req) => {
+            seenHosts.push(String(req.headers.host || ''));
+        });
+        const config = {
+            remotePatterns: [
+                {
+                    protocol: 'http',
+                    hostname: 'images.example.test',
+                    port: String(remote.port),
+                    pathname: '/hero.png'
+                }
+            ],
+            dangerouslyAllowLocalNetwork: true
+        };
+        const lookupImpl = jest.fn(async () => [
+            { address: '127.0.0.1', family: 4 }
+        ]);
+
+        const response = await __imageServiceTestHooks.fetchRemoteImage(
+            new URL(`http://images.example.test:${remote.port}/hero.png`),
+            config,
+            undefined,
+            lookupImpl
+        );
+
+        expect(response.status).toBe(200);
+        expect(String(response.headers.get('content-type') || '')).toContain('image/png');
+        expect(seenHosts).toEqual([`images.example.test:${remote.port}`]);
+        expect(lookupImpl).toHaveBeenCalledWith('images.example.test', { all: true });
+    });
+
+    test('remote image redirects pin each validated hop independently', async () => {
+        const config = {
+            remotePatterns: [
+                { protocol: 'http', hostname: 'images.example.test', pathname: '/start.png' },
+                { protocol: 'http', hostname: 'cdn.example.test', pathname: '/final.png' }
+            ]
+        };
+        const lookupImpl = jest.fn(async (hostname) => {
+            if (hostname === 'images.example.test') {
+                return [{ address: '93.184.216.34', family: 4 }];
+            }
+            if (hostname === 'cdn.example.test') {
+                return [{ address: '93.184.216.35', family: 4 }];
+            }
+            return [{ address: '127.0.0.1', family: 4 }];
+        });
+        const fetchImpl = jest.fn(async (requestUrl, options) => {
+            if (fetchImpl.mock.calls.length === 1) {
+                expect(requestUrl.hostname).toBe('93.184.216.34');
+                expect(options.headers.Host).toBe('images.example.test');
+                return new Response('', {
+                    status: 302,
+                    headers: { Location: 'http://cdn.example.test/final.png' }
+                });
+            }
+            expect(requestUrl.hostname).toBe('93.184.216.35');
+            expect(options.headers.Host).toBe('cdn.example.test');
+            return new Response('ok', {
+                status: 200,
+                headers: { 'Content-Type': 'image/png' }
+            });
+        });
+
+        const response = await __imageServiceTestHooks.fetchRemoteImage(
+            new URL('http://images.example.test/start.png'),
+            config,
+            fetchImpl,
+            lookupImpl
+        );
+
+        expect(response.status).toBe(200);
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+        expect(lookupImpl.mock.calls.map(([hostname]) => hostname)).toEqual([
+            'images.example.test',
+            'cdn.example.test'
+        ]);
     });
 
     test('image materialization source contains no dynamic evaluation path', async () => {
