@@ -6,6 +6,7 @@ import { jest } from '@jest/globals';
 import sharp from 'sharp';
 import { build } from '../dist/build.js';
 import { createPreviewServer } from '../dist/preview.js';
+import { __imageServiceTestHooks } from '../src/images/service.js';
 import { buildLocalVariantPath } from '../src/images/shared.js';
 
 jest.setTimeout(45000);
@@ -263,6 +264,56 @@ describe('native image optimization', () => {
         expect(response.status).toBe(400);
         expect(payload.error).toBe('image_request_failed');
         expect(String(payload.message || '')).toContain('Loopback and local network image fetches are blocked');
+    });
+
+    test('remote image guard blocks local network address forms', () => {
+        const blocked = [
+            '0.0.0.0',
+            '10.0.0.4',
+            '100.64.0.1',
+            '127.0.0.1',
+            '169.254.1.1',
+            '172.16.0.1',
+            '192.168.0.1',
+            '224.0.0.1',
+            '240.0.0.1',
+            '::',
+            '::1',
+            'fc00::1',
+            'fd00::1',
+            'fe80::1',
+            'ff02::1',
+            '::ffff:127.0.0.1',
+            '::ffff:7f00:1'
+        ];
+
+        for (const address of blocked) {
+            expect(__imageServiceTestHooks.isLocalNetworkAddress(address)).toBe(true);
+        }
+        expect(__imageServiceTestHooks.isLocalNetworkAddress('93.184.216.34')).toBe(false);
+        expect(__imageServiceTestHooks.isLocalNetworkAddress('2606:2800:220:1:248:1893:25c8:1946')).toBe(false);
+    });
+
+    test('remote image guard validates redirect targets before fetching redirected image', async () => {
+        const config = {
+            remotePatterns: [
+                { protocol: 'http', hostname: '93.184.216.34', pathname: '/allowed.png' },
+                { protocol: 'http', hostname: '127.0.0.1', pathname: '/blocked.png' }
+            ]
+        };
+        const fetchImpl = jest.fn(async () => new Response('', {
+            status: 302,
+            headers: {
+                Location: 'http://127.0.0.1/blocked.png'
+            }
+        }));
+
+        await expect(__imageServiceTestHooks.fetchRemoteImage(
+            new URL('http://93.184.216.34/allowed.png'),
+            config,
+            fetchImpl
+        )).rejects.toThrow(/Loopback and local network image fetches are blocked/);
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
 
     test('image materialization source contains no dynamic evaluation path', async () => {
