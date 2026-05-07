@@ -3,10 +3,8 @@ use std::collections::{BTreeMap, HashMap};
 use crate::ast::{Attribute, ElementNode, Node, SourceSpan};
 use crate::event_contract;
 use crate::expression_scope::analyze_scoped_expression;
-use crate::script::{
-    ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript, SCRIPT_ID_ATTR,
-    SCRIPT_PLACEHOLDER_TAG,
-};
+use crate::script::{ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript};
+use crate::transform_helpers::{is_raw_text_container, quote_js_string, script_placeholder_id};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkerKind {
@@ -176,7 +174,7 @@ impl Transformer {
     }
 
     fn transform_element(&mut self, mut elem: ElementNode) -> Node {
-        if self.script_placeholder_id(&elem).is_some() {
+        if script_placeholder_id(&elem).is_some() {
             return Node::Text(String::new());
         }
 
@@ -184,7 +182,7 @@ impl Transformer {
         let mut component_markers = Vec::new();
         for child in &elem.children {
             if let Node::Element(child_elem) = child {
-                if let Some(script_id) = self.script_placeholder_id(child_elem) {
+                if let Some(script_id) = script_placeholder_id(child_elem) {
                     let script = self.scripts.get(&script_id).unwrap_or_else(|| {
                         panic!("Missing script payload for placeholder id {}", script_id)
                     });
@@ -204,6 +202,7 @@ impl Transformer {
                             factory: script.factory_name.clone(),
                             imports: script.imports.clone(),
                             code: script.factory_code.clone(),
+                            bindings: script.bindings.clone(),
                         });
 
                     for binding in &script.bindings {
@@ -329,7 +328,7 @@ impl Transformer {
             }
         }
 
-        let raw_text_container = Self::is_raw_text_container(&elem.tag);
+        let raw_text_container = is_raw_text_container(&elem.tag);
         let raw_text_only_children = elem
             .children
             .iter()
@@ -359,7 +358,7 @@ impl Transformer {
                 match child {
                     Node::Text(text) => {
                         if !text.is_empty() {
-                            let quoted = Self::quote_js_string(&text);
+                            let quoted = quote_js_string(&text);
                             combined_parts.push(quoted.clone());
                             combined_raw_parts.push(quoted);
                         }
@@ -420,7 +419,7 @@ impl Transformer {
 
         for child in elem.children {
             match child {
-                Node::Element(child_elem) if self.script_placeholder_id(&child_elem).is_some() => {
+                Node::Element(child_elem) if script_placeholder_id(&child_elem).is_some() => {
                     continue;
                 }
                 Node::Expression { value, span } => {
@@ -469,42 +468,6 @@ impl Transformer {
         }
 
         Node::Element(elem)
-    }
-
-    fn script_placeholder_id(&self, elem: &ElementNode) -> Option<usize> {
-        if elem.tag != SCRIPT_PLACEHOLDER_TAG {
-            return None;
-        }
-
-        for attr in &elem.attributes {
-            if let Attribute::Static { name, value } = attr {
-                if name == SCRIPT_ID_ATTR {
-                    return value.parse::<usize>().ok();
-                }
-            }
-        }
-
-        None
-    }
-
-    fn is_raw_text_container(tag: &str) -> bool {
-        matches!(tag, "title" | "textarea" | "script" | "style")
-    }
-
-    fn quote_js_string(value: &str) -> String {
-        let mut quoted = String::from("\"");
-        for ch in value.chars() {
-            match ch {
-                '\\' => quoted.push_str("\\\\"),
-                '"' => quoted.push_str("\\\""),
-                '\n' => quoted.push_str("\\n"),
-                '\r' => quoted.push_str("\\r"),
-                '\t' => quoted.push_str("\\t"),
-                _ => quoted.push(ch),
-            }
-        }
-        quoted.push('"');
-        quoted
     }
 
     fn rewrite_expression(&self, expr: &str, _context: RewriteContext) -> String {

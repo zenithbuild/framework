@@ -20,7 +20,7 @@ fn create_temp_zen(content: &str) -> tempfile::NamedTempFile {
 
 #[tokio::test]
 async fn bundle_simple_page() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -36,7 +36,7 @@ async fn bundle_simple_page() {
     // Entry JS must contain both exports
     assert!(result.entry_js.contains("__zenith_html"));
     assert!(result.entry_js.contains("__zenith_expr"));
-    assert_eq!(result.expressions, vec!["title"]);
+    assert_eq!(result.expressions, vec!["props.title"]);
 }
 
 #[tokio::test]
@@ -58,7 +58,7 @@ async fn bundle_static_page_no_expressions() {
 #[tokio::test]
 async fn bundle_multiple_expressions() {
     let file = create_temp_zen(
-        r#"<div id="app"><h1>{title}</h1><button on:click={increment}>Count: {count}</button></div>"#,
+        r#"<div id="app"><h1>{props.title}</h1><button on:click={props.increment}>Count: {props.count}</button></div>"#,
     );
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
@@ -69,7 +69,10 @@ async fn bundle_multiple_expressions() {
 
     let result = bundle_page(plan, opts).await.unwrap();
 
-    assert_eq!(result.expressions, vec!["title", "increment", "count"]);
+    assert_eq!(
+        result.expressions,
+        vec!["props.title", "props.increment", "props.count"]
+    );
 }
 
 // ============================================================================
@@ -78,7 +81,7 @@ async fn bundle_multiple_expressions() {
 
 #[tokio::test]
 async fn strict_mode_matching_metadata_passes() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -92,7 +95,7 @@ async fn strict_mode_matching_metadata_passes() {
         graph_edges: Vec::new(),
         graph_nodes: Vec::new(),
         html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(), // HTML not used for expression comparison
-        expressions: vec!["title".into()],
+        expressions: vec!["props.title".into()],
         imports: Default::default(),
         server_script: Default::default(),
         prerender: false,
@@ -121,7 +124,7 @@ async fn strict_mode_matching_metadata_passes() {
 
 #[tokio::test]
 async fn strict_mode_mismatched_count_fails() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -135,7 +138,7 @@ async fn strict_mode_mismatched_count_fails() {
         graph_edges: Vec::new(),
         graph_nodes: Vec::new(),
         html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
-        expressions: vec!["title".into(), "extra".into()],
+        expressions: vec!["props.title".into(), "extra".into()],
         imports: Default::default(),
         server_script: Default::default(),
         prerender: false,
@@ -171,7 +174,7 @@ async fn strict_mode_mismatched_count_fails() {
 
 #[tokio::test]
 async fn strict_mode_mismatched_content_fails() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -245,7 +248,7 @@ async fn bundle_nonexistent_file_fails() {
 
 #[tokio::test]
 async fn bundle_emits_diagnostics() {
-    let file = create_temp_zen("<p>{x}</p>");
+    let file = create_temp_zen("<p>{props.x}</p>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -273,7 +276,8 @@ async fn bundle_emits_diagnostics() {
 
 #[tokio::test]
 async fn expressions_never_mutated() {
-    let file = create_temp_zen(r#"<div title={myVar}><span>{other_var}</span></div>"#);
+    let file =
+        create_temp_zen(r#"<div title={props.myVar}><span>{props.other_var}</span></div>"#);
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,
@@ -284,10 +288,10 @@ async fn expressions_never_mutated() {
     let result = bundle_page(plan, opts).await.unwrap();
 
     // Expressions must be exact strings from the source
-    assert_eq!(result.expressions, vec!["myVar", "other_var"]);
+    assert_eq!(result.expressions, vec!["props.myVar", "props.other_var"]);
     // The JS must contain exactly these strings
-    assert!(result.entry_js.contains("\"myVar\""));
-    assert!(result.entry_js.contains("\"other_var\""));
+    assert!(result.entry_js.contains("\"props.myVar\""));
+    assert!(result.entry_js.contains("\"props.other_var\""));
 }
 
 // ============================================================================
@@ -296,7 +300,7 @@ async fn expressions_never_mutated() {
 
 #[tokio::test]
 async fn no_post_concat_in_bundle() {
-    let file = create_temp_zen("<div>{x}</div>");
+    let file = create_temp_zen("<div>{props.x}</div>");
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,

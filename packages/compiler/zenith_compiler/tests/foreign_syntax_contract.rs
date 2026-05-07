@@ -1,8 +1,8 @@
+use serde_json::to_string_pretty;
 use zenith_compiler::compiler::{
     compile_structured, compile_structured_with_source_options_and_report, CompileOptions,
     CompileReport,
 };
-use serde_json::to_string_pretty;
 
 fn compile_report(input: &str) -> CompileReport {
     compile_structured_with_source_options_and_report(
@@ -138,7 +138,10 @@ fn allows_component_handler_props_named_like_events() {
         "component handler props should remain valid: {:?}",
         report.diagnostics
     );
-    assert!(report.output.is_some(), "component prop input should compile");
+    assert!(
+        report.output.is_some(),
+        "component prop input should compile"
+    );
 }
 
 #[test]

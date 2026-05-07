@@ -43,7 +43,7 @@ describe('diagnostics', () => {
 
   test('preserves unknown-event warning text and suggestion text from diagnostics', async () => {
     const diagnostics = await collectDiagnosticsFromSource(
-      `<button on:clcik={handleClick}></button>`,
+      `<script lang="ts">\nfunction handleClick() {}\n</script>\n<button on:clcik={handleClick}></button>`,
       '/tmp/unknown-event.zen',
       false
     );

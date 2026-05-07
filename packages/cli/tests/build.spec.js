@@ -169,7 +169,7 @@ describe('build orchestration', () => {
 
     test('spawns compiler and bundler processes to emit route output', async () => {
         project = await makeProject({
-            'index.zen': '<main><h1>{title}</h1></main>\n',
+            'index.zen': '<script lang="ts">const title = "Home";</script><main><h1>{title}</h1></main>\n',
             'about.zen': '<main><h1>About</h1></main>\n'
         });
 
@@ -189,7 +189,7 @@ describe('build orchestration', () => {
 
     test('build output remains stable for identical input', async () => {
         project = await makeProject({
-            'index.zen': '<main><p>{count}</p></main>\n',
+            'index.zen': '<script lang="ts">const count = 1;</script><main><p>{count}</p></main>\n',
             'users/[id].zen': '<main><h1>User {params.id}</h1></main>\n'
         });
 
@@ -354,7 +354,7 @@ describe('build orchestration', () => {
 
     test('allows embedded markup expressions when config gate is enabled', async () => {
         project = await makeProject({
-            'index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
+            'index.zen': '<script lang="ts">const cond = true;</script><main>{cond ? (<a>Hi</a>) : null}</main>\n'
         });
 
         const result = await build({

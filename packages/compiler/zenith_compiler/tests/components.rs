@@ -38,7 +38,7 @@ fn component_with_static_attribute() {
 
 #[test]
 fn component_with_expression_attribute() {
-    let input = r#"<Header title={mainTitle} />"#;
+    let input = r#"<Header title={props.mainTitle} />"#;
     let output = compile(input);
 
     println!("Output:\n{}", output);
@@ -46,7 +46,7 @@ fn component_with_expression_attribute() {
     // Expression indexed
     assert!(output.contains(r#"data-zx-title="0""#));
     // Expression table populated
-    assert!(output.contains(r#"__zenith_expr = ["mainTitle"]"#));
+    assert!(output.contains(r#"__zenith_expr = ["props.mainTitle"]"#));
 }
 
 #[test]
@@ -67,27 +67,27 @@ fn component_open_close_not_normalized() {
 #[test]
 fn expression_indexing_is_deterministic_left_to_right() {
     // Left-to-right depth-first traversal order
-    let input = r#"<div><Header title={first} /><Footer label={second} /></div>"#;
+    let input = r#"<div><Header title={props.first} /><Footer label={props.second} /></div>"#;
     let output = compile(input);
 
     println!("Output:\n{}", output);
 
-    // "first" must be index 0, "second" must be index 1
+    // "props.first" must be index 0, "props.second" must be index 1
     assert!(output.contains(r#"data-zx-title="0""#));
     assert!(output.contains(r#"data-zx-label="1""#));
-    assert!(output.contains(r#"__zenith_expr = ["first", "second"]"#));
+    assert!(output.contains(r#"__zenith_expr = ["props.first", "props.second"]"#));
 }
 
 #[test]
 fn component_is_not_a_separate_node_type() {
     // Uppercase and lowercase tags produce identical structure.
     // The compiler does NOT know what a component is.
-    let lower = compile(r#"<header title={val} />"#);
-    let upper = compile(r#"<Header title={val} />"#);
+    let lower = compile(r#"<header title={props.val} />"#);
+    let upper = compile(r#"<Header title={props.val} />"#);
 
     // Both must have identical expression tables
-    assert!(lower.contains(r#"__zenith_expr = ["val"]"#));
-    assert!(upper.contains(r#"__zenith_expr = ["val"]"#));
+    assert!(lower.contains(r#"__zenith_expr = ["props.val"]"#));
+    assert!(upper.contains(r#"__zenith_expr = ["props.val"]"#));
 
     // Both must have data-zx-title="0"
     assert!(lower.contains(r#"data-zx-title="0""#));

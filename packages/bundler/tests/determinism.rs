@@ -39,7 +39,8 @@ fn sha256(s: &str) -> String {
 
 #[tokio::test]
 async fn deterministic_build_identical_bytes() {
-    let content = r#"<div id="app"><h1>{title}</h1><button on:click={go}>Go</button></div>"#;
+    let content =
+        r#"<div id="app"><h1>{props.title}</h1><button on:click={props.go}>Go</button></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -67,7 +68,8 @@ async fn deterministic_build_identical_bytes() {
 
 #[tokio::test]
 async fn deterministic_expressions_order() {
-    let content = r#"<div title={a}><span class={b}>{c}</span><p>{d}</p></div>"#;
+    let content =
+        r#"<div title={props.a}><span class={props.b}>{props.c}</span><p>{props.d}</p></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -80,7 +82,10 @@ async fn deterministic_expressions_order() {
     let result = bundle_page(plan, BundleOptions::default()).await.unwrap();
 
     // Must be left-to-right, depth-first (compiler guarantee preserved through bundler)
-    assert_eq!(result.expressions, vec!["a", "b", "c", "d"]);
+    assert_eq!(
+        result.expressions,
+        vec!["props.a", "props.b", "props.c", "props.d"]
+    );
 }
 
 #[tokio::test]
@@ -107,8 +112,8 @@ async fn deterministic_static_page_hash() {
 
 #[tokio::test]
 async fn different_input_different_output() {
-    let file_a = create_temp_zen("<div>{a}</div>");
-    let file_b = create_temp_zen("<div>{b}</div>");
+    let file_a = create_temp_zen("<div>{props.a}</div>");
+    let file_b = create_temp_zen("<div>{props.b}</div>");
 
     let plan_a = BundlePlan {
         page_path: file_a.path().to_string_lossy().to_string(),
@@ -136,7 +141,7 @@ async fn different_input_different_output() {
 
 #[tokio::test]
 async fn internal_binding_order_snapshot() {
-    let (_, result) = bundle("<h1>{t}</h1>", "page.zen").await;
+    let (_, result) = bundle("<h1>{props.t}</h1>", "page.zen").await;
     let js = result.entry_js;
 
     // Rolldown ESM hoisting order must be stable
@@ -312,15 +317,15 @@ async fn os_independent_hash_snapshot() {
 #[tokio::test]
 async fn hash_stays_stable_when_compiler_normalizes_expression_whitespace() {
     // Process boundary contract: bundler consumes compiler IR as-is.
-    // Current compiler output canonicalizes `{a}` and `{ a }` to the same expression token.
+    // Current compiler output canonicalizes `{props.a}` and `{ props.a }` to the same expression token.
     // Bundler must therefore emit identical output for both sources.
 
     let dir = tempfile::tempdir().unwrap();
     let path_compact = dir.path().join("compact.zen");
     let path_loose = dir.path().join("loose.zen");
 
-    std::fs::write(&path_compact, "<div>{a}</div>").unwrap();
-    std::fs::write(&path_loose, "<div>{ a }</div>").unwrap();
+    std::fs::write(&path_compact, "<div>{props.a}</div>").unwrap();
+    std::fs::write(&path_loose, "<div>{ props.a }</div>").unwrap();
 
     let plan_compact = BundlePlan {
         page_path: path_compact.to_string_lossy().to_string(),
@@ -347,6 +352,6 @@ async fn hash_stays_stable_when_compiler_normalizes_expression_whitespace() {
     );
 
     // Verify canonicalized expression payload
-    assert!(res_compact.entry_js.contains("\"a\""));
-    assert!(res_loose.entry_js.contains("\"a\""));
+    assert!(res_compact.entry_js.contains("\"props.a\""));
+    assert!(res_loose.entry_js.contains("\"props.a\""));
 }

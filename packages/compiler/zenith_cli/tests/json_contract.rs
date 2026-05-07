@@ -209,7 +209,10 @@ fn compiler_cli_emits_structured_invalid_event_diagnostics() {
 #[test]
 fn compiler_cli_emits_warning_diagnostics_with_suggestions() {
     let json = compile_fixture(
-        r#"<button on:clcik={handleClick}></button>"#,
+        r#"<script lang="ts">
+function handleClick() {}
+</script>
+<button on:clcik={handleClick}></button>"#,
         "unknown-event.zen",
     );
 

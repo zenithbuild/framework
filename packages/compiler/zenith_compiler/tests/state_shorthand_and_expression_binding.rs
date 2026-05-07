@@ -19,6 +19,7 @@ state isAnimating = false;
         CompileOptions {
             embedded_markup_expressions: true,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
     .expect("should compile");
@@ -71,6 +72,7 @@ state isOpen = false;
         CompileOptions {
             embedded_markup_expressions: true,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
     .expect("should compile");
@@ -123,6 +125,7 @@ function toggleMenu() { isOpen = !isOpen; }
         CompileOptions {
             embedded_markup_expressions: true,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
     .expect("should compile");
@@ -162,6 +165,7 @@ function handleEscape() {
         CompileOptions {
             embedded_markup_expressions: true,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
     .expect("should compile");

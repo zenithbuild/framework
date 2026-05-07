@@ -52,7 +52,8 @@ fn sha256_vec(data: &[String]) -> String {
 /// SHA256 of expression table must be identical across 3 builds.
 #[tokio::test]
 async fn expression_sha256_stable() {
-    let content = r#"<div><h1>{title}</h1><p>{subtitle}</p><span>{count}</span></div>"#;
+    let content =
+        r#"<div><h1>{props.title}</h1><p>{props.subtitle}</p><span>{props.count}</span></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -75,7 +76,7 @@ async fn expression_sha256_stable() {
 #[tokio::test]
 async fn expression_order_multi() {
     let content =
-        r#"<div title={a}><h1>{b}</h1><ul><li>{c}</li><li>{d}</li></ul><footer>{e}</footer></div>"#;
+        r#"<div title={props.a}><h1>{props.b}</h1><ul><li>{props.c}</li><li>{props.d}</li></ul><footer>{props.e}</footer></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -88,7 +89,7 @@ async fn expression_order_multi() {
 
     assert_eq!(
         result.expressions,
-        vec!["a", "b", "c", "d", "e"],
+        vec!["props.a", "props.b", "props.c", "props.d", "props.e"],
         "Expression order must be left-to-right, depth-first"
     );
 }
@@ -96,7 +97,7 @@ async fn expression_order_multi() {
 /// Inline output exports __zenith_expr.
 #[tokio::test]
 async fn inline_expr_in_output() {
-    let file = create_temp_zen("<h1>{x}</h1>");
+    let file = create_temp_zen("<h1>{props.x}</h1>");
     let path = file.path().to_string_lossy().to_string();
 
     let plan = BundlePlan {
@@ -120,7 +121,7 @@ async fn inline_expr_in_output() {
 /// Inline output exports __zenith_html.
 #[tokio::test]
 async fn inline_html_in_output() {
-    let file = create_temp_zen("<h1>{x}</h1>");
+    let file = create_temp_zen("<h1>{props.x}</h1>");
     let path = file.path().to_string_lossy().to_string();
 
     let plan = BundlePlan {
@@ -144,7 +145,8 @@ async fn inline_html_in_output() {
 /// Inline vs Inline: expression SHA must be identical (path equivalence baseline).
 #[tokio::test]
 async fn inline_vs_inline_expression_sha_equal() {
-    let content = r#"<div><h1>{title}</h1><button on:click={handler}>Go</button></div>"#;
+    let content =
+        r#"<div><h1>{props.title}</h1><button on:click={props.handler}>Go</button></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -181,8 +183,8 @@ async fn inline_vs_inline_expression_sha_equal() {
 /// Two different pages compiled concurrently must not have expression overlap.
 #[tokio::test]
 async fn concurrent_compile_no_overlap() {
-    let file_a = create_temp_zen("<div>{page_a_var}</div>");
-    let file_b = create_temp_zen("<div>{page_b_var}</div>");
+    let file_a = create_temp_zen("<div>{props.page_a_var}</div>");
+    let file_b = create_temp_zen("<div>{props.page_b_var}</div>");
 
     let path_a = file_a.path().to_string_lossy().to_string();
     let path_b = file_b.path().to_string_lossy().to_string();
@@ -207,14 +209,14 @@ async fn concurrent_compile_no_overlap() {
     );
 
     // page_a expressions must NOT appear in page_b and vice versa
-    assert_eq!(result_a.expressions, vec!["page_a_var"]);
-    assert_eq!(result_b.expressions, vec!["page_b_var"]);
+    assert_eq!(result_a.expressions, vec!["props.page_a_var"]);
+    assert_eq!(result_b.expressions, vec!["props.page_b_var"]);
 
     // JS must only contain its own expressions
-    assert!(result_a.entry_js.contains("page_a_var"));
-    assert!(!result_a.entry_js.contains("page_b_var"));
-    assert!(result_b.entry_js.contains("page_b_var"));
-    assert!(!result_b.entry_js.contains("page_a_var"));
+    assert!(result_a.entry_js.contains("props.page_a_var"));
+    assert!(!result_a.entry_js.contains("props.page_b_var"));
+    assert!(result_b.entry_js.contains("props.page_b_var"));
+    assert!(!result_b.entry_js.contains("props.page_a_var"));
 }
 
 /// CSS cache keyed by page ID — no cross-pollination.
@@ -388,7 +390,7 @@ fn invalid_virtual_id_returns_none() {
 /// Both inline paths produce the same error variant on mismatch.
 #[tokio::test]
 async fn strict_inline_and_rolldown_mirror_count() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let path = file.path().to_string_lossy().to_string();
 
     let metadata = CompilerOutput {
@@ -397,7 +399,7 @@ async fn strict_inline_and_rolldown_mirror_count() {
         graph_edges: Vec::new(),
         graph_nodes: Vec::new(),
         html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
-        expressions: vec!["title".into(), "extra".into()],
+        expressions: vec!["props.title".into(), "extra".into()],
         imports: Default::default(),
         server_script: Default::default(),
         prerender: false,
@@ -441,7 +443,7 @@ async fn strict_inline_and_rolldown_mirror_count() {
 /// Strict mode content mismatch produces ExpressionContentMismatch variant.
 #[tokio::test]
 async fn strict_inline_and_rolldown_mirror_content() {
-    let file = create_temp_zen("<h1>{title}</h1>");
+    let file = create_temp_zen("<h1>{props.title}</h1>");
     let path = file.path().to_string_lossy().to_string();
 
     let metadata = CompilerOutput {
@@ -489,7 +491,7 @@ async fn strict_inline_and_rolldown_mirror_content() {
         } => {
             assert_eq!(index, 0);
             assert_eq!(expected, "wrong_name");
-            assert_eq!(got, "title");
+            assert_eq!(got, "props.title");
         }
         e => panic!("Expected ExpressionContentMismatch variant, got: {:?}", e),
     }
@@ -514,7 +516,7 @@ fn rolldown_commit_pinned() {
 /// When bundling the same input twice, the output format is identical.
 #[tokio::test]
 async fn output_asset_order_stable() {
-    let content = r#"<div><h1>{title}</h1><p>{body}</p></div>"#;
+    let content = r#"<div><h1>{props.title}</h1><p>{props.body}</p></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -542,7 +544,8 @@ async fn output_asset_order_stable() {
 /// HTML SHA stability: same input → identical HTML in output.
 #[tokio::test]
 async fn html_sha_stable() {
-    let content = r#"<section><h1>{heading}</h1><article>{content}</article></section>"#;
+    let content =
+        r#"<section><h1>{props.heading}</h1><article>{props.content}</article></section>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -581,7 +584,7 @@ async fn html_sha_stable() {
 #[tokio::test]
 async fn full_output_sha_stable() {
     let content =
-        r#"<div id="app"><h1>{title}</h1><button on:click={handler}>Click</button></div>"#;
+        r#"<div id="app"><h1>{props.title}</h1><button on:click={props.handler}>Click</button></div>"#;
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -610,7 +613,7 @@ async fn full_output_sha_stable() {
 /// Export shape snapshot: named exports, not default-only.
 #[tokio::test]
 async fn export_shape_snapshot() {
-    let file = create_temp_zen("<div>{x}</div>");
+    let file = create_temp_zen("<div>{props.x}</div>");
     let path = file.path().to_string_lossy().to_string();
 
     let plan = BundlePlan {
@@ -633,7 +636,7 @@ async fn export_shape_snapshot() {
 /// Expression table is a const binding, not let or var.
 #[tokio::test]
 async fn expression_binding_is_const() {
-    let file = create_temp_zen("<p>{value}</p>");
+    let file = create_temp_zen("<p>{props.value}</p>");
     let path = file.path().to_string_lossy().to_string();
 
     let plan = BundlePlan {
@@ -652,7 +655,7 @@ async fn expression_binding_is_const() {
 /// Export order: __zenith_html comes before __zenith_expr.
 #[tokio::test]
 async fn export_order_html_before_expr() {
-    let file = create_temp_zen("<div>{x}</div>");
+    let file = create_temp_zen("<div>{props.x}</div>");
     let path = file.path().to_string_lossy().to_string();
 
     let plan = BundlePlan {

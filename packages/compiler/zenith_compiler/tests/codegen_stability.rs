@@ -40,8 +40,8 @@ export default `<p>Hello</p>`"#;
 
 #[test]
 fn snapshot_expression() {
-    let output = compile("<h1>{title}</h1>");
-    let expected = r#"export const __zenith_expr = ["title"]
+    let output = compile("<h1>{props.title}</h1>");
+    let expected = r#"export const __zenith_expr = ["props.title"]
 
 export function setup() {
   return {}
@@ -53,8 +53,8 @@ export default `<h1 data-zx-e="0"></h1>`"#;
 
 #[test]
 fn snapshot_event_handler() {
-    let output = compile(r#"<button on:click={go}>X</button>"#);
-    let expected = r#"export const __zenith_expr = ["go"]
+    let output = compile(r#"<button on:click={props.go}>X</button>"#);
+    let expected = r#"export const __zenith_expr = ["props.go"]
 
 export function setup() {
   return {}
@@ -92,8 +92,8 @@ export default `<div id="main"></div>`"#;
 
 #[test]
 fn snapshot_deep_nesting() {
-    let output = compile(r#"<div><section><p>{content}</p></section></div>"#);
-    let expected = r#"export const __zenith_expr = ["content"]
+    let output = compile(r#"<div><section><p>{props.content}</p></section></div>"#);
+    let expected = r#"export const __zenith_expr = ["props.content"]
 
 export function setup() {
   return {}
@@ -105,9 +105,10 @@ export default `<div><section><p data-zx-e="0"></p></section></div>`"#;
 
 #[test]
 fn snapshot_mixed_everything() {
-    let output =
-        compile(r#"<div id="app"><h1>{title}</h1><button on:click={save}>Save</button></div>"#);
-    let expected = r#"export const __zenith_expr = ["title", "save"]
+    let output = compile(
+        r#"<div id="app"><h1>{props.title}</h1><button on:click={props.save}>Save</button></div>"#,
+    );
+    let expected = r#"export const __zenith_expr = ["props.title", "props.save"]
 
 export function setup() {
   return {}

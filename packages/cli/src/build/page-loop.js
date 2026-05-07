@@ -126,6 +126,17 @@ export async function buildPageEnvelopes(input) {
         const expandedStartedAt = performance.now();
         const { expandedSource } = expandComponents(rawSource, registry, sourceFile);
         pageExpandMs = startupProfile.roundMs(performance.now() - expandedStartedAt);
+        const usesInternalExpandedSource = expandedSource !== rawSource;
+        if (usesInternalExpandedSource) {
+            const rawServerExtracted = extractServerScript(rawSource, sourceFile, compilerOpts);
+            timedRunCompiler(
+                'page',
+                sourceFile,
+                rawServerExtracted.source,
+                compilerOpts,
+                { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
+            );
+        }
 
         const expandedServerExtractStartedAt = performance.now();
         const extractedServer = extractServerScript(expandedSource, sourceFile, compilerOpts);
@@ -138,7 +149,9 @@ export async function buildPageEnvelopes(input) {
             'page',
             sourceFile,
             compileSource,
-            compilerOpts,
+            usesInternalExpandedSource
+                ? { ...compilerOpts, internalAllowUnboundMarkup: true }
+                : compilerOpts,
             { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
         );
         pageCompileMs = startupProfile.roundMs(performance.now() - pageCompileStartedAt);

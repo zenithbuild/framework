@@ -1,4 +1,5 @@
 use crate::ast::Node;
+use crate::expression_syntax::validate_expression_syntax;
 use crate::lexer::Token;
 use std::time::Instant;
 
@@ -84,7 +85,7 @@ impl<'a> Parser<'a> {
         // lex_expression_content consumed everything up to and including the closing '}'.
         // Re-sync current_token from the lexer.
         self.sync_current_token();
-        let content = self.contract_gate_expression(&raw);
+        let content = self.contract_gate_expression(&raw, start_offset);
         let node = Node::Expression {
             value: content,
             span: self.span_for_offsets(start_offset, end_offset_exclusive),
@@ -97,32 +98,37 @@ impl<'a> Parser<'a> {
 
     /// Contract gate: reject embedded markup tags inside expressions unless
     /// the `embeddedMarkupExpressions` flag is enabled.
-    pub(super) fn contract_gate_expression(&mut self, raw: &str) -> String {
+    pub(super) fn contract_gate_expression(&mut self, raw: &str, start_offset: usize) -> String {
         let started_at = self.profile_enabled.then(Instant::now);
-        if self.embedded_markup_expressions {
-            let lowered = lower_embedded_markup_expression(raw);
-            if let Some(started_at) = started_at {
-                self.profile_metrics.contract_gate_ms +=
-                    started_at.elapsed().as_secs_f64() * 1000.0;
+        let value = if self.embedded_markup_expressions {
+            lower_embedded_markup_expression(raw)
+        } else {
+            let contains_markup_started_at = self.profile_enabled.then(Instant::now);
+            let contains_markup = contains_markup_tag(raw);
+            if let Some(contains_markup_started_at) = contains_markup_started_at {
+                self.profile_metrics.contains_markup_ms +=
+                    contains_markup_started_at.elapsed().as_secs_f64() * 1000.0;
             }
-            return lowered;
-        }
-        let contains_markup_started_at = self.profile_enabled.then(Instant::now);
-        let contains_markup = contains_markup_tag(raw);
-        if let Some(contains_markup_started_at) = contains_markup_started_at {
-            self.profile_metrics.contains_markup_ms +=
-                contains_markup_started_at.elapsed().as_secs_f64() * 1000.0;
-        }
-        if contains_markup {
+            if contains_markup {
+                panic!(
+                    "Embedded markup expressions are disabled.\n\
+                     Expression contains HTML/component tags: {{{}}}\n\
+                     To enable, set embeddedMarkupExpressions: true in zenith.config.js\n\
+                     Or refactor the expression to avoid inline markup.",
+                    raw.chars().take(80).collect::<String>()
+                );
+            }
+            raw.to_string()
+        };
+        if validate_expression_syntax(&value).is_err() {
+            let location = self.location_for_offset(start_offset);
             panic!(
-                "Embedded markup expressions are disabled.\n\
-                 Expression contains HTML/component tags: {{{}}}\n\
-                 To enable, set embeddedMarkupExpressions: true in zenith.config.js\n\
-                 Or refactor the expression to avoid inline markup.",
-                raw.chars().take(80).collect::<String>()
+                "Invalid markup expression syntax.\nExpression: {{{}}} at line {}, column {}.",
+                raw.chars().take(80).collect::<String>(),
+                location.line,
+                location.column
             );
         }
-        let value = raw.to_string();
         if let Some(started_at) = started_at {
             self.profile_metrics.contract_gate_ms += started_at.elapsed().as_secs_f64() * 1000.0;
         }

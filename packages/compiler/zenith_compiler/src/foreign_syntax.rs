@@ -60,7 +60,10 @@ fn classify_event_attribute_violation<'a>(
 
     if let Some(event_name) = attr_name.strip_prefix('@') {
         let suggested_event = event_binding_name(event_name);
-        let hint = format!("Use on:{suggested_event}={{handle{}}}.", handler_suffix(&suggested_event));
+        let hint = format!(
+            "Use on:{suggested_event}={{handle{}}}.",
+            handler_suffix(&suggested_event)
+        );
         return Some(ForeignSyntaxViolation {
             kind: ForeignSyntaxKind::Event,
             token: attr_name,

@@ -29,7 +29,7 @@ async fn memory_growth_linear() {
     for &count in &counts {
         let mut content = String::from("<div>");
         for i in 0..count {
-            content.push_str(&format!("{{expr{}}}", i));
+            content.push_str(&format!("{{props.expr{}}}", i));
         }
         content.push_str("</div>");
 
@@ -78,7 +78,7 @@ async fn no_expression_reallocation_explosion() {
     let count = 1000;
     let mut content = String::from("<div>");
     for i in 0..count {
-        content.push_str(&format!("{{unique_expr_{}}}", i));
+        content.push_str(&format!("{{props.unique_expr_{}}}", i));
     }
     content.push_str("</div>");
 
@@ -120,7 +120,8 @@ async fn cold_vs_warm_build_stability() {
     // Build same file twice (simulating cold vs warm compiler state if instances were reused).
     // Assert: Hash identical, Expression array identical, CSS identical.
 
-    let content = "<div><div>{title}<span class=\"red\">Text</span></div><style>.red{color:red}</style></div>";
+    let content =
+        "<div><div>{props.title}<span class=\"red\">Text</span></div><style>.red{color:red}</style></div>";
     let file = create_temp_zen(content);
     let path = file.path().to_string_lossy().to_string();
 
@@ -169,7 +170,7 @@ async fn large_template_stability() {
         content.push_str("<span>static node</span>");
         content.push_str("<span>static node</span>");
         content.push_str("<span>static node</span>"); // 10 static nodes per loop
-        content.push_str(&format!("{{expr{}}}", i));
+        content.push_str(&format!("{{props.expr{}}}", i));
     }
     content.push_str("</div>");
 

@@ -29,7 +29,8 @@ fn sha256(data: &str) -> String {
 }
 
 /// Standard test input for contract snapshots.
-const CONTRACT_INPUT: &str = r#"<div id="app"><h1>{title}</h1><button on:click={handler}>Click</button><p>{count}</p></div>"#;
+const CONTRACT_INPUT: &str =
+    r#"<div id="app"><h1>{props.title}</h1><button on:click={props.handler}>Click</button><p>{props.count}</p></div>"#;
 
 // ===========================================================================
 // 8.2 — Contract Snapshot Tests
@@ -142,12 +143,15 @@ async fn bundler_never_modifies_expressions() {
     let result = bundle_page(plan, BundleOptions::default()).await.unwrap();
 
     // Expressions must be exact source strings — no transformation
-    assert_eq!(result.expressions, vec!["title", "handler", "count"]);
+    assert_eq!(
+        result.expressions,
+        vec!["props.title", "props.handler", "props.count"]
+    );
 
     // JS must contain the raw expression strings in quotes
-    assert!(result.entry_js.contains("\"title\""));
-    assert!(result.entry_js.contains("\"handler\""));
-    assert!(result.entry_js.contains("\"count\""));
+    assert!(result.entry_js.contains("\"props.title\""));
+    assert!(result.entry_js.contains("\"props.handler\""));
+    assert!(result.entry_js.contains("\"props.count\""));
 
     // Must NOT contain any renaming like title_0 or __title
     assert!(!result.entry_js.contains("title_0"));
@@ -233,7 +237,7 @@ async fn runtime_contract_hash_stable() {
 /// This is the canonical reference for compiler + bundler output.
 #[tokio::test]
 async fn golden_e2e_pipeline() {
-    let input = r#"<div id="app"><h1>{title}</h1><p>{subtitle}</p></div>"#;
+    let input = r#"<div id="app"><h1>{props.title}</h1><p>{props.subtitle}</p></div>"#;
     let file = create_temp_zen(input);
     let path = file.path().to_string_lossy().to_string();
 
@@ -246,8 +250,8 @@ async fn golden_e2e_pipeline() {
 
     // 1. Expression count
     assert_eq!(result.expressions.len(), 2);
-    assert_eq!(result.expressions[0], "title");
-    assert_eq!(result.expressions[1], "subtitle");
+    assert_eq!(result.expressions[0], "props.title");
+    assert_eq!(result.expressions[1], "props.subtitle");
 
     // 2. Export structure (Rolldown ESM: const decls + collected export)
     assert!(result.entry_js.contains("const __zenith_html = `"));
@@ -269,7 +273,7 @@ async fn golden_e2e_pipeline() {
 /// Golden test with strict metadata — compiler and bundler agree.
 #[tokio::test]
 async fn golden_e2e_with_strict_metadata() {
-    let input = "<div><h1>{title}</h1><p>{body}</p></div>";
+    let input = "<div><h1>{props.title}</h1><p>{props.body}</p></div>";
     let file = create_temp_zen(input);
     let path = file.path().to_string_lossy().to_string();
 
@@ -279,7 +283,7 @@ async fn golden_e2e_with_strict_metadata() {
         graph_edges: Vec::new(),
         graph_nodes: Vec::new(),
         html: "<!-- ZENITH_STYLES_ANCHOR -->".to_string(),
-        expressions: vec!["title".into(), "body".into()],
+        expressions: vec!["props.title".into(), "props.body".into()],
         imports: Default::default(),
         server_script: Default::default(),
         prerender: false,
@@ -308,7 +312,7 @@ async fn golden_e2e_with_strict_metadata() {
     };
 
     let result = bundle_page(plan, opts).await.unwrap();
-    assert_eq!(result.expressions, vec!["title", "body"]);
+    assert_eq!(result.expressions, vec!["props.title", "props.body"]);
 }
 
 /// Golden test: static page (no expressions) still produces valid output.
@@ -335,7 +339,7 @@ async fn golden_e2e_static_page() {
 /// produces identical expression tables.
 #[tokio::test]
 async fn golden_expressions_identical_across_modes() {
-    let input = r#"<div><h1>{title}</h1><span>{count}</span></div>"#;
+    let input = r#"<div><h1>{props.title}</h1><span>{props.count}</span></div>"#;
     let file = create_temp_zen(input);
     let path = file.path().to_string_lossy().to_string();
 

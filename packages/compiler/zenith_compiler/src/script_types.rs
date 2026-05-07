@@ -56,7 +56,7 @@ pub struct ScriptProfileMetrics {
     pub dom_lint_ms: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HoistedBindingKind {
     Signal,
     State,
@@ -100,6 +100,7 @@ pub struct ComponentScriptAsset {
     pub factory: String,
     pub imports: Vec<String>,
     pub code: String,
+    pub bindings: Vec<HoistedBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

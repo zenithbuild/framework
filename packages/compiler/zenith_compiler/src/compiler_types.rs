@@ -9,6 +9,7 @@ pub const IR_VERSION: u32 = 1;
 pub struct CompileOptions {
     pub embedded_markup_expressions: bool,
     pub strict_dom_lints: bool,
+    pub internal_allow_unbound_markup: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

@@ -26,6 +26,12 @@ pub(crate) fn diagnostic_from_error_message(message: &str, input: &str) -> Compi
     if let Some(diagnostic) = event_contract_diagnostic_from_message(message) {
         return diagnostic;
     }
+    if let Some(diagnostic) = expression_diagnostic_from_message(message) {
+        return diagnostic;
+    }
+    if let Some(diagnostic) = markup_parse_diagnostic_from_message(message) {
+        return diagnostic;
+    }
     if let Some(diagnostic) = foreign_syntax_diagnostic_from_message(message, input) {
         return diagnostic;
     }
@@ -159,6 +165,12 @@ fn script_contract_diagnostic_from_message(
             Some("Remove runtime boundary primitives from component scripts.".to_string()),
             "docs/documentation/contracts/component-script-hoisting.md",
         )
+    } else if reason.contains("invalid TypeScript syntax") {
+        (
+            "ZEN-SCRIPT-SYNTAX",
+            Some("Fix the TypeScript syntax inside the script block.".to_string()),
+            "docs/documentation/contracts/script-boundary.md",
+        )
     } else {
         (
             "ZEN-SCRIPT-CONTRACT",
@@ -181,6 +193,35 @@ fn script_contract_diagnostic_from_message(
     })
 }
 
+fn expression_diagnostic_from_message(message: &str) -> Option<CompileDiagnostic> {
+    let (code, suggestion) = if message.starts_with("Invalid markup expression syntax.") {
+        (
+            "ZEN-EXPR-SYNTAX",
+            Some("Fix the markup expression syntax.".to_string()),
+        )
+    } else if message.starts_with("Unbound markup identifier.") {
+        (
+            "ZEN-EXPR-UNBOUND",
+            Some("Declare the identifier in <script lang=\"ts\"> or pass it through props/data/params/ssr.".to_string()),
+        )
+    } else {
+        return None;
+    };
+    let (line, column) = line_column_from_message(message).unwrap_or((1, 1));
+    Some(CompileDiagnostic {
+        code: code.to_string(),
+        message: message.to_string(),
+        severity: CompileDiagnosticSeverity::Error,
+        range: single_char_range(line, column),
+        source: "compiler".to_string(),
+        suggestion,
+        fixes: Vec::new(),
+        related_information: Vec::new(),
+        tags: Vec::new(),
+        docs_path: Some("docs/documentation/syntax/bindings-expressions.md".to_string()),
+    })
+}
+
 fn event_contract_diagnostic_from_message(message: &str) -> Option<CompileDiagnostic> {
     let (code, suggestion) =
         if message.starts_with("Event handlers must not be direct call expressions.") {
@@ -197,16 +238,7 @@ fn event_contract_diagnostic_from_message(message: &str) -> Option<CompileDiagno
             return None;
         };
 
-    let line_col_re = Regex::new(r"at line (\d+), column (\d+)").ok()?;
-    let captures = line_col_re.captures(message)?;
-    let line = captures
-        .get(1)
-        .and_then(|m| m.as_str().parse::<usize>().ok())
-        .unwrap_or(1);
-    let column = captures
-        .get(2)
-        .and_then(|m| m.as_str().parse::<usize>().ok())
-        .unwrap_or(1);
+    let (line, column) = line_column_from_message(message)?;
 
     Some(CompileDiagnostic {
         code: code.to_string(),
@@ -222,17 +254,56 @@ fn event_contract_diagnostic_from_message(message: &str) -> Option<CompileDiagno
     })
 }
 
-fn foreign_syntax_diagnostic_from_message(
-    message: &str,
-    input: &str,
-) -> Option<CompileDiagnostic> {
+fn markup_parse_diagnostic_from_message(message: &str) -> Option<CompileDiagnostic> {
+    let is_markup_parse = message.starts_with("Mismatched closing tag:")
+        || message.starts_with("Unexpected EOF while parsing children")
+        || message.starts_with("Expected closing tag name")
+        || message.starts_with("Unexpected token in attributes")
+        || message.starts_with("Unexpected token at top level")
+        || message.starts_with("Multiple root nodes detected");
+    if !is_markup_parse {
+        return None;
+    }
+    let (line, column) = line_column_from_message(message).unwrap_or((1, 1));
+    Some(CompileDiagnostic {
+        code: "ZEN-MARKUP-PARSE".to_string(),
+        message: message.to_string(),
+        severity: CompileDiagnosticSeverity::Error,
+        range: single_char_range(line, column),
+        source: "compiler".to_string(),
+        suggestion: Some("Fix the malformed Zenith markup.".to_string()),
+        fixes: Vec::new(),
+        related_information: Vec::new(),
+        tags: Vec::new(),
+        docs_path: Some("docs/documentation/guides/troubleshooting.md".to_string()),
+    })
+}
+
+fn line_column_from_message(message: &str) -> Option<(usize, usize)> {
+    let line_col_re = Regex::new(r"at line (\d+), column (\d+)").ok()?;
+    let captures = line_col_re.captures(message)?;
+    let line = captures
+        .get(1)
+        .and_then(|m| m.as_str().parse::<usize>().ok())
+        .unwrap_or(1);
+    let column = captures
+        .get(2)
+        .and_then(|m| m.as_str().parse::<usize>().ok())
+        .unwrap_or(1);
+    Some((line, column))
+}
+
+fn foreign_syntax_diagnostic_from_message(message: &str, input: &str) -> Option<CompileDiagnostic> {
     let (code, docs_path) = if message.starts_with("Invalid Zenith control syntax: ") {
         (
             "ZEN-TPL-FOREIGN-CONTROL",
             "docs/documentation/guides/troubleshooting.md",
         )
     } else if message.starts_with("Invalid Zenith event syntax: ") {
-        ("ZEN-EVT-FOREIGN-SYNTAX", "docs/documentation/syntax/events.md")
+        (
+            "ZEN-EVT-FOREIGN-SYNTAX",
+            "docs/documentation/syntax/events.md",
+        )
     } else {
         return None;
     };

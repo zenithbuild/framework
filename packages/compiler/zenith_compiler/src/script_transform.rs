@@ -3,11 +3,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use tree_sitter::Node;
 
 use crate::expression_scope::{
-    apply_rewrites, collect_block_scope_bindings, collect_function_scope_bindings,
-    collect_parameter_bindings, collect_pattern_bindings, collect_variable_declaration_bindings,
-    node_text, parse_typescript, scope_contains, ReplacementEdit,
+    apply_rewrites, collect_block_scope_bindings, collect_function_parameter_bindings,
+    collect_function_scope_bindings, collect_pattern_bindings,
+    collect_variable_declaration_bindings, node_text, scope_contains, ReplacementEdit,
 };
+use crate::expression_syntax::parse_valid_typescript;
 use crate::script::{HoistedBinding, HoistedBindingKind};
+use crate::script_patterns::{
+    classify_binding_kind, collect_binding_declarations_from_pattern,
+    collect_binding_pattern_renames, PatternBindingDeclaration,
+};
+use crate::script_sections::{
+    collect_import_ranges, collect_top_level_declarations, dedupe_preserve_order, remove_ranges,
+};
+use crate::script_state::{normalize_state_declarations, StateDeclaration};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StructuredScriptAnalysis {
@@ -18,20 +27,7 @@ pub(crate) struct StructuredScriptAnalysis {
     pub(crate) bindings: Vec<HoistedBinding>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct StateDeclaration {
-    statement_start: usize,
-    keyword_start: usize,
-    keyword_end: usize,
-    name: String,
-}
-
-#[derive(Debug, Clone)]
-struct BindingDeclaration {
-    identifier_start: usize,
-    original: String,
-    kind: HoistedBindingKind,
-}
+type BindingDeclaration = PatternBindingDeclaration;
 
 pub(crate) fn analyze_component_script_structure(
     source: &str,
@@ -39,8 +35,8 @@ pub(crate) fn analyze_component_script_structure(
     rename_prefix: &str,
 ) -> Result<StructuredScriptAnalysis, String> {
     let (normalized_source, state_declarations) = normalize_state_declarations(source);
-    let tree = parse_typescript(&normalized_source)
-        .ok_or_else(|| "failed to parse component script for structural lowering".to_string())?;
+    let tree = parse_valid_typescript(&normalized_source)
+        .map_err(|_| "invalid TypeScript syntax in component script".to_string())?;
     let root = tree.root_node();
 
     let import_ranges = collect_import_ranges(root);
@@ -135,23 +131,13 @@ fn collect_top_level_bindings(
                     let Some(name) = declarator.child_by_field_name("name") else {
                         continue;
                     };
-                    if name.kind() != "identifier" {
-                        continue;
-                    }
-                    let ident = node_text(name, source).to_string();
-                    if ident.is_empty() {
-                        continue;
-                    }
-                    let kind = if matches!(kind_override, Some(state) if state.name == ident) {
+                    let kind = if matches!(kind_override, Some(state) if node_text(name, source) == state.name)
+                    {
                         HoistedBindingKind::State
                     } else {
                         classify_binding_kind(declarator, source)
                     };
-                    declared.push(BindingDeclaration {
-                        identifier_start: name.start_byte(),
-                        original: ident,
-                        kind,
-                    });
+                    collect_binding_declarations_from_pattern(name, source, kind, &mut declared);
                 }
             }
             _ => {}
@@ -159,25 +145,6 @@ fn collect_top_level_bindings(
     }
     declared.sort_by(|left, right| left.identifier_start.cmp(&right.identifier_start));
     Ok(declared)
-}
-
-fn classify_binding_kind(declarator: Node<'_>, source: &str) -> HoistedBindingKind {
-    let Some(initializer) = declarator
-        .child_by_field_name("value")
-        .or_else(|| declarator.named_child(1))
-    else {
-        return HoistedBindingKind::Const;
-    };
-    let text = node_text(initializer, source).trim_start();
-    if text.starts_with("signal(") {
-        HoistedBindingKind::Signal
-    } else if text.starts_with("state(") {
-        HoistedBindingKind::State
-    } else if text.starts_with("ref(") || text.starts_with("ref<") {
-        HoistedBindingKind::Ref
-    } else {
-        HoistedBindingKind::Const
-    }
 }
 
 struct ScriptTransformer<'a> {
@@ -272,12 +239,10 @@ impl<'a> ScriptTransformer<'a> {
                 collect_pattern_bindings(name, self.normalized_source, &mut function_scope);
             }
         }
-        if let Some(parameters) = node.child_by_field_name("parameters") {
-            function_scope.extend(collect_parameter_bindings(
-                parameters,
-                self.normalized_source,
-            ));
-        }
+        function_scope.extend(collect_function_parameter_bindings(
+            node,
+            self.normalized_source,
+        ));
         if let Some(body) = node.child_by_field_name("body") {
             collect_function_scope_bindings(body, self.normalized_source, &mut function_scope);
         }
@@ -360,7 +325,7 @@ impl<'a> ScriptTransformer<'a> {
                 let Some(name) = declarator.child_by_field_name("name") else {
                     continue;
                 };
-                self.rename_binding_identifier(name);
+                self.rename_binding_pattern(name);
                 let initializer = declarator
                     .child_by_field_name("value")
                     .or_else(|| declarator.named_child(1));
@@ -406,6 +371,16 @@ impl<'a> ScriptTransformer<'a> {
         };
         let renamed = binding.renamed.clone();
         self.replace(node.start_byte(), node.end_byte(), renamed);
+    }
+
+    fn rename_binding_pattern(&mut self, node: Node<'_>) {
+        collect_binding_pattern_renames(
+            node,
+            self.normalized_source,
+            &self.bindings_by_name,
+            false,
+            &mut self.edits,
+        );
     }
 
     fn try_rewrite_state_assignment(
@@ -505,290 +480,4 @@ impl<'a> ScriptTransformer<'a> {
             Some(property) if matches!(node_text(property, self.normalized_source), "get" | "set")
         )
     }
-}
-
-fn collect_top_level_declarations(source: &str) -> Vec<String> {
-    let Some(tree) = parse_typescript(source) else {
-        return Vec::new();
-    };
-    let root = tree.root_node();
-    let mut declarations = Vec::new();
-    let mut cursor = root.walk();
-    for child in root.named_children(&mut cursor) {
-        if matches!(child.kind(), "lexical_declaration" | "variable_declaration") {
-            declarations.push(
-                source[child.start_byte()..child.end_byte()]
-                    .trim()
-                    .to_string(),
-            );
-        }
-    }
-    declarations
-}
-
-fn collect_import_ranges(root: Node<'_>) -> Vec<(usize, usize)> {
-    let mut ranges = Vec::new();
-    let mut cursor = root.walk();
-    for child in root.named_children(&mut cursor) {
-        if child.kind() == "import_statement" {
-            ranges.push((child.start_byte(), child.end_byte()));
-        }
-    }
-    ranges
-}
-
-fn remove_ranges(source: &str, ranges: &[(usize, usize)]) -> String {
-    if ranges.is_empty() {
-        return source.to_string();
-    }
-    let mut out = String::with_capacity(source.len());
-    let mut cursor = 0usize;
-    for (start, end) in ranges {
-        let bounded_start = (*start).min(source.len());
-        let bounded_end = (*end).min(source.len());
-        if cursor < bounded_start {
-            out.push_str(&source[cursor..bounded_start]);
-        }
-        cursor = bounded_end;
-    }
-    if cursor < source.len() {
-        out.push_str(&source[cursor..]);
-    }
-    out
-}
-
-fn dedupe_preserve_order(items: Vec<String>) -> Vec<String> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::new();
-    for item in items {
-        if seen.insert(item.clone()) {
-            out.push(item);
-        }
-    }
-    out
-}
-
-fn normalize_state_declarations(source: &str) -> (String, Vec<StateDeclaration>) {
-    let bytes = source.as_bytes();
-    let mut normalized = bytes.to_vec();
-    let mut declarations = Vec::new();
-    let mut i = 0usize;
-    let mut brace_depth = 0usize;
-    let mut regex_allowed = true;
-    let mut template_stack: Vec<usize> = Vec::new();
-
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\'' | b'"' => {
-                i = skip_quoted(bytes, i);
-                regex_allowed = false;
-            }
-            b'`' => {
-                i += 1;
-                while i < bytes.len() {
-                    match bytes[i] {
-                        b'\\' => i = (i + 2).min(bytes.len()),
-                        b'`' => {
-                            i += 1;
-                            break;
-                        }
-                        b'$' if i + 1 < bytes.len() && bytes[i + 1] == b'{' => {
-                            template_stack.push(brace_depth);
-                            i += 2;
-                            break;
-                        }
-                        _ => i += 1,
-                    }
-                }
-                regex_allowed = false;
-            }
-            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'/' => i = skip_line_comment(bytes, i),
-            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => i = skip_block_comment(bytes, i),
-            b'/' if regex_allowed => {
-                i = skip_regex_literal(bytes, i);
-                regex_allowed = false;
-            }
-            b'{' => {
-                brace_depth += 1;
-                regex_allowed = true;
-                i += 1;
-            }
-            b'}' => {
-                if let Some(previous_depth) = template_stack.last().copied() {
-                    if brace_depth == previous_depth {
-                        template_stack.pop();
-                        i += 1;
-                        while i < bytes.len() {
-                            match bytes[i] {
-                                b'\\' => i = (i + 2).min(bytes.len()),
-                                b'`' => {
-                                    i += 1;
-                                    break;
-                                }
-                                b'$' if i + 1 < bytes.len() && bytes[i + 1] == b'{' => {
-                                    template_stack.push(brace_depth);
-                                    i += 2;
-                                    break;
-                                }
-                                _ => i += 1,
-                            }
-                        }
-                        regex_allowed = false;
-                        continue;
-                    }
-                }
-                brace_depth = brace_depth.saturating_sub(1);
-                regex_allowed = false;
-                i += 1;
-            }
-            ch if is_identifier_start(ch) => {
-                let end = scan_identifier(bytes, i);
-                if brace_depth == 0
-                    && &source[i..end] == "state"
-                    && is_boundary_before(bytes, i)
-                    && is_boundary_after(bytes, end)
-                {
-                    let mut cursor = skip_space(bytes, end);
-                    let name_start = cursor;
-                    if cursor < bytes.len() && is_identifier_start(bytes[cursor]) {
-                        cursor = scan_identifier(bytes, cursor);
-                        let name = &source[name_start..cursor];
-                        let next = skip_space(bytes, cursor);
-                        if next < bytes.len() && bytes[next] == b'=' {
-                            normalized[i..end].copy_from_slice(b"const");
-                            declarations.push(StateDeclaration {
-                                statement_start: i,
-                                keyword_start: i,
-                                keyword_end: end,
-                                name: name.to_string(),
-                            });
-                        }
-                    }
-                }
-                regex_allowed = false;
-                i = end;
-            }
-            ch if ch.is_ascii_digit() => {
-                i = skip_number(bytes, i);
-                regex_allowed = false;
-            }
-            b'(' | b'[' | b',' | b';' | b':' | b'?' | b'=' => {
-                regex_allowed = true;
-                i += 1;
-            }
-            b'.' | b')' | b']' => {
-                regex_allowed = false;
-                i += 1;
-            }
-            _ => {
-                regex_allowed = !bytes[i].is_ascii_whitespace();
-                i += 1;
-            }
-        }
-    }
-
-    (
-        String::from_utf8(normalized).unwrap_or_else(|_| source.to_string()),
-        declarations,
-    )
-}
-
-fn is_identifier_start(ch: u8) -> bool {
-    ch == b'_' || ch == b'$' || ch.is_ascii_alphabetic()
-}
-
-fn is_identifier_continue(ch: u8) -> bool {
-    is_identifier_start(ch) || ch.is_ascii_digit()
-}
-
-fn scan_identifier(bytes: &[u8], mut i: usize) -> usize {
-    while i < bytes.len() && is_identifier_continue(bytes[i]) {
-        i += 1;
-    }
-    i
-}
-
-fn skip_space(bytes: &[u8], mut i: usize) -> usize {
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-        i += 1;
-    }
-    i
-}
-
-fn is_boundary_before(bytes: &[u8], start: usize) -> bool {
-    start == 0 || !is_identifier_continue(bytes[start - 1])
-}
-
-fn is_boundary_after(bytes: &[u8], end: usize) -> bool {
-    end >= bytes.len() || !is_identifier_continue(bytes[end])
-}
-
-fn skip_quoted(bytes: &[u8], start: usize) -> usize {
-    let quote = bytes[start];
-    let mut i = start + 1;
-    while i < bytes.len() {
-        if bytes[i] == b'\\' {
-            i = (i + 2).min(bytes.len());
-            continue;
-        }
-        if bytes[i] == quote {
-            return i + 1;
-        }
-        i += 1;
-    }
-    bytes.len()
-}
-
-fn skip_line_comment(bytes: &[u8], start: usize) -> usize {
-    let mut i = start + 2;
-    while i < bytes.len() && bytes[i] != b'\n' {
-        i += 1;
-    }
-    i
-}
-
-fn skip_block_comment(bytes: &[u8], start: usize) -> usize {
-    let mut i = start + 2;
-    while i + 1 < bytes.len() {
-        if bytes[i] == b'*' && bytes[i + 1] == b'/' {
-            return i + 2;
-        }
-        i += 1;
-    }
-    bytes.len()
-}
-
-fn skip_number(bytes: &[u8], start: usize) -> usize {
-    let mut i = start;
-    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || matches!(bytes[i], b'.' | b'_')) {
-        i += 1;
-    }
-    i
-}
-
-fn skip_regex_literal(bytes: &[u8], start: usize) -> usize {
-    let mut i = start + 1;
-    let mut in_class = false;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\\' => i = (i + 2).min(bytes.len()),
-            b'[' => {
-                in_class = true;
-                i += 1;
-            }
-            b']' => {
-                in_class = false;
-                i += 1;
-            }
-            b'/' if !in_class => {
-                i += 1;
-                while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
-                    i += 1;
-                }
-                return i;
-            }
-            _ => i += 1,
-        }
-    }
-    bytes.len()
 }
