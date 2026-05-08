@@ -46,6 +46,10 @@ const SERVER_RUNTIME_FILES = [
         to: 'images/shared.js'
     },
     {
+        from: new URL('./images/remote-fetch.js', import.meta.url),
+        to: 'images/remote-fetch.js'
+    },
+    {
         from: new URL('./images/runtime.js', import.meta.url),
         to: 'images/runtime.js'
     },

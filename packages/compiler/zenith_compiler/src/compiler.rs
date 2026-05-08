@@ -1,14 +1,16 @@
 use crate::codegen::generate;
 use crate::compiler_diagnostics::{diagnostic_from_error_message, map_warning_diagnostic};
 use crate::compiler_expression_bindings::map_expression_bindings;
+use crate::compiler_expression_validate::validate_unbound_expressions;
+use crate::compiler_panic::catch_unwind_silent;
 use crate::compiler_payload_map::{
     map_component_instances, map_component_scripts, map_events, map_hoisted, map_markers,
     map_ref_bindings, map_signals, map_warnings, strip_html_comments,
 };
-use crate::foreign_syntax::reject_foreign_zenith_syntax;
 use crate::compiler_profile::{
     compiler_profile_enabled, emit_compiler_profile, CompileInternalTimings,
 };
+use crate::foreign_syntax::reject_foreign_zenith_syntax;
 use crate::parser::Parser;
 use crate::script::{
     extract_script_blocks_with_profile, ComponentInstanceBinding, ComponentScriptAsset,
@@ -98,7 +100,7 @@ pub fn compile_structured_with_source_unchecked(input: &str, source_path: &str) 
 /// Compile a template into a full TypeScript module string.
 /// Used by the CLI and for human-readable output.
 pub fn compile(input: &str) -> Result<String, String> {
-    let result = std::panic::catch_unwind(|| {
+    let result = catch_unwind_silent(|| {
         let options = CompileOptions::default();
         let (
             ast,
@@ -195,6 +197,16 @@ fn compile_internal_result(
         ref_bindings,
         mut warnings,
     ) = transform(ast, &scripts);
+    if !options.internal_allow_unbound_markup {
+        validate_unbound_expressions(
+            &raw_expressions,
+            &scripts,
+            &component_scripts,
+            &markers,
+            &ref_bindings,
+            &component_instances,
+        )?;
+    }
     if let Some(timings) = timings.as_deref_mut() {
         timings.transform_ms = transform_started_at.elapsed().as_secs_f64() * 1000.0;
     }
@@ -233,7 +245,7 @@ fn compile_capture(
     source_path: &str,
     options: CompileOptions,
 ) -> Result<(CompilerOutput, Vec<CompileWarning>), String> {
-    let result = std::panic::catch_unwind(|| {
+    let result = catch_unwind_silent(|| {
         let (
             html,
             expressions,

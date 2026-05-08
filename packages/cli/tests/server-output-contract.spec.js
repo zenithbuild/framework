@@ -169,6 +169,7 @@ describe('server output contract', () => {
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-error.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'payload.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'materialize.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'remote-fetch.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'service.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'entry.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'page.html'))).toBe(true);

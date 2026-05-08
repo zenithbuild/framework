@@ -115,9 +115,34 @@ pub(crate) fn collect_pattern_bindings(
 
 pub(crate) fn collect_parameter_bindings(node: Node<'_>, source: &str) -> BTreeSet<String> {
     let mut bindings = BTreeSet::new();
+    collect_pattern_bindings(node, source, &mut bindings);
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
         collect_pattern_bindings(child, source, &mut bindings);
+    }
+    bindings
+}
+
+pub(crate) fn collect_function_parameter_bindings(
+    node: Node<'_>,
+    source: &str,
+) -> BTreeSet<String> {
+    if let Some(parameters) = node.child_by_field_name("parameters") {
+        return collect_parameter_bindings(parameters, source);
+    }
+    let mut bindings = BTreeSet::new();
+    if node.kind() == "arrow_function" {
+        let body_start = node
+            .child_by_field_name("body")
+            .map(|body| body.start_byte())
+            .unwrap_or(node.end_byte());
+        let mut cursor = node.walk();
+        for child in node.named_children(&mut cursor) {
+            if child.start_byte() >= body_start {
+                continue;
+            }
+            bindings.extend(collect_parameter_bindings(child, source));
+        }
     }
     bindings
 }
@@ -264,9 +289,7 @@ impl<'a> Analyzer<'a> {
             }
         }
 
-        if let Some(parameters) = node.child_by_field_name("parameters") {
-            function_scope.extend(collect_parameter_bindings(parameters, self.source));
-        }
+        function_scope.extend(collect_function_parameter_bindings(node, self.source));
         if let Some(body) = node.child_by_field_name("body") {
             collect_function_scope_bindings(body, self.source, &mut function_scope);
         }

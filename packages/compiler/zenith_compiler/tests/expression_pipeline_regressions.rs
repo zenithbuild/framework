@@ -12,6 +12,7 @@ fn compile_with_options(
         CompileOptions {
             embedded_markup_expressions,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
 }
@@ -282,6 +283,7 @@ const items = [1, 2, 3];
 #[test]
 fn compiled_embedded_markup_uses_ctx_fragment_in_runtime_expression_scope() {
     let input = r#"
+<script lang="ts">const cond = true</script>
 <main>{cond ? (<a>Hi</a>) : "__zenith_fragment literal"}</main>
 "#;
 

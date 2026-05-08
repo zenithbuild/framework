@@ -1,12 +1,11 @@
-import { lookup } from 'node:dns/promises';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, stat, writeFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import sharp from 'sharp';
+import { fetchRemoteImage, isLocalNetworkAddress, resolveRemoteTarget, validateRemoteTarget } from './remote-fetch.js';
 import {
     buildLocalImageKey,
     buildLocalVariantAssetPath,
-    matchRemotePattern,
     normalizeImageConfig,
     normalizeImageFormat
 } from './shared.js';
@@ -19,31 +18,6 @@ const MIME_BY_FORMAT = {
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg'
 };
-
-function isPrivateIp(address) {
-    if (!address) {
-        return false;
-    }
-    if (address === '::1' || address === '127.0.0.1') {
-        return true;
-    }
-    if (address.startsWith('10.') || address.startsWith('192.168.')) {
-        return true;
-    }
-    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(address)) {
-        return true;
-    }
-    if (/^(fc|fd)/i.test(address.replace(/:/g, ''))) {
-        return true;
-    }
-    return false;
-}
-
-function isLoopbackHostname(hostname) {
-    const normalized = String(hostname || '').toLowerCase();
-    return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
-}
-
 function mimeTypeForFormat(format) {
     return MIME_BY_FORMAT[normalizeImageFormat(format)] || 'application/octet-stream';
 }
@@ -194,23 +168,6 @@ export async function buildImageArtifacts(options) {
     return { manifest };
 }
 
-async function validateRemoteTarget(remoteUrl, config) {
-    const url = new URL(remoteUrl);
-    if (!matchRemotePattern(url, config.remotePatterns)) {
-        throw new Error('[Zenith:Image] Remote URL is not allowed by images.remotePatterns');
-    }
-    if (!config.dangerouslyAllowLocalNetwork) {
-        if (isLoopbackHostname(url.hostname)) {
-            throw new Error('[Zenith:Image] Loopback and local network image fetches are blocked');
-        }
-        const resolved = await lookup(url.hostname, { all: true });
-        if (resolved.some((entry) => isPrivateIp(entry.address))) {
-            throw new Error('[Zenith:Image] Private network image fetches are blocked');
-        }
-    }
-    return url;
-}
-
 async function readRemoteBuffer(response, maxBytes) {
     const reader = response.body?.getReader?.();
     if (!reader) {
@@ -315,12 +272,7 @@ async function createImageResponse(options) {
             return createBufferResponse(200, contentType, cached, config.minimumCacheTTL);
         }
 
-        const response = await fetch(remote, {
-            headers: {
-                'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.1'
-            },
-            redirect: 'follow'
-        });
+        const response = await fetchRemoteImage(remote, config);
         if (!response.ok) {
             throw new Error(`[Zenith:Image] Remote image fetch failed with status ${response.status}`);
         }
@@ -376,3 +328,10 @@ export async function handleImageRequest(_req, res, options) {
     await sendResponse(res, response);
     return true;
 }
+
+export const __imageServiceTestHooks = {
+    fetchRemoteImage,
+    isLocalNetworkAddress,
+    resolveRemoteTarget,
+    validateRemoteTarget
+};

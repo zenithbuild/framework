@@ -29,6 +29,9 @@ struct Cli {
     #[arg(long = "strict-dom-lints")]
     strict_dom_lints: bool,
 
+    #[arg(long = "internal-allow-unbound-markup", hide = true)]
+    internal_allow_unbound_markup: bool,
+
     /// Build `image_materialization` from marker bindings + static props object literals (stdin JSON).
     #[arg(long = "merge-image-materialization")]
     merge_image_materialization: bool,
@@ -91,6 +94,7 @@ fn main() -> Result<()> {
         CompileOptions {
             embedded_markup_expressions: cli.embedded_markup_expressions,
             strict_dom_lints: cli.strict_dom_lints,
+            internal_allow_unbound_markup: cli.internal_allow_unbound_markup,
         },
     );
     for warning in &report.warnings {

@@ -99,6 +99,9 @@ export function runCompiler(filePath, stdinSource, compilerOpts = {}, compilerRu
     if (compilerOpts?.strictDomLints) {
         args.push('--strict-dom-lints');
     }
+    if (compilerOpts?.internalAllowUnboundMarkup) {
+        args.push('--internal-allow-unbound-markup');
+    }
     const opts = {
         encoding: 'utf8',
         maxBuffer: COMPILER_SPAWN_MAX_BUFFER

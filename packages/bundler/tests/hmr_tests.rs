@@ -58,7 +58,8 @@ fn hmr_footer_structure() {
 /// In dev mode, appending HMR footer to compiled output works correctly.
 #[test]
 fn hmr_footer_appended_in_dev() {
-    let (js, _) = compile_zen_source("<h1>{title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) =
+        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     // Simulate what the transform hook does
     let with_hmr = format!("{}{}", js, HMR_FOOTER);
@@ -73,7 +74,8 @@ fn hmr_footer_appended_in_dev() {
 /// In prod mode, no HMR code should be present.
 #[test]
 fn hmr_footer_absent_in_prod() {
-    let (js, _) = compile_zen_source("<h1>{title}</h1>", "page.zen", &prod_config()).unwrap();
+    let (js, _) =
+        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &prod_config()).unwrap();
 
     assert!(!js.contains(HMR_MARKER), "HMR marker found in prod output");
     assert!(
@@ -86,7 +88,7 @@ fn hmr_footer_absent_in_prod() {
 #[test]
 fn hmr_does_not_mutate_expressions() {
     let (js_before, compiled) = compile_zen_source(
-        "<div><span>{a}</span><span>{b}</span></div>",
+        "<div><span>{props.a}</span><span>{props.b}</span></div>",
         "page.zen",
         &dev_config(),
     )
@@ -96,7 +98,7 @@ fn hmr_does_not_mutate_expressions() {
     let js_after = format!("{}{}", js_before, HMR_FOOTER);
 
     // Expression table must be unchanged
-    assert_eq!(compiled.expressions, vec!["a", "b"]);
+    assert_eq!(compiled.expressions, vec!["props.a", "props.b"]);
 
     // The __zenith_expr line must be identical
     let expr_line_before = js_before
@@ -113,7 +115,8 @@ fn hmr_does_not_mutate_expressions() {
 /// Multiple rebuilds must not duplicate the HMR footer.
 #[test]
 fn hmr_multiple_rebuilds_no_duplication() {
-    let (js, _) = compile_zen_source("<h1>{title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) =
+        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     // Simulate 5 rebuilds
     let mut code = format!("{}{}", js, HMR_FOOTER);
@@ -136,7 +139,7 @@ fn hmr_multiple_rebuilds_no_duplication() {
 /// HMR footer position: must appear after all exports.
 #[test]
 fn hmr_footer_position_snapshot() {
-    let (js, _) = compile_zen_source("<div>{x}</div>", "page.zen", &dev_config()).unwrap();
+    let (js, _) = compile_zen_source("<div>{props.x}</div>", "page.zen", &dev_config()).unwrap();
     let with_hmr = format!("{}{}", js, HMR_FOOTER);
 
     // Find positions
@@ -154,7 +157,7 @@ fn hmr_footer_position_snapshot() {
 /// HMR must not re-order exports.
 #[test]
 fn hmr_no_export_reorder() {
-    let (js, _) = compile_zen_source("<div>{x}</div>", "page.zen", &dev_config()).unwrap();
+    let (js, _) = compile_zen_source("<div>{props.x}</div>", "page.zen", &dev_config()).unwrap();
     let with_hmr = format!("{}{}", js, HMR_FOOTER);
 
     // __zenith_html must still come before __zenith_expr
@@ -288,7 +291,7 @@ fn css_dirty_tracking_thread_safe() {
 /// Bundle in dev mode vs prod mode: expressions identical.
 #[tokio::test]
 async fn dev_and_prod_expressions_identical() {
-    let file = create_temp_zen("<div>{title}</div>");
+    let file = create_temp_zen("<div>{props.title}</div>");
     let path = file.path().to_string_lossy().to_string();
 
     let dev_result = bundle_page(
@@ -326,7 +329,8 @@ async fn dev_and_prod_expressions_identical() {
 /// Brutal HMR rebuild cycle: 10 iterations, exactly one marker.
 #[test]
 fn hmr_brutal_rebuild_cycles() {
-    let (js, _) = compile_zen_source("<h1>{title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) =
+        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     let mut code = js.clone();
     for _ in 0..10 {
@@ -352,7 +356,7 @@ fn hmr_brutal_rebuild_cycles() {
 /// This proves HMR is purely additive.
 #[tokio::test]
 async fn hmr_file_sha_identical_except_footer() {
-    let file = create_temp_zen("<div>{title}</div>");
+    let file = create_temp_zen("<div>{props.title}</div>");
     let path = file.path().to_string_lossy().to_string();
 
     let dev_result = bundle_page(

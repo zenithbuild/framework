@@ -108,7 +108,7 @@ impl<'a> Parser<'a> {
                             let value = self.lexer.lex_expression_content();
                             let end_offset_exclusive = self.lexer.current_offset();
                             self.sync_current_token();
-                            let value = self.contract_gate_expression(&value);
+                            let value = self.contract_gate_expression(&value, attr_name_offset);
                             let span =
                                 self.span_for_offsets(attr_name_offset, end_offset_exclusive);
 
@@ -222,15 +222,17 @@ impl<'a> Parser<'a> {
                         if s == "/" {
                             // Closing tag candidate
                             self.advance(); // Eat /
-                            if let Token::Identifier(name) = &self.current_token {
+                            if let Token::Identifier(name) = self.current_token.clone() {
                                 if name == parent_tag {
                                     self.advance(); // Eat tag name
                                     self.expect(Token::Gt); // Eat >
                                     break children;
                                 } else {
+                                    let location =
+                                        self.location_for_offset(self.current_token_start);
                                     panic!(
-                                        "Mismatched closing tag: expected </{}>, found </{}>",
-                                        parent_tag, name
+                                        "Mismatched closing tag: expected </{}>, found </{}> at line {}, column {}.",
+                                        parent_tag, name, location.line, location.column
                                     );
                                 }
                             } else {
@@ -250,7 +252,13 @@ impl<'a> Parser<'a> {
                     let child = self.parse_element_tail();
                     children.push(child);
                 }
-                Token::EOF => panic!("Unexpected EOF while parsing children of <{}>", parent_tag),
+                Token::EOF => {
+                    let location = self.location_for_offset(self.current_token_start);
+                    panic!(
+                        "Unexpected EOF while parsing children of <{}> at line {}, column {}.",
+                        parent_tag, location.line, location.column
+                    );
+                }
                 _ => {
                     // Text or Expression
                     children.push(self.parse_node());

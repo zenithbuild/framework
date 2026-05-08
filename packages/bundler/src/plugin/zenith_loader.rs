@@ -357,10 +357,11 @@ mod tests {
     #[test]
     fn compile_zen_source_basic() {
         let config = loader_config_no_metadata();
-        let (js, compiled) = compile_zen_source("<h1>{title}</h1>", "page.zen", &config).unwrap();
+        let (js, compiled) =
+            compile_zen_source("<h1>{props.title}</h1>", "page.zen", &config).unwrap();
         assert!(js.contains("__zenith_html"));
         assert!(js.contains("__zenith_expr"));
-        assert_eq!(compiled.expressions, vec!["title"]);
+        assert_eq!(compiled.expressions, vec!["props.title"]);
     }
 
     #[test]
@@ -373,31 +374,34 @@ mod tests {
 
     #[test]
     fn compile_zen_source_strict_match() {
-        let config = loader_config_with_metadata(vec!["title".into()]);
-        let result = compile_zen_source("<h1>{title}</h1>", "page.zen", &config);
+        let config = loader_config_with_metadata(vec!["props.title".into()]);
+        let result = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &config);
         assert!(result.is_ok());
     }
 
     #[test]
     fn compile_zen_source_multiple_expressions() {
         let config = loader_config_no_metadata();
-        let (_, compiled) =
-            compile_zen_source(r#"<div><h1>{a}</h1><p>{b}</p></div>"#, "page.zen", &config)
-                .unwrap();
-        assert_eq!(compiled.expressions, vec!["a", "b"]);
+        let (_, compiled) = compile_zen_source(
+            r#"<div><h1>{props.a}</h1><p>{props.b}</p></div>"#,
+            "page.zen",
+            &config,
+        )
+        .unwrap();
+        assert_eq!(compiled.expressions, vec!["props.a", "props.b"]);
     }
 
     #[test]
     fn compile_zen_source_with_event() {
         let config = loader_config_no_metadata();
         let (js, compiled) = compile_zen_source(
-            r#"<button on:click={handler}>Go</button>"#,
+            r#"<button on:click={props.handler}>Go</button>"#,
             "page.zen",
             &config,
         )
         .unwrap();
-        assert_eq!(compiled.expressions, vec!["handler"]);
-        assert!(js.contains("\"handler\""));
+        assert_eq!(compiled.expressions, vec!["props.handler"]);
+        assert!(js.contains("\"props.handler\""));
     }
 
     #[test]

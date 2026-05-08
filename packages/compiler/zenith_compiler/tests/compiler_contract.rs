@@ -18,17 +18,18 @@ fn compile_structured_ok(input: &str) -> CompilerOutput {
 
 #[test]
 fn compile_structured_returns_correct_shape() {
-    let result = compile_structured_ok("<h1>{title}</h1>");
+    let result = compile_structured_ok("<h1>{props.title}</h1>");
 
     assert_eq!(result.ir_version, IR_VERSION);
-    assert_eq!(result.expressions, vec!["title"]);
+    assert_eq!(result.expressions, vec!["props.title"]);
     assert!(result.html.contains("<h1"));
     assert!(result.html.contains("data-zx-e=\"0\""));
 }
 
 #[test]
 fn compile_structured_matches_compile_html() {
-    let input = r#"<div id="app"><h1>{title}</h1><button on:click={save}>Save</button></div>"#;
+    let input =
+        r#"<div id="app"><h1>{props.title}</h1><button on:click={props.save}>Save</button></div>"#;
 
     let structured = compile_structured_ok(input);
     let full = compile(input);
@@ -44,11 +45,14 @@ fn compile_structured_matches_compile_html() {
 
 #[test]
 fn compile_structured_expressions_match_compile() {
-    let input = r#"<div title={a}>{b}<span>{c}</span></div>"#;
+    let input = r#"<div title={props.a}>{props.b}<span>{props.c}</span></div>"#;
 
     let structured = compile_structured_ok(input);
 
-    assert_eq!(structured.expressions, vec!["a", "b", "c"]);
+    assert_eq!(
+        structured.expressions,
+        vec!["props.a", "props.b", "props.c"]
+    );
 }
 
 #[test]
@@ -104,17 +108,17 @@ fn compile_structured_empty_expressions_for_static() {
 
 #[test]
 fn compile_structured_per_file_isolation() {
-    let a = compile_structured_ok("<div>{x}</div>");
-    let b = compile_structured_ok("<div>{y}</div>");
+    let a = compile_structured_ok("<div>{props.x}</div>");
+    let b = compile_structured_ok("<div>{props.y}</div>");
 
     // No shared state between calls
-    assert_eq!(a.expressions, vec!["x"]);
-    assert_eq!(b.expressions, vec!["y"]);
+    assert_eq!(a.expressions, vec!["props.x"]);
+    assert_eq!(b.expressions, vec!["props.y"]);
 }
 
 #[test]
 fn compile_structured_preserves_style_text_without_expression_markers() {
-    let input = r#"<main><style>main{display:block;}</style><h1>{title}</h1></main>"#;
+    let input = r#"<main><style>main{display:block;}</style><h1>{props.title}</h1></main>"#;
 
     let structured = compile_structured_ok(input);
     let full = compile(input);
@@ -122,6 +126,6 @@ fn compile_structured_preserves_style_text_without_expression_markers() {
     assert!(structured
         .html
         .contains("<style>main{display:block;}</style>"));
-    assert_eq!(structured.expressions, vec!["title"]);
+    assert_eq!(structured.expressions, vec!["props.title"]);
     assert!(!full.contains("\"main\" + (display)"));
 }
