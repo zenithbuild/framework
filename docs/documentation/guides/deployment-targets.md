@@ -3,7 +3,7 @@ title: "Deployment Targets Guide"
 description: "Canonical target matrix for Zenith build output, preview behavior, and current deployment limitations."
 version: "0.2"
 status: "canonical"
-last_updated: "2026-04-01"
+last_updated: "2026-05-08"
 tags: ["guides", "deployment", "build"]
 ---
 
@@ -91,6 +91,7 @@ For larger files, we recommend using a direct-to-storage upload strategy (e.g., 
 
 - There is no separate `assetPrefix` knob. Public assets intentionally follow `basePath` so the URL model stays single-source and deterministic.
 - `/_zenith/image` is deployed by `node`, `vercel`, and `netlify` on the same packaged image contract today.
+- Remote image optimization only fetches URLs allowed by `images.remotePatterns`. The image endpoint validates the resolved remote target before fetch, repeats that validation for redirects, and fetches through the validated target while preserving the original host semantics.
 - `bundler-owned final build/static HTML image materialization` remains the hard boundary; runtime paths only consume route artifacts.
 - `/__zenith/route-check` is deployed by local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` targets currently skip advisory route-check and rely on the direct HTML request instead.
 - Hosted `vercel` and `netlify` targets now support `multipart/form-data` parsing plus resource-route `stream(...)` and `sse(...)`.

@@ -460,6 +460,25 @@
       ]
     },
     {
+      "slug": "errors",
+      "title": "Errors",
+      "summary": "Build-time and runtime diagnostics with deterministic fix guidance.",
+      "order": 95,
+      "docs": [
+        {
+          "slug": "errors/index",
+          "title": "Error Reference Index",
+          "label": "Error Reference Index",
+          "url": "/docs/errors/index",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/errors/index.md"
+        }
+      ]
+    },
+    {
       "slug": "reference",
       "title": "Reference",
       "summary": "API and marker references for stable lookup.",
@@ -644,6 +663,7 @@
     "/docs/guides/interactive-demos",
     "/docs/guides/troubleshooting",
     "/docs/contributing/drift-gates",
+    "/docs/errors/index",
     "/docs/reference/markers",
     "/docs/reference/primitives-patterns",
     "/docs/reference/reactive-binding-model",

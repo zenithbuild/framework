@@ -46,6 +46,8 @@ Start here (ordered):
   - /docs/guides/troubleshooting
 - Contributing:
   - /docs/contributing/drift-gates
+- Errors:
+  - /docs/errors/index
 - Reference:
   - /docs/reference/markers
   - /docs/reference/primitives-patterns

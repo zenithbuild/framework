@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+#### Security
+
+- Hardened remote image optimization so allowed remote image URLs are resolved and validated before fetch, with the validated target pinned across the initial request and each redirect hop while preserving expected host semantics.
+
+#### Compiler diagnostics
+
+- Tightened event handler validation so direct-call handler forms are rejected consistently while preserving identifier/member references and inline function handlers.
+- Added stable compiler diagnostics for invalid scripts, invalid markup expressions, and clearly unbound markup identifiers: `ZEN-SCRIPT-SYNTAX`, `ZEN-EXPR-SYNTAX`, and `ZEN-EXPR-UNBOUND`.
+- Converted malformed markup parser failures into structured `ZEN-MARKUP-PARSE` diagnostics, including mismatched tags and unexpected EOF, without panic-style bridge output.
+
+#### Dev/CI maintenance
+
+- Kept Batch 1 regression coverage inside focused test files and fixed the PR touched-file audit path so CI can evaluate changed files from pull request checkouts.
+
 ## [0.7.10] - 2026-04-25
 
 ### Changed
