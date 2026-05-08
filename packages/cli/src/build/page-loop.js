@@ -163,16 +163,9 @@ export async function buildPageEnvelopes(input) {
             adjacentLoadPath: adjacentLoad,
             adjacentActionPath: adjacentAction
         });
-        const hasGuard = composedServer.serverScript?.has_guard === true;
-        const hasLoad = composedServer.serverScript?.has_load === true;
-        const hasAction = composedServer.serverScript?.has_action === true;
-
         applyServerEnvelopeToPageIr({
             pageIr,
             composedServer,
-            hasGuard,
-            hasLoad,
-            hasAction,
             entry,
             srcDir,
             sourceFile

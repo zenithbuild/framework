@@ -22,6 +22,7 @@ import { extractServerScript } from './build/server-script.js';
 import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
 import { validateStaticExportPaths } from './static-export-paths.js';
+import { classifyPageRoute } from './route-classification.js';
 
 /**
  * @typedef {{
@@ -173,13 +174,17 @@ function buildPageManifestEntry({ fullPath, root, routePath, compilerOpts }) {
     const exportPaths = Array.isArray(composed.serverScript?.export_paths)
         ? validateStaticExportPaths(routePath, composed.serverScript.export_paths, fullPath)
         : [];
+    const classification = classifyPageRoute({
+        file: relative(root, fullPath),
+        serverScript: composed.serverScript
+    });
 
     return {
         path: routePath,
         file: relative(root, fullPath),
         route_kind: 'page',
         path_kind: _isDynamic(routePath) ? 'dynamic' : 'static',
-        render_mode: composed.serverScript && composed.serverScript.prerender !== true ? 'server' : 'prerender',
+        render_mode: classification.renderMode,
         params: extractRouteParams(routePath),
         ...(exportPaths.length > 0 ? { export_paths: exportPaths } : {})
     };

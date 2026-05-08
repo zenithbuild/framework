@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadResourceRouteManifest } from './resource-manifest.js';
+import { assignServerRouteNames } from './server-route-names.js';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const RELATIVE_SPECIFIER_RE = /((?:import|export)\s+(?:[^'"]*?\s+from\s+)?|import\s*\()\s*(['"])([^'"]+)\2/g;
@@ -74,21 +75,6 @@ const SPECIAL_SERVER_SPECIFIERS = new Map([
     ['zenith:server-contract', 'server-contract.js'],
     ['zenith:route-auth', 'auth/route-auth.js']
 ]);
-
-function normalizeRouteName(routePath) {
-    if (routePath === '/') {
-        return 'index';
-    }
-    return routePath
-        .replace(/^\//, '')
-        .replace(/\/+/g, '_')
-        .replace(/:/g, 'param_')
-        .replace(/\*/g, 'splat_')
-        .replace(/\?/g, 'opt')
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_+|_+$/g, '');
-}
 
 function resolveTypeScriptApi(projectRoot) {
     try {
@@ -366,8 +352,7 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
     const imageManifestSource = join(staticDir, '_zenith', 'image', 'manifest.json');
     const emittedRoutes = [];
 
-    for (const route of serverRoutes) {
-        const name = normalizeRouteName(route.path);
+    for (const { route, name } of assignServerRouteNames(serverRoutes)) {
         const routeDir = join(serverDir, 'routes', name);
         await mkdir(routeDir, { recursive: true });
 

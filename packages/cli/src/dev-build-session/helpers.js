@@ -159,18 +159,38 @@ function collectTemplateClassSignature(envelope) {
 }
 
 export function buildPageOnlyFastPathSignature(envelope) {
+    const ir = envelope.ir || {};
     return stableJson({
         route: envelope.route,
         router: envelope.router === true,
+        interactivityShape: {
+            requiresJs: envelope.requires_js === true,
+            signals: Array.isArray(ir.signals) ? ir.signals.length : 0,
+            refs: Array.isArray(ir.ref_bindings) ? ir.ref_bindings.length : 0,
+            events: Array.isArray(ir.event_bindings)
+                ? ir.event_bindings.map((entry) => [entry.index, entry.event]).sort()
+                : [],
+            markers: Array.isArray(ir.marker_bindings)
+                ? ir.marker_bindings.map((entry) => [entry.index, entry.kind]).sort()
+                : [],
+            componentInstances: Array.isArray(ir.component_instances) ? ir.component_instances.length : 0,
+            hoistedCode: Array.isArray(ir.hoisted?.code)
+                ? ir.hoisted.code.filter((entry) => String(entry || '').trim().length > 0).length
+                : 0,
+            hoistedState: Array.isArray(ir.hoisted?.state) ? ir.hoisted.state.length : 0,
+            hoistedSignals: Array.isArray(ir.hoisted?.signals) ? ir.hoisted.signals.length : 0
+        },
         assetContract: collectEnvelopeAssetContract(envelope),
         templateClassSignature: collectTemplateClassSignature(envelope),
-        styleBlocks: envelope.ir.style_blocks || [],
-        serverScript: envelope.ir.server_script || null,
-        prerender: envelope.ir.prerender === true,
-        hasGuard: envelope.ir.has_guard === true,
-        hasLoad: envelope.ir.has_load === true,
-        guardModuleRef: envelope.ir.guard_module_ref || null,
-        loadModuleRef: envelope.ir.load_module_ref || null
+        styleBlocks: ir.style_blocks || [],
+        serverScript: ir.server_script || null,
+        prerender: ir.prerender === true,
+        hasGuard: ir.has_guard === true,
+        hasLoad: ir.has_load === true,
+        hasAction: ir.has_action === true,
+        guardModuleRef: ir.guard_module_ref || null,
+        loadModuleRef: ir.load_module_ref || null,
+        actionModuleRef: ir.action_module_ref || null
     });
 }
 
