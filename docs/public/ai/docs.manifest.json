@@ -42,6 +42,13 @@
         "count": 1
       },
       {
+        "slug": "errors",
+        "title": "Errors",
+        "summary": "Build-time and runtime diagnostics with deterministic fix guidance.",
+        "order": 95,
+        "count": 1
+      },
+      {
         "slug": "reference",
         "title": "Reference",
         "summary": "API and marker references for stable lookup.",
@@ -1059,6 +1066,31 @@
       ],
       "category_titles": [
         "Contributing"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "errors/index",
+      "title": "Error Reference Index",
+      "status": "canonical",
+      "tags": [
+        "errors",
+        "diagnostics"
+      ],
+      "source_path": "documentation/errors/index.md",
+      "url": "/docs/errors/index",
+      "category": "errors",
+      "category_title": "Errors",
+      "category_order": 95,
+      "category_path": [
+        "errors"
+      ],
+      "category_titles": [
+        "Errors"
       ],
       "doc_order": null,
       "level": null,

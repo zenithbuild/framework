@@ -39,6 +39,7 @@
     "/docs/guides/interactive-demos",
     "/docs/guides/troubleshooting",
     "/docs/contributing/drift-gates",
+    "/docs/errors/index",
     "/docs/reference/markers",
     "/docs/reference/primitives-patterns",
     "/docs/reference/reactive-binding-model",

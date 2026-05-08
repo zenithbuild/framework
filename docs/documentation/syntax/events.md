@@ -3,7 +3,7 @@ title: "Events"
 description: "Canonical universal event model, alias mapping, and handler validation rules for Zenith."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-03-04"
+last_updated: "2026-05-08"
 tags: ["syntax", "events", "dx"]
 nav:
   order: 10
@@ -44,6 +44,18 @@ Allowed:
 Forbidden at compile time:
 - String handlers
 - Direct call expressions (`on:click={doThing()}`)
+
+Direct calls are rejected even when the call is parenthesized, optional, computed, or part of a chained expression. Use a function reference when the handler already exists, or an inline function when work should run after the event:
+
+```zen
+<script lang="ts">
+function save() {}
+const actions = { save };
+</script>
+
+<button on:click={actions.save}>Save</button>
+<button on:click={() => save()}>Save now</button>
+```
 
 ## Passing Event Handlers Through Components
 
