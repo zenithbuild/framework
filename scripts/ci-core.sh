@@ -37,6 +37,8 @@ node --test scripts/verify-publish-surface.spec.mjs
 node --test scripts/publish-packages-bootstrap.spec.mjs
 node --test scripts/publish-packages-existing-package.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
+node --test scripts/verify-platform-binary-smoke.spec.mjs
+node --test apps/integration-tests/scripts/*.spec.mjs
 
 cargo test --manifest-path packages/compiler/Cargo.toml
 cargo test --manifest-path packages/bundler/Cargo.toml

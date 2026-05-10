@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { findPackageVersionForEntry } from './zenith-bin-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,24 +51,7 @@ for (const internal of expectedInternals) {
 
     try {
         const entryPath = resolveInternal(internal);
-
-        // Walk up to find the package's package.json
-        let currentDir = dirname(entryPath);
-        let pkgVersion = null;
-
-        while (currentDir !== '/' && currentDir !== '.') {
-            try {
-                const pkgTxt = readFileSync(join(currentDir, 'package.json'), 'utf-8');
-                const pkg = JSON.parse(pkgTxt);
-                if (pkg.name === internal) {
-                    pkgVersion = pkg.version;
-                    break;
-                }
-            } catch (e) {
-                // Ignored, continue walking up
-            }
-            currentDir = dirname(currentDir);
-        }
+        const pkgVersion = findPackageVersionForEntry(entryPath, internal);
 
         if (pkgVersion && pkgVersion !== expectedVersion) {
             console.error(`Version mismatch: ${internal} is version ${pkgVersion} but @zenithbuild/core expects exactly ${expectedVersion}`);

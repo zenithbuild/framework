@@ -13,6 +13,7 @@ export default {
         '**/tests/guards.spec.js',
         '**/tests/guardrails.spec.js',
         '**/tests/ir-schema.spec.js',
+        '**/tests/bin-entrypoint-batch4.spec.js',
         '**/tests/core-template.spec.js',
         '**/tests/side-effects.spec.js',
         '**/tests/package-surface.spec.js'
