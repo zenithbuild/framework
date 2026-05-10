@@ -1,5 +1,6 @@
 import { relative } from 'node:path';
 
+import { classifyPageRoute } from '../route-classification.js';
 import {
     createBindingResolutionTotals,
     createComponentLoopPhaseTotals,
@@ -62,13 +63,15 @@ export function preparePageIrForMerge(pageIr) {
 export function applyServerEnvelopeToPageIr({
     pageIr,
     composedServer,
-    hasGuard,
-    hasLoad,
-    hasAction,
     entry,
     srcDir,
     sourceFile
 }) {
+    const classification = classifyPageRoute({
+        file: entry.file,
+        serverScript: composedServer.serverScript
+    });
+
     if (composedServer.serverScript) {
         const {
             has_action: _unusedHasAction,
@@ -76,22 +79,15 @@ export function applyServerEnvelopeToPageIr({
             ...serverScript
         } = composedServer.serverScript;
         pageIr.server_script = serverScript;
-        pageIr.prerender = composedServer.serverScript.prerender === true;
+        pageIr.prerender = classification.prerender;
         if (pageIr.ssr_data === undefined) {
             pageIr.ssr_data = null;
         }
     }
 
-    if (pageIr.prerender === true && (hasGuard || hasLoad || hasAction)) {
-        throw new Error(
-            `[zenith] Build failed for ${entry.file}: protected routes require SSR/runtime. ` +
-            'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
-        );
-    }
-
-    pageIr.has_guard = hasGuard;
-    pageIr.has_load = hasLoad;
-    pageIr.has_action = hasAction;
+    pageIr.has_guard = classification.hasGuard;
+    pageIr.has_load = classification.hasLoad;
+    pageIr.has_action = classification.hasAction;
     pageIr.guard_module_ref = composedServer.guardPath ? relative(srcDir, composedServer.guardPath).replaceAll('\\', '/') : null;
     pageIr.load_module_ref = composedServer.loadPath ? relative(srcDir, composedServer.loadPath).replaceAll('\\', '/') : null;
     pageIr.action_module_ref = composedServer.actionPath ? relative(srcDir, composedServer.actionPath).replaceAll('\\', '/') : null;

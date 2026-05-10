@@ -290,7 +290,7 @@ export function createDevRequestHandler(options) {
                     : resolved.route.output;
                 filePath = resolveWithinDist(outDir, output);
             } else {
-                filePath = toStaticFilePath(outDir, canonicalPath);
+                filePath = null;
             }
 
             resolvedPathFor404 = filePath;
