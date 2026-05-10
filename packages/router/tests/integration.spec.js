@@ -5,6 +5,7 @@
 import { createRouter } from '../dist/router.js';
 import { navigate, refreshCurrentRoute, getCurrentPath } from '../dist/navigate.js';
 import { onRouteChange, _clearSubscribers } from '../dist/events.js';
+import { replace as replaceSourceHistory } from '../dist/history.js';
 import * as routerApi from '../dist/index.js';
 import { jest } from '@jest/globals';
 import fs from 'node:fs';
@@ -28,6 +29,8 @@ describe('Integration: createRouter + lifecycle', () => {
     beforeEach(() => {
         container = document.createElement('div');
         document.body.appendChild(container);
+        history.replaceState({}, '', '/');
+        replaceSourceHistory('/');
         mounted = [];
         cleaned = 0;
     });
@@ -35,6 +38,8 @@ describe('Integration: createRouter + lifecycle', () => {
     afterEach(() => {
         document.body.removeChild(container);
         _clearSubscribers();
+        history.replaceState({}, '', '/');
+        replaceSourceHistory('/');
     });
 
     test('start() resolves initial route by pathname', async () => {
