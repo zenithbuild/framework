@@ -56,12 +56,15 @@ export declare function getCurrentPath(): string;
 export declare function onRouteChange(listener: (event: any) => void): () => void;
 export declare function matchRoute(routes: any[], path: string): any;
 
-export interface RouteProtectionPolicy {
+export interface AdvisoryRoutePolicy {
     onDeny?: "stay" | "redirect" | "render403" | ((ctx: any) => void);
     defaultLoginPath?: string;
     deny401RedirectToLogin?: boolean;
     forbiddenPath?: string;
 }
+
+/** @deprecated Use AdvisoryRoutePolicy. This policy only controls client navigation UX. */
+export type RouteProtectionPolicy = AdvisoryRoutePolicy;
 
 export type NavigationType = "push" | "pop" | "refresh";
 export type NavigationShellPhase = "idle" | "leaving" | "swapping" | "entering";
@@ -115,8 +118,6 @@ export interface NavigationLifecyclePayload {
 export type RouteEventHandler = (payload: unknown) => void | Promise<void>;
 
 export type RouteEventName =
-    | "guard:start"
-    | "guard:end"
     | "route-check:start"
     | "route-check:end"
     | "route-check:error"
@@ -133,7 +134,12 @@ export type RouteEventName =
     | "navigation:abort"
     | "navigation:error";
 
+export declare function setAdvisoryRoutePolicy(policy: AdvisoryRoutePolicy): void;
+export declare function _getAdvisoryRoutePolicy(): AdvisoryRoutePolicy;
+/** @deprecated Use setAdvisoryRoutePolicy. This policy only controls client navigation UX. */
 export declare function setRouteProtectionPolicy(policy: RouteProtectionPolicy): void;
+/** @deprecated Use _getAdvisoryRoutePolicy. This policy only controls client navigation UX. */
+export declare function _getRouteProtectionPolicy(): RouteProtectionPolicy;
 export declare function on(eventName: RouteEventName, handler: RouteEventHandler): void;
 export declare function off(eventName: RouteEventName, handler: RouteEventHandler): void;
 export declare function zenNavigationShell(ref: { current?: Element | null }, options?: NavigationShellOptions | null): NavigationShellController;

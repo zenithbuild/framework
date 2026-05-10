@@ -16,17 +16,20 @@ type RouteChangeDetail = {
     matched: boolean;
 };
 
-type RouteProtectionPolicy = {
+export type AdvisoryRoutePolicy = {
     onDeny?: 'stay' | 'redirect' | 'render403' | ((ctx: any) => void);
     defaultLoginPath?: string;
     deny401RedirectToLogin?: boolean;
     forbiddenPath?: string;
 };
 
+/** @deprecated Use AdvisoryRoutePolicy. This policy only controls client navigation UX. */
+export type RouteProtectionPolicy = AdvisoryRoutePolicy;
+
 type RouteEventHandler = (payload: unknown) => void | Promise<void>;
 type RouteEventListeners = Record<string, Set<RouteEventHandler>>;
 type RouteProtectionScope = typeof globalThis & {
-    __zenith_route_protection_policy?: RouteProtectionPolicy;
+    __zenith_route_protection_policy?: AdvisoryRoutePolicy;
     __zenith_route_event_listeners?: RouteEventListeners;
 };
 
@@ -57,8 +60,6 @@ export function _getSubscriberCount(): number {
 const ROUTE_POLICY_KEY = '__zenith_route_protection_policy';
 const ROUTE_EVENT_LISTENERS_KEY = '__zenith_route_event_listeners';
 const ROUTE_EVENT_NAMES = [
-    'guard:start',
-    'guard:end',
     'route-check:start',
     'route-check:end',
     'route-check:error',
@@ -82,7 +83,7 @@ function getRouteProtectionScope(): RouteProtectionScope {
         : ({} as RouteProtectionScope);
 }
 
-function ensureRouteProtectionState(): { policy: RouteProtectionPolicy; listeners: RouteEventListeners } {
+function ensureRouteProtectionState(): { policy: AdvisoryRoutePolicy; listeners: RouteEventListeners } {
     const scope = getRouteProtectionScope();
 
     let policy = scope[ROUTE_POLICY_KEY];
@@ -106,14 +107,24 @@ function ensureRouteProtectionState(): { policy: RouteProtectionPolicy; listener
     return { policy, listeners };
 }
 
-export function setRouteProtectionPolicy(policy: RouteProtectionPolicy): void {
+export function setAdvisoryRoutePolicy(policy: AdvisoryRoutePolicy): void {
     const state = ensureRouteProtectionState();
     state.policy = Object.assign({}, state.policy, policy);
     getRouteProtectionScope()[ROUTE_POLICY_KEY] = state.policy;
 }
 
-export function _getRouteProtectionPolicy(): RouteProtectionPolicy {
+export function _getAdvisoryRoutePolicy(): AdvisoryRoutePolicy {
     return ensureRouteProtectionState().policy;
+}
+
+/** @deprecated Use setAdvisoryRoutePolicy. This policy only controls client navigation UX. */
+export function setRouteProtectionPolicy(policy: RouteProtectionPolicy): void {
+    setAdvisoryRoutePolicy(policy);
+}
+
+/** @deprecated Use _getAdvisoryRoutePolicy. This policy only controls client navigation UX. */
+export function _getRouteProtectionPolicy(): RouteProtectionPolicy {
+    return _getAdvisoryRoutePolicy();
 }
 
 export function on(eventName: string, handler: RouteEventHandler): void {

@@ -364,6 +364,10 @@ describe('Track A security regression gates', () => {
         expect(deploymentGuide).toContain('bundler-owned final build/static HTML image materialization');
         expect(deploymentGuide).toContain('Hosted `vercel` and `netlify` targets currently skip advisory route-check');
         expect(routeProtectionDoc).toContain('/__zenith/route-check` does not grant security');
+        expect(routeProtectionDoc).toContain('setAdvisoryRoutePolicy');
+        expect(routeProtectionDoc).toContain('never authorization');
+        expect(routeProtectionDoc).toContain('not encrypted');
+        expect(routeProtectionDoc).toContain('do not store secrets');
         expect(routeProtectionDoc).toContain('Internal Server Error');
     });
 });

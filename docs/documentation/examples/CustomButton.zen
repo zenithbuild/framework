@@ -2,7 +2,7 @@
 interface Props {
   label: string;
   disabled?: boolean;
-  onClick: () => void;
+  onPress: () => void;
 }
 
 const incoming = props as Props;
@@ -11,7 +11,7 @@ const incoming = props as Props;
 <button
   class="rounded bg-zinc-900 px-4 py-2 text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
   disabled={incoming.disabled === true}
-  on:click={incoming.onClick}
+  on:click={incoming.onPress}
 >
   {incoming.label}
 </button>

@@ -24,6 +24,6 @@ function startProcess() {
   <CustomButton 
     disabled={status === "loading"}
     label="Start Execution"
-    onClick={startProcess}
+    onPress={startProcess}
   />
 </section>

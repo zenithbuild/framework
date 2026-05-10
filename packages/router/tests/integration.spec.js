@@ -277,6 +277,7 @@ describe('Contract Guardrails', () => {
         const exports = Object.keys(routerApi).sort();
         expect(exports).toEqual([
             '_dispatchRouteEvent',
+            '_getAdvisoryRoutePolicy',
             '_getRouteProtectionPolicy',
             'back',
             'createRouter',
@@ -288,6 +289,7 @@ describe('Contract Guardrails', () => {
             'on',
             'onRouteChange',
             'refreshCurrentRoute',
+            'setAdvisoryRoutePolicy',
             'setRouteProtectionPolicy',
             'zenNavigationShell'
         ]);

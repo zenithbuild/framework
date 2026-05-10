@@ -34,6 +34,10 @@ const runtimeImport = '/assets/runtime.11111111.js';
 const coreImport = '/assets/core.33333333.js';
 const opts = { manifestJson, runtimeImport, coreImport, routeCheck: true };
 
+function normalizeRouterTemplateSnapshot(source) {
+    return source.replace(/  "guard:(?:start|end)",\n/g, '');
+}
+
 assert.equal(existsSync(templateRefreshPath), true, 'router package must keep template-refresh.js in the package root');
 assert.equal(
     Array.isArray(packageJson.files) && packageJson.files.includes('template-refresh.js'),
@@ -190,6 +194,8 @@ assert.ok(
     sourceA.includes('"navigation:before-leave"'),
     'router template must include navigation lifecycle event names'
 );
+assert.equal(sourceA.includes('"guard:start"'), false, 'router template must not declare un-emitted guard:start events');
+assert.equal(sourceA.includes('"guard:end"'), false, 'router template must not declare un-emitted guard:end events');
 assert.ok(
     sourceA.includes('buildNavigationPayload(context'),
     'router template must build lifecycle payloads from the active navigation context'
@@ -270,6 +276,10 @@ const sourceFromPackage = renderRouterModuleFromPackage(opts);
 assert.equal(sourceFromPackage, sourceA, 'subpath export must resolve and return the same deterministic source');
 
 const golden = readFileSync(goldenPath, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-assert.equal(sourceA, golden, 'router template output must match golden bytes for the fixed fixture');
+assert.equal(
+    sourceA,
+    normalizeRouterTemplateSnapshot(golden),
+    'router template output must match golden bytes for the fixed fixture after removed stale event names'
+);
 
 console.log('template-contract.spec.js passed');

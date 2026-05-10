@@ -167,7 +167,7 @@ Evidence:
 
 Contract: `ctx.auth` provides one narrow cookie-backed session workflow inside `guard(ctx)`, `action(ctx)`, and `load(ctx)`.
 
-Invariant: session state lives in one framework-owned signed cookie and uses a JSON-safe plain-object payload only.
+Invariant: session state lives in one framework-owned signed cookie and uses a JSON-safe plain-object payload only. The signature provides integrity and tamper resistance, not confidentiality; cookie payloads are not encrypted and must not contain secrets or sensitive data.
 
 Definition of Done:
 - `await ctx.auth.getSession()` returns the decoded session object or `null`.

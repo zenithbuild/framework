@@ -12,8 +12,6 @@ const __ZENITH_BASE_PATH__ = normalizeBasePath(
 );
 const __ZENITH_ROUTE_EVENT_KEY = "__zenith_route_event_listeners";
 const __ZENITH_ROUTE_EVENT_NAMES = [
-  "guard:start",
-  "guard:end",
   "route-check:start",
   "route-check:end",
   "route-check:error",

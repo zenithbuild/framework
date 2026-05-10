@@ -181,7 +181,7 @@ Evidence:
 
 Contract: `ctx.auth` is the single cookie-session surface for `guard(ctx)`, `action(ctx)`, and `load(ctx)`.
 
-Invariant: auth stays route-owned and explicit. Routes read session state through `getSession()` / `requireSession(...)` and stage cookie mutation through `signIn(...)` / `signOut()`.
+Invariant: auth stays route-owned and explicit. Routes read session state through `getSession()` / `requireSession(...)` and stage cookie mutation through `signIn(...)` / `signOut()`. Signed cookies provide integrity and tamper resistance only; payloads are not encrypted and must not contain secrets or sensitive data.
 
 Banned:
 - new mutation helpers such as `ctx.upload`, `ctx.files`, `ctx.login`, or `ctx.sessionStore`

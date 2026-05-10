@@ -37,6 +37,50 @@ export const FORBIDDEN_PATTERNS = [
   { label: "legacy mouseout binding", regex: /on:mouseout\b/i },
 ];
 
+export const COMPONENT_DOM_EVENT_PROPS = new Set([
+  "onAbort",
+  "onBlur",
+  "onChange",
+  "onClick",
+  "onContextMenu",
+  "onDblClick",
+  "onDrag",
+  "onDragEnd",
+  "onDragEnter",
+  "onDragLeave",
+  "onDragOver",
+  "onDragStart",
+  "onDrop",
+  "onFocus",
+  "onInput",
+  "onKeyDown",
+  "onKeyUp",
+  "onLoad",
+  "onMouseDown",
+  "onMouseEnter",
+  "onMouseLeave",
+  "onMouseMove",
+  "onMouseOut",
+  "onMouseOver",
+  "onMouseUp",
+  "onPointerCancel",
+  "onPointerDown",
+  "onPointerEnter",
+  "onPointerLeave",
+  "onPointerMove",
+  "onPointerOut",
+  "onPointerOver",
+  "onPointerUp",
+  "onReset",
+  "onScroll",
+  "onSubmit",
+  "onTouchCancel",
+  "onTouchEnd",
+  "onTouchMove",
+  "onTouchStart",
+  "onWheel",
+]);
+
 /** Canonical docs must not recommend these DOM anti-patterns. _legacy/ is excluded. */
 export const DOM_ANTIPATTERN_LABELS = [
   { label: "querySelector", regex: /\bquerySelector\s*\(/ },
@@ -239,6 +283,14 @@ export function findForbiddenMatches(source) {
   for (const rule of FORBIDDEN_PATTERNS) {
     if (rule.regex.test(source)) {
       hits.push(rule.label);
+    }
+  }
+  const componentPropRegex = /<[A-Z][A-Za-z0-9_.:-]*\b[^<>]*\b(on[A-Z][A-Za-z0-9_]*)\s*=/g;
+  let match;
+  while ((match = componentPropRegex.exec(source)) !== null) {
+    const propName = match[1];
+    if (COMPONENT_DOM_EVENT_PROPS.has(propName)) {
+      hits.push(`component DOM event prop ${propName}`);
     }
   }
   return hits;
