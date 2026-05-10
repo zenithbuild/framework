@@ -24,12 +24,7 @@ export function _applyMarkerValue(nodes, marker, value) {
                     continue;
                 }
 
-                const html = _renderFragmentValue(value, textPath);
-                if (html !== null) {
-                    node.innerHTML = html;
-                } else {
-                    node.textContent = _coerceText(value, textPath);
-                }
+                _replaceTextMarkerContent(node, value, textPath);
                 continue;
             }
 
@@ -154,9 +149,21 @@ function _mountStructuralFragment(container, value, rootPath = 'renderable') {
         return;
     }
 
-    _runUnmounts(container);
-    container.innerHTML = '';
+    _clearStructuralTarget(container);
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
     _mountFragmentRegion(container, value, container, null, rootPath);
+}
+
+function _replaceTextMarkerContent(node, value, rootPath) {
+    _clearStructuralTarget(node);
+    const html = _renderFragmentValue(value, rootPath);
+    if (html !== null) {
+        node.innerHTML = html;
+    } else {
+        node.textContent = _coerceText(value, rootPath);
+    }
 }
 
 export function _coerceText(value, path = 'renderable') {
@@ -283,6 +290,12 @@ function _runUnmounts(target) {
         }
     }
     target.__z_unmounts = [];
+}
+
+function _clearStructuralTarget(target) {
+    _runUnmounts(target);
+    target.__z_fragment_region = null;
+    target.__z_fragment_region_active = false;
 }
 
 function _updateFragmentRegion(region, value, parent, insertBefore, rootPath) {

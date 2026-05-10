@@ -2,13 +2,14 @@
 
 import { runWithDependencyCollector } from './reactivity-core.js';
 import { registerScopeDisposer, queueWhenScopeReady } from './side-effect-scope.js';
-import { drainCleanupStack, applyCleanupResult, createEffectContext } from './effect-utils.js';
+import { drainCleanupStack, applyCleanupResult, createEffectContext, runCleanupCallback } from './effect-utils.js';
 import { createScheduler } from './effect-scheduler.js';
 
 let _effectIdCounter = 0;
 
 export function createAutoTrackedEffect(effect, options, scope) {
     let disposed = false;
+    let completedSetup = false;
     const activeSubscriptions = new Map();
     const runCleanups = [];
 
@@ -31,50 +32,59 @@ export function createAutoTrackedEffect(effect, options, scope) {
 
         const nextDependenciesById = new Map();
 
-        runWithDependencyCollector((source) => {
-            if (!source || typeof source.subscribe !== 'function') {
-                return;
-            }
-            const reactiveId = Number.isInteger(source.__zenith_id) ? source.__zenith_id : 0;
-            if (!nextDependenciesById.has(reactiveId)) {
-                nextDependenciesById.set(reactiveId, source);
-            }
-        }, () => {
-            const result = effect(createEffectContext(registerCleanup));
-            applyCleanupResult(result, registerCleanup);
-        });
-
-        const nextDependencies = Array.from(nextDependenciesById.values()).sort((left, right) => {
-            const leftId = Number.isInteger(left.__zenith_id) ? left.__zenith_id : 0;
-            const rightId = Number.isInteger(right.__zenith_id) ? right.__zenith_id : 0;
-            return leftId - rightId;
-        });
-        const nextSet = new Set(nextDependencies);
-
-        for (const [dependency, unsubscribe] of activeSubscriptions.entries()) {
-            if (nextSet.has(dependency)) {
-                continue;
-            }
-            if (typeof unsubscribe === 'function') {
-                unsubscribe();
-            }
-            activeSubscriptions.delete(dependency);
-        }
-
-        for (let i = 0; i < nextDependencies.length; i++) {
-            const dependency = nextDependencies[i];
-            if (activeSubscriptions.has(dependency)) {
-                continue;
-            }
-
-            const unsubscribe = dependency.subscribe(() => {
-                scheduler.schedule();
+        try {
+            runWithDependencyCollector((source) => {
+                if (!source || typeof source.subscribe !== 'function') {
+                    return;
+                }
+                const reactiveId = Number.isInteger(source.__zenith_id) ? source.__zenith_id : 0;
+                if (!nextDependenciesById.has(reactiveId)) {
+                    nextDependenciesById.set(reactiveId, source);
+                }
+            }, () => {
+                const result = effect(createEffectContext(registerCleanup));
+                applyCleanupResult(result, registerCleanup);
             });
 
-            activeSubscriptions.set(
-                dependency,
-                typeof unsubscribe === 'function' ? unsubscribe : () => { }
-            );
+            const nextDependencies = Array.from(nextDependenciesById.values()).sort((left, right) => {
+                const leftId = Number.isInteger(left.__zenith_id) ? left.__zenith_id : 0;
+                const rightId = Number.isInteger(right.__zenith_id) ? right.__zenith_id : 0;
+                return leftId - rightId;
+            });
+            const nextSet = new Set(nextDependencies);
+
+            for (const [dependency, unsubscribe] of activeSubscriptions.entries()) {
+                if (nextSet.has(dependency)) {
+                    continue;
+                }
+                if (typeof unsubscribe === 'function') {
+                    unsubscribe();
+                }
+                activeSubscriptions.delete(dependency);
+            }
+
+            for (let i = 0; i < nextDependencies.length; i++) {
+                const dependency = nextDependencies[i];
+                if (activeSubscriptions.has(dependency)) {
+                    continue;
+                }
+
+                const unsubscribe = dependency.subscribe(() => {
+                    scheduler.schedule();
+                });
+
+                activeSubscriptions.set(
+                    dependency,
+                    typeof unsubscribe === 'function' ? unsubscribe : () => { }
+                );
+            }
+
+            completedSetup = true;
+        } catch (error) {
+            if (!completedSetup) {
+                disposeEffect();
+            }
+            throw error;
         }
 
         void effectId;
@@ -82,7 +92,7 @@ export function createAutoTrackedEffect(effect, options, scope) {
 
     const scheduler = createScheduler(runEffectNow, options);
 
-    function disposeEffect() {
+    function disposeEffect(errors = null) {
         if (disposed) {
             return;
         }
@@ -92,12 +102,12 @@ export function createAutoTrackedEffect(effect, options, scope) {
 
         for (const unsubscribe of activeSubscriptions.values()) {
             if (typeof unsubscribe === 'function') {
-                unsubscribe();
+                runCleanupCallback(unsubscribe, errors);
             }
         }
         activeSubscriptions.clear();
 
-        drainCleanupStack(runCleanups);
+        drainCleanupStack(runCleanups, errors);
     }
 
     registerScopeDisposer(scope, disposeEffect);
@@ -120,7 +130,9 @@ export function createExplicitDependencyEffect(effect, dependencies, scope) {
     }
 
     let disposed = false;
+    let completedSetup = false;
     const runCleanups = [];
+    const unsubscribers = [];
 
     function registerCleanup(cleanup) {
         if (typeof cleanup !== 'function') {
@@ -135,41 +147,62 @@ export function createExplicitDependencyEffect(effect, dependencies, scope) {
         }
 
         drainCleanupStack(runCleanups);
-        const result = effect(createEffectContext(registerCleanup));
-        applyCleanupResult(result, registerCleanup);
-    }
-
-    const unsubscribers = dependencies.map((dep, index) => {
-        if (!dep || typeof dep.subscribe !== 'function') {
-            throw new Error(`[Zenith Runtime] zeneffect dependency at index ${index} must expose subscribe(fn)`);
-        }
-
-        return dep.subscribe(() => {
-            if (scope?.mountReady === true) {
-                runEffectNow();
-                return;
+        try {
+            const result = effect(createEffectContext(registerCleanup));
+            applyCleanupResult(result, registerCleanup);
+            completedSetup = true;
+        } catch (error) {
+            if (!completedSetup) {
+                dispose();
             }
-            queueWhenScopeReady(scope, runEffectNow);
-        });
-    });
-
-    if (scope?.mountReady === true) {
-        runEffectNow();
-    } else {
-        queueWhenScopeReady(scope, runEffectNow);
+            throw error;
+        }
     }
 
-    const dispose = () => {
+    function dispose(errors = null) {
         if (disposed) {
             return;
         }
         disposed = true;
-        for (let i = 0; i < unsubscribers.length; i++) {
-            unsubscribers[i]();
+        for (let i = unsubscribers.length - 1; i >= 0; i--) {
+            if (typeof unsubscribers[i] === 'function') {
+                runCleanupCallback(unsubscribers[i], errors);
+            }
         }
-        drainCleanupStack(runCleanups);
-    };
+        unsubscribers.length = 0;
+        drainCleanupStack(runCleanups, errors);
+    }
 
-    registerScopeDisposer(scope, dispose);
-    return dispose;
+    try {
+        for (let index = 0; index < dependencies.length; index++) {
+            const dep = dependencies[index];
+            if (!dep || typeof dep.subscribe !== 'function') {
+                throw new Error(`[Zenith Runtime] zeneffect dependency at index ${index} must expose subscribe(fn)`);
+            }
+        }
+
+        for (let index = 0; index < dependencies.length; index++) {
+            const dep = dependencies[index];
+            const unsubscribe = dep.subscribe(() => {
+                if (scope?.mountReady === true) {
+                    runEffectNow();
+                    return;
+                }
+                queueWhenScopeReady(scope, runEffectNow);
+            });
+            unsubscribers.push(typeof unsubscribe === 'function' ? unsubscribe : () => { });
+        }
+
+        if (scope?.mountReady === true) {
+            runEffectNow();
+        } else {
+            queueWhenScopeReady(scope, runEffectNow);
+        }
+
+        registerScopeDisposer(scope, dispose);
+        return dispose;
+    } catch (error) {
+        dispose();
+        throw error;
+    }
 }

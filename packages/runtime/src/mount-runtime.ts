@@ -29,8 +29,8 @@ export function createMountEffect(callback, scope) {
             console.error('[Zenith Runtime] Unhandled error during zenMount:', error);
         }
 
-        registeredDisposer = registerScopeDisposer(scope, () => {
-            drainCleanupStack(cleanups);
+        registeredDisposer = registerScopeDisposer(scope, (errors = null) => {
+            drainCleanupStack(cleanups, errors);
         });
     }
 

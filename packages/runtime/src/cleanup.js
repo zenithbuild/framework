@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { resetGlobalSideEffects } from './side-effect-scope.js';
+import { runCleanupCallback, throwCleanupErrors } from './effect-utils.js';
 
 /** @type {function[]} */
 const _disposers = [];
@@ -52,32 +53,36 @@ export function _registerListener(element, event, handler) {
  * - Idempotent: calling twice is a no-op
  */
 export function cleanup() {
+    const errors = [];
+
     // Global zenMount/zenEffect registrations can be created outside hydrate's
     // disposer table (e.g. page-level component bootstraps). cleanup() is the
     // full runtime teardown boundary, so that scope must be reset on every pass,
     // including the first real cleanup.
     if (_cleaned) {
-        resetGlobalSideEffects();
+        resetGlobalSideEffects(errors);
+        throwCleanupErrors(errors, 'cleanup');
         return;
     }
 
     // 1. Dispose all effects
     for (let i = 0; i < _disposers.length; i++) {
-        _disposers[i]();
+        runCleanupCallback(_disposers[i], errors);
     }
     _disposers.length = 0;
 
     // 2. Remove all event listeners
     for (let i = 0; i < _listeners.length; i++) {
         const { element, event, handler } = _listeners[i];
-        element.removeEventListener(event, handler);
+        runCleanupCallback(() => element.removeEventListener(event, handler), errors);
     }
     _listeners.length = 0;
 
     // 3. Dispose any top-level reactive work registered outside hydrate.
-    resetGlobalSideEffects();
+    resetGlobalSideEffects(errors);
 
     _cleaned = true;
+    throwCleanupErrors(errors, 'cleanup');
 }
 
 /**
