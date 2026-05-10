@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { runCleanupCallback } from './effect-utils.js';
+
 let _scopeIdCounter = 0;
 
 function createInternalScope(label, mountReady) {
@@ -28,8 +30,8 @@ export function resolveSideEffectScope(scopeOverride) {
     return _globalScope;
 }
 
-export function resetGlobalSideEffects() {
-    disposeSideEffectScope(_globalScope);
+export function resetGlobalSideEffects(errors = null) {
+    disposeSideEffectScope(_globalScope, errors);
     _globalScope = createInternalScope('global', true);
 }
 
@@ -81,7 +83,7 @@ export function registerScopeDisposer(scope, disposer) {
     };
 }
 
-export function disposeSideEffectScope(scope) {
+export function disposeSideEffectScope(scope, errors = null) {
     if (!scope || scope.disposed) {
         return;
     }
@@ -97,10 +99,7 @@ export function disposeSideEffectScope(scope) {
         if (typeof disposer !== 'function') {
             continue;
         }
-        try {
-            disposer();
-        } catch {
-        }
+        runCleanupCallback(() => disposer(errors), errors);
     }
 }
 

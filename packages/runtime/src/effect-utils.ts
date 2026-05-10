@@ -51,7 +51,8 @@ export function normalizeEffectOptions(options) {
     return normalized;
 }
 
-export function drainCleanupStack(cleanups) {
+export function drainCleanupStack(cleanups, errors = null) {
+    const errorSink = Array.isArray(errors) ? errors : null;
     for (let i = cleanups.length - 1; i >= 0; i--) {
         const cleanup = cleanups[i];
         if (typeof cleanup !== 'function') {
@@ -59,10 +60,36 @@ export function drainCleanupStack(cleanups) {
         }
         try {
             cleanup();
-        } catch {
+        } catch (error) {
+            if (errorSink) {
+                errorSink.push(error);
+            }
         }
     }
     cleanups.length = 0;
+}
+
+export function runCleanupCallback(callback, errors = null) {
+    try {
+        callback();
+    } catch (error) {
+        if (Array.isArray(errors)) {
+            errors.push(error);
+        }
+    }
+}
+
+export function throwCleanupErrors(errors, label = 'cleanup') {
+    if (!Array.isArray(errors) || errors.length === 0) {
+        return;
+    }
+
+    const message = `[Zenith Runtime] ${label} failed with ${errors.length} error(s)`;
+    const error = typeof AggregateError === 'function'
+        ? new AggregateError(errors, message)
+        : new Error(message);
+    error.zenithCleanupErrors = errors;
+    throw error;
 }
 
 export function applyCleanupResult(result, registerCleanup) {
