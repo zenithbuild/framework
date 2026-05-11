@@ -33,7 +33,7 @@ function createMemoryLogger() {
 
 async function createProject() {
     const root = join(tmpdir(), `zenith-dev-config-change-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const pagesDir = join(root, 'src', 'pages');
+    const pagesDir = join(root, 'app', 'routes');
     const outDir = join(root, 'dist');
 
     await mkdir(pagesDir, { recursive: true });
@@ -77,6 +77,7 @@ describe('Batch 5A dev config changes', () => {
         dev = await createDevServer({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
+            projectRoot: project.root,
             port: 0,
             config: { router: false },
             logger

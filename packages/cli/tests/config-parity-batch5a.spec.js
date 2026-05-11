@@ -1,15 +1,37 @@
+import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_CONFIG, validateConfig as validateCliConfig } from '../dist/config.js';
 import { KNOWN_TARGETS as CLI_TARGETS } from '../dist/adapters/adapter-types.js';
-import { ZENITH_TARGETS as CORE_TARGETS } from '../../core/dist/config-targets.js';
-import { getDefaults as getCoreDefaults, validateConfig as validateCoreConfig } from '../../core/dist/config.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const UNKNOWN_KEYS = ['softNavigation', 'types', 'assetPrefix', 'devTrace'];
 
 describe('Batch 5A config parity', () => {
+    let CORE_TARGETS;
+    let getCoreDefaults;
+    let validateCoreConfig;
+
+    beforeAll(async () => {
+        const result = spawnSync('npm', ['run', '--prefix', 'packages/core', 'build'], {
+            cwd: REPO_ROOT,
+            encoding: 'utf8',
+            stdio: 'pipe'
+        });
+
+        if (result.status !== 0) {
+            throw new Error([
+                'Failed to build packages/core before config parity assertions.',
+                result.stdout,
+                result.stderr
+            ].filter(Boolean).join('\n'));
+        }
+
+        ({ ZENITH_TARGETS: CORE_TARGETS } = await import('../../core/dist/config-targets.js'));
+        ({ getDefaults: getCoreDefaults, validateConfig: validateCoreConfig } = await import('../../core/dist/config.js'));
+    });
+
     test('core and CLI supported target lists stay in parity', () => {
         expect([...CORE_TARGETS].sort()).toEqual([...CLI_TARGETS].sort());
 
