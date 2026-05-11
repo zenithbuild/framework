@@ -4,6 +4,9 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { readChangeFingerprint } from '../dev-watch.js';
 import { loadRouteSurfaceState } from '../preview.js';
 
+const CONFIG_FILE_NAMES = new Set(['zenith.config.js', 'zenith.config.ts']);
+const CONFIG_CHANGED_MESSAGE = 'Config changed. Restart `zenith dev` to apply config updates.';
+
 export function createDevWatcher(options) {
     const {
         watchRoots,
@@ -61,6 +64,11 @@ export function createDevWatcher(options) {
             || segments.includes('.zenith')
             || segments.includes('target')
             || segments.includes('.turbo');
+    }
+
+    function isConfigFileChange(absPath) {
+        const rel = relative(projectRoot, absPath).replace(/\\/g, '/');
+        return CONFIG_FILE_NAMES.has(rel);
     }
 
     const triggerBuildDrain = (delayMs = rebuildDebounceMs) => {
@@ -191,6 +199,15 @@ export function createDevWatcher(options) {
                     }
                     const changedPath = resolve(root, String(filename));
                     if (shouldIgnoreChange(changedPath)) {
+                        return;
+                    }
+                    if (isConfigFileChange(changedPath)) {
+                        logger.warn(CONFIG_CHANGED_MESSAGE, {
+                            onceKey: `config-change:${changedPath}`
+                        });
+                        trace('config_change_restart_required', {
+                            path: toDisplayPath(changedPath)
+                        });
                         return;
                     }
                     void (async () => {

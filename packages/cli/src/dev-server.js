@@ -95,7 +95,7 @@ export async function createDevServer(options) {
     const projectRoot = basename(pagesParentDir) === 'src'
         ? dirname(pagesParentDir)
         : pagesParentDir;
-    const watchRoots = new Set([pagesParentDir]);
+    const watchRoots = new Set([projectRoot, pagesParentDir]);
 
     /** @type {import('http').ServerResponse[]} */
     const hmrClients = [];
@@ -122,7 +122,7 @@ export async function createDevServer(options) {
         currentCssContent: '',
         currentRouteState: { pageRoutes: [], resourceRoutes: [] }
     };
-    const traceEnabled = config.devTrace === true || process.env.ZENITH_DEV_TRACE === '1';
+    const traceEnabled = process.env.ZENITH_DEV_TRACE === '1';
     const verboseLogging = traceEnabled || logger.mode?.logLevel === 'verbose';
 
     let actualPort = port;

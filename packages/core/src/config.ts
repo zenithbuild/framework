@@ -3,6 +3,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { ZENITH_TARGETS } from './config-targets.js';
 import type { ZenithAdapter, ZenithTarget } from './config-types.js';
 export type {
   BuildManifest,
@@ -16,14 +17,6 @@ export type {
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const CONFIG_FILES = ['zenith.config.ts', 'zenith.config.js'] as const;
-const KNOWN_TARGETS: ZenithTarget[] = [
-  'static',
-  'vercel-static',
-  'netlify-static',
-  'vercel',
-  'netlify',
-  'node'
-];
 
 export interface ZenithConfig {
   router: boolean;
@@ -387,7 +380,7 @@ export function validateConfig(config: ConfigInput): ZenithConfig {
     if (expectedType === 'string' && typeof value === 'string' && value.trim() === '') {
       throw new Error(`[Zenith:Config] Key "${key}" must be a non-empty string`);
     }
-    if (key === 'target' && !KNOWN_TARGETS.includes(value as ZenithTarget)) {
+    if (key === 'target' && !ZENITH_TARGETS.includes(value as ZenithTarget)) {
       throw new Error(`[Zenith:Config] Unsupported target: "${value as string}"`);
     }
     if (key === 'basePath') {

@@ -1,10 +1,4 @@
-export type ZenithTarget =
-  | 'static'
-  | 'vercel-static'
-  | 'netlify-static'
-  | 'vercel'
-  | 'netlify'
-  | 'node';
+export type { ZenithTarget } from './config-targets.js';
 
 export type ZenithRenderMode = 'prerender' | 'server';
 export type ZenithPathKind = 'static' | 'dynamic';

@@ -115,11 +115,19 @@ describe('validateConfig', () => {
     });
 
     test('accepts supported deployment targets', () => {
-        expect(validateConfig({ target: 'vercel-static' }).target).toBe('vercel-static');
-        expect(validateConfig({ target: 'netlify-static' }).target).toBe('netlify-static');
-        expect(validateConfig({ target: 'vercel' }).target).toBe('vercel');
-        expect(validateConfig({ target: 'netlify' }).target).toBe('netlify');
-        expect(validateConfig({ target: 'node' }).target).toBe('node');
+        const targets = [
+            'static',
+            'static-export',
+            'vercel-static',
+            'netlify-static',
+            'vercel',
+            'netlify',
+            'node'
+        ];
+
+        for (const target of targets) {
+            expect(validateConfig({ target }).target).toBe(target);
+        }
     });
 
     test('normalizes images config', () => {

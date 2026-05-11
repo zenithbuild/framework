@@ -42,6 +42,11 @@ Zenith loads exactly **one** config file per project root. It will not attempt t
 **Operational CLI Flags vs Schema:**  
 CLI listener options like `--port`, `--host`, or environment variables (`ZENITH_DEV_PORT`) are operational deployment flags. They control the node listener orchestrating the CLI commands rather than mutating the framework `ZenithConfig` payload. They are not part of the config schema.
 
+Dev tracing is also operational. Use `ZENITH_DEV_TRACE=1`; `devTrace` is not a supported config key.
+
+**Dev Server Config Changes:**
+Changes to `zenith.config.ts` or `zenith.config.js` while `zenith dev` is running require a restart. When the dev watcher observes a config-file edit, it warns instead of rebuilding with stale config.
+
 ## 3. Trust Boundary
 The configuration file is **executable code running with host node privileges**.
 
