@@ -1,4 +1,5 @@
 import { build } from '../dist/build.js';
+import { generateEnvDts } from '../dist/types/generate-env-dts.js';
 import { jest } from '@jest/globals';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -80,9 +81,38 @@ describe('build orchestration core', () => {
         const tsconfig = JSON.parse(await readFile(join(project.root, 'tsconfig.json'), 'utf8'));
 
         expect(envDts.includes('interface LoadContext')).toBe(true);
+        expect(envDts).toContain('headers: Record<string, string>;');
+        expect(envDts).toContain('cookies: Record<string, string>;');
+        expect(envDts).toContain('method: string;');
+        expect(envDts).toContain('env: Record<string, unknown>;');
+        expect(envDts).toContain('action: ActionState;');
+        expect(envDts).toContain('auth: {');
+        expect(envDts).toContain('data<T extends PageData = PageData>(payload: T): DataResult<T>;');
+        expect(envDts).toContain('redirect(location: string, status?: number): RedirectResult;');
+        expect(envDts).toContain('deny(status: 401 | 403 | 404, message?: string): DenyResult;');
+        expect(envDts).toContain('bodyEncoding: "utf8" | "base64";');
+        expect(envDts).toContain('type PageRouteResult<T extends PageData = PageData> = T | DataResult<T> | RedirectResult | DenyResult;');
+        expect(envDts).not.toContain('stream(');
+        expect(envDts).not.toContain('sse(');
         expect(routeDts.includes('"/": {}')).toBe(true);
         expect(Array.isArray(tsconfig.include)).toBe(true);
         expect(tsconfig.include.includes('.zenith/**/*.d.ts')).toBe(true);
+    });
+
+    test('direct env type generation uses the shared LoadContext contract', async () => {
+        project = await makeProject({
+            'index.zen': '<main>Types</main>\n'
+        });
+
+        await generateEnvDts(project.root);
+
+        const envDts = await readFile(join(project.root, '.zenith', 'zenith-env.d.ts'), 'utf8');
+        expect(envDts).toContain('interface LoadContext');
+        expect(envDts).toContain('headers: Record<string, string>;');
+        expect(envDts).toContain('auth: {');
+        expect(envDts).toContain('type Load<T extends PageData = PageData> = (ctx: LoadContext) => Promise<PageRouteResult<T>> | PageRouteResult<T>;');
+        expect(envDts).not.toContain('stream(');
+        expect(envDts).not.toContain('sse(');
     });
 
     test('rejects mixed data and load exports in <script server>', async () => {

@@ -152,6 +152,8 @@ Zenith's first auth milestone is intentionally narrow:
 - route-owned session read and require logic
 - route-owned sign-in and sign-out through ordinary HTML form flows
 
+Signed session cookies provide integrity and tamper resistance only. The cookie payload is not encrypted, so do not store secrets, tokens, or sensitive user data in signed session cookies.
+
 Routes use:
 - `await ctx.auth.getSession()`
 - `await ctx.auth.requireSession({ redirectTo: "/login", status?: 302|303|307 })`
@@ -314,7 +316,27 @@ For upload-capable routes, read both ordinary fields and files inside `action(ct
 For dedicated resource routes, use ordinary same-origin requests or standard HTML forms without `data-zen-form` enhancement. The resource response is JSON or plain text, not same-route HTML.
 
 ### Optional Client Policy and Events
-You can still subscribe to advisory route-protection events:
+The router exposes advisory client policy hooks for navigation UX only. These hooks can reduce flashes or choose a local fallback, but they are never authorization and never replace server `guard(ctx)` / `load(ctx)`.
+
+```ts
+import { setAdvisoryRoutePolicy } from "@zenithbuild/router";
+
+setAdvisoryRoutePolicy({
+  onDeny: "redirect",
+  defaultLoginPath: "/login",
+  deny401RedirectToLogin: true,
+  forbiddenPath: "/forbidden"
+});
+```
+
+Compatibility aliases remain available for older code:
+- `setRouteProtectionPolicy(...)` -> `setAdvisoryRoutePolicy(...)`
+- `_getRouteProtectionPolicy()` -> `_getAdvisoryRoutePolicy()`
+- `RouteProtectionPolicy` -> `AdvisoryRoutePolicy`
+
+The compatibility names are deprecated because they sound stronger than what the client router can provide.
+
+You can also subscribe to advisory route events:
 
 ```ts
 import { on, off } from "@zenithbuild/router";
@@ -328,7 +350,7 @@ on("route:deny", handleDeny);
 off("route:deny", handleDeny);
 ```
 
-Supported route-protection events:
+Supported advisory route events:
 - `route-check:start`
 - `route-check:end`
 - `route-check:error`

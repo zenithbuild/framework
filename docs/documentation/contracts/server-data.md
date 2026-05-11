@@ -151,7 +151,7 @@ Evidence:
 
 Contract: `ctx.auth` provides one cookie-backed session workflow inside `guard(ctx)`, `action(ctx)`, and `load(ctx)`.
 
-Invariant: routes read session state with `getSession()` / `requireSession(...)` and stage cookie mutation with `signIn(...)` / `signOut()` while keeping ordinary HTML forms and redirects first-class.
+Invariant: routes read session state with `getSession()` / `requireSession(...)` and stage cookie mutation with `signIn(...)` / `signOut()` while keeping ordinary HTML forms and redirects first-class. Signed cookies are tamper-resistant but not encrypted, so session payloads must not contain secrets or sensitive data.
 
 Banned:
 - provider abstraction, OAuth, social login, RBAC, or generic auth service behavior in this milestone

@@ -67,7 +67,7 @@ When `zenith.strictDomLints` is `true`, ZEN-DOM-* diagnostics are reported as **
 The canonical hover/completion surface is limited to Zenith primitives and syntax:
 
 - Script and expression completions: `zenMount`, `zenEffect`, `state`, `signal`, `ref`, `zenWindow`, `zenDocument`, `zenOn`, `zenResize`, `collectRefs`
-- Markup attribute completions: canonical `on:*` event attributes plus the handler-prop convention (`onClick={handler}` at component callsites)
+- Markup attribute completions: canonical `on:*` event attributes plus ordinary component callback props such as `onPress={handler}` at component callsites
 - Hovers for `zenEffect`, `zenMount`, `state`, `signal`, `ref` must include a short definition, a tiny example, and a `Docs:` line pointing at canonical docs
 - Editor tooling must not register React/Vue/Svelte snippet templates for `.zen`
 

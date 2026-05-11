@@ -79,7 +79,7 @@ Component callsite:
 function increment() {}
 </script>
 
-<Button onClick={increment}></Button>
+<Button onPress={increment}></Button>
 ```
 
 Component implementation:
@@ -87,40 +87,43 @@ Component implementation:
 ```zen
 <script lang="ts">
 interface Props {
-  onClick: () => void;
+  onPress: () => void;
 }
 
 const incoming = props as Props;
 </script>
 
-<button on:click={incoming.onClick}>Increment</button>
+<button on:click={incoming.onPress}>Increment</button>
 ```
 
-This works for any event-like prop name as long as the component forwards it into canonical DOM event markup:
-- `onClick`
-- `onKeydown`
-- `onInput`
-- `onSubmit`
+Handler props are ordinary component props. Choose names that describe the component contract without copying native DOM event prop names:
 - `onPress`
+- `onRequestSubmit`
+- `onOpenChange`
+- `onValueChange`
+
+The component must still forward the callback into canonical DOM event markup:
+- `on:click={incoming.onPress}`
+- `on:submit={incoming.onRequestSubmit}`
 
 Forwarding across multiple component hops is supported:
 
 ```zen
 <script lang="ts">
 interface Props {
-  onClick: () => void;
+  onPress: () => void;
 }
 
 const incoming = props as Props;
 </script>
 
-<EventSink onClick={incoming.onClick}></EventSink>
+<EventSink onPress={incoming.onPress}></EventSink>
 ```
 
 Inline function props are also supported when they still evaluate to a function reference:
 
 ```zen
-<FormShell onSubmit={(event) => submit(event)}></FormShell>
+<FormShell onRequestSubmit={(event) => submit(event)}></FormShell>
 ```
 
 Transport rule:
@@ -134,13 +137,13 @@ If a handler prop may be absent, guard it with a small wrapper:
 ```zen
 <script lang="ts">
 interface Props {
-  onClick?: () => void;
+  onPress?: () => void;
 }
 
 const incoming = props as Props;
 </script>
 
-<button on:click={() => incoming.onClick?.()}>Maybe Increment</button>
+<button on:click={() => incoming.onPress?.()}>Maybe Increment</button>
 ```
 
 Use the direct form when the handler is required.
