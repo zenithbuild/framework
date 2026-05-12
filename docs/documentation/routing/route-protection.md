@@ -170,7 +170,9 @@ Freshness note:
 - resource-route login/logout flows remain direct/manual from a page-freshness perspective
 - when a resource-route auth change should refresh the current page, app code calls router-side `refreshCurrentRoute()`
 
-The cookie secret comes from `ZENITH_SESSION_SECRET`. This milestone does **not** add:
+The cookie secret comes from `ZENITH_SESSION_SECRET`. For packaged `node` deployments behind TLS termination, set `ZENITH_PUBLIC_ORIGIN` to the external HTTPS origin so staged session cookies include `Secure`.
+
+This milestone does **not** add:
 - OAuth or provider abstraction
 - social login
 - RBAC or policy framework

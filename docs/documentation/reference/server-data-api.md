@@ -61,6 +61,8 @@ Dedicated resource routes keep the non-HTML surface:
 Resource routes do **not** support `data(...)` or `invalid(...)`.
 Page routes do **not** support `json(...)`, `text(...)`, `download(...)`, `stream(...)`, or `sse(...)`.
 
+SSE event metadata is intentionally narrow: optional `event` and `id` fields must be single-line metadata values, and optional `retry` must be a non-negative safe integer. Multiline `data` remains supported and is framed as one `data:` line per input line.
+
 ## Contract: Explicit Middleware Composition
 
 Contract: server middleware composition is explicit, route-level, and server-only.
@@ -124,6 +126,7 @@ Definition of Done:
 - `download(body, { filename, contentType? })` uses fixed `Content-Disposition: attachment`
 - `stream(body, { status?, contentType? })` accepts only `ReadableStream` or `AsyncIterable`
 - `sse(events)` accepts only `AsyncIterable` event sources and emits standard SSE framing
+- `sse(events)` accepts optional single-line `event` / `id` metadata and non-negative integer `retry` metadata
 - `download(...)` accepts only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes and enforces a 5 MiB payload cap
 - `ctx.auth` and staged `Set-Cookie` behavior match page-route behavior
 

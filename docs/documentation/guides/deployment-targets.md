@@ -36,6 +36,16 @@ Static-only targets fail fast if the route manifest contains server-classified r
 
 `static-export` also fails fast if a dynamic prerender route does not declare explicit `exportPaths`.
 
+### Packaged Node Public Origin
+
+When the packaged `node` target runs behind TLS termination, set `ZENITH_PUBLIC_ORIGIN` to the externally visible origin:
+
+```bash
+ZENITH_PUBLIC_ORIGIN=https://app.example.com node dist/index.js
+```
+
+The value must be an absolute `http` or `https` origin with no credentials, path, query, or hash. When the trusted public origin is HTTPS, route-owned session cookies include `Secure`.
+
 ## Base Path Contract
 
 Zenith now supports a single deployment base-path knob:

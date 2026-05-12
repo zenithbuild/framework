@@ -150,6 +150,7 @@ Definition of Done:
 - `download(body, { filename, contentType? })` returns an attachment-style response with fixed `Content-Disposition: attachment`.
 - `stream(body, { status?, contentType? })` streams a `ReadableStream` or `AsyncIterable` body and may set an explicit content type.
 - `sse(events)` returns `text/event-stream; charset=utf-8` with standard SSE framing.
+- `sse(events)` supports optional single-line `event` / `id` metadata and non-negative integer `retry` metadata. Multiline `data` remains valid and is framed as separate `data:` lines.
 - `redirect(...)` and `deny(...)` behave the same way they do on page routes.
 - `json(payload)` reuses the existing JSON-safe top-level plain-object contract.
 - `download(...)` accepts only `string`, `Uint8Array`, `ArrayBuffer`, or `Buffer`-compatible bytes and enforces a 5 MiB payload cap.
@@ -174,6 +175,7 @@ Definition of Done:
 - `await ctx.auth.requireSession({ redirectTo, status? })` or `await ctx.auth.requireSession({ deny, message? })` short-circuits through the route's explicit policy.
 - `await ctx.auth.signIn(sessionObject)` and `await ctx.auth.signOut()` stage cookie mutation only; the route still returns the route-kind-appropriate result such as `redirect(...)`, `data(...)`, `invalid(...)`, `json(...)`, `text(...)`, or `download(...)`.
 - `ZENITH_SESSION_SECRET` is read from env when a route uses `ctx.auth`.
+- Packaged `node` deployments behind TLS termination should set `ZENITH_PUBLIC_ORIGIN` to their external HTTPS origin so staged session cookies include `Secure`.
 
 Failure Modes:
 - Auth examples imply provider abstraction, OAuth, RBAC, or a generic auth service.
