@@ -83,7 +83,8 @@ Current limitations:
 
 - There is no separate `assetPrefix` knob. Assets intentionally follow `basePath`.
 - `static-export` does not expose deployed `/_zenith/image` or `/__zenith/route-check` endpoints. A plain static file server is the contract.
-- `vercel` and `netlify` do not yet emit a deployed `/_zenith/image` endpoint. The `node` target does.
+- `node`, `vercel`, and `netlify` expose deployed `/_zenith/image` endpoints on the packaged image contract.
+- Hosted `vercel` and `netlify` targets skip advisory `/__zenith/route-check`; direct HTML requests remain the server-side route boundary.
 - Image materialization is route-artifact-driven. Bundler owns final build/static HTML image materialization, while preview and server render still materialize at runtime from structured `image_materialization` metadata. No path executes page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
 - There is no shipped plugin install/remove command surface in this CLI.
 
@@ -91,6 +92,8 @@ Current limitations:
 
 ### `zenith dev`
 Starts the development server on `localhost:3000`.
+
+Changes to `zenith.config.js` or `zenith.config.ts` require restarting `zenith dev`. If the dev watcher observes a config-file edit, it reports the restart policy instead of rebuilding with stale config.
 
 ### `zenith build`
 Compiles and bundles your application for production.

@@ -68,7 +68,7 @@ function appendSetCookieHeaders(headers, setCookies = []) {
 /**
  * Create and start a development server.
  *
- * @param {{ pagesDir: string, outDir: string, port?: number, host?: string, config?: object, logger?: object | null }} options
+ * @param {{ pagesDir: string, outDir: string, projectRoot?: string, port?: number, host?: string, config?: object, logger?: object | null }} options
  * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
  */
 export async function createDevServer(options) {
@@ -76,6 +76,7 @@ export async function createDevServer(options) {
     const {
         pagesDir,
         outDir,
+        projectRoot: providedProjectRoot = null,
         port = 3000,
         host = '127.0.0.1',
         config = {},
@@ -92,10 +93,11 @@ export async function createDevServer(options) {
     const resolvedOutDir = resolve(outDir);
     const resolvedOutDirTmp = resolve(dirname(resolvedOutDir), `${basename(resolvedOutDir)}.tmp`);
     const pagesParentDir = dirname(resolvedPagesDir);
-    const projectRoot = basename(pagesParentDir) === 'src'
+    const inferredProjectRoot = basename(pagesParentDir) === 'src'
         ? dirname(pagesParentDir)
         : pagesParentDir;
-    const watchRoots = new Set([pagesParentDir]);
+    const projectRoot = resolve(providedProjectRoot || inferredProjectRoot);
+    const watchRoots = new Set([projectRoot, pagesParentDir]);
 
     /** @type {import('http').ServerResponse[]} */
     const hmrClients = [];
@@ -122,7 +124,7 @@ export async function createDevServer(options) {
         currentCssContent: '',
         currentRouteState: { pageRoutes: [], resourceRoutes: [] }
     };
-    const traceEnabled = config.devTrace === true || process.env.ZENITH_DEV_TRACE === '1';
+    const traceEnabled = process.env.ZENITH_DEV_TRACE === '1';
     const verboseLogging = traceEnabled || logger.mode?.logLevel === 'verbose';
 
     let actualPort = port;

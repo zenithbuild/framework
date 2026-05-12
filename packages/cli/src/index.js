@@ -141,7 +141,7 @@ export async function cli(args, cwd) {
             : resolvePort(args.slice(1), 3000);
         const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
         logger.dev('Starting dev server…');
-        const dev = await createDevServer({ pagesDir, outDir, port, host, config, logger });
+        const dev = await createDevServer({ pagesDir, outDir, projectRoot, port, host, config, logger });
         logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
 
         // Graceful shutdown
