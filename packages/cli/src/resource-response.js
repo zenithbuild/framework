@@ -29,6 +29,28 @@ function createReadableStreamFromAsyncIterable(iterable) {
     });
 }
 
+const SSE_METADATA_CONTROL_RE = /[\x00-\x1F\x7F]/u;
+
+function serializeSseMetadata(value, field) {
+    const serialized = String(value);
+    if (SSE_METADATA_CONTROL_RE.test(serialized)) {
+        throw new Error(`[Zenith] sse ${field} metadata must be a single line without control characters.`);
+    }
+    return serialized;
+}
+
+function serializeSseRetry(value) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error('[Zenith] sse retry metadata must be a non-negative safe integer.');
+    }
+    return String(value);
+}
+
+function serializeSseData(value) {
+    const raw = typeof value === 'string' ? value : JSON.stringify(value);
+    return String(raw ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 function createSseStream(events) {
     const iterator = events[Symbol.asyncIterator]();
     const encoder = new TextEncoder();
@@ -43,12 +65,11 @@ function createSseStream(events) {
                 }
 
                 let chunk = '';
-                if (value.event) chunk += `event: ${value.event}\n`;
-                if (value.id) chunk += `id: ${value.id}\n`;
-                if (value.retry) chunk += `retry: ${value.retry}\n`;
+                if (value.event !== undefined) chunk += `event: ${serializeSseMetadata(value.event, 'event')}\n`;
+                if (value.id !== undefined) chunk += `id: ${serializeSseMetadata(value.id, 'id')}\n`;
+                if (value.retry !== undefined) chunk += `retry: ${serializeSseRetry(value.retry)}\n`;
 
-                const data = typeof value.data === 'string' ? value.data : JSON.stringify(value.data);
-                const lines = data.split('\n');
+                const lines = serializeSseData(value.data).split('\n');
                 for (const line of lines) {
                     chunk += `data: ${line}\n`;
                 }

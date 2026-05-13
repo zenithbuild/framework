@@ -12,6 +12,7 @@ import { resolveRequestRoute } from './resolve-request-route.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const PUBLIC_ORIGIN_ENV = 'ZENITH_PUBLIC_ORIGIN';
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -408,8 +409,9 @@ function createNodeRequestHandler(context, resolveServerOrigin) {
 
 export async function createRequestHandler(options = {}) {
     const context = await loadRuntimeContext(options);
+    const publicOrigin = options.publicOrigin ?? process.env[PUBLIC_ORIGIN_ENV];
     const resolveServerOrigin = createTrustedOriginResolver({
-        publicOrigin: options.publicOrigin,
+        publicOrigin,
         host: options.host || '127.0.0.1',
         port: Number.isInteger(options.port) ? options.port : undefined,
         label: 'createRequestHandler()'
@@ -425,8 +427,9 @@ export async function createNodeServer(options = {}) {
     } = options;
     const context = await loadRuntimeContext(options);
     let actualPort = Number.isInteger(port) && port > 0 ? port : 0;
+    const publicOrigin = options.publicOrigin ?? process.env[PUBLIC_ORIGIN_ENV];
     const resolveServerOrigin = createTrustedOriginResolver({
-        publicOrigin: options.publicOrigin,
+        publicOrigin,
         host,
         getPort: () => actualPort,
         label: 'createNodeServer()'

@@ -81,6 +81,66 @@ describe('resource streaming & sse', () => {
         );
     });
 
+    test('sse() preserves safe metadata, retry zero, headers, and multiline data', async () => {
+        async function* events() {
+            yield {
+                event: 'update',
+                id: 'message-1',
+                retry: 0,
+                data: ['alpha', 'beta', 'gamma'].join('\r\n')
+            };
+        }
+
+        const descriptor = buildResourceResponseDescriptor(sse(events()));
+
+        expect(descriptor.headers['Content-Type']).toBe('text/event-stream; charset=utf-8');
+        expect(descriptor.headers['Cache-Control']).toBe('no-cache');
+        expect(descriptor.headers.Connection).toBe('keep-alive');
+
+        const chunks = await consumeStream(descriptor.body);
+        expect(chunks.join('')).toBe(
+            'event: update\n' +
+            'id: message-1\n' +
+            'retry: 0\n' +
+            'data: alpha\n' +
+            'data: beta\n' +
+            'data: gamma\n\n'
+        );
+    });
+
+    test('sse() rejects invalid event and id metadata while streaming', async () => {
+        const lineBreak = String.fromCharCode(10);
+        const control = String.fromCharCode(1);
+
+        async function* invalidEvent() {
+            yield { event: `bad${lineBreak}value`, data: 'ok' };
+        }
+
+        async function* invalidId() {
+            yield { id: `bad${control}value`, data: 'ok' };
+        }
+
+        await expect(consumeStream(buildResourceResponseDescriptor(sse(invalidEvent())).body))
+            .rejects.toThrow('sse event metadata must be a single line');
+        await expect(consumeStream(buildResourceResponseDescriptor(sse(invalidId())).body))
+            .rejects.toThrow('sse id metadata must be a single line');
+    });
+
+    test('sse() rejects invalid retry metadata while streaming', async () => {
+        async function* numericStringRetry() {
+            yield { retry: '1000', data: 'ok' };
+        }
+
+        async function* negativeRetry() {
+            yield { retry: -1, data: 'ok' };
+        }
+
+        await expect(consumeStream(buildResourceResponseDescriptor(sse(numericStringRetry())).body))
+            .rejects.toThrow('sse retry metadata must be a non-negative safe integer');
+        await expect(consumeStream(buildResourceResponseDescriptor(sse(negativeRetry())).body))
+            .rejects.toThrow('sse retry metadata must be a non-negative safe integer');
+    });
+
     test('misuse of streaming in page route fails validation', async () => {
         const filePath = 'pages/example.zen';
         await expect(resolveRouteResult({
