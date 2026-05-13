@@ -120,6 +120,8 @@ Run the server directly:
 zenith-language-server
 ```
 
+The binary defaults to stdio when no transport flag is provided. Plain LSP clients may still pass `--stdio` explicitly, but it is not required for the default Neovim setup.
+
 Example Neovim `lspconfig` setup:
 
 ```lua
@@ -146,10 +148,21 @@ lspconfig.zenith = {
 lspconfig.zenith.setup({})
 ```
 
+Supported Neovim/plain-LSP features:
+
+- compiler-backed diagnostics for `.zen`, `.zen.html`, and `.zenx`
+- DOM-safety code actions for supported `ZEN-DOM-*` diagnostics
+- limited doc-backed hover and completion for canonical Zenith primitives and documented `on:*` events
+
+Current limitations:
+
+- Zenith does not provide full TypeScript semantic completion or typechecking through the language server yet.
+- Completion is intentionally limited to compiler-safe Zenith syntax and documented framework primitives.
+
 ## Verified Parity
 
 - Packaged VS Code verification passed for compiler-backed diagnostics, `strictDomLints`, supported `ZEN-DOM-*` quick fixes, canonical hovers, and canonical completions.
-- Direct Neovim verification passed on the default Node `--stdio` path for the same diagnostics, quick fixes, hover, and completion surface.
+- Direct plain-LSP verification covers package-bin startup, initialize capabilities, `.zen` diagnostics publication, valid-document empty diagnostics, hover, and completion over stdio.
 - VS Code-compatible environments consume the packaged `@zenithbuild/language` extension path; plain LSP clients consume `@zenithbuild/language-server` directly.
 
 ## Troubleshooting
