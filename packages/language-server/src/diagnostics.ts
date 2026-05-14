@@ -1,5 +1,5 @@
-import { fileURLToPath } from 'node:url';
-import { compile } from '@zenithbuild/compiler';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   DiagnosticSeverity,
   DiagnosticTag,
@@ -51,12 +51,19 @@ interface CompilerEnvelope {
   readonly diagnostics?: readonly CompilerDiagnosticEntry[];
 }
 
+interface CompilerModule {
+  readonly compile: (input: { source: string; filePath: string }) => CompilerEnvelope;
+}
+
+let compilerModulePromise: Promise<CompilerModule> | undefined;
+
 export async function collectDiagnosticsFromSource(
   source: string,
   filePath: string,
   strictDomLints: boolean
 ): Promise<Diagnostic[]> {
   try {
+    const { compile } = await loadCompiler();
     const result = compile({ source, filePath }) as CompilerEnvelope;
     if (result.schemaVersion !== 1) {
       return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
@@ -66,6 +73,16 @@ export async function collectDiagnosticsFromSource(
   } catch (error) {
     return [compilerContractDiagnostic(String(error))];
   }
+}
+
+async function loadCompiler(): Promise<CompilerModule> {
+  compilerModulePromise ??= import('@zenithbuild/compiler')
+    .catch(() => import(pathToFileURL(resolveCompilerFallbackPath()).href)) as Promise<CompilerModule>;
+  return compilerModulePromise;
+}
+
+function resolveCompilerFallbackPath(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'compiler', 'dist', 'index.js');
 }
 
 export function mapCompilerEnvelopeToDiagnostics(

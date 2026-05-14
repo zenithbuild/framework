@@ -1,14 +1,23 @@
 import { test, expect } from '@jest/globals';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { URL, fileURLToPath } from 'node:url';
-import { compile } from '@zenithbuild/compiler';
+import { URL, fileURLToPath, pathToFileURL } from 'node:url';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const WORKSPACE_ROOT = resolve(PACKAGE_ROOT, '../..');
 const EXAMPLES_DIR = join(WORKSPACE_ROOT, 'docs', 'documentation', 'examples');
 
-test('all .zen examples in docs must compile cleanly (no false teaching surfaces)', () => {
+async function loadCompiler() {
+    try {
+        return await import('@zenithbuild/compiler');
+    } catch {
+        const fallbackPath = join(WORKSPACE_ROOT, 'packages', 'compiler', 'dist', 'index.js');
+        return import(pathToFileURL(fallbackPath).href);
+    }
+}
+
+test('all .zen examples in docs must compile cleanly (no false teaching surfaces)', async () => {
+    const { compile } = await loadCompiler();
     const examples = readdirSync(EXAMPLES_DIR).filter((file) => file.endsWith('.zen'));
     expect(examples.length).toBeGreaterThan(0);
 
