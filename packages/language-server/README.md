@@ -41,4 +41,6 @@ bun test packages/language-server/test/neovim-smoke.spec.ts
 The Neovim smoke uses `cmd = { "zenith-language-server" }` through the local
 package bin, opens `.zen` files, waits for LSP attachment, and verifies
 compiler diagnostics through `vim.diagnostic`. It prints
-`SKIP: nvim not installed` when Neovim is unavailable.
+`SKIP: nvim not installed` when Neovim is unavailable and
+`SKIP: nvim >= 0.10 required` when the installed Neovim is too old for the
+tested LSP client API.
