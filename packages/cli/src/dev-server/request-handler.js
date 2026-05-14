@@ -14,6 +14,7 @@ import { materializeImageMarkup } from '../images/materialize.js';
 import { injectImageRuntimePayload } from '../images/payload.js';
 import { handleImageRequest } from '../images/service.js';
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
+import { respondWithDevBuildError } from './build-error-response.js';
 import { handleRouteCheckRequest } from './route-check.js';
 
 export function createDevRequestHandler(options) {
@@ -274,6 +275,18 @@ export function createDevRequestHandler(options) {
                 res.end(descriptor.body);
                 return;
             }
+
+            if (state.buildStatus === 'error' && (!requestExt || requestExt === '.html')) {
+                respondWithDevBuildError({
+                    req,
+                    res,
+                    pathname,
+                    state,
+                    looksLikeJsonRequest
+                });
+                return;
+            }
+
             const resolved = resolveRequestRoute(canonicalUrl, routes.pageRoutes || []);
             let filePath = null;
 

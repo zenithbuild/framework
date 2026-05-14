@@ -33,6 +33,7 @@ import {
 } from './dev-server/not-found.js';
 import { createDevRequestHandler } from './dev-server/request-handler.js';
 import { createDevWatcher } from './dev-server/watcher.js';
+import { listenWithPortFallback } from './dev-server/port-fallback.js';
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -69,7 +70,7 @@ function appendSetCookieHeaders(headers, setCookies = []) {
  * Create and start a development server.
  *
  * @param {{ pagesDir: string, outDir: string, projectRoot?: string, port?: number, host?: string, config?: object, logger?: object | null }} options
- * @returns {Promise<{ server: import('http').Server, port: number, close: () => void }>}
+ * @returns {Promise<{ server: import('http').Server, port: number, requestedPort: number, portFallback: object | null, close: () => void }>}
  */
 export async function createDevServer(options) {
     const startupProfile = createStartupProfiler('cli-dev-server');
@@ -365,49 +366,34 @@ export async function createDevServer(options) {
             try { client.end(); } catch { }
         }
         hmrClients.length = 0;
-        server.close();
+        try { server.close(); } catch { }
     };
 
-    return new Promise((resolve, reject) => {
-        let settled = false;
-
-        server.once('error', (error) => {
-            if (!settled) {
-                settled = true;
-                reject(error);
-            }
+    try {
+        const listenResult = await listenWithPortFallback({ server, port, host });
+        actualPort = listenResult.port;
+        startupProfile.emit('server_bound', {
+            host: _publicHost(),
+            port: actualPort,
+            buildStatus: state.buildStatus
+        });
+        _trace('server_bound', {
+            host: _publicHost(),
+            port: actualPort,
+            buildStatus: state.buildStatus
         });
 
-        server.listen(port, host, async () => {
-            actualPort = server.address().port;
-            startupProfile.emit('server_bound', {
-                host: _publicHost(),
-                port: actualPort,
-                buildStatus: state.buildStatus
-            });
-            _trace('server_bound', {
-                host: _publicHost(),
-                port: actualPort,
-                buildStatus: state.buildStatus
-            });
-
-            try {
-                await _runInitialBuild();
-                watcherController.start();
-                if (!settled) {
-                    settled = true;
-                    resolve({
-                        server,
-                        port: actualPort,
-                        close: closeServer
-                    });
-                }
-            } catch (error) {
-                if (!settled) {
-                    settled = true;
-                    reject(error);
-                }
-            }
-        });
-    });
+        await _runInitialBuild();
+        watcherController.start();
+        return {
+            server,
+            port: actualPort,
+            requestedPort: listenResult.requestedPort,
+            portFallback: listenResult.portFallback,
+            close: closeServer
+        };
+    } catch (error) {
+        closeServer();
+        throw error;
+    }
 }

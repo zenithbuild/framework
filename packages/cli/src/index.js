@@ -142,7 +142,17 @@ export async function cli(args, cwd) {
         const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
         logger.dev('Starting dev server…');
         const dev = await createDevServer({ pagesDir, outDir, projectRoot, port, host, config, logger });
-        logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
+        const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+        const servingUrl = `http://${displayHost}:${dev.port}`;
+        if (dev.portFallback) {
+            const occupied = Array.isArray(dev.portFallback.occupiedPorts)
+                ? dev.portFallback.occupiedPorts.join(', ')
+                : String(dev.requestedPort);
+            logger.warn(`Requested port ${dev.requestedPort} is occupied; using ${dev.port}.`, {
+                hint: `Occupied port(s): ${occupied}; serving at ${servingUrl}`
+            });
+        }
+        logger.ok(servingUrl);
 
         // Graceful shutdown
         process.on('SIGINT', () => {
