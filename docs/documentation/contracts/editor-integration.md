@@ -164,7 +164,8 @@ The smoke test runs Neovim headlessly when `nvim` is installed, starts the local
 `zenith-language-server` package binary with no transport args, confirms the LSP
 client attaches to a `.zen` buffer, and verifies compiler diagnostics through
 `vim.diagnostic`. Environments without Neovim print `SKIP: nvim not installed`;
-the protocol-level stdio harness remains the required CI proof in that case.
+Neovim versions older than 0.10 print `SKIP: nvim >= 0.10 required`. The
+protocol-level stdio harness remains the required CI proof in either skip case.
 
 Current limitations:
 

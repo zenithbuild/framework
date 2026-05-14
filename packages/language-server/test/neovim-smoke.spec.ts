@@ -27,9 +27,29 @@ interface SmokeResult {
   validDiagnostics?: number;
 }
 
-function hasNeovim(): boolean {
-  const result = spawnSync('nvim', ['--version'], { stdio: 'ignore' });
-  return result.status === 0;
+interface NeovimAvailability {
+  available: boolean;
+  skipMessage?: string;
+}
+
+function checkNeovim(): NeovimAvailability {
+  const result = spawnSync('nvim', ['--version'], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    return { available: false, skipMessage: 'SKIP: nvim not installed' };
+  }
+
+  const version = /^NVIM v(\d+)\.(\d+)\.(\d+)/.exec(result.stdout);
+  if (!version) {
+    return { available: false, skipMessage: 'SKIP: nvim >= 0.10 required' };
+  }
+
+  const major = Number(version[1]);
+  const minor = Number(version[2]);
+  if (major === 0 && minor < 10) {
+    return { available: false, skipMessage: 'SKIP: nvim >= 0.10 required' };
+  }
+
+  return { available: true };
 }
 
 async function runNeovimSmoke(): Promise<SmokeResult> {
@@ -242,8 +262,9 @@ vim.cmd("qa")
 
 describe('headless Neovim LSP smoke', () => {
   test('attaches to .zen buffers and surfaces compiler diagnostics', async () => {
-    if (!hasNeovim()) {
-      console.log('SKIP: nvim not installed');
+    const neovim = checkNeovim();
+    if (!neovim.available) {
+      console.log(neovim.skipMessage);
       return;
     }
 
