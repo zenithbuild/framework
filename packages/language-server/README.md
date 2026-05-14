@@ -31,3 +31,14 @@ Supported features:
 Limitations:
 - no full TypeScript semantic completion or typechecking
 - no project-wide symbol index
+
+Editor smoke:
+
+```bash
+bun test packages/language-server/test/neovim-smoke.spec.ts
+```
+
+The Neovim smoke uses `cmd = { "zenith-language-server" }` through the local
+package bin, opens `.zen` files, waits for LSP attachment, and verifies
+compiler diagnostics through `vim.diagnostic`. It prints
+`SKIP: nvim not installed` when Neovim is unavailable.
