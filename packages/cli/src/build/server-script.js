@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { findNextKnownComponentTag } from '../component-tag-parser.js';
+import { readRouteHandlerExport } from '../route-handler-export-analysis.js';
 import { extractStaticExportPaths } from '../static-export-paths.js';
 
 /**
@@ -75,17 +76,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
-    const loadFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+load\s*\(([^)]*)\)/);
-    const loadConstParenMatch = serverSource.match(/\bexport\s+const\s+load\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
-    const loadConstSingleArgMatch = serverSource.match(
-        /\bexport\s+const\s+load\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
-    );
-    const hasLoad = Boolean(loadFnMatch || loadConstParenMatch || loadConstSingleArgMatch);
-    const loadMatchCount =
-        Number(Boolean(loadFnMatch)) +
-        Number(Boolean(loadConstParenMatch)) +
-        Number(Boolean(loadConstSingleArgMatch));
-    if (loadMatchCount > 1) {
+    const loadExport = readRouteHandlerExport(serverSource, 'load');
+    const hasLoad = loadExport.hasExport;
+    if (loadExport.matchCount > 1) {
         throw new Error(
             `Zenith server script contract violation:\n` +
             `  File: ${sourceFile}\n` +
@@ -94,17 +87,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
-    const guardFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+guard\s*\(([^)]*)\)/);
-    const guardConstParenMatch = serverSource.match(/\bexport\s+const\s+guard\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
-    const guardConstSingleArgMatch = serverSource.match(
-        /\bexport\s+const\s+guard\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
-    );
-    const hasGuard = Boolean(guardFnMatch || guardConstParenMatch || guardConstSingleArgMatch);
-    const guardMatchCount =
-        Number(Boolean(guardFnMatch)) +
-        Number(Boolean(guardConstParenMatch)) +
-        Number(Boolean(guardConstSingleArgMatch));
-    if (guardMatchCount > 1) {
+    const guardExport = readRouteHandlerExport(serverSource, 'guard');
+    const hasGuard = guardExport.hasExport;
+    if (guardExport.matchCount > 1) {
         throw new Error(
             `Zenith server script contract violation:\n` +
             `  File: ${sourceFile}\n` +
@@ -113,17 +98,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
-    const actionFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+action\s*\(([^)]*)\)/);
-    const actionConstParenMatch = serverSource.match(/\bexport\s+const\s+action\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
-    const actionConstSingleArgMatch = serverSource.match(
-        /\bexport\s+const\s+action\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
-    );
-    const hasAction = Boolean(actionFnMatch || actionConstParenMatch || actionConstSingleArgMatch);
-    const actionMatchCount =
-        Number(Boolean(actionFnMatch)) +
-        Number(Boolean(actionConstParenMatch)) +
-        Number(Boolean(actionConstSingleArgMatch));
-    if (actionMatchCount > 1) {
+    const actionExport = readRouteHandlerExport(serverSource, 'action');
+    const hasAction = actionExport.hasExport;
+    if (actionExport.matchCount > 1) {
         throw new Error(
             `Zenith server script contract violation:\n` +
             `  File: ${sourceFile}\n` +
@@ -155,10 +132,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     }
 
     if (hasLoad) {
-        const singleArg = String(loadConstSingleArgMatch?.[1] || '').trim();
-        const paramsText = String((loadFnMatch || loadConstParenMatch)?.[1] || '').trim();
-        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-        if (arity !== 1) {
+        if (loadExport.arity !== null && loadExport.arity !== 1) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
@@ -169,10 +143,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     }
 
     if (hasGuard) {
-        const singleArg = String(guardConstSingleArgMatch?.[1] || '').trim();
-        const paramsText = String((guardFnMatch || guardConstParenMatch)?.[1] || '').trim();
-        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-        if (arity !== 1) {
+        if (guardExport.arity !== null && guardExport.arity !== 1) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
@@ -183,10 +154,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     }
 
     if (hasAction) {
-        const singleArg = String(actionConstSingleArgMatch?.[1] || '').trim();
-        const paramsText = String((actionFnMatch || actionConstParenMatch)?.[1] || '').trim();
-        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-        if (arity !== 1) {
+        if (actionExport.arity !== null && actionExport.arity !== 1) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +

@@ -1,35 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { relative, sep } from 'node:path';
+import { readRouteHandlerExport } from './route-handler-export-analysis.js';
 
 const RESOURCE_EXTENSIONS = ['.resource.ts', '.resource.js', '.resource.mts', '.resource.cts', '.resource.mjs', '.resource.cjs'];
 const FORBIDDEN_RESOURCE_EXPORT_RE =
     /\bexport\s+const\s+(?:data|prerender|exportPaths|ssr_data|props|ssr)\b/;
 
-function readSingleExport(source, name) {
-    const fnMatch = source.match(new RegExp(`\\bexport\\s+(?:async\\s+)?function\\s+${name}\\s*\\(([^)]*)\\)`));
-    const constParenMatch = source.match(new RegExp(`\\bexport\\s+const\\s+${name}\\s*=\\s*(?:async\\s*)?\\(([^)]*)\\)\\s*=>`));
-    const constSingleArgMatch = source.match(
-        new RegExp(`\\bexport\\s+const\\s+${name}\\s*=\\s*(?:async\\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=>`)
-    );
-    const matchCount =
-        Number(Boolean(fnMatch)) +
-        Number(Boolean(constParenMatch)) +
-        Number(Boolean(constSingleArgMatch));
-
-    return {
-        fnMatch,
-        constParenMatch,
-        constSingleArgMatch,
-        hasExport: matchCount > 0,
-        matchCount
-    };
-}
-
 function assertSingleCtxArg(sourceFile, name, exportMatch) {
-    const singleArg = String(exportMatch.constSingleArgMatch?.[1] || '').trim();
-    const paramsText = String((exportMatch.fnMatch || exportMatch.constParenMatch)?.[1] || '').trim();
-    const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-    if (arity !== 1) {
+    if (exportMatch.arity !== null && exportMatch.arity !== 1) {
         throw new Error(
             `Zenith resource route contract violation:\n` +
             `  File: ${sourceFile}\n` +
@@ -104,9 +82,9 @@ export function analyzeResourceRouteModule(fullPath, root) {
         );
     }
 
-    const guardExport = readSingleExport(source, 'guard');
-    const loadExport = readSingleExport(source, 'load');
-    const actionExport = readSingleExport(source, 'action');
+    const guardExport = readRouteHandlerExport(source, 'guard');
+    const loadExport = readRouteHandlerExport(source, 'load');
+    const actionExport = readRouteHandlerExport(source, 'action');
 
     for (const [name, exportMatch] of [
         ['guard', guardExport],
