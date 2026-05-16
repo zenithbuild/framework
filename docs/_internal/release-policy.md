@@ -48,11 +48,13 @@ Zenith uses three protected branches with branch-specific semver lines. Channel 
 
 ## Pipeline Policy
 
+- Pull request and reusable CI workflows run with read-only repository permissions and no npm publish credentials.
 - Publishing is OIDC-only via [publish.yml](../../.github/workflows/publish.yml) in the `npm-release` environment.
+- OIDC token permission is granted only on npm publish jobs, not on preflight, verification, or release metadata jobs.
 - The standard publish path must not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, token-written `.npmrc` auth, or a separate latest-promotion token flow.
 - Tag publishing is guarded twice before npm publish begins:
   - the pushed tag must match `TRAIN_VERSION` after removing the leading `v`
   - the tagged commit must be contained in the correct branch for that tag kind (`beta`, `train`, or `master`)
 - The CI gate retries once (`bun run ci`) to reduce flaky failures. Publish never retries automatically.
-- [release.yml](../../.github/workflows/release.yml) runs only after publish succeeds.
+- [release.yml](../../.github/workflows/release.yml) runs only after publish succeeds and consumes the verified publish metadata artifacts from that successful run.
 - [bootstrap-platform-packages.yml](../../.github/workflows/bootstrap-platform-packages.yml) remains manual-only for bootstrapping brand-new npm package names before trusted publishing can take over.

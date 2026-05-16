@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   ci:
@@ -161,6 +160,9 @@ jobs:
             platform_key: win32-x64
     runs-on: ${{ matrix.runner }}
     environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -302,6 +304,9 @@ jobs:
     if: needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
