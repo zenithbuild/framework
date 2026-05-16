@@ -11,6 +11,7 @@ import { injectImageMaterializationIntoRouterManifest } from '../images/router-m
 import { buildImageArtifacts } from '../images/service.js';
 import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from '../images/payload.js';
+import { writeResourceRouteManifest } from '../resource-manifest.js';
 import { createStartupProfiler } from '../startup-profile.js';
 import { resolveBuildAdapter } from '../adapters/resolve-adapter.js';
 import { supportsTargetRouteCheck } from '../route-check-support.js';
@@ -55,6 +56,10 @@ export function createDevBuildSession(options) {
 
     const state = createDevBuildState(config, basePath);
 
+    function pageManifestEntries() {
+        return state.manifest.filter((entry) => entry?.route_kind !== 'resource');
+    }
+
     async function syncImageState(startupProfile) {
         const { manifest } = await startupProfile.measureAsync(
             'build_image_artifacts',
@@ -86,7 +91,7 @@ export function createDevBuildSession(options) {
         bundlerOptions = {}
     ) {
         const orderedEnvelopes = bundlerOptions.envelopesOverride
-            || orderEnvelopes(state.manifest, resolvedPagesDir, state.envelopeByFile);
+            || orderEnvelopes(pageManifestEntries(), resolvedPagesDir, state.envelopeByFile);
         if (!orderedEnvelopes || orderedEnvelopes.length === 0) {
             throw new Error('Dev rebuild cache is incomplete; full rebuild required.');
         }
@@ -139,15 +144,16 @@ export function createDevBuildSession(options) {
 
         state.registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
         state.manifest = await startupProfile.measureAsync('generate_manifest', () => generateManifest(resolvedPagesDir));
+        const pageManifest = pageManifestEntries();
         await startupProfile.measureAsync('ensure_zenith_type_declarations', () => ensureZenithTypeDeclarations({
-            manifest: state.manifest,
+            manifest: pageManifest,
             pagesDir: resolvedPagesDir
         }));
 
         state.pageLoopCaches = createPageLoopCaches();
         const emitCompilerWarning = buildCompilerWarningEmitter(activeLogger);
         const { envelopes, expressionRewriteMetrics } = await buildPageEnvelopes({
-            manifest: state.manifest,
+            manifest: pageManifest,
             pagesDir: resolvedPagesDir,
             srcDir,
             registry: state.registry,
@@ -161,16 +167,20 @@ export function createDevBuildSession(options) {
         });
 
         state.envelopeByFile = new Map(envelopes.map((entry) => [entry.file, entry]));
-        state.manifestEntryByPath = toManifestEntryMap(state.manifest, resolvedPagesDir);
+        state.manifestEntryByPath = toManifestEntryMap(pageManifest, resolvedPagesDir);
         state.pageOnlyFastPathSignatureByFile = new Map(
             envelopes.map((entry) => [entry.file, buildPageOnlyFastPathSignature(entry)])
         );
         state.globalGraphHash = buildGlobalGraphHash(envelopes);
         const { assets } = await runBundlerWithCachedEnvelopes(startupProfile, activeLogger, showBundlerInfo);
+        await startupProfile.measureAsync(
+            'write_resource_manifest',
+            () => writeResourceRouteManifest(outDir, state.manifest, basePath)
+        );
         await syncImageState(startupProfile);
 
         startupProfile.emit('build_complete', {
-            pages: state.manifest.length,
+            pages: pageManifest.length,
             assets: assets.length,
             compilerTotals,
             expressionRewriteMetrics,
@@ -178,7 +188,7 @@ export function createDevBuildSession(options) {
         });
 
         state.hasSuccessfulBuild = true;
-        return { pages: state.manifest.length, assets, strategy: 'full' };
+        return { pages: pageManifest.length, assets, strategy: 'full' };
     }
 
     async function runBundleOnlyBuild(activeLogger, showBundlerInfo) {
@@ -194,7 +204,7 @@ export function createDevBuildSession(options) {
         await syncImageState(startupProfile);
 
         startupProfile.emit('build_complete', {
-            pages: state.manifest.length,
+            pages: pageManifestEntries().length,
             assets: assets.length,
             compilerTotals,
             expressionRewriteMetrics,
@@ -236,7 +246,7 @@ export function createDevBuildSession(options) {
                 buildPageOnlyFastPathSignature(envelope)
             );
         }
-        const orderedEnvelopes = orderEnvelopes(state.manifest, resolvedPagesDir, state.envelopeByFile);
+        const orderedEnvelopes = orderEnvelopes(pageManifestEntries(), resolvedPagesDir, state.envelopeByFile);
         if (!orderedEnvelopes || orderedEnvelopes.length === 0) {
             throw new Error('Dev rebuild cache is incomplete; full rebuild required.');
         }
@@ -256,7 +266,7 @@ export function createDevBuildSession(options) {
         );
         await syncImageState(startupProfile);
         startupProfile.emit('build_complete', {
-            pages: state.manifest.length,
+            pages: pageManifestEntries().length,
             assets: assets.length,
             compilerTotals,
             expressionRewriteMetrics,
@@ -264,7 +274,7 @@ export function createDevBuildSession(options) {
             rebuiltPages: entries.length
         });
 
-        return { pages: state.manifest.length, assets, strategy: 'page-only', rebuiltPages: entries.length };
+        return { pages: pageManifestEntries().length, assets, strategy: 'page-only', rebuiltPages: entries.length };
     }
 
     return {
