@@ -18,6 +18,6 @@
     "bench:round1:publication": "node ./scripts/run-matrix.mjs --profile=publication --round=1"
   },
   "devDependencies": {
-    "playwright": "1.54.2"
+    "playwright": "1.60.0"
   }
 }

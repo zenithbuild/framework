@@ -16,7 +16,7 @@
     "@zenithbuild/core": "0.7.10"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/cli": "^4.1.18",
     "@types/bun": "latest",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
@@ -27,7 +27,7 @@
     "@zenithbuild/router": "0.7.10",
     "@zenithbuild/runtime": "0.7.10",
     "eslint": "^9.39.2",
-    "playwright": "^1.58.2",
+    "playwright": "^1.60.0",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.18"
   }
