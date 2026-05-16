@@ -12,6 +12,9 @@ on:
       - train
       - master
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     uses: ./.github/workflows/reusable-ci.yml
