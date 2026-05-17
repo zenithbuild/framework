@@ -13,6 +13,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing v-prefixed release tag to publish or recover."
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -28,6 +34,7 @@ jobs:
     outputs:
       release_version: ${{ steps.release_version.outputs.release_version }}
       release_tag: ${{ steps.release_version.outputs.release_tag }}
+      release_sha: ${{ steps.release_version.outputs.release_sha }}
       dist_tag: ${{ steps.release_version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
@@ -42,9 +49,17 @@ jobs:
         id: release_version
         shell: bash
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG_NAME="${INPUT_RELEASE_TAG}"
+          else
+            TAG_NAME="${REF_NAME}"
+          fi
+
           release_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
           tag_version="${TAG_NAME#v}"
 
@@ -57,6 +72,9 @@ jobs:
             echo "TRAIN_VERSION=${release_version} but tag=${TAG_NAME}; bump TRAIN_VERSION first or retag correctly." >&2
             exit 1
           fi
+
+          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+          release_sha="$(git rev-parse "${TAG_NAME}^{commit}")"
 
           if [[ "${TAG_NAME}" == *-beta.* ]]; then
             dist_tag="beta"
@@ -71,13 +89,14 @@ jobs:
 
           echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
           echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
           echo "target_branch=${target_branch}" >> "$GITHUB_OUTPUT"
 
       - name: Assert tag is on correct branch
         env:
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ steps.release_version.outputs.release_sha }}
+          GITHUB_REF_NAME: ${{ steps.release_version.outputs.release_tag }}
           TARGET_BRANCH: ${{ steps.release_version.outputs.target_branch }}
         run: node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
 
@@ -170,6 +189,11 @@ jobs:
         with:
           node-version: "24"
 
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.package_kind == 'bundler'
+        with:
+          bun-version: latest
+
       - name: Assert OIDC-only publish auth
         shell: bash
         run: |
@@ -212,6 +236,15 @@ jobs:
             COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-compiler-platform-package.mjs
           fi
+
+      - name: Build JS template dependencies for bundler smoke
+        if: matrix.package_kind == 'bundler'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install
+          bun run --cwd packages/runtime build
+          bun run --cwd packages/router build
 
       - name: Verify platform binary exists and works
         shell: bash
@@ -401,7 +434,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
           RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
-          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
         run: |
           set -euo pipefail
           cat > framework-release.json <<JSON

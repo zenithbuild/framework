@@ -78,3 +78,32 @@ test('publish workflow does not mask required native smoke commands', () => {
     assert.doesNotMatch(workflow, /\|\|\s*true/);
     assert.match(workflow, /node scripts\/verify-platform-binary-smoke\.mjs/);
 });
+
+test('publish workflow prepares bundler template dependencies before platform smoke', () => {
+    const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
+    const setupIndex = workflow.indexOf('oven-sh/setup-bun@v2');
+    const buildIndex = workflow.indexOf('Build JS template dependencies for bundler smoke');
+    const smokeIndex = workflow.indexOf('Verify platform binary exists and works');
+
+    assert.ok(setupIndex !== -1, 'bundler platform smoke should install Bun');
+    assert.ok(buildIndex !== -1, 'bundler platform smoke should build JS template dependencies');
+    assert.ok(smokeIndex !== -1, 'platform smoke step should exist');
+    assert.ok(setupIndex < smokeIndex, 'Bun setup should run before platform smoke');
+    assert.ok(buildIndex < smokeIndex, 'template dependencies should build before platform smoke');
+
+    const dependencyBuildBlock = workflow.slice(buildIndex, smokeIndex);
+    assert.match(dependencyBuildBlock, /if:\s*matrix\.package_kind == 'bundler'/);
+    assert.match(dependencyBuildBlock, /bun install/);
+    assert.match(dependencyBuildBlock, /bun run --cwd packages\/runtime build/);
+    assert.match(dependencyBuildBlock, /bun run --cwd packages\/router build/);
+});
+
+test('publish workflow can recover an existing release tag without moving it', () => {
+    const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
+    assert.match(workflow, /workflow_dispatch:/);
+    assert.match(workflow, /release_tag:/);
+    assert.match(workflow, /git fetch --force origin "refs\/tags\/\$\{TAG_NAME\}:refs\/tags\/\$\{TAG_NAME\}"/);
+    assert.match(workflow, /release_sha="\$\(git rev-parse "\$\{TAG_NAME\}\^\{commit\}"\)"/);
+    assert.match(workflow, /GITHUB_SHA:\s*\$\{\{ steps\.release_version\.outputs\.release_sha \}\}/);
+    assert.match(workflow, /RELEASE_SHA:\s*\$\{\{ needs\.preflight\.outputs\.release_sha \}\}/);
+});
