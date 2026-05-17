@@ -6,21 +6,80 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-05-17
+
 ### Changed
 
-#### Security
+#### Compiler hardening and diagnostics
+
+- Tightened `.zen` event handler validation so direct-call handler forms are rejected consistently while preserving identifier/member references and inline function handlers.
+- Added stable compiler diagnostics for invalid scripts, invalid markup expressions, and clearly unbound markup identifiers: `ZEN-SCRIPT-SYNTAX`, `ZEN-EXPR-SYNTAX`, and `ZEN-EXPR-UNBOUND`.
+- Converted malformed markup parser failures into structured `ZEN-MARKUP-PARSE` diagnostics, including mismatched tags and unexpected EOF, without panic-style bridge output.
+
+#### Image optimizer hardening
 
 - Hardened remote image optimization so allowed remote image URLs are resolved and validated before fetch, with the validated target pinned across the initial request and each redirect hop while preserving expected host semantics.
 
-#### Compiler diagnostics
+#### Runtime cleanup and embedded markup hardening
 
-- Tightened event handler validation so direct-call handler forms are rejected consistently while preserving identifier/member references and inline function handlers.
-- Added stable compiler diagnostics for invalid scripts, invalid markup expressions, and clearly unbound markup identifiers: `ZEN-SCRIPT-SYNTAX`, `ZEN-EXPR-SYNTAX`, and `ZEN-EXPR-UNBOUND`.
-- Converted malformed markup parser failures into structured `ZEN-MARKUP-PARSE` diagnostics, including mismatched tags and unexpected EOF, without panic-style bridge output.
+- Ensured structural fragment replacement drains nested cleanup before text or HTML replacement.
+- Made cleanup continue after throwing disposers and report collected cleanup errors deterministically.
+- Rolled back `zeneffect` subscriptions and cleanup registrations when setup or registration fails.
+- Hardened embedded-markup URL-bearing attributes, including `srcset`, by decoding and normalizing values before protocol validation.
+
+#### Build, routing, and server output
+
+- Shared route classification across build and manifest paths so protected routes cannot be marked prerender.
+- Fixed dev output to honor configured `basePath`, including soft navigation under the configured prefix.
+- Tightened dev rebuild cache invalidation for route deletions and static-to-interactive transitions.
+- Made server route output names collision-resistant.
+
+#### Dev server stability
+
+- Improved dev rebuild and browser refresh recovery so failed builds surface clear build-error responses without wedging the dev server.
+- Preserved resource route execution while page refreshes are served build-error responses.
+- Added automatic next-available-port fallback with clear CLI output for requested and occupied ports, without killing processes.
+
+#### Server and resource hardening
+
+- Validated SSE `event`, `id`, and `retry` metadata while preserving safe headers, `retry: 0`, and multiline `data` framing.
+- Added packaged Node support for `ZENITH_PUBLIC_ORIGIN` / `publicOrigin` so secure cookies are set correctly behind HTTPS termination while local HTTP behavior remains unchanged.
+
+#### Package, release, and CI integrity
+
+- Made Windows CLI bin entrypoint detection platform-safe and locked package `.bin` ownership.
+- Made native binary publish smoke checks fail closed and kept Windows `.exe` handling covered.
+- Derived CI integration shard coverage from the filesystem and included the router legacy Jest suite in the core release gate.
+- Audited CI/release/publish trust boundaries, hardened workflow permissions, scoped OIDC to npm publish jobs, and added static workflow policy coverage.
+- Cleaned dependency audit findings through dev/test/browser automation updates without adding an allowlist or changing production-shipped runtime dependencies.
 
 #### Dev/CI maintenance
 
 - Kept Batch 1 regression coverage inside focused test files and fixed the PR touched-file audit path so CI can evaluate changed files from pull request checkouts.
+
+#### Docs and API contract clarity
+
+- Extended docs gates to catch forbidden component callsite DOM event prop drift while preserving ordinary callback props.
+- Clarified router route-policy APIs as advisory UX only and kept server `guard(ctx)` / `load(ctx)` as the security boundary.
+- Aligned router event type declarations with emitted route events and centralized generated `Zenith.LoadContext` declarations around the real server route contract.
+- Documented that signed session cookies provide integrity and tamper resistance, not confidentiality.
+- Aligned public config truth for `static-export`, target parity, unknown-key rejection, env-driven `ZENITH_DEV_TRACE`, and dev config-change restart warnings.
+- Updated hosted image endpoint wording to reflect current `node`, `vercel`, `netlify`, and `static-export` behavior.
+
+#### Route-local middleware and plugin surface
+
+- Added end-to-end parity coverage for route-local `withMiddleware(...)` across page and resource routes, dev, packaged Node, and hosted function paths without introducing a global middleware primitive.
+- Quarantined archived legacy plugin code from the current public API surface and clarified that the public plugin API is currently closed.
+
+#### Language server and editor DX
+
+- Made the framework language-server package expose a reliable `zenith-language-server` stdio entrypoint while preserving explicit transport arguments.
+- Added protocol-level LSP smoke coverage for initialization, diagnostics, hover, and completion, plus honest Neovim smoke coverage and docs for current limitations.
+- Note: standalone `zenith-language` and `zenith-language-server` repositories have separate `v0.7.12` tags, but their npm publish remains separate from this framework release and was blocked locally by npm auth.
+
+#### Maintainability planning
+
+- Added the ZFW-26 oversized-file refactor plan and focused follow-up issues for active bundler source, runtime tests, CLI tests, generated/golden policy, docs/site scripts, the overlay sheet docs page, and archived legacy bundler audit handling.
 
 ## [0.7.10] - 2026-04-25
 
