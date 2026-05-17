@@ -1,3 +1,7 @@
+# Archived Legacy Compiler Source
+
+This source tree is an archived internal snapshot from the legacy Zenith v1 compiler work. It is not part of the current public Zenith API surface and does not define supported plugin, config, or runtime contracts for current Zenith packages.
+
 # Zenith Compiler - Phase 1: Parse & Extract
 
 ## Overview
@@ -377,4 +381,3 @@ try {
   console.error('Compiler error:', error)
 }
 ```
-

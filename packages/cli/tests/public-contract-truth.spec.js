@@ -29,6 +29,10 @@ function collectFiles(dir, matcher) {
     return out.sort();
 }
 
+function isLegacyArchive(file) {
+    return file.includes('/_legacy_v1/');
+}
+
 describe('public contract truth', () => {
     test('package-facing docs do not reference removed zenith-docs paths or local machine paths', () => {
         const packageRoot = resolve(REPO_ROOT, 'packages');
@@ -51,7 +55,7 @@ describe('public contract truth', () => {
         const files = [
             ...collectFiles(docsRoot, (file) => file.endsWith('.md')),
             ...collectFiles(packageRoot, (file) => file.endsWith('.md'))
-        ];
+        ].filter((file) => !isLegacyArchive(file));
 
         for (const file of files) {
             const source = readFileSync(file, 'utf8');
@@ -70,6 +74,31 @@ describe('public contract truth', () => {
         expect(readme).toContain('### `zenith dev`');
         expect(readme).toContain('### `zenith build`');
         expect(readme).toContain('### `zenith preview`');
+    });
+
+    test('public docs keep the plugin surface closed instead of implying support', () => {
+        const extensionContract = readFileSync(
+            resolve(REPO_ROOT, 'docs/documentation/contracts/extension-contract.md'),
+            'utf8'
+        );
+
+        expect(extensionContract).toContain('plugin and extension surface is currently **CLOSED**');
+        expect(extensionContract).toContain('No public plugin architecture');
+        expect(extensionContract).toContain('Legacy `_legacy_v1` directories are archived internal snapshots');
+
+        const docsRoot = resolve(REPO_ROOT, 'docs');
+        const packageRoot = resolve(REPO_ROOT, 'packages');
+        const files = [
+            ...collectFiles(docsRoot, (file) => file.endsWith('.md') && !file.includes('/public/ai/')),
+            ...collectFiles(packageRoot, (file) => file.endsWith('.md'))
+        ].filter((file) => !isLegacyArchive(file));
+
+        for (const file of files) {
+            const source = readFileSync(file, 'utf8');
+            expect(source).not.toMatch(/\bplugins?\s+(?:are|is)\s+(?:supported|available|enabled)\b/i);
+            expect(source).not.toMatch(/\bpublic\s+plugin\s+API\s+(?:is\s+)?(?:supported|available|open)\b/i);
+            expect(source).not.toMatch(/\bframework\s+installer\s+command\s+for\s+plugins?\b/i);
+        }
     });
 
     test('create-zenith docs describe the shipped templates and not the dead router preset', () => {

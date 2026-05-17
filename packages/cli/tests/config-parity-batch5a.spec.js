@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG, validateConfig as validateCliConfig } from '../dist/con
 import { KNOWN_TARGETS as CLI_TARGETS } from '../dist/adapters/adapter-types.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
-const UNKNOWN_KEYS = ['softNavigation', 'types', 'assetPrefix', 'devTrace'];
+const UNKNOWN_KEYS = ['softNavigation', 'types', 'assetPrefix', 'devTrace', 'plugins'];
 
 describe('Batch 5A config parity', () => {
     let CORE_TARGETS;
