@@ -1,14 +1,13 @@
 {
   "name": "@zenithbuild/compiler-legacy-v1",
   "version": "1.0.0",
-  "description": "The Iron Heart: Native Compiler for the Zenith Framework",
+  "private": true,
+  "description": "Archived internal legacy compiler snapshot; not part of the current public Zenith API",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/core/config/loader.js",
-    "./plugins": "./dist/core/plugins/bridge.js",
-    "./registry": "./dist/core/plugins/registry.js",
     "./transform": "./dist/transform/layoutProcessor.js"
   },
   "files": [
@@ -18,9 +17,6 @@
     "native/compiler-native/package.json",
     "native/compiler-native/*.node"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "tsc --skipLibCheck && cd native/compiler-native && bun run build && cp compiler-native.node compiler-native.darwin-arm64.node 2>/dev/null || true",
     "test": "bun test"

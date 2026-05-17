@@ -22,6 +22,8 @@ This means:
 - **No public runtime/DOM extension hook system**: The runtime executes canonical static instructions. It does not provide lifecycle hooking for arbitrary DOM observation or injection.
 - **Internal seams are not public context**: Any internal abstraction boundaries within Zenith packages are solely for framework orchestration and testing. They are not guaranteed or semver-protected endpoints for external consumption.
 
+Legacy `_legacy_v1` directories are archived internal snapshots. They are not supported public APIs and do not change the current closed plugin surface.
+
 ## Configuration Deployment Adapters
 
 The Zenith configuration supports an `adapter` key. This is the **only** supported framework-level extension, and its scope is strictly limited.
