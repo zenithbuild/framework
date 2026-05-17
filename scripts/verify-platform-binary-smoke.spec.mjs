@@ -98,6 +98,19 @@ test('publish workflow prepares bundler template dependencies before platform sm
     assert.match(dependencyBuildBlock, /bun run --cwd packages\/router build/);
 });
 
+test('publish workflow gives linux bundler container smoke access to template bridge packages', () => {
+    const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
+    const bundlerContainerMounts = [...workflow.matchAll(/docker_mounts=\(\n\s+-v "\$\(pwd\):\/repo:ro"\n\s+-v "\$\(pwd\)\/\$\{PACKAGE_DIR\}\/bin:\/test-bin:ro"\n\s+-w \/repo\/packages\/bundler\n\s+\)/g)];
+
+    assert.equal(
+        bundlerContainerMounts.length,
+        2,
+        'glibc and musl linux container smokes should mount the repo for bundler template dependencies'
+    );
+    assert.match(workflow, /node:20-slim[\s\S]*node \/repo\/scripts\/verify-platform-binary-smoke\.mjs/);
+    assert.match(workflow, /node:20-alpine[\s\S]*node \/repo\/scripts\/verify-platform-binary-smoke\.mjs/);
+});
+
 test('publish workflow can recover an existing release tag without moving it', () => {
     const workflow = readFileSync('.github/workflows/publish.yml', 'utf8');
     assert.match(workflow, /workflow_dispatch:/);
