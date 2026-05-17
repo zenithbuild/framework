@@ -266,14 +266,22 @@ jobs:
           set -euo pipefail
           if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
             binary_name="zenith-bundler"
+            docker_mounts=(
+              -v "$(pwd):/repo:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+              -w /repo/packages/bundler
+            )
           else
             binary_name="zenith-compiler"
+            docker_mounts=(
+              -v "$(pwd)/scripts:/repo/scripts:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+            )
           fi
 
           echo "--- node:20-slim (Debian Bookworm, glibc ~2.36) ---"
           docker run --rm \
-            -v "$(pwd)/scripts:/repo/scripts:ro" \
-            -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro" \
+            "${docker_mounts[@]}" \
             -e PACKAGE_KIND="${PACKAGE_KIND}" \
             -e PLATFORM_BINARY="/test-bin/${binary_name}" \
             -e PLATFORM_KEY="linux-x64" \
@@ -290,14 +298,22 @@ jobs:
           set -euo pipefail
           if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
             binary_name="zenith-bundler"
+            docker_mounts=(
+              -v "$(pwd):/repo:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+              -w /repo/packages/bundler
+            )
           else
             binary_name="zenith-compiler"
+            docker_mounts=(
+              -v "$(pwd)/scripts:/repo/scripts:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+            )
           fi
 
           echo "--- node:20-alpine (Alpine, musl libc) ---"
           docker run --rm \
-            -v "$(pwd)/scripts:/repo/scripts:ro" \
-            -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro" \
+            "${docker_mounts[@]}" \
             -e PACKAGE_KIND="${PACKAGE_KIND}" \
             -e PLATFORM_BINARY="/test-bin/${binary_name}" \
             -e PLATFORM_KEY="linux-x64" \
