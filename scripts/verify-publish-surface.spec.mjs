@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -60,7 +60,7 @@ test('framework and scaffolder selections resolve from one matrix', () => {
     const framework = selectPublishMatrixEntries({ selection: 'framework' });
     const scaffolder = selectPublishMatrixEntries({ selection: 'scaffolder' });
 
-    assert.equal(framework.length, 16);
+    assert.equal(framework.length, 14);
     assert.equal(scaffolder.length, 1);
     assert.equal(scaffolder[0].dir, 'packages/create-zenith');
     assert.equal(framework.some((entry) => entry.dir === 'packages/create-zenith'), false);
@@ -71,6 +71,29 @@ test('framework and scaffolder selections resolve from one matrix', () => {
         }).map((entry) => entry.dir),
         ['packages/runtime', 'packages/router']
     );
+});
+
+test('framework release selection excludes standalone-owned editor packages', () => {
+    const releaseDirs = selectPublishMatrixEntries({ selection: 'release' }).map((entry) => entry.dir);
+    const frameworkDirs = selectPublishMatrixEntries({ selection: 'framework' }).map((entry) => entry.dir);
+    const allDirs = selectPublishMatrixEntries({ selection: 'all' }).map((entry) => entry.dir);
+    const languagePackage = JSON.parse(readFileSync(path.join(REPO_ROOT, 'packages/language/package.json'), 'utf8'));
+    const languageServerPackage = JSON.parse(readFileSync(path.join(REPO_ROOT, 'packages/language-server/package.json'), 'utf8'));
+
+    assert.deepEqual(releaseDirs, [
+        'packages/bundler',
+        'packages/compiler',
+        'packages/runtime',
+        'packages/router',
+        'packages/core',
+        'packages/cli'
+    ]);
+    assert.equal(languagePackage.private, true);
+    assert.equal(languageServerPackage.private, true);
+    assert.equal(frameworkDirs.includes('packages/language-server'), false);
+    assert.equal(frameworkDirs.includes('packages/language'), false);
+    assert.equal(allDirs.includes('packages/language-server'), false);
+    assert.equal(allDirs.includes('packages/language'), false);
 });
 
 test('verifyPublishSurface passes for a valid package surface', () => {
@@ -336,5 +359,5 @@ test('verifyPublishSurface uses shell mode for npm pack on win32', () => {
 });
 
 test('matrix stays aligned with expected publish targets', () => {
-    assert.equal(PUBLISH_SURFACE_MATRIX.length, 17);
+    assert.equal(PUBLISH_SURFACE_MATRIX.length, 15);
 });

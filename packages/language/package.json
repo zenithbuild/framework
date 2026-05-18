@@ -5,7 +5,7 @@
   "version": "0.7.11",
   "publisher": "ZenithBuild",
   "license": "MIT",
-  "private": false,
+  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/zenithbuild/framework",
@@ -42,9 +42,6 @@
     "LICENSE",
     "package.json"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "bun run build:server && rm -rf out && mkdir -p out && bun x esbuild src/extension.ts --bundle --outfile=out/extension.cjs --external:vscode --external:vscode-languageclient/node --format=cjs --platform=node && cp ../language-server/dist/server.mjs out/server.mjs",
     "build:server": "bun run --cwd ../language-server build",
