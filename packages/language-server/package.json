@@ -3,7 +3,7 @@
   "version": "0.7.11",
   "description": "Canonical Language Server Protocol implementation for Zenith",
   "license": "MIT",
-  "private": false,
+  "private": true,
   "type": "module",
   "main": "./dist/server.mjs",
   "bin": {
@@ -25,9 +25,6 @@
     "url": "https://github.com/zenithbuild/framework/issues"
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "rm -rf dist && mkdir -p dist && bun x esbuild src/server.ts --bundle --outfile=dist/server.mjs --format=esm --platform=node --external:@zenithbuild/compiler --external:vscode-languageserver --external:vscode-languageserver/node.js --external:vscode-languageserver-textdocument",
     "typecheck": "tsc -p tsconfig.json --noEmit",

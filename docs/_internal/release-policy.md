@@ -22,6 +22,11 @@ Zenith uses three protected branches with branch-specific semver lines. Channel 
 - `vX.Y.Z` tags publish to npm dist-tag `latest` and must come from `master`.
 - Stable releases are distinct semver publishes. `v0.7.1-train.0` and `v0.7.1` are different releases; `latest` is never moved by re-tagging or by post-publish dist-tag promotion.
 
+## Published Package Ownership
+
+- Framework releases publish `@zenithbuild/bundler`, `@zenithbuild/cli`, `@zenithbuild/compiler`, `@zenithbuild/core`, `@zenithbuild/router`, `@zenithbuild/runtime`, and the matching native platform packages.
+- `@zenithbuild/language` and `@zenithbuild/language-server` are standalone-release-owned. The framework repo may keep private source mirrors for CI and integration checks, but the framework publish workflow must not publish those package names.
+
 ## Versioning Rules
 
 - `TRAIN_VERSION` remains the source of truth for the version being cut from the current branch.
