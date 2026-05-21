@@ -21,6 +21,12 @@ describe('defineConfig', () => {
     expect(defineConfig(config)).toBe(config);
   });
 
+  test('accepts the minimal plugin config surface for type inference passthrough', () => {
+    const plugin = { name: 'auth', config: () => ({ basePath: '/auth' }) };
+    const config = { plugins: [plugin] };
+    expect(defineConfig(config)).toBe(config);
+  });
+
   test('loadConfig supports zenith.config.ts files that call defineConfig()', async () => {
     projectRoot = join(tmpdir(), `zenith-core-define-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     await mkdir(projectRoot, { recursive: true });

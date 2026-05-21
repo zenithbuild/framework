@@ -19,7 +19,7 @@ The command-line interface for developing and building Zenith applications.
 - `zenith build`
 - `zenith preview`
 
-It does not ship a public plugin-management surface.
+It ships a minimal V1 plugin surface for config-time normalization only.
 
 ## Features
 
@@ -41,8 +41,17 @@ Current top-level `zenith.config.js` keys:
 - `adapter`
 - `strictDomLints`
 - `images`
+- `plugins`
 
 There is no separate `assetPrefix` config. Public framework asset URLs follow `basePath`.
+
+`plugins` behavior:
+
+- Plugins are added in `zenith.config.js` with `plugins: [authPlugin(), mdxPlugin()]`.
+- V1 plugins must be named objects and may only provide a `config()` hook.
+- V1 plugin config patches are shallow top-level patches; nested objects such as `images` replace that config object instead of deep-merging.
+- V1 plugins cannot transform files, register middleware, mutate routes/security, or install compiler/bundler/dev-server hooks.
+- Global middleware is separate Lane 2 work.
 
 `pagesDir` resolution:
 

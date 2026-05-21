@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG, validateConfig as validateCliConfig } from '../dist/con
 import { KNOWN_TARGETS as CLI_TARGETS } from '../dist/adapters/adapter-types.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
-const UNKNOWN_KEYS = ['softNavigation', 'types', 'assetPrefix', 'devTrace', 'plugins'];
+const UNKNOWN_KEYS = ['softNavigation', 'types', 'assetPrefix', 'devTrace'];
 
 describe('Batch 5A config parity', () => {
     let CORE_TARGETS;
@@ -43,6 +43,13 @@ describe('Batch 5A config parity', () => {
 
     test('core and CLI top-level default config keys stay in parity', () => {
         expect(Object.keys(getCoreDefaults()).sort()).toEqual(Object.keys(DEFAULT_CONFIG).sort());
+    });
+
+    test('core and CLI accept the minimal plugin config surface', () => {
+        const plugin = { name: 'auth' };
+
+        expect(validateCoreConfig({ plugins: [plugin] }).plugins).toEqual([{ name: 'auth' }]);
+        expect(validateCliConfig({ plugins: [plugin] }).plugins).toEqual([{ name: 'auth' }]);
     });
 
     test('core and CLI reject removed or config-like unknown keys', () => {

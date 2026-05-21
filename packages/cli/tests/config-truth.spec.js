@@ -25,6 +25,7 @@ const PHASE_ONE_BASELINE_KEYS = [
     'images',
     'outDir',
     'pagesDir',
+    'plugins',
     'router',
     'strictDomLints',
     'target',
@@ -282,7 +283,7 @@ describe('config truth', () => {
         await expect(loadConfig(project.root)).rejects.toThrow('[Zenith:Config] Unknown key: "assetPrefix"');
     });
 
-    test('docs vs implementation key parity lock matches exactly 10 keys', async () => {
+    test('docs vs implementation key parity lock matches exactly 11 keys', async () => {
         const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
         const docsPath = join(rootDir, 'docs', 'documentation', 'contracts', 'config-contract.md');
         
@@ -302,6 +303,6 @@ describe('config truth', () => {
         }).filter(Boolean);
 
         expect(documentedKeys.sort()).toEqual(PHASE_ONE_BASELINE_KEYS.slice().sort());
-        expect(documentedKeys.length).toBe(10);
+        expect(documentedKeys.length).toBe(11);
     });
 });

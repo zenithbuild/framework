@@ -5,6 +5,14 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ZENITH_TARGETS } from './config-targets.js';
 import type { ZenithAdapter, ZenithTarget } from './config-types.js';
+import {
+  assertPluginConfigPatch,
+  cloneConfigValue,
+  deepFreeze,
+  normalizePlugins,
+  pluginHookError,
+  type ZenithPlugin
+} from './config-plugins.js';
 export type {
   BuildManifest,
   BuildManifestRoute,
@@ -14,6 +22,11 @@ export type {
   ZenithRenderMode,
   ZenithTarget
 } from './config-types.js';
+export type {
+  ZenithPlugin,
+  ZenithPluginConfigContext,
+  ZenithPluginConfigPatch
+} from './config-plugins.js';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const CONFIG_FILES = ['zenith.config.ts', 'zenith.config.js'] as const;
@@ -29,6 +42,7 @@ export interface ZenithConfig {
   adapter: ZenithAdapter | null;
   strictDomLints: boolean;
   images: ZenithImageConfig;
+  plugins: ZenithPlugin[];
 }
 
 export type ZenithConfigInput =
@@ -84,10 +98,12 @@ const DEFAULTS: ZenithConfig = {
   target: 'static',
   adapter: null,
   strictDomLints: false,
-  images: DEFAULT_IMAGE_CONFIG
+  images: DEFAULT_IMAGE_CONFIG,
+  plugins: []
 };
 
-const SCHEMA: Record<Exclude<keyof ZenithConfig, 'images' | 'adapter'>, string> & { images: 'object'; adapter: 'object' } = {
+const SCHEMA: Record<Exclude<keyof ZenithConfig, 'images' | 'adapter' | 'plugins'>, string>
+  & { images: 'object'; adapter: 'object'; plugins: 'array' } = {
   router: 'boolean',
   embeddedMarkupExpressions: 'boolean',
   typescriptDefault: 'boolean',
@@ -97,7 +113,8 @@ const SCHEMA: Record<Exclude<keyof ZenithConfig, 'images' | 'adapter'>, string> 
   target: 'string',
   adapter: 'object',
   strictDomLints: 'boolean',
-  images: 'object'
+  images: 'object',
+  plugins: 'array'
 };
 
 function cloneImageConfig(): ZenithImageConfig {
@@ -343,7 +360,7 @@ export function defineConfig<T extends ZenithConfigInput>(config: T): T {
 
 export function validateConfig(config: ConfigInput): ZenithConfig {
   if (config === null || config === undefined) {
-    return { ...DEFAULTS, images: cloneImageConfig() };
+    return { ...DEFAULTS, images: cloneImageConfig(), plugins: [] };
   }
 
   if (typeof config !== 'object' || Array.isArray(config)) {
@@ -359,7 +376,7 @@ export function validateConfig(config: ConfigInput): ZenithConfig {
     throw new Error('[Zenith:Config] Keys "target" and "adapter" are mutually exclusive');
   }
 
-  const result: ZenithConfig = { ...DEFAULTS, images: cloneImageConfig() };
+  const result: ZenithConfig = { ...DEFAULTS, images: cloneImageConfig(), plugins: [] };
 
   for (const [key, expectedType] of Object.entries(SCHEMA) as Array<[keyof ZenithConfig, string]>) {
     if (!(key in config)) {
@@ -372,6 +389,10 @@ export function validateConfig(config: ConfigInput): ZenithConfig {
     }
     if (key === 'adapter') {
       result.adapter = validateAdapterValue(value);
+      continue;
+    }
+    if (key === 'plugins') {
+      result.plugins = normalizePlugins(value);
       continue;
     }
     if (typeof value !== expectedType) {
@@ -393,6 +414,45 @@ export function validateConfig(config: ConfigInput): ZenithConfig {
   return result;
 }
 
+function normalizeConfigPatch(patch: unknown): Partial<ZenithConfig> {
+  assertPluginConfigPatch(patch);
+  const keys = Object.keys(patch);
+  const normalized = validateConfig(patch as ConfigInput);
+  const out: Partial<ZenithConfig> = {};
+  for (const key of keys as Array<keyof ZenithConfig>) {
+    out[key] = cloneConfigValue(normalized[key]) as never;
+  }
+  return out;
+}
+
+function runPluginConfigHooks(config: ZenithConfig, projectRoot: string): Promise<ZenithConfig> {
+  return config.plugins.reduce<Promise<ZenithConfig>>((promise, plugin) => promise.then((current) => {
+    if (typeof plugin.config !== 'function') {
+      return current;
+    }
+
+    const snapshot = deepFreeze(cloneConfigValue(current));
+    return Promise.resolve()
+      .then(() => plugin.config?.(snapshot, { projectRoot }))
+      .catch((error) => {
+        throw pluginHookError(plugin.name, 'config', error);
+      })
+      .then((patch) => {
+        if (patch === undefined || patch === null) {
+          return current;
+        }
+
+        let normalizedPatch: Partial<ZenithConfig>;
+        try {
+          normalizedPatch = normalizeConfigPatch(patch);
+        } catch (error) {
+          throw pluginHookError(plugin.name, 'config', error);
+        }
+        return { ...current, ...normalizedPatch, plugins: current.plugins };
+      });
+  }), Promise.resolve(config));
+}
+
 export async function loadConfig(projectRoot: string): Promise<ZenithConfig> {
   const resolvedProjectRoot = resolve(projectRoot);
   const configPath = resolveConfigFile(resolvedProjectRoot);
@@ -403,9 +463,9 @@ export async function loadConfig(projectRoot: string): Promise<ZenithConfig> {
   const mod = configPath.endsWith('.ts')
     ? await importTypescriptConfig(configPath, resolvedProjectRoot)
     : await importJavascriptConfig(configPath, resolvedProjectRoot);
-  return validateConfig(mod.default || mod);
+  return runPluginConfigHooks(validateConfig(mod.default || mod), resolvedProjectRoot);
 }
 
 export function getDefaults(): ZenithConfig {
-  return { ...DEFAULTS, images: cloneImageConfig() };
+  return { ...DEFAULTS, images: cloneImageConfig(), plugins: [] };
 }

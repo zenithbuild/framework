@@ -76,14 +76,16 @@ describe('public contract truth', () => {
         expect(readme).toContain('### `zenith preview`');
     });
 
-    test('public docs keep the plugin surface closed instead of implying support', () => {
+    test('public docs keep the plugin surface limited to config-time V1 support', () => {
         const extensionContract = readFileSync(
             resolve(REPO_ROOT, 'docs/documentation/contracts/extension-contract.md'),
             'utf8'
         );
 
-        expect(extensionContract).toContain('plugin and extension surface is currently **CLOSED**');
-        expect(extensionContract).toContain('No public plugin architecture');
+        expect(extensionContract).toContain('V1 plugin surface is intentionally config-time only');
+        expect(extensionContract).toContain('Only `config()` in V1');
+        expect(extensionContract).toContain('No public file transform hooks');
+        expect(extensionContract).toContain('No plugin middleware registration');
         expect(extensionContract).toContain('Legacy `_legacy_v1` directories are archived internal snapshots');
 
         const docsRoot = resolve(REPO_ROOT, 'docs');
@@ -95,9 +97,9 @@ describe('public contract truth', () => {
 
         for (const file of files) {
             const source = readFileSync(file, 'utf8');
-            expect(source).not.toMatch(/\bplugins?\s+(?:are|is)\s+(?:supported|available|enabled)\b/i);
-            expect(source).not.toMatch(/\bpublic\s+plugin\s+API\s+(?:is\s+)?(?:supported|available|open)\b/i);
+            expect(source).not.toMatch(/\bpublic\s+plugin\s+API\s+(?:is\s+)?(?:available|open)\b/i);
             expect(source).not.toMatch(/\bframework\s+installer\s+command\s+for\s+plugins?\b/i);
+            expect(source).not.toMatch(/\bplugins?\s+(?:can|may)\s+(?:transform|register middleware|mutate routes|mutate security)\b/i);
         }
     });
 

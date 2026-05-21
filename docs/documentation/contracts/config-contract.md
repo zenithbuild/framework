@@ -12,8 +12,8 @@ tags: ["contracts", "config", "schema"]
 This document formally defines the definitive Zenith configuration contract.
 
 ## 1. Supported Keys
-Zenith supports **exactly 10 top-level keys** in its configuration schema. 
-Of those, 9 are standard public keys, while 1 (`adapter`) remains an advanced/unstable hook.
+Zenith supports **exactly 11 top-level keys** in its configuration schema.
+Of those, 10 are standard public keys, while 1 (`adapter`) remains an advanced/unstable hook.
 Any unknown key present in a configuration file explicitly fails fast with a validation error and aborts the load.
 
 ### Schema Properties
@@ -30,6 +30,36 @@ Any unknown key present in a configuration file explicitly fails fast with a val
 | `adapter` | `object` | `null` | **[Advanced]** Provide a custom deployment adapter. Mutually exclusive with `target`. |
 | `strictDomLints` | `boolean` | `false` | Promotes Zenith DOM AST warnings into fatal compilation errors. |
 | `images` | `object` | *See Source* | Explicit image generation, format, caching, and layout constraints. |
+| `plugins` | `array` | `[]` | Config-time V1 plugins. Only named plugin objects with an optional `config()` hook are supported. |
+
+### V1 Plugin Configuration
+
+Plugins are configured in `zenith.config.js` or `zenith.config.ts`:
+
+```js
+function authPlugin() {
+  return {
+    name: 'auth',
+    config() {
+      return { basePath: '/app' };
+    }
+  };
+}
+
+function mdxPlugin() {
+  return { name: 'mdx' };
+}
+
+export default {
+  plugins: [authPlugin(), mdxPlugin()]
+};
+```
+
+V1 plugins are config-time only. A plugin must return a named object, and the only supported hook is `config()`. The hook receives a frozen resolved config snapshot and may return a conservative config patch for safe keys only: `router`, `embeddedMarkupExpressions`, `typescriptDefault`, `strictDomLints`, `images`, `basePath`, and `outDir`.
+
+V1 config patches are shallow top-level patches; scalar keys such as `router` replace their value, and nested object keys such as `images` replace that config object instead of deep-merging.
+
+V1 plugins cannot transform files, register middleware, mutate routes/security policy, patch `target`, patch `pagesDir`, or install compiler/bundler/dev-server hooks. Global middleware is a separate Lane 2 design and implementation.
 
 ## 2. Precedence Order
 Zenith configuration properties are resolved via a strict precedence hierarchy:
