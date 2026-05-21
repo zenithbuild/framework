@@ -12,7 +12,11 @@ export const PLUGIN_CONFIG_PATCH_KEYS = new Set([
 ]);
 
 function isPlainObject(value) {
-    return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
 }
 
 function describePlugin(index, plugin) {

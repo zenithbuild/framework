@@ -171,12 +171,26 @@ describe('validateConfig', () => {
     });
 
     test('rejects invalid plugin shapes', () => {
+        class ClassPlugin {
+            constructor() {
+                this.name = 'classy';
+            }
+        }
+        const datedPlugin = Object.assign(new Date(), { name: 'dated' });
+
         expect(() => validateConfig({ plugins: {} })).toThrow('Key "plugins" must be an array');
         expect(() => validateConfig({ plugins: [null] })).toThrow('Plugin at index 0 must be a plain object');
+        expect(() => validateConfig({ plugins: [new ClassPlugin()] })).toThrow('Plugin at index 0 must be a plain object');
+        expect(() => validateConfig({ plugins: [datedPlugin] })).toThrow('Plugin at index 0 must be a plain object');
         expect(() => validateConfig({ plugins: [{}] })).toThrow('Plugin at index 0 must have a non-empty name');
         expect(() => validateConfig({ plugins: [{ name: '  ' }] })).toThrow('non-empty name');
         expect(() => validateConfig({ plugins: [{ name: 'auth' }, { name: 'auth' }] })).toThrow('Duplicate plugin name: "auth"');
         expect(() => validateConfig({ plugins: [{ name: 'auth', transform() {} }] })).toThrow('unsupported key "transform"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', resolve() {} }] })).toThrow('unsupported key "resolve"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', server() {} }] })).toThrow('unsupported key "server"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', middleware() {} }] })).toThrow('unsupported key "middleware"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', compiler() {} }] })).toThrow('unsupported key "compiler"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', bundler() {} }] })).toThrow('unsupported key "bundler"');
         expect(() => validateConfig({ plugins: [{ name: 'auth', config: true }] })).toThrow('key "config" must be a function');
     });
 });
@@ -298,5 +312,52 @@ describe('loadConfig', () => {
             '};'
         ].join('\n'));
         await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: [Zenith:Config] Key "router" must be boolean');
+    });
+
+    test('plugin config hook rejects non-plain object patches', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'class Patch { constructor() { this.basePath = "/class"; } }',
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { return new Patch(); } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: config hook must return a plain object patch');
+
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { const patch = new Date(); patch.basePath = "/date"; return patch; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: config hook must return a plain object patch');
+    });
+
+    test('plugin config patches are shallow top-level patches', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  router: true,',
+            '  basePath: "/docs",',
+            '  images: { formats: ["png"], quality: 70, remotePatterns: [{ hostname: "cdn.example.com" }] },',
+            '  plugins: [{ name: "images", config() { return { images: { quality: 80 } }; } }]',
+            '};'
+        ].join('\n'));
+
+        const config = await loadConfig(tmpDir);
+
+        expect(config.router).toBe(true);
+        expect(config.basePath).toBe('/docs');
+        expect(config.images.quality).toBe(80);
+        expect(config.images.formats).toEqual(['webp', 'avif']);
+        expect(config.images.remotePatterns).toEqual([]);
+
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [{ name: "images", config() { return { images: { quality: 0 } }; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin images] config failed: [Zenith:Config] images.quality must be a positive integer');
     });
 });

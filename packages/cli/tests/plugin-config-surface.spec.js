@@ -34,8 +34,17 @@ describe('plugin config surface', () => {
     });
 
     test('invalid plugin shapes are rejected', () => {
+        class ClassPlugin {
+            constructor() {
+                this.name = 'classy';
+            }
+        }
+        const datedPlugin = Object.assign(new Date(), { name: 'dated' });
+
         expect(() => validateConfig({ plugins: {} })).toThrow('Key "plugins" must be an array');
         expect(() => validateConfig({ plugins: [() => {}] })).toThrow('Plugin at index 0 must be a plain object');
+        expect(() => validateConfig({ plugins: [new ClassPlugin()] })).toThrow('Plugin at index 0 must be a plain object');
+        expect(() => validateConfig({ plugins: [datedPlugin] })).toThrow('Plugin at index 0 must be a plain object');
         expect(() => validateConfig({ plugins: [{}] })).toThrow('Plugin at index 0 must have a non-empty name');
         expect(() => validateConfig({ plugins: [{ name: '' }] })).toThrow('non-empty name');
         expect(() => validateConfig({ plugins: [{ name: 'auth', config: true }] })).toThrow('key "config" must be a function');
@@ -47,6 +56,8 @@ describe('plugin config surface', () => {
         expect(() => validateConfig({ plugins: [{ name: 'auth', transform() {} }] })).toThrow('unsupported key "transform"');
         expect(() => validateConfig({ plugins: [{ name: 'auth', resolve() {} }] })).toThrow('unsupported key "resolve"');
         expect(() => validateConfig({ plugins: [{ name: 'auth', server() {} }] })).toThrow('unsupported key "server"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', compiler() {} }] })).toThrow('unsupported key "compiler"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', bundler() {} }] })).toThrow('unsupported key "bundler"');
     });
 
     test('async config hooks run in deterministic order and apply returned patches', async () => {
@@ -110,6 +121,49 @@ describe('plugin config surface', () => {
             '};'
         ].join('\n'));
         await expect(loadConfig(projectRoot)).rejects.toThrow('[Zenith plugin auth] config failed: [Zenith:Config] Key "router" must be boolean');
+    });
+
+    test('non-plain config hook patches are rejected', async () => {
+        await writeConfig([
+            'class Patch { constructor() { this.basePath = "/class"; } }',
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { return new Patch(); } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(projectRoot)).rejects.toThrow('[Zenith plugin auth] config failed: config hook must return a plain object patch');
+
+        await writeConfig([
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { const patch = new Date(); patch.basePath = "/date"; return patch; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(projectRoot)).rejects.toThrow('[Zenith plugin auth] config failed: config hook must return a plain object patch');
+    });
+
+    test('config hook patches are shallow top-level patches', async () => {
+        await writeConfig([
+            'module.exports = {',
+            '  router: true,',
+            '  basePath: "/docs",',
+            '  images: { formats: ["png"], quality: 70, remotePatterns: [{ hostname: "cdn.example.com" }] },',
+            '  plugins: [{ name: "images", config() { return { images: { quality: 80 } }; } }]',
+            '};'
+        ].join('\n'));
+
+        const config = await loadConfig(projectRoot);
+
+        expect(config.router).toBe(true);
+        expect(config.basePath).toBe('/docs');
+        expect(config.images.quality).toBe(80);
+        expect(config.images.formats).toEqual(['webp', 'avif']);
+        expect(config.images.remotePatterns).toEqual([]);
+
+        await writeConfig([
+            'module.exports = {',
+            '  plugins: [{ name: "images", config() { return { images: { quality: 0 } }; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(projectRoot)).rejects.toThrow('[Zenith plugin images] config failed: [Zenith:Config] images.quality must be a positive integer');
     });
 
     test('config hook cannot patch plugins, adapter, or pagesDir', async () => {

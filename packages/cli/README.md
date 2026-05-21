@@ -49,6 +49,7 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 - Plugins are added in `zenith.config.js` with `plugins: [authPlugin(), mdxPlugin()]`.
 - V1 plugins must be named objects and may only provide a `config()` hook.
+- V1 plugin config patches are shallow top-level patches; nested objects such as `images` replace that config object instead of deep-merging.
 - V1 plugins cannot transform files, register middleware, mutate routes/security, or install compiler/bundler/dev-server hooks.
 - Global middleware is separate Lane 2 work.
 

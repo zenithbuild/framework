@@ -57,6 +57,8 @@ export default {
 
 V1 plugins are config-time only. A plugin must return a named object, and the only supported hook is `config()`. The hook receives a frozen resolved config snapshot and may return a conservative config patch for safe keys only: `router`, `embeddedMarkupExpressions`, `typescriptDefault`, `strictDomLints`, `images`, `basePath`, and `outDir`.
 
+V1 config patches are shallow top-level patches; scalar keys such as `router` replace their value, and nested object keys such as `images` replace that config object instead of deep-merging.
+
 V1 plugins cannot transform files, register middleware, mutate routes/security policy, patch `target`, patch `pagesDir`, or install compiler/bundler/dev-server hooks. Global middleware is a separate Lane 2 design and implementation.
 
 ## 2. Precedence Order
