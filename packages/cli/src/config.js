@@ -5,6 +5,13 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { KNOWN_TARGETS } from './adapters/adapter-types.js';
 import { normalizeBasePath } from './base-path.js';
+import {
+    assertPluginConfigPatch,
+    cloneConfigValue,
+    deepFreeze,
+    normalizePlugins,
+    pluginHookError
+} from './config-plugins.js';
 import { normalizeImageConfig } from './images/shared.js';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
@@ -21,7 +28,8 @@ export const DEFAULT_CONFIG = {
     target: 'static',
     adapter: null,
     strictDomLints: false,
-    images: normalizeImageConfig()
+    images: normalizeImageConfig(),
+    plugins: []
 };
 
 const TOP_LEVEL_SCHEMA = {
@@ -34,7 +42,8 @@ const TOP_LEVEL_SCHEMA = {
     target: 'string',
     adapter: 'object',
     strictDomLints: 'boolean',
-    images: 'object'
+    images: 'object',
+    plugins: 'array'
 };
 
 function attachConfigMeta(config, explicitKeys) {
@@ -187,7 +196,7 @@ export function resolveConfigOutDir(projectRoot, config) {
 export function validateConfig(config) {
     if (config === null || config === undefined) {
         return attachConfigMeta(
-            { ...DEFAULT_CONFIG, images: normalizeImageConfig() },
+            { ...DEFAULT_CONFIG, images: normalizeImageConfig(), plugins: [] },
             []
         );
     }
@@ -206,7 +215,8 @@ export function validateConfig(config) {
 
     const result = {
         ...DEFAULT_CONFIG,
-        images: normalizeImageConfig(DEFAULT_CONFIG.images)
+        images: normalizeImageConfig(DEFAULT_CONFIG.images),
+        plugins: []
     };
 
     for (const [key, expectedType] of Object.entries(TOP_LEVEL_SCHEMA)) {
@@ -220,6 +230,10 @@ export function validateConfig(config) {
         }
         if (key === 'adapter') {
             result.adapter = validateAdapterValue(value);
+            continue;
+        }
+        if (key === 'plugins') {
+            result.plugins = normalizePlugins(value);
             continue;
         }
         if (typeof value !== expectedType) {
@@ -241,6 +255,55 @@ export function validateConfig(config) {
     return attachConfigMeta(result, Object.keys(config));
 }
 
+function normalizeConfigPatch(patch) {
+    assertPluginConfigPatch(patch);
+    const keys = Object.keys(patch);
+    const normalized = validateConfig(patch);
+    const out = {};
+    for (const key of keys) {
+        out[key] = cloneConfigValue(normalized[key]);
+    }
+    return out;
+}
+
+async function runPluginConfigHooks(config, projectRoot) {
+    let current = config;
+    for (const plugin of current.plugins) {
+        if (typeof plugin.config !== 'function') {
+            continue;
+        }
+
+        let patch;
+        try {
+            const snapshot = deepFreeze(cloneConfigValue(current));
+            patch = await plugin.config(snapshot, { projectRoot });
+        } catch (error) {
+            throw pluginHookError(plugin.name, 'config', error);
+        }
+
+        if (patch === undefined || patch === null) {
+            continue;
+        }
+
+        let normalizedPatch;
+        try {
+            normalizedPatch = normalizeConfigPatch(patch);
+        } catch (error) {
+            throw pluginHookError(plugin.name, 'config', error);
+        }
+
+        const explicitKeys = new Set(current?.[CONFIG_META]?.explicitKeys || []);
+        for (const key of Object.keys(normalizedPatch)) {
+            explicitKeys.add(key);
+        }
+        current = attachConfigMeta(
+            { ...current, ...normalizedPatch, plugins: current.plugins },
+            explicitKeys
+        );
+    }
+    return current;
+}
+
 export async function loadConfig(projectRoot) {
     const resolvedProjectRoot = resolve(projectRoot);
     const configPath = resolveConfigFile(resolvedProjectRoot);
@@ -251,5 +314,6 @@ export async function loadConfig(projectRoot) {
     const mod = configPath.endsWith('.ts')
         ? await importTypescriptConfig(configPath, resolvedProjectRoot)
         : await importJavascriptConfig(configPath, resolvedProjectRoot);
-    return markLoaded(validateConfig(mod.default || mod));
+    const config = validateConfig(mod.default || mod);
+    return markLoaded(await runPluginConfigHooks(config, resolvedProjectRoot));
 }

@@ -9,15 +9,18 @@ tags: ["contracts", "plugins", "extensions"]
 
 # Extension Contract
 
-Zenith prioritizes deterministic behavior, explicit control chains, and transparent capability boundaries. To maintain compiler predictability and runtime guarantees, Zenith **does not offer a general-purpose plugin system**.
+Zenith prioritizes deterministic behavior, explicit control chains, and transparent capability boundaries. To maintain compiler predictability and runtime guarantees, Zenith's V1 plugin surface is intentionally config-time only.
 
-## Contract: Closed Plugin Surface
+## Contract: Minimal Plugin Surface
 
-The public Zenith plugin and extension surface is currently **CLOSED**.
+The public Zenith plugin and extension surface is currently limited to `zenith.config.js` / `zenith.config.ts` configuration plugins.
 
 This means:
-- **No public plugin architecture**: Zenith does not define a public `Plugin` interface or a framework installer command for third-party extensions.
+- **Config-time only**: Users add plugins with `plugins: [authPlugin(), mdxPlugin()]`, and plugin functions return named objects.
+- **Only `config()` in V1**: A plugin may provide a `config()` hook that returns a conservative config patch. Direct mutation of the resolved config is not an accepted change path.
 - **No public compiler middleware**: The AST, IR generation, and HTML rendering pipeline are closed. You cannot inject custom parsers or transform passes.
+- **No public file transform hooks**: V1 plugins cannot implement `transform`, `resolve`, compiler, bundler, or dev-server mutation hooks.
+- **No plugin middleware registration**: Global middleware is a separate Lane 2 design and implementation, not part of the V1 plugin surface.
 - **No public router lifecycle plugin hooks**: The client and server routers do not expose middleware hooks (e.g., `beforeEach`). Route protection is strictly governed by canonical `guard(ctx)` and `load(ctx)` data contracts.
 - **No public runtime/DOM extension hook system**: The runtime executes canonical static instructions. It does not provide lifecycle hooking for arbitrary DOM observation or injection.
 - **Internal seams are not public context**: Any internal abstraction boundaries within Zenith packages are solely for framework orchestration and testing. They are not guaranteed or semver-protected endpoints for external consumption.

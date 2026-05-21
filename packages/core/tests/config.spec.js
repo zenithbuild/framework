@@ -28,7 +28,8 @@ const DEFAULT_CONFIG = {
         maxPixels: 40_000_000,
         minimumCacheTTL: 60,
         dangerouslyAllowLocalNetwork: false
-    }
+    },
+    plugins: []
 };
 
 describe('validateConfig', () => {
@@ -158,6 +159,26 @@ describe('validateConfig', () => {
         expect(() => validateConfig({ images: { remotePatterns: [{ pathname: '/blog/**' }] } })).toThrow('hostname is required');
         expect(() => validateConfig({ images: { quality: 0 } })).toThrow('positive integer');
     });
+
+    test('accepts named plugins in config shape validation', () => {
+        const plugin = { name: 'auth' };
+        const userConfig = { plugins: [plugin] };
+
+        const config = validateConfig(userConfig);
+
+        expect(config.plugins).toEqual([{ name: 'auth' }]);
+        expect(userConfig).toEqual({ plugins: [plugin] });
+    });
+
+    test('rejects invalid plugin shapes', () => {
+        expect(() => validateConfig({ plugins: {} })).toThrow('Key "plugins" must be an array');
+        expect(() => validateConfig({ plugins: [null] })).toThrow('Plugin at index 0 must be a plain object');
+        expect(() => validateConfig({ plugins: [{}] })).toThrow('Plugin at index 0 must have a non-empty name');
+        expect(() => validateConfig({ plugins: [{ name: '  ' }] })).toThrow('non-empty name');
+        expect(() => validateConfig({ plugins: [{ name: 'auth' }, { name: 'auth' }] })).toThrow('Duplicate plugin name: "auth"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', transform() {} }] })).toThrow('unsupported key "transform"');
+        expect(() => validateConfig({ plugins: [{ name: 'auth', config: true }] })).toThrow('key "config" must be a function');
+    });
 });
 
 describe('getDefaults', () => {
@@ -208,5 +229,74 @@ describe('loadConfig', () => {
 
         await writeFile(configPath, 'module.exports = { target: "netlify", basePath: "/app" }');
         expect(await loadConfig(tmpDir)).toMatchObject({ target: 'netlify', basePath: '/app' });
+    });
+
+    test('runs async plugin config hooks in deterministic order', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [',
+            '    { name: "first", async config() { return { basePath: "/first" }; } },',
+            '    { name: "second", async config(config) { return { outDir: config.basePath.slice(1) + "-out" }; } }',
+            '  ]',
+            '};'
+        ].join('\n'));
+
+        const config = await loadConfig(tmpDir);
+        expect(config.basePath).toBe('/first');
+        expect(config.outDir).toBe('first-out');
+    });
+
+    test('plugin config hook mutation is not an accepted change path', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'const userConfig = {',
+            '  router: false,',
+            '  plugins: [{',
+            '    name: "mutator",',
+            '    config(config) {',
+            '      config.router = true;',
+            '      return { basePath: userConfig.router ? "/mutated" : "/clean" };',
+            '    }',
+            '  }]',
+            '};',
+            'module.exports = userConfig;'
+        ].join('\n'));
+
+        const config = await loadConfig(tmpDir);
+        expect(config.router).toBe(false);
+        expect(config.basePath).toBe('/clean');
+    });
+
+    test('plugin config hook errors include plugin name, hook, and original message', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { throw new Error("boom"); } }]',
+            '};'
+        ].join('\n'));
+
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: boom');
+    });
+
+    test('plugin config patches are revalidated and restricted to the allowlist', async () => {
+        tmpDir = join(tmpdir(), `zenith-cfg-${Date.now()}`);
+        await mkdir(tmpDir, { recursive: true });
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { return { target: "node" }; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: target is not patchable');
+
+        await writeFile(join(tmpDir, 'zenith.config.js'), [
+            'module.exports = {',
+            '  plugins: [{ name: "auth", config() { return { router: "yes" }; } }]',
+            '};'
+        ].join('\n'));
+        await expect(loadConfig(tmpDir)).rejects.toThrow('[Zenith plugin auth] config failed: [Zenith:Config] Key "router" must be boolean');
     });
 });
