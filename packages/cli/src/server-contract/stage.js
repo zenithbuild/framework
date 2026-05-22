@@ -1,14 +1,4 @@
-import { AUTH_CONTROL_FLOW_FLAG } from './constants.js';
-import { assertValidRouteResultShape } from './route-result-validation.js';
-
-function unwrapAuthControlFlow(error, where, allowedKinds) {
-    if (!error || typeof error !== 'object' || error[AUTH_CONTROL_FLOW_FLAG] !== true) {
-        return null;
-    }
-    const result = error.result;
-    assertValidRouteResultShape(result, where, allowedKinds);
-    return result;
-}
+import { unwrapAuthControlFlow } from './auth-control-flow.js';
 
 export async function invokeRouteStage({ fn, ctx, where, allowedKinds }) {
     try {
