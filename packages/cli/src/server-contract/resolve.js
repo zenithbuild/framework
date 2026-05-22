@@ -1,9 +1,18 @@
-import { STAGED_SET_COOKIES_KEY } from './constants.js';
 import { validateServerExports } from './export-validation.js';
+import { unwrapAuthControlFlow } from './auth-control-flow.js';
 import { assertJsonSerializable } from './json-serializable.js';
 import { assertValidRouteResultShape, isRouteResultLike } from './route-result-validation.js';
+import { buildResolvedEnvelope } from './resolved-envelope.js';
 import { allow, data, text } from './result-helpers.js';
 import { invokeRouteStage } from './stage.js';
+
+const GLOBAL_MIDDLEWARE_RESULT_ERROR =
+    'Global middleware may only continue with next() or short-circuit with redirect() / deny() in V1.';
+const GLOBAL_MIDDLEWARE_DOUBLE_NEXT_ERROR =
+    'Global middleware called next() more than once.';
+const GLOBAL_MIDDLEWARE_POST_NEXT_ERROR =
+    'Global middleware cannot override the route result after next() in V1.';
+const GLOBAL_MIDDLEWARE_ALLOWED_KINDS = new Set(['redirect', 'deny']);
 
 function buildActionState(result) {
     if (!result || typeof result !== 'object') {
@@ -26,18 +35,109 @@ function buildActionState(result) {
     return null;
 }
 
-function buildResolvedEnvelope({ result, trace, status, ctx }) {
-    const envelope = { result, trace };
-    if (status !== undefined) {
-        envelope.status = status;
+function createEmptyRouteTrace() {
+    return {
+        guard: 'none',
+        action: 'none',
+        load: 'none'
+    };
+}
+
+function createUnsupportedMiddlewareResultError() {
+    return new Error(GLOBAL_MIDDLEWARE_RESULT_ERROR);
+}
+
+function buildMiddlewareShortCircuitEnvelope(result, ctx) {
+    assertValidRouteResultShape(
+        result,
+        'global middleware return',
+        GLOBAL_MIDDLEWARE_ALLOWED_KINDS
+    );
+    return buildResolvedEnvelope({
+        result,
+        trace: createEmptyRouteTrace(),
+        ctx
+    });
+}
+
+function normalizePreNextResult(result, ctx) {
+    if (!isRouteResultLike(result) || !GLOBAL_MIDDLEWARE_ALLOWED_KINDS.has(result.kind)) {
+        throw createUnsupportedMiddlewareResultError();
     }
-    const setCookies = Array.isArray(ctx?.[STAGED_SET_COOKIES_KEY])
-        ? ctx[STAGED_SET_COOKIES_KEY].slice()
-        : [];
-    if (setCookies.length > 0) {
-        envelope.setCookies = setCookies;
+    return buildMiddlewareShortCircuitEnvelope(result, ctx);
+}
+
+export async function runGlobalMiddlewareChain({ middlewareFn, ctx, runRoute }) {
+    if (typeof middlewareFn !== 'function' || typeof runRoute !== 'function') {
+        throw createUnsupportedMiddlewareResultError();
     }
-    return envelope;
+
+    let nextCalled = false;
+    let capturedEnvelope;
+    const next = async () => {
+        if (nextCalled) {
+            throw new Error(GLOBAL_MIDDLEWARE_DOUBLE_NEXT_ERROR);
+        }
+        nextCalled = true;
+        capturedEnvelope = await runRoute();
+        return capturedEnvelope;
+    };
+
+    let middlewareResult;
+    try {
+        middlewareResult = await middlewareFn(ctx, next);
+    } catch (error) {
+        const authResult = unwrapAuthControlFlow(
+            error,
+            'global middleware return',
+            GLOBAL_MIDDLEWARE_ALLOWED_KINDS
+        );
+        if (authResult) {
+            return buildMiddlewareShortCircuitEnvelope(authResult, ctx);
+        }
+        throw error;
+    }
+
+    if (nextCalled) {
+        if (middlewareResult === undefined || middlewareResult === capturedEnvelope) {
+            return capturedEnvelope;
+        }
+        throw new Error(GLOBAL_MIDDLEWARE_POST_NEXT_ERROR);
+    }
+
+    if (middlewareResult === undefined) {
+        throw createUnsupportedMiddlewareResultError();
+    }
+    return normalizePreNextResult(middlewareResult, ctx);
+}
+
+export async function executeMatchedRoutePipeline({
+    exports,
+    ctx,
+    filePath,
+    guardOnly = false,
+    routeKind = 'page',
+    globalMiddleware = null
+}) {
+    const runRoute = () => resolveRouteResult({
+        exports,
+        ctx,
+        filePath,
+        guardOnly,
+        routeKind
+    });
+
+    if (globalMiddleware == null) {
+        return runRoute();
+    }
+    if (typeof globalMiddleware !== 'function') {
+        throw createUnsupportedMiddlewareResultError();
+    }
+    return runGlobalMiddlewareChain({
+        middlewareFn: globalMiddleware,
+        ctx,
+        runRoute
+    });
 }
 
 export async function resolveRouteResult({ exports, ctx, filePath, guardOnly = false, routeKind = 'page' }) {

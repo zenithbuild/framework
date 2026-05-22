@@ -6,7 +6,8 @@ import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/
 import { materializeImageMarkup } from '../images/materialize.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException } from '../server-error.js';
-import { allow, data, deny, download, invalid, json, redirect, resolveRouteResult, text } from '../server-contract.js';
+import { allow, data, deny, download, invalid, json, redirect, text } from '../server-contract.js';
+import { executeMatchedRoutePipeline } from '../server-contract/resolve.js';
 
 const MODULE_CACHE = new Map();
 const INTERNAL_QUERY_PREFIX = '__zenith_param_';
@@ -230,12 +231,13 @@ export async function executeRouteRequest(options) {
     const publicUrl = buildPublicUrl(request.url, route, params);
     const ctx = createRouteContext({ request, route, params, publicUrl, guardOnly });
     const exports = await loadRouteExports(routeModulePath);
-    const resolved = await resolveRouteResult({
+    const resolved = await executeMatchedRoutePipeline({
         exports,
         ctx,
         filePath: route.file || route.server_script_path || route.path,
         guardOnly,
-        routeKind: route.route_kind === 'resource' ? 'resource' : 'page'
+        routeKind: route.route_kind === 'resource' ? 'resource' : 'page',
+        globalMiddleware: null
     });
 
     return {
