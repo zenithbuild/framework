@@ -20,6 +20,7 @@ import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } fro
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { writeServerOutput } from './server-output.js';
+import { resolveGlobalMiddleware } from './global-middleware.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
 import {
     createBundlerToolchain,
@@ -90,6 +91,10 @@ export async function build(options) {
     }
 
     const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
+    const globalMiddleware = await startupProfile.measureAsync(
+        'resolve_global_middleware',
+        () => resolveGlobalMiddleware({ projectRoot, pagesDir, target })
+    );
 
     const manifest = await startupProfile.measureAsync(
         'generate_manifest',
@@ -198,7 +203,8 @@ export async function build(options) {
             staticDir: staticOutputDir,
             target,
             routeManifest: pageManifest,
-            basePath
+            basePath,
+            globalMiddleware: globalMiddleware?.metadata || null
         })
     );
     await startupProfile.measureAsync(
@@ -208,7 +214,8 @@ export async function build(options) {
             staticDir: staticOutputDir,
             projectRoot,
             config,
-            basePath
+            basePath,
+            globalMiddleware: globalMiddleware?.metadata || null
         })
     );
     await startupProfile.measureAsync(
