@@ -49,6 +49,24 @@ function expectSourceOnlyMetadata(manifest, sourceFile) {
     }
 }
 
+function expectServerMetadata(manifest, sourceFile, projectRoot) {
+    expect(manifest.global_middleware).toEqual({
+        source_file: sourceFile,
+        module: 'global-middleware/entry.js'
+    });
+    for (const forbidden of [
+        'stub',
+        'entry',
+        'root',
+        'middleware_root',
+        'compiled_path',
+        'emitted_module_path'
+    ]) {
+        expect(manifest.global_middleware).not.toHaveProperty(forbidden);
+    }
+    expect(manifest.global_middleware.module).not.toContain(projectRoot);
+}
+
 describe('global middleware Gate 1', () => {
     let projectRoot = null;
 
@@ -291,7 +309,7 @@ describe('global middleware Gate 1', () => {
     });
 
     describe('manifest metadata', () => {
-        test('node build writes source-only metadata to existing build and server manifests', async () => {
+        test('node build writes source-only build metadata and internal server module metadata', async () => {
             projectRoot = await createProject({
                 'src/pages/index.zen': '<main>home</main>\n',
                 'src/middleware.ts': VALID_MIDDLEWARE,
@@ -305,13 +323,16 @@ describe('global middleware Gate 1', () => {
             const distManifest = await readJson(join(projectRoot, 'dist', 'manifest.json'));
             const distServerManifest = await readJson(join(projectRoot, 'dist', 'server', 'manifest.json'));
 
-            for (const manifest of [coreManifest, coreServerManifest, distManifest, distServerManifest]) {
+            for (const manifest of [coreManifest, distManifest]) {
                 expectSourceOnlyMetadata(manifest, 'src/middleware.ts');
             }
+            for (const manifest of [coreServerManifest, distServerManifest]) {
+                expectServerMetadata(manifest, 'src/middleware.ts', projectRoot);
+            }
 
-            expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'global-middleware', 'entry.js'))).toBe(false);
+            expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'global-middleware', 'entry.js'))).toBe(true);
             expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'middleware.js'))).toBe(false);
-            expect(existsSync(join(projectRoot, 'dist', 'server', 'global-middleware', 'entry.js'))).toBe(false);
+            expect(existsSync(join(projectRoot, 'dist', 'server', 'global-middleware', 'entry.js'))).toBe(true);
             expect(existsSync(join(projectRoot, 'dist', 'server', 'middleware.js'))).toBe(false);
         });
 

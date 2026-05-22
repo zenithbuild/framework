@@ -66,6 +66,25 @@ function resolveWithinRoot(rootDir, requestPath) {
     return null;
 }
 
+function resolveManifestMiddlewareModulePath(serverDir, serverManifest) {
+    const modulePath = serverManifest?.global_middleware?.module;
+    if (typeof modulePath !== 'string' || modulePath.trim().length === 0) {
+        return null;
+    }
+
+    const normalized = normalize(modulePath).replace(/\\/g, '/');
+    if (normalized === '..' || normalized.startsWith('../') || normalized.startsWith('/')) {
+        throw new Error('[Zenith:Middleware] Invalid global middleware module path in server manifest.');
+    }
+
+    const root = resolve(serverDir);
+    const candidate = resolve(root, normalized);
+    if (candidate !== root && candidate.startsWith(`${root}${sep}`)) {
+        return candidate;
+    }
+    throw new Error('[Zenith:Middleware] Invalid global middleware module path in server manifest.');
+}
+
 function toStaticFilePath(staticDir, pathname) {
     let resolvedPath = pathname;
     if (resolvedPath === '/') {
@@ -206,6 +225,7 @@ async function loadRuntimeContext(options = {}) {
         });
         const serverManifest = await readJson(join(serverDir, 'manifest.json'), { routes: [] });
         const allServerRoutes = Array.isArray(serverManifest.routes) ? serverManifest.routes : [];
+        const globalMiddlewareModulePath = resolveManifestMiddlewareModulePath(serverDir, serverManifest);
 
         return {
             distDir,
@@ -216,6 +236,7 @@ async function loadRuntimeContext(options = {}) {
             serverRoutes: allServerRoutes,
             pageServerRoutes: allServerRoutes.filter((route) => route?.route_kind !== 'resource'),
             resourceServerRoutes: allServerRoutes.filter((route) => route?.route_kind === 'resource'),
+            globalMiddlewareModulePath,
             images: config.images || {},
             basePath: normalizeBasePath(config.base_path || '/')
         };
@@ -351,7 +372,8 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             request,
             route: resourceResolved.route,
             params: resourceResolved.params,
-            routeModulePath: join(routeDir, 'route', 'entry.js')
+            routeModulePath: join(routeDir, 'route', 'entry.js'),
+            globalMiddlewareModulePath: context.globalMiddlewareModulePath
         });
         await sendFetchResponse(res, response, req.method);
         return;
@@ -366,6 +388,7 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             route: serverResolved.route,
             params: serverResolved.params,
             routeModulePath: join(routeDir, 'route', 'entry.js'),
+            globalMiddlewareModulePath: context.globalMiddlewareModulePath,
             shellHtmlPath: join(routeDir, 'route', 'page.html'),
             imageManifestPath: serverResolved.route.image_manifest_file
                 ? join(routeDir, 'route', serverResolved.route.image_manifest_file)
