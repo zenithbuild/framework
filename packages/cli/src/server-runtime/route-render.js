@@ -10,6 +10,7 @@ import { allow, data, deny, download, invalid, json, redirect, text } from '../s
 import { executeMatchedRoutePipeline } from '../server-contract/resolve.js';
 
 const MODULE_CACHE = new Map();
+const GLOBAL_MIDDLEWARE_MODULE_CACHE = new Map();
 const INTERNAL_QUERY_PREFIX = '__zenith_param_';
 
 function parseCookies(rawCookieHeader) {
@@ -175,6 +176,23 @@ async function loadRouteExports(routeModulePath) {
     return value;
 }
 
+async function loadGlobalMiddleware(globalMiddlewareModulePath) {
+    if (!globalMiddlewareModulePath) {
+        return null;
+    }
+    const cacheKey = globalMiddlewareModulePath;
+    if (GLOBAL_MIDDLEWARE_MODULE_CACHE.has(cacheKey)) {
+        return GLOBAL_MIDDLEWARE_MODULE_CACHE.get(cacheKey);
+    }
+    const mod = await import(pathToFileURL(globalMiddlewareModulePath).href);
+    const middlewareFn = mod?.default;
+    if (typeof middlewareFn !== 'function') {
+        throw new Error('[Zenith:Middleware] Compiled global middleware module must default export a function.');
+    }
+    GLOBAL_MIDDLEWARE_MODULE_CACHE.set(cacheKey, middlewareFn);
+    return middlewareFn;
+}
+
 function createRouteContext({ request, route, params, publicUrl, guardOnly = false }) {
     const requestHeaders = Object.fromEntries(request.headers.entries());
     const ctx = {
@@ -215,6 +233,7 @@ function createRouteContext({ request, route, params, publicUrl, guardOnly = fal
  *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null },
  *   params: Record<string, string>,
  *   routeModulePath: string,
+ *   globalMiddlewareModulePath?: string | null,
  *   guardOnly?: boolean
  * }} options
  * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
@@ -225,19 +244,21 @@ export async function executeRouteRequest(options) {
         route,
         params,
         routeModulePath,
+        globalMiddlewareModulePath = null,
         guardOnly = false
     } = options;
 
     const publicUrl = buildPublicUrl(request.url, route, params);
     const ctx = createRouteContext({ request, route, params, publicUrl, guardOnly });
     const exports = await loadRouteExports(routeModulePath);
+    const globalMiddleware = await loadGlobalMiddleware(globalMiddlewareModulePath);
     const resolved = await executeMatchedRoutePipeline({
         exports,
         ctx,
         filePath: route.file || route.server_script_path || route.path,
         guardOnly,
         routeKind: route.route_kind === 'resource' ? 'resource' : 'page',
-        globalMiddleware: null
+        globalMiddleware
     });
 
     return {
@@ -255,6 +276,7 @@ export async function executeRouteRequest(options) {
  *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null },
  *   params: Record<string, string>,
  *   routeModulePath: string,
+ *   globalMiddlewareModulePath?: string | null,
  *   shellHtmlPath: string,
  *   imageManifestPath?: string | null,
  *   imageConfig?: Record<string, unknown>
@@ -267,6 +289,7 @@ export async function renderRouteRequest(options) {
         route,
         params,
         routeModulePath,
+        globalMiddlewareModulePath = null,
         shellHtmlPath,
         imageManifestPath = null,
         imageConfig = {}
@@ -282,7 +305,8 @@ export async function renderRouteRequest(options) {
             request,
             route,
             params,
-            routeModulePath
+            routeModulePath,
+            globalMiddlewareModulePath
         });
 
         if (result.kind === 'redirect') {
@@ -344,7 +368,8 @@ export async function renderRouteRequest(options) {
  *   request: Request,
  *   route: { path: string, params?: string[], route_id?: string | null, server_script_path?: string | null, file?: string | null, route_kind?: string | null, base_path?: string | null },
  *   params: Record<string, string>,
- *   routeModulePath: string
+ *   routeModulePath: string,
+ *   globalMiddlewareModulePath?: string | null
  * }} options
  * @returns {Promise<Response>}
  */
@@ -353,7 +378,8 @@ export async function renderResourceRouteRequest(options) {
         request,
         route,
         params,
-        routeModulePath
+        routeModulePath,
+        globalMiddlewareModulePath = null
     } = options;
 
     try {
@@ -361,7 +387,8 @@ export async function renderResourceRouteRequest(options) {
             request,
             route: { ...route, route_kind: 'resource' },
             params,
-            routeModulePath
+            routeModulePath,
+            globalMiddlewareModulePath
         });
         return createResourceResponse(result, route.base_path || '/', setCookies);
     } catch (error) {
