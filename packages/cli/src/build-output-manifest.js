@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { normalizeGlobalMiddlewareMetadata } from './global-middleware.js';
 
 const CLI_VERSION = (() => {
     try {
@@ -43,7 +44,14 @@ async function readRouteHtml(staticDir, htmlPath) {
     }
 }
 
-export async function writeBuildOutputManifest({ coreOutputDir, staticDir, target, routeManifest, basePath = '/' }) {
+export async function writeBuildOutputManifest({
+    coreOutputDir,
+    staticDir,
+    target,
+    routeManifest,
+    basePath = '/',
+    globalMiddleware = null
+}) {
     const bundlerManifest = await readJson(join(staticDir, 'manifest.json'), {});
     const routerManifest = await readJson(join(staticDir, 'assets', 'router-manifest.json'), { routes: [] });
     const routeByPath = new Map(
@@ -98,6 +106,7 @@ export async function writeBuildOutputManifest({ coreOutputDir, staticDir, targe
             ...routeAssetCss
         ].filter((value) => typeof value === 'string' && value.endsWith('.css'))
     );
+    const globalMiddlewareMetadata = normalizeGlobalMiddlewareMetadata(globalMiddleware);
 
     const buildManifest = {
         schema_version: 1,
@@ -105,6 +114,7 @@ export async function writeBuildOutputManifest({ coreOutputDir, staticDir, targe
         target,
         base_path: basePath,
         content_hash: typeof bundlerManifest.hash === 'string' ? bundlerManifest.hash : '',
+        ...(globalMiddlewareMetadata ? { global_middleware: globalMiddlewareMetadata } : {}),
         routes,
         assets: {
             js: [...jsAssets].sort(),

@@ -5,6 +5,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadResourceRouteManifest } from './resource-manifest.js';
 import { assignServerRouteNames } from './server-route-names.js';
+import { normalizeGlobalMiddlewareMetadata } from './global-middleware.js';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const RELATIVE_SPECIFIER_RE = /((?:import|export)\s+(?:[^'"]*?\s+from\s+)?|import\s*\()\s*(['"])([^'"]+)\2/g;
@@ -321,7 +322,14 @@ async function copyOptionalFile(sourcePath, targetPath) {
     return true;
 }
 
-export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot, config, basePath = '/' }) {
+export async function writeServerOutput({
+    coreOutputDir,
+    staticDir,
+    projectRoot,
+    config,
+    basePath = '/',
+    globalMiddleware = null
+}) {
     const serverDir = join(coreOutputDir, 'server');
     await rm(serverDir, { recursive: true, force: true });
 
@@ -411,9 +419,16 @@ export async function writeServerOutput({ coreOutputDir, staticDir, projectRoot,
         emittedRoutes.push(meta);
     }
 
+    const globalMiddlewareMetadata = normalizeGlobalMiddlewareMetadata(globalMiddleware);
+    const serverManifest = {
+        base_path: basePath,
+        ...(globalMiddlewareMetadata ? { global_middleware: globalMiddlewareMetadata } : {}),
+        routes: emittedRoutes
+    };
+
     await writeFile(
         join(serverDir, 'manifest.json'),
-        `${JSON.stringify({ base_path: basePath, routes: emittedRoutes }, null, 2)}\n`,
+        `${JSON.stringify(serverManifest, null, 2)}\n`,
         'utf8'
     );
     return {

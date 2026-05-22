@@ -38,6 +38,7 @@ export const KNOWN_TARGETS = [
  *   target: string,
  *   base_path: string,
  *   content_hash: string,
+ *   global_middleware?: { source_file: string },
  *   routes: Array<{
  *     path: string,
  *     file: string,
