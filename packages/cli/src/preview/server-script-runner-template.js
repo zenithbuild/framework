@@ -15,6 +15,8 @@ const routeFile = process.env.ZENITH_SERVER_ROUTE_FILE || sourcePath || '';
 const routeId = process.env.ZENITH_SERVER_ROUTE_ID || routePattern || '';
 const routeKind = process.env.ZENITH_SERVER_ROUTE_KIND || 'page';
 const guardOnly = process.env.ZENITH_SERVER_GUARD_ONLY === '1';
+const globalMiddlewareSource = process.env.ZENITH_GLOBAL_MIDDLEWARE_SOURCE || '';
+const globalMiddlewareSourcePath = process.env.ZENITH_GLOBAL_MIDDLEWARE_SOURCE_PATH || '';
 
 if (!source.trim()) {
   process.stdout.write('null');
@@ -332,6 +334,84 @@ async function linkModule(specifier, parentIdentifier) {
   return loadFileModule(resolvedUrl);
 }
 
+function configuredFrameworkUrl(specifier) {
+  if (specifier === 'zenith:server-contract') {
+    const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'server-contract.js');
+    const configuredPath = process.env.ZENITH_SERVER_CONTRACT_PATH || '';
+    return {
+      url: pathToFileURL(configuredPath || defaultPath).href,
+      fallbackUrl: pathToFileURL(defaultPath).href,
+      hasConfiguredPath: Boolean(configuredPath)
+    };
+  }
+  if (specifier === 'zenith:route-auth') {
+    const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'auth', 'route-auth.js');
+    const configuredPath = process.env.ZENITH_SERVER_ROUTE_AUTH_PATH || '';
+    return {
+      url: pathToFileURL(configuredPath || defaultPath).href,
+      fallbackUrl: pathToFileURL(defaultPath).href,
+      hasConfiguredPath: Boolean(configuredPath)
+    };
+  }
+  return null;
+}
+
+async function linkEntryModule(specifier, referencingModule) {
+  const frameworkUrl = configuredFrameworkUrl(specifier);
+  if (frameworkUrl) {
+    if (frameworkUrl.hasConfiguredPath) {
+      return loadFileModule(frameworkUrl.url);
+    }
+    return loadFileModule(frameworkUrl.url).catch(() =>
+      loadFileModule(frameworkUrl.fallbackUrl)
+    );
+  }
+  return linkModule(specifier, referencingModule.identifier);
+}
+
+async function loadMatchedRoutePipeline() {
+  const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'server-runtime', 'matched-route-pipeline.js');
+  const configuredPath = process.env.ZENITH_SERVER_MATCHED_ROUTE_PIPELINE_PATH || '';
+  const pipelineUrl = pathToFileURL(configuredPath || defaultPath).href;
+  const module = await loadFileModule(pipelineUrl).catch((error) => {
+    if (configuredPath) {
+      throw error;
+    }
+    return loadFileModule(pathToFileURL(defaultPath).href);
+  });
+  await module.evaluate();
+  if (typeof module.namespace.executeMatchedRoutePipeline !== 'function') {
+    throw new Error('[zenith-preview] matched route pipeline unavailable');
+  }
+  return module.namespace.executeMatchedRoutePipeline;
+}
+
+async function loadGlobalMiddleware() {
+  if (!globalMiddlewareSource.trim()) {
+    return null;
+  }
+  const identifier = globalMiddlewareSourcePath
+    ? pathToFileURL(globalMiddlewareSourcePath).href
+    : 'zenith:global-middleware';
+  const filename = globalMiddlewareSourcePath || 'global-middleware.ts';
+  const code = await transpileIfNeeded(filename, globalMiddlewareSource);
+  const module = new vm.SourceTextModule(code, {
+    context,
+    identifier,
+    initializeImportMeta(meta) {
+      meta.url = identifier;
+    }
+  });
+  moduleCache.set(identifier, module);
+  await module.link(linkEntryModule);
+  await module.evaluate();
+  const middlewareFn = module.namespace.default;
+  if (typeof middlewareFn !== 'function') {
+    throw new Error('[Zenith:Middleware] Global middleware module must default export a function.');
+  }
+  return middlewareFn;
+}
+
 const allowed = new Set(['data', 'load', 'guard', 'action', 'ssr_data', 'props', 'ssr', 'prerender', 'exportPaths']);
 const prelude = "const params = globalThis.params;\n" +
   "const ctx = globalThis.ctx;\n" +
@@ -358,29 +438,7 @@ const entryModule = new vm.SourceTextModule(entryCode, {
 
 moduleCache.set(entryIdentifier, entryModule);
 await entryModule.link((specifier, referencingModule) => {
-  if (specifier === 'zenith:server-contract') {
-    const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'server-contract.js');
-    const configuredPath = process.env.ZENITH_SERVER_CONTRACT_PATH || '';
-    const contractUrl = pathToFileURL(configuredPath || defaultPath).href;
-    if (configuredPath) {
-      return loadFileModule(contractUrl);
-    }
-    return loadFileModule(contractUrl).catch(() =>
-      loadFileModule(pathToFileURL(defaultPath).href)
-    );
-  }
-  if (specifier === 'zenith:route-auth') {
-    const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'auth', 'route-auth.js');
-    const configuredPath = process.env.ZENITH_SERVER_ROUTE_AUTH_PATH || '';
-    const authUrl = pathToFileURL(configuredPath || defaultPath).href;
-    if (configuredPath) {
-      return loadFileModule(authUrl);
-    }
-    return loadFileModule(authUrl).catch(() =>
-      loadFileModule(pathToFileURL(defaultPath).href)
-    );
-  }
-  return linkModule(specifier, referencingModule.identifier);
+  return linkEntryModule(specifier, referencingModule);
 });
 await entryModule.evaluate();
 context.attachRouteAuth(routeContext, {
@@ -399,12 +457,15 @@ for (const key of namespaceKeys) {
 
 const exported = entryModule.namespace;
 try {
-  const resolved = await context.resolveRouteResult({
+  const executeMatchedRoutePipeline = await loadMatchedRoutePipeline();
+  const globalMiddleware = await loadGlobalMiddleware();
+  const resolved = await executeMatchedRoutePipeline({
     exports: exported,
     ctx: context.ctx,
     filePath: sourcePath || 'server_script',
     guardOnly: guardOnly,
-    routeKind: routeKind
+    routeKind: routeKind,
+    globalMiddleware
   });
 
   process.stdout.write(JSON.stringify(resolved || null));

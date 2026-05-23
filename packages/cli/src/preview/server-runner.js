@@ -7,7 +7,7 @@ import { SERVER_SCRIPT_RUNNER } from './server-script-runner-template.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, requestBodyBuffer?: Buffer | null, routePattern?: string, routeFile?: string, routeId?: string, routeKind?: 'page' | 'resource' }} input
+ * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl?: string, requestMethod?: string, requestHeaders?: Record<string, string | string[] | undefined>, requestBodyBuffer?: Buffer | null, routePattern?: string, routeFile?: string, routeId?: string, routeKind?: 'page' | 'resource', globalMiddlewareSource?: string, globalMiddlewareSourcePath?: string }} input
  * @returns {Promise<{ result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
  */
 export async function executeServerRoute({
@@ -22,7 +22,9 @@ export async function executeServerRoute({
   routeFile,
   routeId,
   routeKind = 'page',
-  guardOnly = false
+  guardOnly = false,
+  globalMiddlewareSource = '',
+  globalMiddlewareSourcePath = ''
 }) {
   if (!source || !String(source).trim()) {
     return {
@@ -43,7 +45,9 @@ export async function executeServerRoute({
     routeFile: routeFile || sourcePath || '',
     routeId: routeId || routeIdFromSourcePath(sourcePath || ''),
     routeKind,
-    guardOnly
+    guardOnly,
+    globalMiddlewareSource,
+    globalMiddlewareSourcePath
   });
 
   if (payload === null || payload === undefined) {
@@ -135,7 +139,7 @@ export async function executeServerScript(input) {
 }
 
 /**
- * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl: string, requestMethod: string, requestHeaders: Record<string, string>, requestBodyBuffer?: Buffer | null, routePattern: string, routeFile: string, routeId: string, routeKind?: 'page' | 'resource' }} input
+ * @param {{ source: string, sourcePath: string, params: Record<string, string>, requestUrl: string, requestMethod: string, requestHeaders: Record<string, string>, requestBodyBuffer?: Buffer | null, routePattern: string, routeFile: string, routeId: string, routeKind?: 'page' | 'resource', globalMiddlewareSource?: string, globalMiddlewareSourcePath?: string }} input
  * @returns {Promise<unknown>}
  */
 function spawnNodeServerRunner(input) {
@@ -158,7 +162,10 @@ function spawnNodeServerRunner(input) {
           ZENITH_SERVER_ROUTE_KIND: input.routeKind || 'page',
           ZENITH_SERVER_GUARD_ONLY: input.guardOnly ? '1' : '',
           ZENITH_SERVER_CONTRACT_PATH: join(__dirname, '..', 'server-contract.js'),
-          ZENITH_SERVER_ROUTE_AUTH_PATH: join(__dirname, '..', 'auth', 'route-auth.js')
+          ZENITH_SERVER_ROUTE_AUTH_PATH: join(__dirname, '..', 'auth', 'route-auth.js'),
+          ZENITH_SERVER_MATCHED_ROUTE_PIPELINE_PATH: join(__dirname, '..', 'server-runtime', 'matched-route-pipeline.js'),
+          ZENITH_GLOBAL_MIDDLEWARE_SOURCE: input.globalMiddlewareSource || '',
+          ZENITH_GLOBAL_MIDDLEWARE_SOURCE_PATH: input.globalMiddlewareSourcePath || ''
         },
         stdio: ['pipe', 'pipe', 'pipe']
       }
