@@ -1,7 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { compareRouteSpecificity } from '../server/resolve-request-route.js';
-import { copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
+import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
 import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteSource } from './route-rules.js';
 import { validateHostedResourceRoutes } from './validate-hosted-resource-routes.js';
 
@@ -57,13 +57,17 @@ function createImageFunctionSource(imagesConfig) {
     ].join('\n');
 }
 
-function createFunctionSource(route) {
+function createFunctionSource(route, globalMiddlewareModulePath) {
+    const globalMiddlewarePathExpression = globalMiddlewareModulePath
+        ? "join(__dirname, 'global-middleware', 'entry.js')"
+        : 'null';
     return [
         "import { fileURLToPath } from 'node:url';",
         "import { dirname, join } from 'node:path';",
         "import { renderResourceRouteRequest, renderRouteRequest, extractInternalParams } from './runtime/route-render.js';",
         '',
         'const __dirname = dirname(fileURLToPath(import.meta.url));',
+        `const globalMiddlewareModulePath = ${globalMiddlewarePathExpression};`,
         `const route = ${JSON.stringify(route, null, 2)};`,
         '',
         'function createHostedUnsupportedResponse(message) {',
@@ -78,7 +82,8 @@ function createFunctionSource(route) {
         '        request,',
         '        route,',
         '        params,',
-        `        routeModulePath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'entry.js')`,
+        `        routeModulePath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'entry.js'),`,
+        '        globalMiddlewareModulePath',
         '      });',
         "      if (response.headers.has('content-disposition')) {",
         "        return createHostedUnsupportedResponse('Hosted resource downloads are unsupported in this milestone');",
@@ -90,6 +95,7 @@ function createFunctionSource(route) {
         '      route,',
         '      params,',
         `      routeModulePath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'entry.js'),`,
+        '      globalMiddlewareModulePath,',
         `      shellHtmlPath: join(__dirname, 'routes', ${JSON.stringify(route.name)}, 'route', 'page.html'),`,
         `      pageAssetPath: ${route.page_asset_file ? "join(__dirname, 'routes', " + JSON.stringify(route.name) + ", 'route', " + JSON.stringify(route.page_asset_file) + ')' : 'null'},`,
         `      imageManifestPath: ${route.image_manifest_file ? "join(__dirname, 'routes', " + JSON.stringify(route.name) + ", 'route', " + JSON.stringify(route.image_manifest_file) + ')' : 'null'},`,
@@ -151,13 +157,14 @@ export const vercelAdapter = {
             const functionDir = join(options.outDir, 'functions', '__zenith', `${route.name}.func`);
             await mkdir(functionDir, { recursive: true });
             await copyHostedPageRuntime(options.coreOutput, functionDir);
+            const globalMiddlewareModulePath = await copyHostedGlobalMiddlewareRuntime(options.coreOutput, functionDir);
             await cp(
                 join(options.coreOutput, 'server', 'routes', route.name),
                 join(functionDir, 'routes', route.name),
                 { recursive: true, force: true }
             );
             await writeFile(join(functionDir, 'package.json'), '{\n  "type": "module"\n}\n', 'utf8');
-            await writeFile(join(functionDir, 'index.js'), createFunctionSource(route), 'utf8');
+            await writeFile(join(functionDir, 'index.js'), createFunctionSource(route, globalMiddlewareModulePath), 'utf8');
             await writeFile(join(functionDir, '.vc-config.json'), vercelFunctionConfig(), 'utf8');
         }
 
