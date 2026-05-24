@@ -8,6 +8,7 @@ import { readRequestBodyBuffer } from '../request-body.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
+import { loadPreviewGlobalMiddlewareSource } from '../global-middleware-runtime-source.js';
 import { loadRouteSurfaceState } from './manifest.js';
 import { injectSsrPayload } from './payload.js';
 import { fileExists, resolveWithinDist, toStaticFilePath } from './paths.js';
@@ -36,6 +37,12 @@ function appendSetCookieHeaders(headers, setCookies = []) {
   return headers;
 }
 
+function respondWithMiddlewareSourceError(res, error) {
+  logServerException('preview server route execution failed', error);
+  res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end(clientFacingRouteMessage(500));
+}
+
 export function createPreviewRequestHandler(options) {
   const {
     distDir,
@@ -57,6 +64,10 @@ export function createPreviewRequestHandler(options) {
     } catch {
       return {};
     }
+  }
+
+  async function loadGlobalMiddlewareForRoute() {
+    return loadPreviewGlobalMiddlewareSource({ projectRoot, distDir });
   }
 
   return async function previewRequestHandler(req, res) {
@@ -196,6 +207,13 @@ export function createPreviewRequestHandler(options) {
       canonicalUrl.pathname = canonicalPath;
       const resolvedResource = resolveRequestRoute(canonicalUrl, resourceRoutes);
       if (resolvedResource.matched && resolvedResource.route) {
+        let globalMiddleware = null;
+        try {
+          globalMiddleware = await loadGlobalMiddlewareForRoute();
+        } catch (error) {
+          respondWithMiddlewareSourceError(res, error);
+          return;
+        }
         const requestMethod = req.method || 'GET';
         const requestBodyBuffer =
           requestMethod === 'GET' || requestMethod === 'HEAD'
@@ -212,7 +230,9 @@ export function createPreviewRequestHandler(options) {
           routePattern: resolvedResource.route.path,
           routeFile: resolvedResource.route.server_script_path || '',
           routeId: resolvedResource.route.route_id || routeIdFromSourcePath(resolvedResource.route.server_script_path || ''),
-          routeKind: 'resource'
+          routeKind: 'resource',
+          globalMiddlewareSource: globalMiddleware?.source || '',
+          globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
         });
         const descriptor = buildResourceResponseDescriptor(execution?.result, basePath, Array.isArray(execution?.setCookies) ? execution.setCookies : []);
         res.writeHead(descriptor.status, appendSetCookieHeaders(descriptor.headers, descriptor.setCookies));
@@ -248,6 +268,13 @@ export function createPreviewRequestHandler(options) {
       let ssrPayload = null;
       let routeExecution = null;
       if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
+        let globalMiddleware = null;
+        try {
+          globalMiddleware = await loadGlobalMiddlewareForRoute();
+        } catch (error) {
+          respondWithMiddlewareSourceError(res, error);
+          return;
+        }
         try {
           const requestMethod = req.method || 'GET';
           const requestBodyBuffer =
@@ -264,7 +291,9 @@ export function createPreviewRequestHandler(options) {
             requestBodyBuffer,
             routePattern: resolved.route.path,
             routeFile: resolved.route.server_script_path || '',
-            routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || '')
+            routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || ''),
+            globalMiddlewareSource: globalMiddleware?.source || '',
+            globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
           });
         } catch (error) {
           logServerException('preview server route execution failed', error);

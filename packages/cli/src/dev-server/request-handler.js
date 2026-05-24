@@ -17,6 +17,12 @@ import { resolveRequestRoute } from '../server/resolve-request-route.js';
 import { respondWithDevBuildError } from './build-error-response.js';
 import { handleRouteCheckRequest } from './route-check.js';
 
+function respondWithMiddlewareSourceError(res, error) {
+    logServerException('dev server route execution failed', error);
+    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(clientFacingRouteMessage(500));
+}
+
 export function createDevRequestHandler(options) {
     const {
         outDir,
@@ -31,6 +37,7 @@ export function createDevRequestHandler(options) {
         state,
         serverOrigin,
         loadRoutesForRequests,
+        loadGlobalMiddlewareForRequests,
         readFileForRequest,
         trace404,
         looksLikeJsonRequest,
@@ -244,6 +251,15 @@ export function createDevRequestHandler(options) {
             canonicalUrl.pathname = canonicalPath;
             const resolvedResource = resolveRequestRoute(canonicalUrl, routes.resourceRoutes || []);
             if (resolvedResource.matched && resolvedResource.route) {
+                let globalMiddleware = null;
+                try {
+                    globalMiddleware = loadGlobalMiddlewareForRequests
+                        ? await loadGlobalMiddlewareForRequests()
+                        : null;
+                } catch (error) {
+                    respondWithMiddlewareSourceError(res, error);
+                    return;
+                }
                 const requestMethod = req.method || 'GET';
                 const requestBodyBuffer =
                     requestMethod === 'GET' || requestMethod === 'HEAD'
@@ -260,7 +276,9 @@ export function createDevRequestHandler(options) {
                     routePattern: resolvedResource.route.path,
                     routeFile: resolvedResource.route.server_script_path || '',
                     routeId: resolvedResource.route.route_id || '',
-                    routeKind: 'resource'
+                    routeKind: 'resource',
+                    globalMiddlewareSource: globalMiddleware?.source || '',
+                    globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
                 });
                 const descriptor = buildResourceResponseDescriptor(
                     execution?.result,
@@ -316,6 +334,15 @@ export function createDevRequestHandler(options) {
             let ssrPayload = null;
             let routeExecution = null;
             if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
+                let globalMiddleware = null;
+                try {
+                    globalMiddleware = loadGlobalMiddlewareForRequests
+                        ? await loadGlobalMiddlewareForRequests()
+                        : null;
+                } catch (error) {
+                    respondWithMiddlewareSourceError(res, error);
+                    return;
+                }
                 try {
                     const requestMethod = req.method || 'GET';
                     const requestBodyBuffer =
@@ -332,7 +359,9 @@ export function createDevRequestHandler(options) {
                         requestBodyBuffer,
                         routePattern: resolved.route.path,
                         routeFile: resolved.route.server_script_path || '',
-                        routeId: resolved.route.route_id || ''
+                        routeId: resolved.route.route_id || '',
+                        globalMiddlewareSource: globalMiddleware?.source || '',
+                        globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
                     });
                 } catch (error) {
                     logServerException('dev server route execution failed', error);

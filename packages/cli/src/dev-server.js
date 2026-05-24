@@ -34,6 +34,7 @@ import {
 import { createDevRequestHandler } from './dev-server/request-handler.js';
 import { createDevWatcher } from './dev-server/watcher.js';
 import { listenWithPortFallback } from './dev-server/port-fallback.js';
+import { loadDevGlobalMiddlewareSource } from './global-middleware-runtime-source.js';
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -231,6 +232,14 @@ export async function createDevServer(options) {
         return state.currentRouteState;
     }
 
+    async function _loadGlobalMiddlewareForRequests() {
+        return loadDevGlobalMiddlewareSource({
+            projectRoot,
+            pagesDir: resolvedPagesDir,
+            target: resolvedTarget
+        });
+    }
+
     function _broadcastEvent(type, payload = {}) {
         const eventBuildId = Number.isInteger(payload.buildId) ? payload.buildId : state.buildId;
         const data = JSON.stringify({
@@ -327,6 +336,7 @@ export async function createDevServer(options) {
         state,
         serverOrigin: _serverOrigin,
         loadRoutesForRequests: _loadRoutesForRequests,
+        loadGlobalMiddlewareForRequests: _loadGlobalMiddlewareForRequests,
         readFileForRequest: _readFileForRequest,
         trace404: _trace404,
         looksLikeJsonRequest,
