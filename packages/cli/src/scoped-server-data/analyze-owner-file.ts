@@ -18,14 +18,14 @@ import type {
     ScriptBlockPartition
 } from './types.js';
 
-export const RESERVED_LEVEL1_BINDING_NAMES = Object.freeze([
+export const RESERVED_LEVEL1_BINDING_NAMES = [
     'data',
     'props',
     'params',
     'ssr',
     'ssr_data',
     'ctx'
-] as const);
+] as const;
 
 const TOP_LEVEL_CONST_RE = /(?:^|\n)\s*const\s+([A-Za-z_$][\w$]*)\s*=/g;
 const TOP_LEVEL_LET_RE = /(?:^|\n)\s*let\s+([A-Za-z_$][\w$]*)\s*=/g;

@@ -1,6 +1,6 @@
 import type { ScopedServerDiagnostic, ScopedServerDiagnosticSeverity } from './types.js';
 
-export const SCOPED_SERVER_DIAGNOSTIC = Object.freeze({
+export const SCOPED_SERVER_DIAGNOSTIC = {
     OWNER_LOAD_MISUSE: 'CSV001',
     OWNER_GUARD_MISUSE: 'CSV002',
     OWNER_ACTION_MISUSE: 'CSV003',
@@ -12,7 +12,7 @@ export const SCOPED_SERVER_DIAGNOSTIC = Object.freeze({
     MIXED_LEVEL1_AND_DATA: 'CSV009',
     MISSING_LANG_TS: 'CSV010',
     UNREFERENCED_SERVER_VAR: 'CSV011'
-});
+} as const;
 
 export function createScopedServerDiagnostic(
     code: string,
