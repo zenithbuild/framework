@@ -1314,8 +1314,8 @@ Work **one GitHub issue at a time** on dedicated `feature/*` (or `docs/*`) branc
 
 | Issue | Branch | Status | Notes |
 |-------|--------|--------|-------|
-| #95 | `docs/component-server-values-architecture-lock` | pr-open | Doc-only architecture lock; closes via PR merge |
-| #96 | `feature/component-server-values-owner-scanner` | pending | Blocked until #95 merged |
+| #95 | `docs/component-server-values-architecture-lock` | complete | Merged via PR #108 |
+| #96 | `feature/component-server-values-owner-scanner` | pr-open | Scanner merged via PR #106 |
 | #97 | — | pending | Blocked until #96 closed |
 
 ---
