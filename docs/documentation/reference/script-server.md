@@ -3,7 +3,7 @@ title: "Script Server Reference"
 description: "Public contract for `<script server>` exports and context access."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-04-01"
+last_updated: "2026-05-25"
 tags: ["reference", "server", "script-server"]
 ---
 
@@ -106,22 +106,24 @@ The same `ctx` shape is used for dedicated resource routes. Resource `action(ctx
 
 ## Contract: Explicit Middleware Composition
 
-Contract: middleware composition is explicit and server-only.
+Contract: route-local middleware composition is explicit and server-only. Root global middleware is documented separately as a TypeScript-only file-based route pipeline hook.
 
 Invariant:
 - route modules compose middleware directly with `withMiddleware(handler, ...middleware)`
 - `withMiddleware(handler, a, b)` composes as `a(b(handler))`
-- middleware is route-owned; there is no root/global or inherited middleware surface in this milestone
+- route-local `withMiddleware(...)` only runs where a route export uses it
+- root global middleware lives in `middleware.ts` or `middleware/index.ts`, receives `(ctx, next)`, and runs before matched route `guard(ctx)`, `action(ctx)`, and `load(ctx)`
 
 Definition of Done:
-- middleware returns a wrapped handler function
+- route-local middleware returns a wrapped handler function
 - wrapped handlers return only valid result helpers for the route kind (`data/invalid/...` for page routes, `json/text/download/stream/sse/...` for resource routes)
-- middleware may short-circuit by returning a valid route result or by throwing
+- route-local middleware may short-circuit by returning a valid route result or by throwing
+- root global middleware may only continue with `next()` or short-circuit with `redirect(...)` / `deny(...)`
 
 Failure Modes:
 - middleware appears as `ctx.middleware` or `ctx.withMiddleware`
 - docs imply implicit route-tree middleware inheritance
-- middleware is described as `req/res/next` chain semantics
+- route-local `withMiddleware(...)` is described as the same API as root global middleware
 
 ## Contract: Freshness Bridge
 

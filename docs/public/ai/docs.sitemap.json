@@ -50,6 +50,7 @@
     "/docs/cli-contract",
     "/docs/install-compatibility",
     "/docs/routing/navigation-shell",
+    "/docs/routing/global-middleware",
     "/docs/routing/route-protection",
     "/blog/routing-awareness",
     "/blog/runtime-expression-integrity"

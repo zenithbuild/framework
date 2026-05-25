@@ -3,7 +3,7 @@ title: "Server Data API"
 description: "Public `<script server>` API for data, load context, and serialization requirements."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-04-01"
+last_updated: "2026-05-25"
 tags: ["reference", "server", "data"]
 ---
 
@@ -65,22 +65,26 @@ SSE event metadata is intentionally narrow: optional `event` and `id` fields mus
 
 ## Contract: Explicit Middleware Composition
 
-Contract: server middleware composition is explicit, route-level, and server-only.
+Contract: server middleware has a root global surface and an explicit route-local composition helper.
 
 Invariant:
+- root global middleware V1 is TypeScript-only and is discovered only from `middleware.ts` or `middleware/index.ts` at the directory that contains `pagesDir`
+- root global middleware receives `(ctx, next)` and runs before matched route `guard(ctx)`, `action(ctx)`, and `load(ctx)`
 - middleware is composed directly inside route exports via `withMiddleware(handler, ...middleware)`
 - composition order is deterministic: `withMiddleware(handler, a, b)` means `a(b(handler))`
-- middleware does not create a hidden global pipeline
+- route-local `withMiddleware(...)` only runs where route exports use it
 
 Definition of Done:
-- middleware may return any valid result for the wrapped handler kind, throw, or call `next` and return its result
-- middleware does not invent result kinds or bypass route result validation
+- root global middleware may return `next()`, `ctx.redirect(...)`, or `ctx.deny(...)`
+- root global middleware may use `ctx.auth.requireSession({ redirectTo })`, `ctx.auth.requireSession({ deny: 401|403|404, message? })`, `ctx.auth.signIn(...)`, and `ctx.auth.signOut()`
+- root global middleware rejects `ctx.allow(...)`, `ctx.data(...)`, `ctx.invalid(...)`, `ctx.json(...)`, `ctx.text(...)`, `ctx.download(...)`, arbitrary `Response`, and plain objects
+- route-local middleware may return any valid result for the wrapped handler kind, throw, or call the wrapped handler
 - route handlers stay the canonical owner of behavior (`guard`, `load`, `action`, resource handlers)
 
 Failure Modes:
-- root/global middleware files become part of the public contract
+- user-authored `middleware.js`, `middleware/index.js`, `middleware.tsx`, `middleware.mts`, or `middleware.cts` is implied as supported
 - filesystem inheritance or automatic wrapping is implied
-- middleware is presented as generic backend `req/res/next` framework semantics
+- middleware is presented as generic backend `req/res/next` framework semantics or as an arbitrary header/Response API
 
 ## Contract: Action Form Data
 

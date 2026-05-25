@@ -3,7 +3,7 @@ title: "Using AI with Zenith"
 description: "Prompt contract for AI-assisted Zenith code generation with canonical event and reactivity rules."
 version: "0.3"
 status: "canonical"
-last_updated: "2026-02-27"
+last_updated: "2026-05-25"
 tags: ["guides", "ai", "workflow", "contracts"]
 nav:
   order: 30
@@ -23,6 +23,7 @@ Required defaults:
 - Use controlled/uncontrolled prop triplets for interactive components.
 - Preserve parent scope for slot content.
 - Route protection MUST be implemented via `guard(ctx)` and `load(ctx)` exports in `<script server>` or adjacent route modules, returning canonical `RouteResult` types (`allow()`, `redirect()`, `deny()`, `data()`).
+- Root global middleware may be used for coarse redirects, request normalization, and session setup before matched route stages, but `guard(ctx)` and `load(ctx)` remain the canonical authorization boundary.
 
 ## Copy-Paste System Prompt
 
@@ -35,6 +36,7 @@ You are coding in Zenith. Follow Zenith canonical docs and rule IDs.
 - For interactive components, use controlled/uncontrolled triplets:
   open/defaultOpen/onOpenChange and value/defaultValue/onValueChange.
 - For route protection, export `guard(ctx)` or `load(ctx)` returning `allow()`, `redirect()`, `deny()`, or `data()`. Never implement generic client-side guards; "Server is Security".
+- Root global middleware is TypeScript-only (`middleware.ts` or `middleware/index.ts`) and is not a replacement for per-route authorization.
 - Do NOT use querySelector, addEventListener, or custom window/document wrappers. Use zenWindow(), zenDocument(), zenOn(), zenResize(), collectRefs() from @zenithbuild/runtime.
 If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 ```
@@ -45,5 +47,6 @@ If unsure, check Zenith docs and cite the relevant ZEN-RULE in comments.
 - [Reactivity Model](/docs/reactivity/reactivity-model)
 - [DOM and Environment](/docs/reactivity/dom-and-environment)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
+- [Global Middleware](/docs/routing/global-middleware)
 - [Route Protection](/docs/routing/route-protection)
 - [Common Mistakes](/docs/guides/common-mistakes)

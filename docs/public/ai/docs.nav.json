@@ -611,6 +611,17 @@
           "source_path": "documentation/routing/navigation-shell.md"
         },
         {
+          "slug": "routing/global-middleware",
+          "title": "Global Middleware",
+          "label": "Global Middleware",
+          "url": "/docs/routing/global-middleware",
+          "order": 45,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/routing/global-middleware.md"
+        },
+        {
           "slug": "routing/route-protection",
           "title": "Route Protection (guard/load)",
           "label": "Route Protection (guard/load)",
@@ -674,6 +685,7 @@
     "/docs/cli-contract",
     "/docs/install-compatibility",
     "/docs/routing/navigation-shell",
+    "/docs/routing/global-middleware",
     "/docs/routing/route-protection"
   ]
 }

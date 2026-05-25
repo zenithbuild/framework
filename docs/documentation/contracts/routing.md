@@ -3,7 +3,7 @@ title: "Routing Contract"
 description: "Canonical Phase 0 server-routing contract: manifest truth, deterministic precedence, direct-request execution order, and 404/redirect/error outcomes."
 version: "0.3"
 status: "canonical"
-last_updated: "2026-03-12"
+last_updated: "2026-05-25"
 tags: ["routing", "manifest", "contracts"]
 ---
 
@@ -75,12 +75,16 @@ Contract: on a matched non-prerender route, the server evaluates route data for 
 Execution order:
 
 1. Resolve the route from the manifest using the request pathname.
-2. If the route has a server module, run `guard(ctx)` first when present.
-3. On `POST` requests, if `guard(ctx)` returns `allow()` and the route exports `action(ctx)`, run `action(ctx)`.
-4. If `action(ctx)` returns `data(...)` or `invalid(...)`, expose that result to `load(ctx)` through `ctx.action`.
-5. If `guard(ctx)` or `action(ctx)` returns `redirect(...)` or `deny(...)`, short-circuit rendering immediately.
-6. Run `load(ctx)` when present, otherwise use `data`, then legacy `ssr_data` / `props` / `ssr`, then `{}`.
-7. Inject the resolved payload into HTML and return the matched page.
+2. Create `ctx` for the matched route.
+3. If TypeScript root global middleware exists, run it before route stages.
+4. If the route has a server module, run `guard(ctx)` first when present.
+5. On `POST` requests, if `guard(ctx)` returns `allow()` and the route exports `action(ctx)`, run `action(ctx)`.
+6. If `action(ctx)` returns `data(...)` or `invalid(...)`, expose that result to `load(ctx)` through `ctx.action`.
+7. If global middleware, `guard(ctx)`, or `action(ctx)` returns `redirect(...)` or `deny(...)`, short-circuit rendering immediately.
+8. Run `load(ctx)` when present, otherwise use `data`, then legacy `ssr_data` / `props` / `ssr`, then `{}`.
+9. Inject the resolved payload into HTML and return the matched page.
+
+Global middleware V1 is TypeScript-only and is discovered from `middleware.ts` or `middleware/index.ts` at the directory that contains `pagesDir`. It runs for matched server page and resource routes, and it does not run for static assets, image endpoints, prerender/static HTML routes, unmatched 404s, or `/__zenith/route-check`.
 
 ### Server Module Sources
 

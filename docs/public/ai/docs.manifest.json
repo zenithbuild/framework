@@ -67,7 +67,7 @@
         "title": "Routing",
         "summary": "",
         "order": null,
-        "count": 2
+        "count": 3
       }
     ]
   },
@@ -1343,6 +1343,32 @@
         "Routing"
       ],
       "doc_order": 42,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/global-middleware",
+      "title": "Global Middleware",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "middleware",
+        "server"
+      ],
+      "source_path": "documentation/routing/global-middleware.md",
+      "url": "/docs/routing/global-middleware",
+      "category": "routing",
+      "category_title": "Routing",
+      "category_order": null,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 45,
       "level": null,
       "hidden": false,
       "prerequisites": []

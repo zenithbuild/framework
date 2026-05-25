@@ -3,7 +3,7 @@ title: "Route Protection (guard/load)"
 description: "How to securely protect Zenith routes using server-enforced guard and load exports."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-04-01"
+last_updated: "2026-05-25"
 tags: ["routing", "security", "guard", "load"]
 nav:
   order: 50
@@ -286,6 +286,8 @@ Routes using `guard(ctx)`, `action(ctx)`, or `load(ctx)` **cannot be statically 
 When navigating via marked soft-nav links (`<a data-zen-link>`), the router may preflight guarded server routes through `/__zenith/route-check` using the target pathname plus query string when the configured target exposes that endpoint. That preflight is advisory only.
 
 Today, advisory route-check is available in local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` server adapters skip advisory route-check and rely on the direct same-origin HTML request instead.
+
+Global middleware does not run for route-check in V1. Route-check remains guard-only and advisory, so real navigation may redirect or deny through global middleware even when route-check would allow.
 
 The actual soft-navigation authority is the direct same-origin HTML fetch for the target URL:
 - if the server returns a successful HTML page, the router may soft-commit it

@@ -61,6 +61,7 @@ Start here (ordered):
   - /docs/install-compatibility
 - Routing:
   - /docs/routing/navigation-shell
+  - /docs/routing/global-middleware
   - /docs/routing/route-protection
 
 Machine-readable:
