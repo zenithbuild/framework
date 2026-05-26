@@ -33,6 +33,10 @@ function isLegacyArchive(file) {
     return file.includes('/_legacy_v1/');
 }
 
+function readRel(rel) {
+    return readFileSync(resolve(REPO_ROOT, rel), 'utf8');
+}
+
 describe('public contract truth', () => {
     test('package-facing docs do not reference removed zenith-docs paths or local machine paths', () => {
         const packageRoot = resolve(REPO_ROOT, 'packages');
@@ -180,5 +184,113 @@ describe('public contract truth', () => {
             expect(coreContract).toContain(`${key}:`);
         }
         expect(coreContract).not.toMatch(/softNavigation:|assetPrefix:|types:/);
+    });
+
+    test('canonical docs document TypeScript-only root global middleware V1', () => {
+        const guide = readRel('docs/documentation/routing/global-middleware.md');
+        const supportingDocs = [
+            'docs/documentation/contracts/server-data.md',
+            'docs/documentation/reference/server-data-api.md',
+            'docs/documentation/reference/script-server.md',
+            'docs/documentation/contracts/routing.md',
+            'docs/documentation/routing/route-protection.md',
+            'docs/documentation/guides/deployment-targets.md',
+            'docs/documentation/guides/using-ai-with-zenith.md',
+            'docs/documentation/contracts/config-contract.md',
+            'docs/documentation/contracts/extension-contract.md'
+        ].map(readRel).join('\n');
+        const source = `${guide}\n${supportingDocs}`;
+
+        expect(guide).toContain('Root global middleware is a TypeScript-only server feature');
+        expect(guide).toContain('{dirname(pagesDir)}/middleware.ts');
+        expect(guide).toContain('{dirname(pagesDir)}/middleware/index.ts');
+        expect(guide).toContain('middleware.js');
+        expect(guide).toContain('middleware/index.js');
+        expect(guide).toContain('middleware.tsx');
+        expect(guide).toContain('middleware.mts');
+        expect(guide).toContain('middleware.cts');
+        expect(guide).toContain('Internal compiled `.js` output is an implementation detail');
+
+        for (const target of ['dev', 'preview', 'node', 'vercel', 'netlify']) {
+            expect(source).toMatch(new RegExp(`\\b${target}\\b`));
+        }
+        for (const target of ['static', 'static-export', 'vercel-static', 'netlify-static']) {
+            expect(source).toContain(target);
+        }
+
+        expect(guide).toContain('return next()');
+        expect(guide).toContain('await next()');
+        expect(guide).toContain('return ctx.redirect');
+        expect(guide).toContain('return ctx.deny');
+        expect(guide).toContain('ctx.auth.requireSession({ redirectTo');
+        expect(guide).toContain('ctx.auth.requireSession({ deny: 401');
+        expect(guide).toContain('ctx.auth.signIn');
+        expect(guide).toContain('ctx.auth.signOut');
+
+        for (const rejected of [
+            'return ctx.allow()',
+            'return ctx.data(...)',
+            'return ctx.invalid(...)',
+            'return ctx.json(...)',
+            'return ctx.text(...)',
+            'return ctx.download(...)',
+            'return new Response(...)',
+            'plain object returns'
+        ]) {
+            expect(guide).toContain(rejected);
+        }
+
+        expect(source).toContain('route-check');
+        expect(source).toMatch(/Global middleware does not run for route-check in V1/);
+        expect(source).toMatch(/static output cannot enforce middleware/);
+        expect(source).toMatch(/guard\(ctx\).*load\(ctx\).*canonical authorization boundary/s);
+    });
+
+    test('canonical and generated docs do not promote unsupported global middleware surfaces', () => {
+        const rels = [
+            'docs/documentation/routing/global-middleware.md',
+            'docs/documentation/contracts/server-data.md',
+            'docs/documentation/reference/server-data-api.md',
+            'docs/documentation/reference/script-server.md',
+            'docs/documentation/contracts/routing.md',
+            'docs/documentation/routing/route-protection.md',
+            'docs/documentation/contracts/config-contract.md',
+            'docs/documentation/contracts/extension-contract.md',
+            'docs/documentation/guides/deployment-targets.md',
+            'docs/documentation/guides/using-ai-with-zenith.md',
+            'docs/public/ai/docs.index.jsonl',
+            'docs/public/ai/docs.manifest.json',
+            'docs/public/ai/docs.nav.json',
+            'docs/public/ai/docs.sitemap.json',
+            'docs/public/llms.txt',
+            'docs/public/rss.xml'
+        ];
+        const source = rels.map(readRel).join('\n');
+
+        const forbiddenSupportClaims = [
+            /\bsupports?\s+`?middleware\.js`?/i,
+            /\b`?middleware\.js`?\s+is\s+supported\b/i,
+            /\bsupports?\s+`?middleware\/index\.js`?/i,
+            /\bsupports?\s+`?middleware\.(?:tsx|mts|cts)`?/i,
+            /\bnested\s+middleware\s+(?:is|are)\s+supported\b/i,
+            /\bmiddleware\s+arrays?\s+(?:is|are)\s+supported\b/i,
+            /\bplugins?\s+(?:can|may)\s+register\s+middleware\b/i,
+            /\bplugin\s+middleware\s+(?:is|are)\s+supported\b/i,
+            /\bctx\.setHeader\b.{0,80}\b(?:supported|available|allowed)\b/i,
+            /\barbitrary\s+headers?\s+(?:is|are)\s+supported\b/i,
+            /\braw\s+Response\s+(?:is|returns?\s+are|support)\b/i,
+            /\broute-check\s+(?:runs|executes|includes)\s+global\s+middleware\b/i,
+            /\bglobal\s+middleware\s+runs\s+for\s+route-check\b/i,
+            /\bstatic(?:-export)?\s+(?:can|does|will)\s+enforce\s+middleware\b/i,
+            /\badapter\s+plugin\s+middleware\s+API\b.{0,80}\b(?:available|supported|open|exists)\b/i,
+            /\bpublic\s+adapter\s+plugin\s+API\s+(?:is\s+)?(?:available|supported|open)\b/i
+        ];
+
+        for (const pattern of forbiddenSupportClaims) {
+            expect(source).not.toMatch(pattern);
+        }
+
+        expect(source).toContain('No plugin middleware registration');
+        expect(source).toContain('not a public adapter plugin API');
     });
 });

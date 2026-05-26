@@ -3,7 +3,7 @@ title: "Deployment Targets Guide"
 description: "Canonical target matrix for Zenith build output, preview behavior, and current deployment limitations."
 version: "0.2"
 status: "canonical"
-last_updated: "2026-05-08"
+last_updated: "2026-05-25"
 tags: ["guides", "deployment", "build"]
 ---
 
@@ -35,6 +35,14 @@ Definition of Done:
 Static-only targets fail fast if the route manifest contains server-classified routes.
 
 `static-export` also fails fast if a dynamic prerender route does not declare explicit `exportPaths`.
+
+Root global middleware is server-only. If Zenith discovers `middleware.ts` or `middleware/index.ts`, static-family targets fail the build:
+- `static`
+- `static-export`
+- `vercel-static`
+- `netlify-static`
+
+Global middleware runs in dev, preview, packaged `node`, and the built-in `vercel` and `netlify` server targets for matched server page and resource routes only. It does not run for static assets, image endpoints, static HTML, unmatched 404s, or route-check.
 
 ### Packaged Node Public Origin
 

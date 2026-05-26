@@ -3,7 +3,7 @@ title: "Config Contract"
 description: "Formal definition of the definitive Zenith configuration contract."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-03-29"
+last_updated: "2026-05-25"
 tags: ["contracts", "config", "schema"]
 ---
 
@@ -59,7 +59,7 @@ V1 plugins are config-time only. A plugin must return a named object, and the on
 
 V1 config patches are shallow top-level patches; scalar keys such as `router` replace their value, and nested object keys such as `images` replace that config object instead of deep-merging.
 
-V1 plugins cannot transform files, register middleware, mutate routes/security policy, patch `target`, patch `pagesDir`, or install compiler/bundler/dev-server hooks. Global middleware is a separate Lane 2 design and implementation.
+V1 plugins cannot transform files, register middleware, mutate routes/security policy, patch `target`, patch `pagesDir`, or install compiler/bundler/dev-server hooks. Root global middleware is a TypeScript-only file-based route feature, not plugin registration and not a config API.
 
 ## 2. Precedence Order
 Zenith configuration properties are resolved via a strict precedence hierarchy:

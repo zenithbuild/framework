@@ -3,7 +3,7 @@ title: "Docs Inventory"
 description: "Classification and alignment status for legacy and canonical docs during migration to content collections."
 version: "0.3"
 status: "draft"
-last_updated: "2026-03-24"
+last_updated: "2026-05-25"
 tags: ["inventory", "migration", "docs"]
 ---
 
@@ -40,6 +40,7 @@ Definition of Done:
 | guides/troubleshooting | Troubleshooting Guide | guide | keep | Operational diagnosis |
 | contributing/drift-gates | Drift Gates | contributing | keep | CI + docs integrity checks |
 | routing/navigation-shell | Navigation Shell | routing | keep | Canonical tiny visual shell utility on existing lifecycle |
+| routing/global-middleware | Global Middleware | routing | keep | TypeScript-only root middleware contract |
 | reactivity/dom-and-environment | DOM and Environment | reactivity | keep | Refs, zenWindow/zenDocument, zenOn, zenResize, collectRefs |
 | reactivity/effects-vs-mount | zenEffect vs zenMount | reactivity | keep | When to use zenEffect vs zenMount |
 | reactivity/presence | Presence | reactivity | keep | Canonical ref-owned presence helper and phase model |

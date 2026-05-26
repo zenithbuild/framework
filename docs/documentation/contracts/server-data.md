@@ -3,7 +3,7 @@ title: "Server Data Contract"
 description: "Allowed server exports, load context shape, and serialization constraints."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-04-01"
+last_updated: "2026-05-25"
 tags: ["server", "data", "contracts"]
 ---
 
@@ -77,22 +77,25 @@ Page routes do **not** allow `json(...)`, `text(...)`, `download(...)`, `stream(
 
 ## Contract: Explicit Middleware Composition
 
-Contract: middleware composition is explicit and route-owned.
+Contract: Zenith has two separate middleware surfaces: root global middleware and route-local handler composition.
 
 Invariant:
+- root global middleware is TypeScript-only file-based app middleware discovered from `middleware.ts` or `middleware/index.ts` at the directory that contains `pagesDir`
+- root global middleware runs after route match and `ctx` creation, before `guard(ctx)`, `action(ctx)`, and `load(ctx)`, for matched server page and resource routes
 - route modules compose middleware directly with `withMiddleware(handler, ...middleware)`
 - composition order is deterministic and left-to-right by declaration (`withMiddleware(handler, a, b) = a(b(handler))`)
-- middleware remains server-contract-only and is not exposed as a route context helper
+- route-local `withMiddleware(...)` remains server-contract-only and is not exposed as a route context helper
 
 Definition of Done:
-- middleware returns a wrapped handler function
-- middleware may short-circuit with any valid result kind for the wrapped handler type, throw, or call wrapped handler
-- middleware does not add new result kinds or bypass route contract validation
+- root global middleware may continue with `next()` or short-circuit with `redirect(...)` / `deny(...)`
+- root global middleware rejects route payload results such as `data(...)`, `invalid(...)`, `json(...)`, `text(...)`, `download(...)`, arbitrary `Response`, and plain objects
+- route-local middleware returns a wrapped handler function and may short-circuit with any valid result kind for the wrapped handler type
+- neither middleware surface adds arbitrary headers or bypasses route contract validation
 
 Failure Modes:
-- root/global middleware becomes automatic
+- TypeScript-only root middleware is confused with user-authored `middleware.js`, which V1 ignores
 - folder inheritance semantics appear
-- middleware drifts into generic request/response interceptor chains
+- plugin middleware registration, nested middleware, arrays, or generic request/response interceptor chains are implied
 
 ## Contract: Serialization Rules
 
