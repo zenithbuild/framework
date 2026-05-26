@@ -15,14 +15,35 @@
 //   - Tie-breaker: lexicographic route path
 // ---------------------------------------------------------------------------
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join, relative, sep, basename, extname, dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { extractServerScript } from './build/server-script.js';
 import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
 import { validateStaticExportPaths } from './static-export-paths.js';
 import { classifyPageRoute } from './route-classification.js';
+import { buildComponentRegistry } from './resolve-components.js';
+
+function resolveManifestIntegrationPath() {
+    const moduleDir = dirname(fileURLToPath(import.meta.url));
+    const distRelativePath = join(moduleDir, 'scoped-server-data', 'manifest-integration.js');
+    if (existsSync(distRelativePath)) {
+        return distRelativePath;
+    }
+
+    return join(moduleDir, '..', 'dist', 'scoped-server-data', 'manifest-integration.js');
+}
+
+const manifestIntegration = await import(pathToFileURL(resolveManifestIntegrationPath()).href);
+
+/** @type {typeof import('./scoped-server-data/manifest-integration.js').analyzeRouteScopedServerMetadata} */
+export const analyzeRouteScopedServerMetadata = manifestIntegration.analyzeRouteScopedServerMetadata;
+
+/** @type {typeof import('./scoped-server-data/manifest-integration.js').assertNoScopedServerBuildErrors} */
+export const assertNoScopedServerBuildErrors = manifestIntegration.assertNoScopedServerBuildErrors;
 
 /**
  * @typedef {{
@@ -37,6 +58,8 @@ import { classifyPageRoute } from './route-classification.js';
  *   has_guard?: boolean,
  *   has_load?: boolean,
  *   has_action?: boolean,
+ *   has_scoped_server_data?: boolean,
+ *   scoped_server_data?: import('./scoped-server-data/types.js').ManifestScopedServerDataEntry[],
  *   export_paths?: string[]
  * }} ManifestEntry
  */
@@ -46,11 +69,16 @@ import { classifyPageRoute } from './route-classification.js';
  *
  * @param {string} pagesDir - Absolute path to /pages directory
  * @param {string} [extension='.zen'] - File extension to scan for
- * @param {{ compilerOpts?: object }} [options]
+ * @param {{ compilerOpts?: object, srcDir?: string, registry?: Map<string, string> }} [options]
  * @returns {Promise<ManifestEntry[]>}
  */
 export async function generateManifest(pagesDir, extension = '.zen', options = {}) {
-    const entries = await _scanDir(pagesDir, pagesDir, extension, options.compilerOpts || {});
+    const resolvedPagesDir = resolve(pagesDir);
+    const srcDir = resolve(options.srcDir || resolve(resolvedPagesDir, '..'));
+    const registry = options.registry || buildComponentRegistry(srcDir);
+    const scanContext = { srcDir, registry, compilerOpts: options.compilerOpts || {} };
+
+    const entries = await _scanDir(resolvedPagesDir, resolvedPagesDir, extension, scanContext);
     const apiAliasState = _resolveSrcApiAliasState(pagesDir);
     if (apiAliasState) {
         const aliasEntries = await _scanResourceDir(apiAliasState.aliasDir, apiAliasState.srcDir);
@@ -75,7 +103,7 @@ export async function generateManifest(pagesDir, extension = '.zen', options = {
  * @param {string} ext - Extension to match
  * @returns {Promise<ManifestEntry[]>}
  */
-async function _scanDir(dir, root, ext, compilerOpts) {
+async function _scanDir(dir, root, ext, scanContext) {
     /** @type {ManifestEntry[]} */
     const entries = [];
 
@@ -94,7 +122,7 @@ async function _scanDir(dir, root, ext, compilerOpts) {
         const info = await stat(fullPath);
 
         if (info.isDirectory()) {
-            const nested = await _scanDir(fullPath, root, ext, compilerOpts);
+            const nested = await _scanDir(fullPath, root, ext, scanContext);
             entries.push(...nested);
         } else if (item.endsWith(ext)) {
             const routePath = _fileToRoute(fullPath, root, ext);
@@ -102,7 +130,7 @@ async function _scanDir(dir, root, ext, compilerOpts) {
                 fullPath,
                 root,
                 routePath,
-                compilerOpts
+                scanContext
             }));
         } else if (isResourceRouteFile(item)) {
             entries.push(analyzeResourceRouteModule(fullPath, root));
@@ -159,7 +187,8 @@ function _resolveSrcApiAliasState(pagesDir) {
     };
 }
 
-function buildPageManifestEntry({ fullPath, root, routePath, compilerOpts }) {
+function buildPageManifestEntry({ fullPath, root, routePath, scanContext }) {
+    const { srcDir, registry, compilerOpts } = scanContext;
     const rawSource = readFileSync(fullPath, 'utf8');
     const inlineServerScript = extractServerScript(rawSource, fullPath, compilerOpts).serverScript;
     const { guardPath, loadPath, actionPath } = resolveAdjacentServerModules(fullPath);
@@ -171,21 +200,41 @@ function buildPageManifestEntry({ fullPath, root, routePath, compilerOpts }) {
         adjacentActionPath: actionPath
     });
 
+    const scopedMetadata = analyzeRouteScopedServerMetadata({
+        pageSource: rawSource,
+        pageFile: fullPath,
+        registry,
+        srcDir,
+        compilerOpts
+    });
+    const manifestFile = relative(root, fullPath);
+    assertNoScopedServerBuildErrors(scopedMetadata.diagnostics, manifestFile);
+
     const exportPaths = Array.isArray(composed.serverScript?.export_paths)
         ? validateStaticExportPaths(routePath, composed.serverScript.export_paths, fullPath)
         : [];
     const classification = classifyPageRoute({
-        file: relative(root, fullPath),
-        serverScript: composed.serverScript
+        file: manifestFile,
+        serverScript: composed.serverScript,
+        hasScopedServerData: scopedMetadata.hasScopedServerData
     });
 
     return {
         path: routePath,
-        file: relative(root, fullPath),
+        file: manifestFile,
         route_kind: 'page',
         path_kind: _isDynamic(routePath) ? 'dynamic' : 'static',
         render_mode: classification.renderMode,
         params: extractRouteParams(routePath),
+        has_guard: classification.hasGuard,
+        has_load: classification.hasLoad,
+        has_action: classification.hasAction,
+        ...(scopedMetadata.hasScopedServerData
+            ? {
+                has_scoped_server_data: true,
+                scoped_server_data: scopedMetadata.scopedServerData
+            }
+            : {}),
         ...(exportPaths.length > 0 ? { export_paths: exportPaths } : {})
     };
 }

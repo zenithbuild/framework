@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
 
 import { classifyPageRoute } from '../route-classification.js';
+import { assertNoScopedServerBuildErrors } from '../manifest.js';
 import {
     createBindingResolutionTotals,
     createComponentLoopPhaseTotals,
@@ -65,11 +66,15 @@ export function applyServerEnvelopeToPageIr({
     composedServer,
     entry,
     srcDir,
-    sourceFile
+    sourceFile,
+    scopedMetadata
 }) {
+    assertNoScopedServerBuildErrors(scopedMetadata.diagnostics, entry.file);
+
     const classification = classifyPageRoute({
         file: entry.file,
-        serverScript: composedServer.serverScript
+        serverScript: composedServer.serverScript,
+        hasScopedServerData: scopedMetadata.hasScopedServerData
     });
 
     if (composedServer.serverScript) {
@@ -88,6 +93,10 @@ export function applyServerEnvelopeToPageIr({
     pageIr.has_guard = classification.hasGuard;
     pageIr.has_load = classification.hasLoad;
     pageIr.has_action = classification.hasAction;
+    pageIr.has_scoped_server_data = scopedMetadata.hasScopedServerData;
+    pageIr.scoped_server_data = scopedMetadata.hasScopedServerData
+        ? scopedMetadata.scopedServerData
+        : [];
     pageIr.guard_module_ref = composedServer.guardPath ? relative(srcDir, composedServer.guardPath).replaceAll('\\', '/') : null;
     pageIr.load_module_ref = composedServer.loadPath ? relative(srcDir, composedServer.loadPath).replaceAll('\\', '/') : null;
     pageIr.action_module_ref = composedServer.actionPath ? relative(srcDir, composedServer.actionPath).replaceAll('\\', '/') : null;

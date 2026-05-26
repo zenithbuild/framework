@@ -49,3 +49,28 @@ export interface ScriptBlockPartition {
     attrs: string;
     body: string;
 }
+
+export type ScopedServerInstanceStrategy = 'singleton' | 'per-instance';
+
+export interface ManifestScopedServerDataEntry {
+    ownerKind: ScopedServerOwnerKind;
+    ownerKey: string;
+    syntax: ScopedServerOwnerSyntax;
+    exportName: 'data';
+    instanceStrategy: ScopedServerInstanceStrategy;
+    serializedVariableNames?: string[];
+}
+
+export interface AnalyzeRouteScopedServerMetadataOptions {
+    pageSource: string;
+    pageFile: string;
+    registry: Map<string, string>;
+    srcDir: string;
+    compilerOpts?: CompilerOptsLike;
+}
+
+export interface AnalyzeRouteScopedServerMetadataResult {
+    hasScopedServerData: boolean;
+    scopedServerData: ManifestScopedServerDataEntry[];
+    diagnostics: ScopedServerDiagnostic[];
+}
