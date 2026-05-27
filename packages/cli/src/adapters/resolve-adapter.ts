@@ -7,8 +7,22 @@ import { staticAdapter } from './adapter-static.js';
 import { KNOWN_TARGETS } from './adapter-types.js';
 import { vercelAdapter } from './adapter-vercel.js';
 import { vercelStaticAdapter } from './adapter-vercel-static.js';
+import type { ZenithAdapter } from './adapter-types.js';
 
-const LEGACY_ADAPTER = {
+type BuildAdapterMode = 'adapter' | 'target' | 'legacy';
+
+type BuildAdapterConfig = {
+    target?: unknown;
+    adapter?: unknown;
+};
+
+type ResolvedBuildAdapter = {
+    target: string;
+    adapter: ZenithAdapter;
+    mode: BuildAdapterMode;
+};
+
+const LEGACY_ADAPTER: ZenithAdapter = {
     name: 'legacy',
     validateRoutes() {
         // Internal build() callers without loaded config stay on the pre-target contract.
@@ -16,23 +30,23 @@ const LEGACY_ADAPTER = {
     adapt: staticAdapter.adapt
 };
 
-function validateAdapterShape(adapter) {
+function validateAdapterShape(adapter: unknown): ZenithAdapter {
     if (!adapter || typeof adapter !== 'object' || Array.isArray(adapter)) {
         throw new Error('[Zenith:Config] Key "adapter" must be a plain object');
     }
-    if (typeof adapter.name !== 'string' || adapter.name.trim().length === 0) {
+    if (typeof (adapter as Partial<ZenithAdapter>).name !== 'string' || (adapter as { name: string }).name.trim().length === 0) {
         throw new Error('[Zenith:Config] Key "adapter.name" must be a non-empty string');
     }
-    if (typeof adapter.validateRoutes !== 'function') {
+    if (typeof (adapter as Partial<ZenithAdapter>).validateRoutes !== 'function') {
         throw new Error('[Zenith:Config] Key "adapter.validateRoutes" must be a function');
     }
-    if (typeof adapter.adapt !== 'function') {
+    if (typeof (adapter as Partial<ZenithAdapter>).adapt !== 'function') {
         throw new Error('[Zenith:Config] Key "adapter.adapt" must be a function');
     }
-    return adapter;
+    return adapter as ZenithAdapter;
 }
 
-function resolveTargetAdapter(target) {
+function resolveTargetAdapter(target: string): ZenithAdapter {
     if (target === 'static') {
         return staticAdapter;
     }
@@ -60,7 +74,7 @@ function resolveTargetAdapter(target) {
     throw new Error(`[Zenith:Config] Unsupported target: "${target}"`);
 }
 
-export function resolveBuildAdapter(config = {}) {
+export function resolveBuildAdapter(config: BuildAdapterConfig = {}): ResolvedBuildAdapter {
     const targetExplicit = isConfigKeyExplicit(config, 'target');
     const adapterExplicit = isConfigKeyExplicit(config, 'adapter') && config.adapter !== null && config.adapter !== undefined;
 
