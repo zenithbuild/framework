@@ -1,8 +1,9 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createVercelBasePathAssetRoutes, createVercelRouteSource } from './route-rules.js';
+import type { AdapterDriver, BuildManifest } from './adapter-types.js';
 
-function createConfig(manifest) {
+function createConfig(manifest: BuildManifest) {
     return {
         version: 3,
         routes: [
@@ -16,7 +17,7 @@ function createConfig(manifest) {
     };
 }
 
-export const vercelStaticAdapter = {
+export const vercelStaticAdapter: AdapterDriver = {
     name: 'vercel-static',
     validateRoutes(manifest) {
         const serverRoutes = manifest.filter((entry) => entry.render_mode === 'server');
