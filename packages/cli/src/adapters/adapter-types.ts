@@ -62,8 +62,29 @@ export interface AdaptOptions {
     config: object;
 }
 
-export interface ZenithAdapter {
+export type AdapterResolutionMode = 'adapter' | 'target' | 'legacy';
+
+export interface AdapterManifestEntry extends RouteManifestEntry {
+    route_kind?: 'page' | 'resource';
+    server_script?: string;
+    server_script_path?: string;
+    has_guard?: boolean;
+    has_load?: boolean;
+    has_action?: boolean;
+}
+
+export type AdapterRouteManifest = AdapterManifestEntry[];
+
+export interface AdapterDriver {
     name: string;
-    validateRoutes: (manifest: RouteManifestEntry[]) => void;
+    validateRoutes: (manifest: AdapterRouteManifest) => void;
     adapt: (options: AdaptOptions) => Promise<void>;
 }
+
+export interface ResolvedBuildAdapter {
+    target: string;
+    adapter: AdapterDriver;
+    mode: AdapterResolutionMode;
+}
+
+export type ZenithAdapter = AdapterDriver;

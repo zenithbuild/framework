@@ -7,22 +7,18 @@ import { staticAdapter } from './adapter-static.js';
 import { KNOWN_TARGETS } from './adapter-types.js';
 import { vercelAdapter } from './adapter-vercel.js';
 import { vercelStaticAdapter } from './adapter-vercel-static.js';
-import type { ZenithAdapter } from './adapter-types.js';
-
-type BuildAdapterMode = 'adapter' | 'target' | 'legacy';
+import type {
+    AdapterDriver,
+    AdapterResolutionMode,
+    ResolvedBuildAdapter
+} from './adapter-types.js';
 
 type BuildAdapterConfig = {
     target?: unknown;
     adapter?: unknown;
 };
 
-type ResolvedBuildAdapter = {
-    target: string;
-    adapter: ZenithAdapter;
-    mode: BuildAdapterMode;
-};
-
-const LEGACY_ADAPTER: ZenithAdapter = {
+const LEGACY_ADAPTER: AdapterDriver = {
     name: 'legacy',
     validateRoutes() {
         // Internal build() callers without loaded config stay on the pre-target contract.
@@ -30,23 +26,23 @@ const LEGACY_ADAPTER: ZenithAdapter = {
     adapt: staticAdapter.adapt
 };
 
-function validateAdapterShape(adapter: unknown): ZenithAdapter {
+function validateAdapterShape(adapter: unknown): AdapterDriver {
     if (!adapter || typeof adapter !== 'object' || Array.isArray(adapter)) {
         throw new Error('[Zenith:Config] Key "adapter" must be a plain object');
     }
-    if (typeof (adapter as Partial<ZenithAdapter>).name !== 'string' || (adapter as { name: string }).name.trim().length === 0) {
+    if (typeof (adapter as Partial<AdapterDriver>).name !== 'string' || (adapter as { name: string }).name.trim().length === 0) {
         throw new Error('[Zenith:Config] Key "adapter.name" must be a non-empty string');
     }
-    if (typeof (adapter as Partial<ZenithAdapter>).validateRoutes !== 'function') {
+    if (typeof (adapter as Partial<AdapterDriver>).validateRoutes !== 'function') {
         throw new Error('[Zenith:Config] Key "adapter.validateRoutes" must be a function');
     }
-    if (typeof (adapter as Partial<ZenithAdapter>).adapt !== 'function') {
+    if (typeof (adapter as Partial<AdapterDriver>).adapt !== 'function') {
         throw new Error('[Zenith:Config] Key "adapter.adapt" must be a function');
     }
-    return adapter as ZenithAdapter;
+    return adapter as AdapterDriver;
 }
 
-function resolveTargetAdapter(target: string): ZenithAdapter {
+function resolveTargetAdapter(target: string): AdapterDriver {
     if (target === 'static') {
         return staticAdapter;
     }
@@ -87,7 +83,7 @@ export function resolveBuildAdapter(config: BuildAdapterConfig = {}): ResolvedBu
         return {
             target: adapter.name,
             adapter,
-            mode: 'adapter'
+            mode: 'adapter' satisfies AdapterResolutionMode
         };
     }
 
@@ -98,13 +94,13 @@ export function resolveBuildAdapter(config: BuildAdapterConfig = {}): ResolvedBu
         return {
             target,
             adapter: resolveTargetAdapter(target),
-            mode: 'target'
+            mode: 'target' satisfies AdapterResolutionMode
         };
     }
 
     return {
         target: 'legacy',
         adapter: LEGACY_ADAPTER,
-        mode: 'legacy'
+        mode: 'legacy' satisfies AdapterResolutionMode
     };
 }
