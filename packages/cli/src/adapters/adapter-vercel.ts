@@ -4,8 +4,26 @@ import { compareRouteSpecificity } from '../server/resolve-request-route.js';
 import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
 import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteSource } from './route-rules.js';
 import { validateHostedResourceRoutes } from './validate-hosted-resource-routes.js';
+import type { AdapterDriver, AdapterManifestEntry, BuildManifest } from './adapter-types.js';
 
-function buildVercelServerDest(route) {
+interface HostedRoute extends AdapterManifestEntry {
+    name: string;
+    page_asset_file?: string;
+    image_manifest_file?: string;
+    image_config?: unknown;
+}
+
+interface AdapterConfig {
+    images?: unknown;
+}
+
+interface VercelConfigRoute {
+    src?: string;
+    dest?: string;
+    handle?: 'filesystem';
+}
+
+function buildVercelServerDest(route: HostedRoute) {
     const base = `/__zenith/${route.name}`;
     if (!Array.isArray(route.params) || route.params.length === 0) {
         return base;
@@ -14,8 +32,8 @@ function buildVercelServerDest(route) {
     return `${base}?${query}`;
 }
 
-function buildVercelConfig(buildManifest, serverRoutes) {
-    const routes = [...createVercelBasePathAssetRoutes(buildManifest.base_path)];
+function buildVercelConfig(buildManifest: BuildManifest, serverRoutes: HostedRoute[]) {
+    const routes: VercelConfigRoute[] = [...createVercelBasePathAssetRoutes(buildManifest.base_path)];
     for (const route of [...serverRoutes].sort((left, right) => compareRouteSpecificity(left.path, right.path))) {
         routes.push({
             src: createVercelRouteSource(route.path, buildManifest.base_path),
@@ -36,7 +54,7 @@ function buildVercelConfig(buildManifest, serverRoutes) {
     };
 }
 
-function createImageFunctionSource(imagesConfig) {
+function createImageFunctionSource(imagesConfig: unknown) {
     return [
         "import { fileURLToPath } from 'node:url';",
         "import { dirname } from 'node:path';",
@@ -57,7 +75,7 @@ function createImageFunctionSource(imagesConfig) {
     ].join('\n');
 }
 
-function createFunctionSource(route, globalMiddlewareModulePath) {
+function createFunctionSource(route: HostedRoute, globalMiddlewareModulePath: string | null) {
     const globalMiddlewarePathExpression = globalMiddlewareModulePath
         ? "join(__dirname, 'global-middleware', 'entry.js')"
         : 'null';
@@ -107,7 +125,7 @@ function createFunctionSource(route, globalMiddlewareModulePath) {
     ].join('\n');
 }
 
-async function loadServerManifest(coreOutput) {
+async function loadServerManifest(coreOutput: string): Promise<HostedRoute[]> {
     try {
         const parsed = JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
         return Array.isArray(parsed.routes) ? parsed.routes : [];
@@ -125,7 +143,7 @@ function vercelFunctionConfig() {
     }, null, 2)}\n`;
 }
 
-async function writeHostedFunctionBundle(functionDir, coreOutput, source) {
+async function writeHostedFunctionBundle(functionDir: string, coreOutput: string, source: string) {
     await mkdir(functionDir, { recursive: true });
     await copyHostedPageRuntime(coreOutput, functionDir);
     await writeFile(join(functionDir, 'package.json'), '{\n  "type": "module"\n}\n', 'utf8');
@@ -133,7 +151,7 @@ async function writeHostedFunctionBundle(functionDir, coreOutput, source) {
     await writeFile(join(functionDir, '.vc-config.json'), vercelFunctionConfig(), 'utf8');
 }
 
-export const vercelAdapter = {
+export const vercelAdapter: AdapterDriver = {
     name: 'vercel',
     validateRoutes(manifest) {
         validateHostedResourceRoutes(manifest, 'vercel');
@@ -150,7 +168,7 @@ export const vercelAdapter = {
         await writeHostedFunctionBundle(
             join(options.outDir, 'functions', '__zenith', 'image.func'),
             options.coreOutput,
-            createImageFunctionSource(options.config?.images || {})
+            createImageFunctionSource((options.config as AdapterConfig | null | undefined)?.images || {})
         );
 
         for (const route of serverRoutes) {
