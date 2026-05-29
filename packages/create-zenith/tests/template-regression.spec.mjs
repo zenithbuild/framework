@@ -194,6 +194,15 @@ function assertToolingSelection(projectDir, { eslint, prettier }) {
     assert.equal(typeof devDependencies.prettier === 'string', prettier, 'prettier dependency presence mismatch');
 }
 
+function assertGeneratedGitignore(projectDir) {
+    const gitignorePath = join(projectDir, '.gitignore');
+    assert.equal(existsSync(gitignorePath), true, 'scaffolded .gitignore missing');
+
+    const gitignore = readFileSync(gitignorePath, 'utf8');
+    assert.match(gitignore, /^\.zenith\/$/m, 'scaffolded .gitignore must ignore .zenith/');
+    assert.match(gitignore, /^\.zenith-output\/$/m, 'scaffolded .gitignore must ignore .zenith-output/');
+}
+
 function assertTemplateShape(projectDir, template) {
     const config = TEMPLATE_MATRIX[template];
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
@@ -356,6 +365,7 @@ for (const template of Object.keys(TEMPLATE_MATRIX)) {
         try {
             assertPackageDependencies(projectDir, template);
             assertSourceContracts(projectDir);
+            assertGeneratedGitignore(projectDir);
             assertTemplateShape(projectDir, template);
             installForBuild(projectDir, template);
             patchRuntimeTemplateExport(projectDir);

@@ -1,3 +1,7 @@
+# Zenith generated output
+.zenith/
+.zenith-output/
+
 # Dependencies
 node_modules/
 bun.lock
