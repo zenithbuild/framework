@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
 import { generateManifest } from '../src/manifest.js';
@@ -12,6 +14,9 @@ import {
 } from '../dist/scoped-server-data/manifest-integration.js';
 
 jest.setTimeout(30000);
+
+const SCOPED_SERVER_DATA_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Manifest integration helper is unavailable. Run the CLI build step before using scoped server data manifest integration.';
 
 /**
  * @param {Record<string, string>} files
@@ -94,6 +99,47 @@ describe('scoped server manifest + classification (#97)', () => {
         if (project) {
             await rm(project.root, { recursive: true, force: true });
             project = null;
+        }
+    });
+
+    test('source manifest import does not require prebuilt scoped manifest helper', async () => {
+        const helperPath = fileURLToPath(
+            new URL('../dist/scoped-server-data/manifest-integration.js', import.meta.url)
+        );
+        const hiddenHelperPath = `${helperPath}.source-import-test-${process.pid}-${Date.now()}`;
+
+        expect(existsSync(helperPath)).toBe(true);
+        await rename(helperPath, hiddenHelperPath);
+
+        try {
+            const sourceManifestUrl = new URL(
+                `../src/manifest.js?source-import-no-dist=${Date.now()}`,
+                import.meta.url
+            );
+            const result = spawnSync(process.execPath, [
+                '--input-type=module',
+                '-e',
+                [
+                    `const sourceManifest = await import(${JSON.stringify(sourceManifestUrl.href)});`,
+                    'if (typeof sourceManifest.generateManifest !== "function") throw new Error("missing generateManifest export");',
+                    'if (typeof sourceManifest.analyzeRouteScopedServerMetadata !== "function") throw new Error("missing analyzeRouteScopedServerMetadata export");',
+                    'try {',
+                    '  sourceManifest.analyzeRouteScopedServerMetadata({});',
+                    '  throw new Error("expected scoped server helper call to fail");',
+                    '} catch (error) {',
+                    `  if (error.message !== ${JSON.stringify(SCOPED_SERVER_DATA_HELPER_UNAVAILABLE)}) throw error;`,
+                    '}'
+                ].join('\n')
+            ], {
+                encoding: 'utf8'
+            });
+
+            expect(result.stderr).toBe('');
+            expect(result.status).toBe(0);
+        } finally {
+            if (existsSync(hiddenHelperPath)) {
+                await rename(hiddenHelperPath, helperPath);
+            }
         }
     });
 

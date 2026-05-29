@@ -1,25 +1,10 @@
-// ---------------------------------------------------------------------------
-// manifest.js — Zenith CLI V0
-// ---------------------------------------------------------------------------
-// File-based manifest engine.
-//
-// Scans a /pages directory and produces a deterministic RouteManifest.
-//
-// Rules:
-//   - index.zen → parent directory path
-//   - [param].zen → :param dynamic segment
-//   - [...slug].zen → *slug catch-all segment (must be terminal, 1+ segments;
-//                     root '/*slug' may match '/' in router matcher)
-//   - [[...slug]].zen → *slug? optional catch-all segment (must be terminal, 0+ segments)
-//   - Deterministic precedence: static > :param > *catchall
-//   - Tie-breaker: lexicographic route path
-// ---------------------------------------------------------------------------
+// File-based manifest engine. Scans /pages and produces deterministic RouteManifest entries.
+// Rules: static > :param > *catchall, then lexicographic tie-breaker.
 
 import { readFileSync, existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join, relative, sep, basename, extname, dirname, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { extractServerScript } from './build/server-script.js';
 import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
 import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
@@ -27,23 +12,39 @@ import { validateStaticExportPaths } from './static-export-paths.js';
 import { classifyPageRoute } from './route-classification.js';
 import { buildComponentRegistry } from './resolve-components.js';
 
+const SCOPED_SERVER_DATA_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Manifest integration helper is unavailable. Run the CLI build step before using scoped server data manifest integration.';
+
 function resolveManifestIntegrationPath() {
     const moduleDir = dirname(fileURLToPath(import.meta.url));
-    const distRelativePath = join(moduleDir, 'scoped-server-data', 'manifest-integration.js');
-    if (existsSync(distRelativePath)) {
-        return distRelativePath;
-    }
-
-    return join(moduleDir, '..', 'dist', 'scoped-server-data', 'manifest-integration.js');
+    return [
+        join(moduleDir, 'scoped-server-data', 'manifest-integration.js'),
+        join(moduleDir, '..', 'dist', 'scoped-server-data', 'manifest-integration.js')
+    ].find((candidate) => existsSync(candidate)) || null;
 }
 
-const manifestIntegration = await import(pathToFileURL(resolveManifestIntegrationPath()).href);
+const manifestIntegrationPath = resolveManifestIntegrationPath();
+const manifestIntegration = manifestIntegrationPath
+    ? await import(pathToFileURL(manifestIntegrationPath).href)
+    : null;
+
+function getManifestIntegration() {
+    if (!manifestIntegration) {
+        throw new Error(SCOPED_SERVER_DATA_HELPER_UNAVAILABLE);
+    }
+
+    return manifestIntegration;
+}
 
 /** @type {typeof import('./scoped-server-data/manifest-integration.js').analyzeRouteScopedServerMetadata} */
-export const analyzeRouteScopedServerMetadata = manifestIntegration.analyzeRouteScopedServerMetadata;
+export function analyzeRouteScopedServerMetadata(options) {
+    return getManifestIntegration().analyzeRouteScopedServerMetadata(options);
+}
 
 /** @type {typeof import('./scoped-server-data/manifest-integration.js').assertNoScopedServerBuildErrors} */
-export const assertNoScopedServerBuildErrors = manifestIntegration.assertNoScopedServerBuildErrors;
+export function assertNoScopedServerBuildErrors(diagnostics, contextFile) {
+    return getManifestIntegration().assertNoScopedServerBuildErrors(diagnostics, contextFile);
+}
 
 /**
  * @typedef {{
