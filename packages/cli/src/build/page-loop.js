@@ -34,6 +34,7 @@ import {
     createPageLoopExecutionState
 } from './page-loop-state.js';
 import { extractServerScript } from './server-script.js';
+import { analyzeRouteScopedServerMetadata } from '../manifest.js';
 
 /**
  * @param {{
@@ -163,12 +164,20 @@ export async function buildPageEnvelopes(input) {
             adjacentLoadPath: adjacentLoad,
             adjacentActionPath: adjacentAction
         });
+        const scopedMetadata = analyzeRouteScopedServerMetadata({
+            pageSource: rawSource,
+            pageFile: sourceFile,
+            registry,
+            srcDir,
+            compilerOpts
+        });
         applyServerEnvelopeToPageIr({
             pageIr,
             composedServer,
             entry,
             srcDir,
-            sourceFile
+            sourceFile,
+            scopedMetadata
         });
 
         const pageIrMergeCache = createPageIrMergeCache(pageIr);
