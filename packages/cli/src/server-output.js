@@ -1,12 +1,15 @@
 import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadResourceRouteManifest } from './resource-manifest.js';
 import { assignServerRouteNames } from './server-route-names.js';
 import { normalizeGlobalMiddlewareMetadata } from './global-middleware.js';
 import { writeServerModulePackage } from './server-module-output.js';
 
 const GLOBAL_MIDDLEWARE_MODULE = 'global-middleware/entry.js';
+const SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Server-output lowering helper is unavailable. Run the CLI build step before packaging scoped server data modules.';
 const SERVER_RUNTIME_FILES = [
     {
         from: new URL('./server-runtime/route-render.js', import.meta.url),
@@ -70,6 +73,27 @@ const SERVER_RUNTIME_FILES = [
         to: 'download-result.js'
     }
 ];
+let scopedServerDataLoweringPromise = null;
+
+function resolveScopedServerDataLoweringPath() {
+    const moduleDir = dirname(fileURLToPath(import.meta.url));
+    return [
+        join(moduleDir, 'scoped-server-data', 'lowering.js'),
+        join(moduleDir, '..', 'dist', 'scoped-server-data', 'lowering.js')
+    ].find((candidate) => existsSync(candidate)) || null;
+}
+
+async function getScopedServerDataLowering() {
+    const helperPath = resolveScopedServerDataLoweringPath();
+    if (!helperPath) {
+        throw new Error(SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE);
+    }
+    if (!scopedServerDataLoweringPromise) {
+        scopedServerDataLoweringPromise = import(pathToFileURL(helperPath).href);
+    }
+    return scopedServerDataLoweringPromise;
+}
+
 async function writeRouteModulePackage({
     projectRoot,
     serverDir,
@@ -135,13 +159,90 @@ async function writeGlobalMiddlewarePackage({ projectRoot, serverDir, globalMidd
     };
 }
 
+function mergePageRouteMetadata(route, manifestEntry) {
+    if (!manifestEntry) {
+        return route;
+    }
+
+    return {
+        ...route,
+        file: manifestEntry.file || route.file || null,
+        has_scoped_server_data: manifestEntry.has_scoped_server_data === true || route.has_scoped_server_data === true,
+        scoped_server_data: Array.isArray(manifestEntry.scoped_server_data)
+            ? manifestEntry.scoped_server_data
+            : (Array.isArray(route.scoped_server_data) ? route.scoped_server_data : [])
+    };
+}
+
+async function writeScopedServerDataModules({
+    projectRoot,
+    serverDir,
+    route,
+    pagesDir,
+    srcDir,
+    registry,
+    compilerOpts
+}) {
+    if (route.route_kind === 'resource' || route.has_scoped_server_data !== true) {
+        return [];
+    }
+    if (!pagesDir || !srcDir || !registry) {
+        throw new Error(
+            `[Zenith:ScopedServerData] Cannot package scoped server data for route "${route.path}" without build context.`
+        );
+    }
+    if (typeof route.file !== 'string' || route.file.length === 0) {
+        throw new Error(
+            `[Zenith:ScopedServerData] Cannot package scoped server data for route "${route.path}" without a source file.`
+        );
+    }
+
+    const pageFile = resolve(pagesDir, route.file);
+    const pageSource = await readFile(pageFile, 'utf8');
+    const lowering = await getScopedServerDataLowering();
+    const lowered = lowering.lowerRouteScopedServerData({
+        pageSource,
+        pageFile,
+        registry,
+        srcDir,
+        projectRoot,
+        compilerOpts,
+        scopedServerData: Array.isArray(route.scoped_server_data) ? route.scoped_server_data : []
+    });
+
+    if (!Array.isArray(lowered.scopedServerData) || lowered.scopedServerData.length === 0) {
+        throw new Error(
+            `[Zenith:ScopedServerData] Cannot package scoped server data for route "${route.path}" because no owners were lowered.`
+        );
+    }
+
+    for (const module of lowered.modules) {
+        const entryOutputPath = lowering.resolveScopedServerModuleOutputPath(serverDir, module.module);
+        await writeServerModulePackage({
+            projectRoot,
+            serverDir,
+            entrySource: module.source,
+            entrySourcePath: module.sourcePath,
+            entryOutputPath,
+            modulesRoot: join(serverDir, 'scoped', '_modules')
+        });
+    }
+
+    return lowered.scopedServerData;
+}
+
 export async function writeServerOutput({
     coreOutputDir,
     staticDir,
     projectRoot,
     config,
     basePath = '/',
-    globalMiddleware = null
+    globalMiddleware = null,
+    pageManifest = [],
+    pagesDir = null,
+    srcDir = null,
+    registry = null,
+    compilerOpts = {}
 }) {
     const serverDir = join(coreOutputDir, 'server');
     await rm(serverDir, { recursive: true, force: true });
@@ -156,9 +257,15 @@ export async function writeServerOutput({
     }
     const resourceManifest = await loadResourceRouteManifest(staticDir, basePath);
 
-    const pageRoutes = Array.isArray(routerManifest.routes) ? routerManifest.routes : [];
+    const pageManifestByPath = new Map(
+        (Array.isArray(pageManifest) ? pageManifest : [])
+            .filter((entry) => entry?.route_kind !== 'resource')
+            .map((entry) => [entry.path, entry])
+    );
+    const pageRoutes = (Array.isArray(routerManifest.routes) ? routerManifest.routes : [])
+        .map((route) => mergePageRouteMetadata(route, pageManifestByPath.get(route.path)));
     const serverRoutes = pageRoutes
-        .filter((route) => route.server_script && route.prerender !== true)
+        .filter((route) => route.prerender !== true && (route.server_script || route.has_scoped_server_data === true))
         .map((route) => ({ ...route, route_kind: 'page' }))
         .concat(
             (Array.isArray(resourceManifest.routes) ? resourceManifest.routes : []).map((route) => ({
@@ -166,6 +273,9 @@ export async function writeServerOutput({
                 route_kind: 'resource'
             }))
         );
+    if (serverRoutes.some((route) => route.route_kind !== 'resource' && route.has_scoped_server_data === true)) {
+        await getScopedServerDataLowering();
+    }
 
     await mkdir(serverDir, { recursive: true });
     await copyRuntimeFiles(serverDir);
@@ -208,6 +318,16 @@ export async function writeServerOutput({
             route
         });
 
+        const scopedServerData = await writeScopedServerDataModules({
+            projectRoot,
+            serverDir,
+            route,
+            pagesDir,
+            srcDir,
+            registry,
+            compilerOpts
+        });
+
         const meta = {
             name,
             path: route.path,
@@ -230,6 +350,10 @@ export async function writeServerOutput({
             image_manifest_file: route.route_kind === 'resource' ? null : imageManifestFile,
             image_config: config?.images || {}
         };
+        if (scopedServerData.length > 0) {
+            meta.has_scoped_server_data = true;
+            meta.scoped_server_data = scopedServerData;
+        }
         if (route.route_kind !== 'resource' && Array.isArray(route.image_materialization) && route.image_materialization.length > 0) {
             meta.image_materialization = route.image_materialization;
         }
