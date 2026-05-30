@@ -215,7 +215,12 @@ export async function build(options) {
             projectRoot,
             config,
             basePath,
-            globalMiddleware: globalMiddleware?.metadata || null
+            globalMiddleware: globalMiddleware?.metadata || null,
+            pageManifest,
+            pagesDir,
+            srcDir,
+            registry,
+            compilerOpts
         })
     );
     await startupProfile.measureAsync(

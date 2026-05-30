@@ -24,6 +24,61 @@ function createEmptyExpressionRewrite() {
     };
 }
 
+const SERVER_CONST_RE = /(?:^|\n)\s*const\s+([A-Za-z_$][\w$]*)\s*=/g;
+
+function stripOwnerServerBlocks(source) {
+    return String(source || '').replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (full, attrs) => {
+        if (/\bserver\b/i.test(String(attrs || ''))) {
+            return '';
+        }
+        return full;
+    });
+}
+
+function collectServerConstNames(source) {
+    const names = [];
+    for (const match of String(source || '').matchAll(SERVER_CONST_RE)) {
+        const name = String(match[1] || '');
+        if (name && !names.includes(name)) {
+            names.push(name);
+        }
+    }
+    return names;
+}
+
+function createClientPlaceholderPrelude(source, strippedSource) {
+    const names = [];
+    String(source || '').replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (full, attrs, body) => {
+        if (/\bserver\b/i.test(String(attrs || ''))) {
+            for (const name of collectServerConstNames(body)) {
+                const refRe = new RegExp(`\\b${escapeRegExp(name)}\\b`);
+                if (refRe.test(strippedSource) && !names.includes(name)) {
+                    names.push(name);
+                }
+            }
+        }
+        return full;
+    });
+    if (names.length === 0) {
+        return '';
+    }
+    return [
+        '<script lang="ts">',
+        ...names.map((name) => `const ${name} = undefined;`),
+        '</script>',
+        ''
+    ].join('\n');
+}
+
+function prepareOwnerClientCompileSource(source) {
+    const strippedSource = stripOwnerServerBlocks(source);
+    return stripStyleBlocks(`${createClientPlaceholderPrelude(source, strippedSource)}${strippedSource}`);
+}
+
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function resolveComponentIr({
     compPath,
     componentSource,
@@ -48,7 +103,7 @@ async function resolveComponentIr({
         compIr = timedRunCompiler(
             'component',
             compPath,
-            stripStyleBlocks(componentSource),
+            prepareOwnerClientCompileSource(componentSource),
             compilerOpts,
             { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
         );
@@ -141,7 +196,7 @@ async function resolveOwnerRewriteContext({
         ownerIr = timedRunCompiler(
             'component',
             ownerPath,
-            stripStyleBlocks(ownerSource),
+            prepareOwnerClientCompileSource(ownerSource),
             compilerOpts,
             { compilerToolchain: compilerBin, onWarning: emitCompilerWarning }
         );
