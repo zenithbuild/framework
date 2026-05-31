@@ -18,6 +18,10 @@ const INVALID_GLOBAL_MIDDLEWARE_MODULE_PATH_ERROR =
     '[Zenith:Middleware] Invalid global middleware module path in server manifest.';
 const MISSING_GLOBAL_MIDDLEWARE_RUNTIME_ERROR =
     '[Zenith:Middleware] Compiled global middleware runtime is missing from server output.';
+const MISSING_SCOPED_RUNTIME_ERROR =
+    '[Zenith:ScopedServerData] Compiled scoped server data runtime is missing from server output.';
+const MISSING_SCOPED_MODULES_ERROR =
+    '[Zenith:ScopedServerData] Compiled scoped server data modules are missing from server output.';
 
 function createSharpRuntimeSource() {
     const sharpPath = PACKAGE_REQUIRE.resolve('sharp');
@@ -66,15 +70,25 @@ function normalizeGlobalMiddlewareModulePath(modulePath) {
     return normalized;
 }
 
-async function assertPathExists(filePath) {
+async function assertPathExists(filePath, message) {
     try {
         await stat(filePath);
     } catch {
-        throw new Error(MISSING_GLOBAL_MIDDLEWARE_RUNTIME_ERROR);
+        throw new Error(message);
     }
 }
 
-export async function copyHostedPageRuntime(coreOutput, targetDir) {
+async function copyHostedScopedServerDataRuntime(coreOutput, targetDir) {
+    const serverDir = join(coreOutput, 'server');
+    const runtimeRoot = join(serverDir, 'scoped-server-data');
+    const scopedRoot = join(serverDir, 'scoped');
+    await assertPathExists(runtimeRoot, MISSING_SCOPED_RUNTIME_ERROR);
+    await assertPathExists(scopedRoot, MISSING_SCOPED_MODULES_ERROR);
+    await cp(runtimeRoot, join(targetDir, 'scoped-server-data'), { recursive: true, force: true });
+    await cp(scopedRoot, join(targetDir, 'scoped'), { recursive: true, force: true });
+}
+
+export async function copyHostedPageRuntime(coreOutput, targetDir, options = {}) {
     const serverDir = join(coreOutput, 'server');
     await mkdir(targetDir, { recursive: true });
 
@@ -97,6 +111,10 @@ export async function copyHostedPageRuntime(coreOutput, targetDir) {
         'utf8'
     );
     await writeFile(join(targetDir, 'images', 'sharp-runtime.js'), createSharpRuntimeSource(), 'utf8');
+
+    if (options.includeScopedServerData === true) {
+        await copyHostedScopedServerDataRuntime(coreOutput, targetDir);
+    }
 }
 
 export async function copyHostedGlobalMiddlewareRuntime(coreOutput, targetDir) {
@@ -109,8 +127,8 @@ export async function copyHostedGlobalMiddlewareRuntime(coreOutput, targetDir) {
     const normalizedModulePath = normalizeGlobalMiddlewareModulePath(modulePath);
     const serverDir = join(coreOutput, 'server');
     const middlewareRoot = join(serverDir, 'global-middleware');
-    await assertPathExists(middlewareRoot);
-    await assertPathExists(join(serverDir, normalizedModulePath));
+    await assertPathExists(middlewareRoot, MISSING_GLOBAL_MIDDLEWARE_RUNTIME_ERROR);
+    await assertPathExists(join(serverDir, normalizedModulePath), MISSING_GLOBAL_MIDDLEWARE_RUNTIME_ERROR);
     await cp(middlewareRoot, join(targetDir, 'global-middleware'), {
         recursive: true,
         force: true

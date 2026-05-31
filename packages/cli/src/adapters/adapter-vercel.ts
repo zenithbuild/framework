@@ -11,6 +11,8 @@ interface HostedRoute extends AdapterManifestEntry {
     page_asset_file?: string;
     image_manifest_file?: string;
     image_config?: unknown;
+    has_scoped_server_data?: boolean;
+    scoped_server_data?: unknown[];
 }
 
 interface AdapterConfig {
@@ -125,6 +127,13 @@ function createFunctionSource(route: HostedRoute, globalMiddlewareModulePath: st
     ].join('\n');
 }
 
+function hasHostedScopedServerData(route: HostedRoute) {
+    return route.route_kind !== 'resource' &&
+        route.has_scoped_server_data === true &&
+        Array.isArray(route.scoped_server_data) &&
+        route.scoped_server_data.length > 0;
+}
+
 async function loadServerManifest(coreOutput: string): Promise<HostedRoute[]> {
     try {
         const parsed = JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
@@ -174,7 +183,9 @@ export const vercelAdapter: AdapterDriver = {
         for (const route of serverRoutes) {
             const functionDir = join(options.outDir, 'functions', '__zenith', `${route.name}.func`);
             await mkdir(functionDir, { recursive: true });
-            await copyHostedPageRuntime(options.coreOutput, functionDir);
+            await copyHostedPageRuntime(options.coreOutput, functionDir, {
+                includeScopedServerData: hasHostedScopedServerData(route)
+            });
             const globalMiddlewareModulePath = await copyHostedGlobalMiddlewareRuntime(options.coreOutput, functionDir);
             await cp(
                 join(options.coreOutput, 'server', 'routes', route.name),

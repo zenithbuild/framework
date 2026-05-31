@@ -12,6 +12,8 @@ interface HostedRoute extends AdapterManifestEntry {
     page_asset_file?: string;
     image_manifest_file?: string;
     image_config?: unknown;
+    has_scoped_server_data?: boolean;
+    scoped_server_data?: unknown[];
 }
 
 interface AdapterConfig {
@@ -117,6 +119,13 @@ function createImageFunctionSource(imagesConfig: unknown) {
     ].join('\n');
 }
 
+function hasHostedScopedServerData(route: HostedRoute) {
+    return route.route_kind !== 'resource' &&
+        route.has_scoped_server_data === true &&
+        Array.isArray(route.scoped_server_data) &&
+        route.scoped_server_data.length > 0;
+}
+
 async function loadServerManifest(coreOutput: string): Promise<HostedRoute[]> {
     try {
         const parsed = JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
@@ -176,7 +185,9 @@ export const netlifyAdapter: AdapterDriver = {
         await cp(staticDir, publishDir, { recursive: true, force: true });
         await writeFile(join(functionsDir, 'package.json'), '{\n  "type": "module"\n}\n', 'utf8');
 
-        await copyHostedPageRuntime(options.coreOutput, join(functionsDir, '_zenith'));
+        await copyHostedPageRuntime(options.coreOutput, join(functionsDir, '_zenith'), {
+            includeScopedServerData: serverRoutes.some(hasHostedScopedServerData)
+        });
         const globalMiddlewareModulePath = serverRoutes.length > 0
             ? await copyHostedGlobalMiddlewareRuntime(options.coreOutput, join(functionsDir, '_zenith'))
             : null;
