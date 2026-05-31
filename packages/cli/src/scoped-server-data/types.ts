@@ -52,6 +52,22 @@ export interface ScriptBlockPartition {
 
 export type ScopedServerInstanceStrategy = 'singleton' | 'per-instance';
 
+export type ScopedServerStaticPropValue =
+    | string
+    | number
+    | boolean
+    | null
+    | ScopedServerStaticPropValue[]
+    | { [key: string]: ScopedServerStaticPropValue };
+
+export type ScopedServerStaticProps = Record<string, ScopedServerStaticPropValue>;
+
+export interface ManifestScopedServerDataInstance {
+    key: string;
+    occurrenceId: string;
+    props: ScopedServerStaticProps;
+}
+
 export interface ManifestScopedServerDataEntry {
     ownerKind: ScopedServerOwnerKind;
     ownerKey: string;
@@ -59,6 +75,8 @@ export interface ManifestScopedServerDataEntry {
     exportName: 'data';
     instanceStrategy: ScopedServerInstanceStrategy;
     serializedVariableNames?: string[];
+    props?: ScopedServerStaticProps;
+    instances?: ManifestScopedServerDataInstance[];
 }
 
 export interface AnalyzeRouteScopedServerMetadataOptions {

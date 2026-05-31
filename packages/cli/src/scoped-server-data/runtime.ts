@@ -28,8 +28,6 @@ export interface ExecuteScopedServerDataOptions {
 
 const INVALID_SCOPED_MODULE_PATH =
     '[Zenith:ScopedServerData] Invalid scoped server data module path.';
-const PER_INSTANCE_DEFERRED =
-    '[Zenith:ScopedServerData] Per-instance scoped server data execution is deferred to #99B.';
 
 export function hasExecutableScopedServerData(route: ExecuteScopedServerDataOptions['route']): boolean {
     return route?.route_kind !== 'resource' &&
@@ -62,7 +60,7 @@ export async function executeScopedServerData(
     const scoped: Record<string, Record<string, unknown>> = {};
     const entries = route.scoped_server_data || [];
     for (const entry of entries) {
-        const key = scopedPayloadKey(entry);
+        const workItems = scopedPayloadWorkItems(entry);
         const mod = await loadScopedModule(entry, options);
         const dataFn = mod?.data;
         if (typeof dataFn !== 'function') {
@@ -71,14 +69,17 @@ export async function executeScopedServerData(
             );
         }
 
-        const result = await dataFn(options.ctx, {});
-        if (isRouteResultLike(result)) {
-            throw new Error(
-                `[Zenith:ScopedServerData] Scoped server data owner "${entry.ownerKey}" must return a plain serializable object, not a route result.`
-            );
+        for (const item of workItems) {
+            const props = normalizeStaticProps(item.props, entry.ownerKey);
+            const result = await dataFn(options.ctx, props);
+            if (isRouteResultLike(result)) {
+                throw new Error(
+                    `[Zenith:ScopedServerData] Scoped server data owner "${entry.ownerKey}" must return a plain serializable object, not a route result.`
+                );
+            }
+            assertJsonSerializable(result, `${entry.ownerKey}: scoped data return`);
+            scoped[item.key] = result as Record<string, unknown>;
         }
-        assertJsonSerializable(result, `${entry.ownerKey}: scoped data return`);
-        scoped[key] = result as Record<string, unknown>;
     }
     return scoped;
 }
@@ -96,18 +97,46 @@ async function loadScopedModule(entry: ScopedEntry, options: ExecuteScopedServer
     return import(pathToFileURL(modulePath).href);
 }
 
-function scopedPayloadKey(entry: ScopedEntry): string {
+function scopedPayloadWorkItems(entry: ScopedEntry): Array<{ key: string; props: unknown }> {
     const ownerKey = String(entry?.ownerKey || '');
     if (entry?.instanceStrategy === 'per-instance') {
-        throw new Error(PER_INSTANCE_DEFERRED);
+        if (!Array.isArray(entry.instances) || entry.instances.length === 0) {
+            throw new Error(
+                `[Zenith:ScopedServerData] Per-instance scoped server data owner "${ownerKey}" is missing instance metadata.`
+            );
+        }
+        return entry.instances.map((instance) => {
+            const key = typeof instance?.key === 'string' && instance.key.length > 0
+                ? instance.key
+                : '';
+            if (!key.startsWith(`component:${ownerKey}:`)) {
+                throw new Error(
+                    `[Zenith:ScopedServerData] Invalid scoped server data instance key for "${ownerKey}".`
+                );
+            }
+            return { key, props: instance.props || {} };
+        });
     }
     if (entry?.ownerKind === 'layout') {
-        return `layout:${ownerKey}`;
+        return [{ key: `layout:${ownerKey}`, props: {} }];
     }
     if (entry?.ownerKind === 'component') {
-        return `component:${ownerKey}`;
+        return [{ key: `component:${ownerKey}`, props: entry.props || {} }];
     }
     throw new Error(`[Zenith:ScopedServerData] Unsupported scoped server data owner kind "${String(entry?.ownerKind || '')}".`);
+}
+
+function normalizeStaticProps(value: unknown, ownerKey: string): Record<string, unknown> {
+    if (value == null) {
+        return {};
+    }
+    if (!isPlainRecord(value)) {
+        throw new Error(
+            `[Zenith:ScopedServerData] Scoped server data props for "${ownerKey}" must be a plain object.`
+        );
+    }
+    assertJsonSerializable(value, `${ownerKey}: scoped data props`);
+    return value;
 }
 
 function resolveScopedServerModulePath(serverDir: string, modulePath: unknown): string {

@@ -184,6 +184,52 @@ describe('hosted scoped server runtime (#99B-1)', () => {
         expect(existsSync(join(hostedRuntimeRoot(projectRoot, target, 'plain'), 'scoped-server-data'))).toBe(false);
     });
 
+    test.each(['vercel', 'netlify'])('%s executes singleton and repeated component props', async (target) => {
+        projectRoot = await createProject(target, {
+            'src/components/Badge.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ label: props.label })',
+                '</script>',
+                '<span>{data.label}</span>'
+            ].join('\n'),
+            'src/components/Card.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ title: props.title, count: props.count })',
+                '</script>',
+                '<p>{data.title}:{data.count}</p>'
+            ].join('\n'),
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'import Badge from "../components/Badge.zen";',
+                'import Card from "../components/Card.zen";',
+                '</script>',
+                '<main>',
+                '<Badge label="hosted singleton" />',
+                '<Card title="First" count={1} />',
+                '<Card title="Second" count={2} />',
+                '</main>'
+            ].join('\n')
+        });
+
+        await cli(['build'], projectRoot);
+        const response = await executeHostedRoute(projectRoot, target, 'index');
+        expect(response.status).toBe(200);
+        const payload = extractSsrPayload(await response.text());
+        expect(payload.scoped).toEqual({
+            'component:src/components/Badge.zen': {
+                label: 'hosted singleton'
+            },
+            'component:src/components/Card.zen:o0': {
+                title: 'First',
+                count: 1
+            },
+            'component:src/components/Card.zen:o1': {
+                title: 'Second',
+                count: 2
+            }
+        });
+    });
+
     test.each(['vercel', 'netlify'])('%s short-circuits redirect and deny before scoped execution', async (target) => {
         projectRoot = await createProject(target, {
             'src/layouts/ExplodingLayout.zen': [
@@ -253,7 +299,7 @@ describe('hosted scoped server runtime (#99B-1)', () => {
         }
     });
 
-    test('per-instance scoped execution remains deferred', async () => {
+    test('per-instance scoped execution requires instance metadata', async () => {
         await expect(executeScopedServerData({
             route: {
                 route_kind: 'page',
@@ -270,7 +316,7 @@ describe('hosted scoped server runtime (#99B-1)', () => {
             },
             ctx: {},
             loadModule: async () => ({ data: async () => ({ ok: true }) })
-        })).rejects.toThrow('Per-instance scoped server data execution is deferred to #99B.');
+        })).rejects.toThrow('Per-instance scoped server data owner "src/components/Card.zen" is missing instance metadata.');
     });
 
     test('hosted copy fails loudly when scoped modules are missing', async () => {

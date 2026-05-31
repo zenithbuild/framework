@@ -237,6 +237,57 @@ describe('scoped server output packaging (#98)', () => {
         }
     });
 
+    test('component instance metadata is preserved while emitting one owner module', async () => {
+        projectRoot = await createProject({
+            'src/components/Card.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ title: props.title })',
+                '</script>',
+                '<p>{data.title}</p>'
+            ].join('\n'),
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'import Card from "../components/Card.zen";',
+                '</script>',
+                '<main>',
+                '<Card title="First" />',
+                '<Card title="Second" />',
+                '</main>'
+            ].join('\n'),
+            'zenith.config.js': baseConfig()
+        });
+
+        await cli(['build'], projectRoot);
+
+        const manifest = await readJson(join(projectRoot, '.zenith-output', 'server', 'manifest.json'));
+        const route = manifest.routes.find((entry) => entry.path === '/');
+        expect(route.scoped_server_data).toEqual([
+            expect.objectContaining({
+                ownerKind: 'component',
+                ownerKey: 'src/components/Card.zen',
+                instanceStrategy: 'per-instance',
+                module: 'scoped/src/components/Card.zen.mjs',
+                instances: [
+                    {
+                        key: 'component:src/components/Card.zen:o0',
+                        occurrenceId: 'o0',
+                        props: { title: 'First' }
+                    },
+                    {
+                        key: 'component:src/components/Card.zen:o1',
+                        occurrenceId: 'o1',
+                        props: { title: 'Second' }
+                    }
+                ]
+            })
+        ]);
+
+        const modulePath = join(projectRoot, '.zenith-output', 'server', 'scoped', 'src', 'components', 'Card.zen.mjs');
+        expect(existsSync(modulePath)).toBe(true);
+        const routeJson = await readJson(join(projectRoot, '.zenith-output', 'server', 'routes', route.name, 'route.json'));
+        expect(routeJson.scoped_server_data).toEqual(route.scoped_server_data);
+    });
+
     test('ownerKey-derived module paths are normalized under server/scoped', () => {
         expect(scopedServerModulePathForOwnerKey('src/layouts/DefaultLayout.zen')).toBe(
             'scoped/src/layouts/DefaultLayout.zen.mjs'
