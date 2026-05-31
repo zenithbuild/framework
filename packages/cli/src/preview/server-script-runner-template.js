@@ -17,11 +17,9 @@ const routeKind = process.env.ZENITH_SERVER_ROUTE_KIND || 'page';
 const guardOnly = process.env.ZENITH_SERVER_GUARD_ONLY === '1';
 const globalMiddlewareSource = process.env.ZENITH_GLOBAL_MIDDLEWARE_SOURCE || '';
 const globalMiddlewareSourcePath = process.env.ZENITH_GLOBAL_MIDDLEWARE_SOURCE_PATH || '';
+const scopedServerData = JSON.parse(process.env.ZENITH_SCOPED_SERVER_DATA || '[]'), scopedServerModuleBaseDir = process.env.ZENITH_SCOPED_SERVER_MODULE_BASE_DIR || '', scopedServerModuleSources = JSON.parse(process.env.ZENITH_SCOPED_SERVER_MODULE_SOURCES || '[]');
 
-if (!source.trim()) {
-  process.stdout.write('null');
-  process.exit(0);
-}
+if (!source.trim() && !(Array.isArray(scopedServerData) && scopedServerData.length > 0)) { process.stdout.write('null'); process.exit(0); }
 
 let cachedTypeScript = undefined;
 async function loadTypeScript() {
@@ -353,6 +351,7 @@ function configuredFrameworkUrl(specifier) {
       hasConfiguredPath: Boolean(configuredPath)
     };
   }
+  if (specifier === 'zenith:scoped-server-data-runtime') { const defaultPath = path.join(process.cwd(), 'node_modules', '@zenithbuild', 'cli', 'src', 'scoped-server-data', 'runtime.js'); const configuredPath = process.env.ZENITH_SCOPED_SERVER_RUNTIME_PATH || ''; return { url: pathToFileURL(configuredPath || defaultPath).href, fallbackUrl: pathToFileURL(defaultPath).href, hasConfiguredPath: Boolean(configuredPath) }; }
   return null;
 }
 
@@ -412,6 +411,13 @@ async function loadGlobalMiddleware() {
   return middlewareFn;
 }
 
+async function loadScopedServerRuntime() { const module = await linkEntryModule('zenith:scoped-server-data-runtime', null); await module.evaluate(); if (typeof module.namespace.executeScopedServerData !== 'function' || typeof module.namespace.mergeScopedSsrPayload !== 'function') throw new Error('[zenith-preview] scoped server data runtime unavailable'); return module.namespace; }
+async function loadScopedSourceModule(entry) { const modulePath = String(entry && entry.module || ''); const found = Array.isArray(scopedServerModuleSources) ? scopedServerModuleSources.find((item) => item && item.module === modulePath) : null; if (!found || typeof found.source !== 'string') throw new Error('[Zenith:ScopedServerData] Missing scoped server data source for "' + modulePath + '".'); const sourcePath = typeof found.sourcePath === 'string' && found.sourcePath.length > 0 ? found.sourcePath : modulePath; const identifier = sourcePath.startsWith('file:') ? sourcePath : pathToFileURL(sourcePath).href; const filename = sourcePath.toLowerCase().endsWith('.zen') ? sourcePath.replace(/\.zen$/i, '.ts') : sourcePath; const code = await transpileIfNeeded(filename, found.source); const module = new vm.SourceTextModule(code, { context, identifier, initializeImportMeta(meta) { meta.url = identifier; } }); moduleCache.set(identifier, module); await module.link(linkEntryModule); await module.evaluate(); return module.namespace; }
+function invalidScopedModulePath() { throw new Error('[Zenith:ScopedServerData] Invalid scoped server data module path.'); }
+function resolveScopedPackagedModulePath(entry) { const modulePath = String(entry && entry.module || ''); if (!modulePath || path.isAbsolute(modulePath) || /^[A-Za-z]:[\\/]/.test(modulePath)) invalidScopedModulePath(); const normalized = modulePath.replace(/\\/g, '/'); if (!normalized.startsWith('scoped/') || normalized.split('/').some((part) => part === '..' || part === '.')) invalidScopedModulePath(); const scopedRoot = path.resolve(scopedServerModuleBaseDir, 'scoped'); const candidate = path.resolve(scopedServerModuleBaseDir, normalized); if (candidate !== scopedRoot && !candidate.startsWith(scopedRoot + path.sep)) invalidScopedModulePath(); return candidate; }
+async function loadScopedPackagedModule(entry) { if (!scopedServerModuleBaseDir) throw new Error('[Zenith:ScopedServerData] Cannot execute scoped server data without a server module root.'); const module = await loadFileModule(pathToFileURL(resolveScopedPackagedModulePath(entry)).href); await module.evaluate(); return module.namespace; }
+async function executeScopedServerDataAfterRoute(resolved) { if (guardOnly || routeKind === 'resource' || !Array.isArray(scopedServerData) || scopedServerData.length === 0 || !resolved || !resolved.result || resolved.result.kind !== 'data') return resolved; const runtime = await loadScopedServerRuntime(); const scoped = await runtime.executeScopedServerData({ route: { route_kind: routeKind, prerender: false, has_scoped_server_data: true, scoped_server_data: scopedServerData }, ctx: context.ctx, loadModule: (entry) => Array.isArray(scopedServerModuleSources) && scopedServerModuleSources.length > 0 ? loadScopedSourceModule(entry) : loadScopedPackagedModule(entry) }); return { ...resolved, result: { ...resolved.result, data: runtime.mergeScopedSsrPayload(resolved.result.data, scoped) } }; }
+
 const allowed = new Set(['data', 'load', 'guard', 'action', 'ssr_data', 'props', 'ssr', 'prerender', 'exportPaths']);
 const prelude = "const params = globalThis.params;\n" +
   "const ctx = globalThis.ctx;\n" +
@@ -459,7 +465,7 @@ const exported = entryModule.namespace;
 try {
   const executeMatchedRoutePipeline = await loadMatchedRoutePipeline();
   const globalMiddleware = await loadGlobalMiddleware();
-  const resolved = await executeMatchedRoutePipeline({
+  let resolved = await executeMatchedRoutePipeline({
     exports: exported,
     ctx: context.ctx,
     filePath: sourcePath || 'server_script',
@@ -467,6 +473,7 @@ try {
     routeKind: routeKind,
     globalMiddleware
   });
+  resolved = await executeScopedServerDataAfterRoute(resolved);
 
   process.stdout.write(JSON.stringify(resolved || null));
 } catch (error) {

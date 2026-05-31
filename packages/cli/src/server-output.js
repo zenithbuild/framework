@@ -25,6 +25,10 @@ const SERVER_RUNTIME_FILES = [
         recursive: true
     },
     {
+        from: new URL('./scoped-server-data/runtime.js', import.meta.url),
+        to: 'scoped-server-data/runtime.js'
+    },
+    {
         from: new URL('./server-middleware.js', import.meta.url),
         to: 'server-middleware.js'
     },

@@ -23,6 +23,12 @@ function respondWithMiddlewareSourceError(res, error) {
     res.end(clientFacingRouteMessage(500));
 }
 
+function hasRouteScopedServerData(route) {
+    return route?.has_scoped_server_data === true &&
+        Array.isArray(route?.scoped_server_data) &&
+        route.scoped_server_data.length > 0;
+}
+
 export function createDevRequestHandler(options) {
     const {
         outDir,
@@ -333,7 +339,11 @@ export function createDevRequestHandler(options) {
 
             let ssrPayload = null;
             let routeExecution = null;
-            if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
+            if (
+                resolved.matched &&
+                resolved.route?.prerender !== true &&
+                (resolved.route?.server_script || hasRouteScopedServerData(resolved.route))
+            ) {
                 let globalMiddleware = null;
                 try {
                     globalMiddleware = loadGlobalMiddlewareForRequests
@@ -361,7 +371,13 @@ export function createDevRequestHandler(options) {
                         routeFile: resolved.route.server_script_path || '',
                         routeId: resolved.route.route_id || '',
                         globalMiddlewareSource: globalMiddleware?.source || '',
-                        globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
+                        globalMiddlewareSourcePath: globalMiddleware?.sourcePath || '',
+                        scopedServerData: Array.isArray(resolved.route.scoped_server_data)
+                            ? resolved.route.scoped_server_data
+                            : [],
+                        scopedServerModuleSources: Array.isArray(resolved.route.scoped_server_modules)
+                            ? resolved.route.scoped_server_modules
+                            : []
                     });
                 } catch (error) {
                     logServerException('dev server route execution failed', error);
