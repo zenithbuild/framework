@@ -1,13 +1,17 @@
 import { resolve } from 'node:path';
 import { collectExpandedComponentOccurrences } from '../component-occurrences.js';
-import { scanRouteScopedServerOwners } from './owner-scanner.js';
+import { scanRouteScopedServerOwners, toOwnerKey } from './owner-scanner.js';
+import { sortScopedServerDiagnostics } from './diagnostics.js';
+import { parseScopedComponentStaticProps } from './static-props.js';
 import type {
     AnalyzeRouteScopedServerMetadataOptions,
     AnalyzeRouteScopedServerMetadataResult,
     ManifestScopedServerDataEntry,
+    ManifestScopedServerDataInstance,
     ScopedServerDataOwner,
     ScopedServerDiagnostic,
-    ScopedServerInstanceStrategy
+    ScopedServerInstanceStrategy,
+    ScopedServerStaticProps
 } from './types.js';
 
 export type {
@@ -33,18 +37,25 @@ export function analyzeRouteScopedServerMetadata(
         compilerOpts
     });
 
-    const occurrenceCountByPath = buildOccurrenceCountByPath(
-        collectExpandedComponentOccurrences(pageSource, registry, pageFile)
-    );
+    const componentOccurrences = collectExpandedComponentOccurrences(pageSource, registry, pageFile);
+    const occurrenceCountByPath = buildOccurrenceCountByPath(componentOccurrences);
+    const occurrenceDetails = buildScopedComponentOccurrenceDetails({
+        componentOccurrences,
+        owners: scanResult.owners,
+        srcDir
+    });
 
     const scopedServerData = scanResult.owners.map((owner) =>
-        toManifestScopedServerDataEntry(owner, occurrenceCountByPath)
+        toManifestScopedServerDataEntry(owner, occurrenceCountByPath, occurrenceDetails.byOwnerKey)
     );
 
     return {
         hasScopedServerData: scopedServerData.length > 0,
         scopedServerData,
-        diagnostics: scanResult.diagnostics
+        diagnostics: sortScopedServerDiagnostics([
+            ...scanResult.diagnostics,
+            ...occurrenceDetails.diagnostics
+        ])
     };
 }
 
@@ -65,21 +76,98 @@ export function assertNoScopedServerBuildErrors(
 
 function toManifestScopedServerDataEntry(
     owner: ScopedServerDataOwner,
-    occurrenceCountByPath: Map<string, number>
+    occurrenceCountByPath: Map<string, number>,
+    occurrenceDetailsByOwnerKey: Map<string, ScopedComponentOccurrenceDetails[]>
 ): ManifestScopedServerDataEntry {
+    const instanceStrategy = resolveInstanceStrategy(owner, occurrenceCountByPath);
     const entry: ManifestScopedServerDataEntry = {
         ownerKind: owner.ownerKind,
         ownerKey: owner.ownerKey,
         syntax: owner.syntax,
         exportName: owner.exportName,
-        instanceStrategy: resolveInstanceStrategy(owner, occurrenceCountByPath)
+        instanceStrategy
     };
 
     if (owner.syntax === 'variables' && owner.serializedVariableNames.length > 0) {
         entry.serializedVariableNames = [...owner.serializedVariableNames];
     }
 
+    if (owner.ownerKind === 'component') {
+        const occurrences = occurrenceDetailsByOwnerKey.get(owner.ownerKey) || [];
+        if (instanceStrategy === 'per-instance') {
+            entry.instances = occurrences.map(({ key, occurrenceId, props }) => ({
+                key,
+                occurrenceId,
+                props
+            }));
+        } else if (occurrences.length === 1 && Object.keys(occurrences[0].props).length > 0) {
+            entry.props = occurrences[0].props;
+        }
+    }
+
     return entry;
+}
+
+interface ScopedComponentOccurrenceDetails {
+    key: string;
+    occurrenceId: string;
+    props: ScopedServerStaticProps;
+}
+
+function buildScopedComponentOccurrenceDetails({
+    componentOccurrences,
+    owners,
+    srcDir
+}: {
+    componentOccurrences: Array<{ attrs: string; ownerPath: string; componentPath: string }>;
+    owners: ScopedServerDataOwner[];
+    srcDir: string;
+}): {
+    byOwnerKey: Map<string, ScopedComponentOccurrenceDetails[]>;
+    diagnostics: ScopedServerDiagnostic[];
+} {
+    const componentOwnerByKey = new Map<string, ScopedServerDataOwner>();
+    for (const owner of owners) {
+        if (owner.ownerKind === 'component') {
+            componentOwnerByKey.set(owner.ownerKey, owner);
+        }
+    }
+
+    const byOwnerKey = new Map<string, ScopedComponentOccurrenceDetails[]>();
+    const occurrenceCountByOwnerKey = new Map<string, number>();
+    const diagnostics: ScopedServerDiagnostic[] = [];
+
+    for (const occurrence of componentOccurrences) {
+        if (typeof occurrence.componentPath !== 'string' || occurrence.componentPath.length === 0) {
+            continue;
+        }
+        const ownerKey = toOwnerKey(occurrence.componentPath, srcDir);
+        if (!componentOwnerByKey.has(ownerKey)) {
+            continue;
+        }
+
+        const index = occurrenceCountByOwnerKey.get(ownerKey) || 0;
+        occurrenceCountByOwnerKey.set(ownerKey, index + 1);
+        const occurrenceId = `o${index}`;
+        const parsed = parseScopedComponentStaticProps({
+            attrs: occurrence.attrs,
+            ownerKey,
+            contextFile: occurrence.ownerPath || occurrence.componentPath,
+            occurrenceId
+        });
+        diagnostics.push(...parsed.diagnostics);
+
+        if (!byOwnerKey.has(ownerKey)) {
+            byOwnerKey.set(ownerKey, []);
+        }
+        byOwnerKey.get(ownerKey)?.push({
+            key: `component:${ownerKey}:${occurrenceId}`,
+            occurrenceId,
+            props: parsed.props
+        });
+    }
+
+    return { byOwnerKey, diagnostics };
 }
 
 function resolveInstanceStrategy(

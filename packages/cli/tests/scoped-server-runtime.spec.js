@@ -163,6 +163,55 @@ describe('scoped server runtime (#99A)', () => {
         }
     });
 
+    test('node, dev, and preview execute singleton and repeated component props', async () => {
+        project = await createProject({
+            'src/components/Badge.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ label: props.label })',
+                '</script>',
+                '<span>{data.label}</span>'
+            ].join('\n'),
+            'src/components/Card.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ title: props.title, count: props.count })',
+                '</script>',
+                '<p>{data.title}:{data.count}</p>'
+            ].join('\n'),
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'import Badge from "../components/Badge.zen";',
+                'import Card from "../components/Card.zen";',
+                '</script>',
+                '<main>',
+                '<Badge label="singleton" />',
+                '<Card title="First" count={1} />',
+                '<Card title="Second" count={2} />',
+                '</main>'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node", router: true };\n'
+        });
+        targets = await startTargets(project);
+
+        for (const target of targets) {
+            const response = await fetchText(target.origin, '/');
+            expect(response.status).toBe(200);
+            const payload = payloadFromHtml(response.body);
+            expect(payload.scoped).toEqual({
+                'component:src/components/Badge.zen': {
+                    label: 'singleton'
+                },
+                'component:src/components/Card.zen:o0': {
+                    title: 'First',
+                    count: 1
+                },
+                'component:src/components/Card.zen:o1': {
+                    title: 'Second',
+                    count: 2
+                }
+            });
+        }
+    });
+
     test('scoped owner failures are fatal and do not expose partial payloads', async () => {
         project = await createProject({
             'src/layouts/ExplodingLayout.zen': [
@@ -258,7 +307,7 @@ describe('scoped server runtime (#99A)', () => {
         }
     });
 
-    test('per-instance scoped execution is deferred to #99B', async () => {
+    test('per-instance scoped execution requires instance metadata', async () => {
         await expect(executeScopedServerData({
             route: {
                 route_kind: 'page',
@@ -275,6 +324,6 @@ describe('scoped server runtime (#99A)', () => {
             },
             ctx: {},
             loadModule: async () => ({ data: async () => ({ ok: true }) })
-        })).rejects.toThrow('Per-instance scoped server data execution is deferred to #99B.');
+        })).rejects.toThrow('Per-instance scoped server data owner "src/components/Card.zen" is missing instance metadata.');
     });
 });

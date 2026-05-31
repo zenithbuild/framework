@@ -190,6 +190,83 @@ describe('scoped server manifest + classification (#97)', () => {
         });
     });
 
+    test('component scoped metadata includes singleton props and deterministic per-instance props', async () => {
+        project = await makeProject({
+            'components/Badge.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ label: props.label })',
+                '</script>',
+                '<span>{data.label}</span>'
+            ].join('\n'),
+            'components/Card.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ title: props.title, featured: props.featured })',
+                '</script>',
+                '<article>{data.title}</article>'
+            ].join('\n'),
+            'pages/index.zen': [
+                '<script lang="ts">',
+                'import Badge from "../components/Badge.zen";',
+                'import Card from "../components/Card.zen";',
+                '</script>',
+                '<Badge label="Solo" />',
+                '<Card title="First" featured />',
+                '<Card title="Second" featured={false} />'
+            ].join('\n')
+        });
+
+        const manifest = await generateManifest(project.pagesDir);
+        const route = manifest[0];
+        const badge = route.scoped_server_data.find((entry) => entry.ownerKey === 'src/components/Badge.zen');
+        const card = route.scoped_server_data.find((entry) => entry.ownerKey === 'src/components/Card.zen');
+
+        expect(badge).toEqual(expect.objectContaining({
+            ownerKind: 'component',
+            instanceStrategy: 'singleton',
+            props: { label: 'Solo' }
+        }));
+        expect(badge.instances).toBeUndefined();
+        expect(card).toEqual(expect.objectContaining({
+            ownerKind: 'component',
+            instanceStrategy: 'per-instance',
+            instances: [
+                {
+                    key: 'component:src/components/Card.zen:o0',
+                    occurrenceId: 'o0',
+                    props: { title: 'First', featured: true }
+                },
+                {
+                    key: 'component:src/components/Card.zen:o1',
+                    occurrenceId: 'o1',
+                    props: { title: 'Second', featured: false }
+                }
+            ]
+        }));
+        expect(card.props).toBeUndefined();
+    });
+
+    test('dynamic scoped component props fail before output with CSV013', async () => {
+        project = await makeProject({
+            'components/Card.zen': [
+                '<script server lang="ts">',
+                'export const data = async (ctx, props) => ({ title: props.title })',
+                '</script>',
+                '<article>{data.title}</article>'
+            ].join('\n'),
+            'pages/index.zen': [
+                '<script lang="ts">',
+                'import Card from "../components/Card.zen";',
+                'const title = "Runtime";',
+                '</script>',
+                '<Card title={title} />'
+            ].join('\n')
+        });
+
+        await expect(generateManifest(project.pagesDir)).rejects.toThrow(
+            /CSV013 Unsupported scoped component prop expression/
+        );
+    });
+
     test('prerender=true with layout scoped values throws CSV012', async () => {
         project = await makeProject({
             'layouts/DefaultLayout.zen': layoutWithLevel1Vars(),
