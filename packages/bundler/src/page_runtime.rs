@@ -8,13 +8,27 @@ function __zrd(staticValue) {{
   }}
   return staticValue;
 }}
+function __zro(value) {{
+  return value && typeof value === 'object' && !Array.isArray(value);
+}}
+function __zsr(value) {{
+  if (__zro(value) && __zro(value.route) && __zro(value.scoped)) {{
+    return value.route;
+  }}
+  return __zro(value) ? value : {{}};
+}}
+function __zsd(value, key) {{
+  const scoped = __zro(value) && __zro(value.scoped) ? value.scoped : null;
+  const scopedValue = scoped && typeof key === 'string' ? scoped[key] : null;
+  return __zro(scopedValue) ? scopedValue : {{}};
+}}
 let __zenith_ssr_data = __zrd(__zss);
 let data = __zenith_ssr_data;
 let ssr_data = __zenith_ssr_data;
 function __zrr() {{
   __zenith_ssr_data = __zrd(__zss);
-  data = __zenith_ssr_data;
-  ssr_data = __zenith_ssr_data;
+  data = __zsr(__zenith_ssr_data);
+  ssr_data = data;
 }}
 "#,
         ssr_json

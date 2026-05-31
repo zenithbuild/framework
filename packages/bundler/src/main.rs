@@ -512,6 +512,8 @@ fn run() -> Result<(), String> {
             input.ir.has_load,
             input.ir.guard_module_ref.clone(),
             input.ir.load_module_ref.clone(),
+            input.ir.has_scoped_server_data,
+            input.ir.scoped_server_data.clone(),
         ));
     }
 
@@ -648,6 +650,8 @@ fn run() -> Result<(), String> {
             has_load,
             guard_module_ref,
             load_module_ref,
+            has_scoped_server_data,
+            scoped_server_data,
         ) in &page_assets
         {
             let output = format!(
@@ -671,6 +675,8 @@ fn run() -> Result<(), String> {
                 has_load: *has_load,
                 guard_module_ref: guard_module_ref.clone(),
                 load_module_ref: load_module_ref.clone(),
+                has_scoped_server_data: *has_scoped_server_data,
+                scoped_server_data: scoped_server_data.clone(),
             });
         }
         router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
@@ -698,6 +704,8 @@ fn run() -> Result<(), String> {
         _has_load,
         _guard_module_ref,
         _load_module_ref,
+        _has_scoped_server_data,
+        _scoped_server_data,
     ) in page_assets
     {
         if output_mode.is_dev_stable()

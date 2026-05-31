@@ -180,6 +180,7 @@ fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
                 },
                 snippet: Some("count ? \"on\" : \"off\"".to_string()),
             }),
+            scoped_data_key: None,
         },
         CompilerExpressionBinding {
             marker_index: 1,
@@ -191,6 +192,7 @@ fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
             literal: Some("props.href".to_string()),
             compiled_expr: None,
             source: None,
+            scoped_data_key: None,
         },
     ];
 
@@ -211,6 +213,34 @@ fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
 }
 
 #[test]
+fn scoped_expression_bindings_wrap_ssr_data_with_scoped_slice() {
+    let bindings = vec![CompilerExpressionBinding {
+        marker_index: 0,
+        signal_index: None,
+        signal_indices: Vec::new(),
+        state_index: None,
+        component_instance: None,
+        component_binding: None,
+        literal: Some("data.title".to_string()),
+        compiled_expr: Some("data.title".to_string()),
+        source: None,
+        scoped_data_key: Some("component:src/components/Card.zen:o0".to_string()),
+    }];
+
+    let (js, runtime_bindings) =
+        build_expression_fns_and_bindings(&bindings).expect("scoped expression fns should emit");
+
+    assert!(js.contains("__zsd(__ctx.ssrData"));
+    assert!(js.contains("component:src/components/Card.zen:o0"));
+    assert_eq!(runtime_bindings[0]["fn_index"], serde_json::json!(0));
+    assert_eq!(
+        runtime_bindings[0]["scoped_data_key"],
+        serde_json::json!("component:src/components/Card.zen:o0")
+    );
+    assert_module_parses(&js);
+}
+
+#[test]
 fn compiled_expression_functions_parse_without_escape_cleanup() {
     let bindings = vec![CompilerExpressionBinding {
         marker_index: 0,
@@ -225,6 +255,7 @@ fn compiled_expression_functions_parse_without_escape_cleanup() {
                 .to_string(),
         ),
         source: None,
+        scoped_data_key: None,
     }];
 
     let (js, runtime_bindings) =
@@ -250,6 +281,7 @@ fn invalid_compiled_expression_functions_fail_hard() {
         literal: None,
         compiled_expr: Some("props.note +".to_string()),
         source: None,
+        scoped_data_key: None,
     }];
 
     let err = build_expression_fns_and_bindings(&bindings)
@@ -288,6 +320,8 @@ fn derive_binding_tables_supports_comment_text_markers() {
         has_load: false,
         guard_module_ref: None,
         load_module_ref: None,
+        has_scoped_server_data: false,
+        scoped_server_data: Vec::new(),
     };
 
     let (markers, events) = derive_binding_tables(&ir).expect("derive bindings");

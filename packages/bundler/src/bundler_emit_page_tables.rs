@@ -198,7 +198,7 @@ fn is_default_expression_row_value(index: usize, value: &serde_json::Value) -> b
         return matches!(value, serde_json::Value::Array(items) if items.is_empty());
     }
 
-    matches!(index, 1 | 2 | 3 | 5 | 6 | 7 | 8) && value.is_null()
+    matches!(index, 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9) && value.is_null()
 }
 
 fn marker_kind_code(kind: &MarkerKind) -> u8 {
@@ -259,6 +259,11 @@ pub(crate) fn render_compacted_page_payload_tables_js(
                 .unwrap_or(serde_json::Value::Null),
             binding
                 .component_binding
+                .as_ref()
+                .map(|value| serde_json::json!(value))
+                .unwrap_or(serde_json::Value::Null),
+            binding
+                .scoped_data_key
                 .as_ref()
                 .map(|value| serde_json::json!(value))
                 .unwrap_or(serde_json::Value::Null),
@@ -350,6 +355,7 @@ pub(crate) fn render_compacted_page_payload_tables_js(
     js.push_str("    state_index: tuple.length > 3 ? tuple[3] : null,\n");
     js.push_str("    component_instance: tuple.length > 7 ? tuple[7] : null,\n");
     js.push_str("    component_binding: tuple.length > 8 ? tuple[8] : null,\n");
+    js.push_str("    scoped_data_key: tuple.length > 9 ? tuple[9] : null,\n");
     js.push_str("    literal: tuple.length > 1 ? tuple[1] : null,\n");
     js.push_str("    source: __zis(tuple.length > 2 ? tuple[2] : null)\n");
     js.push_str("  };\n");

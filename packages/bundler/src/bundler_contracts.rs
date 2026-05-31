@@ -102,6 +102,16 @@ pub(crate) fn validate_payload(
                 ));
             }
         }
+        if binding
+            .scoped_data_key
+            .as_ref()
+            .map(|value| value.trim().is_empty())
+            .unwrap_or(false)
+        {
+            return Err(format!(
+                "input.ir.expression_bindings[{position}].scoped_data_key must be non-empty"
+            ));
+        }
     }
     for (hoist_id, script) in &payload.ir.components_scripts {
         if hoist_id.trim().is_empty() {

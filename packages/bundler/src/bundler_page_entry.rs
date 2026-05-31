@@ -83,6 +83,7 @@ pub(crate) fn generate_entry_js(
                 literal: Some(value.clone()),
                 compiled_expr: None,
                 source: None,
+                scoped_data_key: None,
             })
             .collect()
     } else {
@@ -324,12 +325,16 @@ fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, S
 pub(crate) fn build_expression_fns_and_bindings(
     bindings: &[CompilerExpressionBinding],
 ) -> Result<(String, Vec<serde_json::Value>), String> {
-    let mut expr_fns = Vec::new();
+    let mut expr_fns = Vec::<(String, Option<String>)>::new();
     let mut fn_index_by_binding = std::collections::BTreeMap::new();
     for (i, b) in bindings.iter().enumerate() {
-        if let Some(ref expr) = b.compiled_expr {
+        let expression = b
+            .compiled_expr
+            .as_ref()
+            .or_else(|| b.literal.as_ref().filter(|literal| expression_reads_ssr_data(literal)));
+        if let Some(expr) = expression {
             let fn_idx = expr_fns.len();
-            expr_fns.push(expr.clone());
+            expr_fns.push((expr.clone(), b.scoped_data_key.clone()));
             fn_index_by_binding.insert(i, fn_idx);
         }
     }
@@ -338,7 +343,10 @@ pub(crate) fn build_expression_fns_and_bindings(
     } else {
         let fn_defs: Vec<String> = expr_fns
             .iter()
-            .map(|expression| zenith_bundler::utils::emit_runtime_expression_function(expression))
+            .map(|(expression, scoped_data_key)| {
+                let emitted = zenith_bundler::utils::emit_runtime_expression_function(expression)?;
+                wrap_runtime_expression_function(&emitted, scoped_data_key.as_deref())
+            })
             .collect::<Result<Vec<_>, _>>()?;
         format!(
             "const __zenith_expr_fns = [\n  {}\n];\n",
@@ -357,7 +365,8 @@ pub(crate) fn build_expression_fns_and_bindings(
                 "component_instance": b.component_instance,
                 "component_binding": b.component_binding,
                 "literal": b.literal,
-                "source": b.source
+                "source": b.source,
+                "scoped_data_key": b.scoped_data_key
             });
             if let Some(&fi) = fn_index_by_binding.get(&i) {
                 obj["fn_index"] = serde_json::json!(fi);
@@ -366,4 +375,28 @@ pub(crate) fn build_expression_fns_and_bindings(
         })
         .collect();
     Ok((js, runtime_bindings))
+}
+
+fn expression_reads_ssr_data(expression: &str) -> bool {
+    Regex::new(r"\b(?:data|ssr|ssrData)\b")
+        .map(|re| re.is_match(expression))
+        .unwrap_or(false)
+}
+
+fn wrap_runtime_expression_function(
+    emitted_function: &str,
+    scoped_data_key: Option<&str>,
+) -> Result<String, String> {
+    let target = if let Some(key) = scoped_data_key.filter(|value| !value.is_empty()) {
+        format!(
+            "{{...__ctx, ssrData: __zsd(__ctx.ssrData, {})}}",
+            serde_json::to_string(key)
+                .map_err(|error| format!("failed to serialize scoped data key: {error}"))?
+        )
+    } else {
+        "{...__ctx, ssrData: __zsr(__ctx.ssrData)}".to_string()
+    };
+    Ok(format!(
+        "(function(__zfn){{return function(__ctx){{return __zfn({target});}};}})({emitted_function})"
+    ))
 }

@@ -465,6 +465,7 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                     binding.state_index = resolved.state_index;
                     binding.component_instance = resolved.component_instance;
                     binding.component_binding = resolved.component_binding;
+                    binding.scoped_data_key = resolved.scoped_data_key;
                 }
             }
             exprCursor = found + 1;
