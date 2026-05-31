@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { materializeImageMarkup } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
@@ -43,6 +43,46 @@ function respondWithMiddlewareSourceError(res, error) {
   res.end(clientFacingRouteMessage(500));
 }
 
+function hasRouteScopedServerData(route) {
+  return route?.has_scoped_server_data === true &&
+    Array.isArray(route?.scoped_server_data) &&
+    route.scoped_server_data.length > 0;
+}
+
+async function loadPreviewScopedServerRoutes(serverModuleBaseDir) {
+  try {
+    const parsed = JSON.parse(await readFile(join(serverModuleBaseDir, 'manifest.json'), 'utf8'));
+    return Array.isArray(parsed?.routes) ? parsed.routes : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergePreviewScopedServerRoutes(routeState, serverRoutes) {
+  const scopedByPath = new Map(
+    (Array.isArray(serverRoutes) ? serverRoutes : [])
+      .filter((route) => hasRouteScopedServerData(route))
+      .map((route) => [route.path, route])
+  );
+  if (scopedByPath.size === 0) {
+    return routeState;
+  }
+  return {
+    ...routeState,
+    pageRoutes: (Array.isArray(routeState.pageRoutes) ? routeState.pageRoutes : []).map((route) => {
+      const scoped = scopedByPath.get(route.path);
+      if (!scoped) {
+        return route;
+      }
+      return {
+        ...route,
+        has_scoped_server_data: true,
+        scoped_server_data: scoped.scoped_server_data
+      };
+    })
+  };
+}
+
 export function createPreviewRequestHandler(options) {
   const {
     distDir,
@@ -72,7 +112,12 @@ export function createPreviewRequestHandler(options) {
 
   return async function previewRequestHandler(req, res) {
     const url = new URL(req.url, serverOrigin());
-    const { basePath, pageRoutes, resourceRoutes } = await loadRouteSurfaceState(distDir, configuredBasePath);
+    const serverModuleBaseDir = join(dirname(distDir), 'server');
+    const routeState = mergePreviewScopedServerRoutes(
+      await loadRouteSurfaceState(distDir, configuredBasePath),
+      await loadPreviewScopedServerRoutes(serverModuleBaseDir)
+    );
+    const { basePath, pageRoutes, resourceRoutes } = routeState;
     const canonicalPath = stripBasePath(url.pathname, basePath);
 
     try {
@@ -267,7 +312,11 @@ export function createPreviewRequestHandler(options) {
 
       let ssrPayload = null;
       let routeExecution = null;
-      if (resolved.matched && resolved.route?.server_script && resolved.route.prerender !== true) {
+      if (
+        resolved.matched &&
+        resolved.route?.prerender !== true &&
+        (resolved.route?.server_script || hasRouteScopedServerData(resolved.route))
+      ) {
         let globalMiddleware = null;
         try {
           globalMiddleware = await loadGlobalMiddlewareForRoute();
@@ -293,7 +342,11 @@ export function createPreviewRequestHandler(options) {
             routeFile: resolved.route.server_script_path || '',
             routeId: resolved.route.route_id || routeIdFromSourcePath(resolved.route.server_script_path || ''),
             globalMiddlewareSource: globalMiddleware?.source || '',
-            globalMiddlewareSourcePath: globalMiddleware?.sourcePath || ''
+            globalMiddlewareSourcePath: globalMiddleware?.sourcePath || '',
+            scopedServerData: Array.isArray(resolved.route.scoped_server_data)
+              ? resolved.route.scoped_server_data
+              : [],
+            scopedServerModuleBaseDir: serverModuleBaseDir
           });
         } catch (error) {
           logServerException('preview server route execution failed', error);

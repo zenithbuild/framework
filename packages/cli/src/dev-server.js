@@ -12,11 +12,15 @@
 // ---------------------------------------------------------------------------
 
 import { createServer } from 'node:http';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { normalizeBasePath } from './base-path.js';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { createDevBuildSession } from './dev-build-session.js';
+import { generateManifest } from './manifest.js';
+import { buildComponentRegistry } from './resolve-components.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { createSilentLogger } from './ui/logger.js';
 import { createTrustedOriginResolver, publicHost } from './request-origin.js';
@@ -35,6 +39,9 @@ import { createDevRequestHandler } from './dev-server/request-handler.js';
 import { createDevWatcher } from './dev-server/watcher.js';
 import { listenWithPortFallback } from './dev-server/port-fallback.js';
 import { loadDevGlobalMiddlewareSource } from './global-middleware-runtime-source.js';
+
+const SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Server-output lowering helper is unavailable. Run the CLI build step before packaging scoped server data modules.';
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -56,6 +63,26 @@ const IMAGE_RUNTIME_TAG_RE = new RegExp(
 );
 const EVENT_STREAM_MIME = ['text', 'event-stream'].join('/');
 const LEGACY_DEV_STREAM_PATH = ['/__zenith', '_hmr'].join('');
+let scopedServerDataLoweringPromise = null;
+
+function resolveScopedServerDataLoweringPath() {
+    const moduleDir = dirname(fileURLToPath(import.meta.url));
+    return [
+        join(moduleDir, 'scoped-server-data', 'lowering.js'),
+        join(moduleDir, '..', 'dist', 'scoped-server-data', 'lowering.js')
+    ].find((candidate) => existsSync(candidate)) || null;
+}
+
+async function getScopedServerDataLowering() {
+    const helperPath = resolveScopedServerDataLoweringPath();
+    if (!helperPath) {
+        throw new Error(SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE);
+    }
+    if (!scopedServerDataLoweringPromise) {
+        scopedServerDataLoweringPromise = import(pathToFileURL(helperPath).href);
+    }
+    return scopedServerDataLoweringPromise;
+}
 
 function appendSetCookieHeaders(headers, setCookies = []) {
     if (Array.isArray(setCookies) && setCookies.length > 0) {
@@ -90,6 +117,7 @@ export async function createDevServer(options) {
     const resolvedTarget = resolveBuildAdapter(config).target;
     const routeCheckEnabled = supportsTargetRouteCheck(resolvedTarget);
     const isStaticExportTarget = resolvedTarget === 'static-export';
+    const compilerOpts = { typescriptDefault: config.typescriptDefault === true, experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true, strictDomLints: config.strictDomLints === true };
 
     const resolvedPagesDir = resolve(pagesDir);
     const resolvedOutDir = resolve(outDir);
@@ -218,8 +246,9 @@ export async function createDevServer(options) {
                 (Array.isArray(routeState.pageRoutes) && routeState.pageRoutes.length > 0) ||
                 (Array.isArray(routeState.resourceRoutes) && routeState.resourceRoutes.length > 0)
             ) {
-                state.currentRouteState = routeState;
-                return routeState;
+                const mergedRouteState = await _mergeDevScopedServerData(routeState);
+                state.currentRouteState = mergedRouteState;
+                return mergedRouteState;
             }
         } catch (error) {
             if (
@@ -230,6 +259,65 @@ export async function createDevServer(options) {
             }
         }
         return state.currentRouteState;
+    }
+
+    async function _mergeDevScopedServerData(routeState) {
+        const scopedByPath = await _loadDevScopedServerDataByPath();
+        if (scopedByPath.size === 0) {
+            return routeState;
+        }
+        return {
+            ...routeState,
+            pageRoutes: (Array.isArray(routeState.pageRoutes) ? routeState.pageRoutes : []).map((route) => {
+                const scoped = scopedByPath.get(route.path);
+                return scoped ? { ...route, ...scoped } : route;
+            })
+        };
+    }
+
+    async function _loadDevScopedServerDataByPath() {
+        const srcDir = resolve(resolvedPagesDir, '..');
+        const registry = buildComponentRegistry(srcDir);
+        const manifest = await generateManifest(resolvedPagesDir, '.zen', {
+            srcDir,
+            registry,
+            compilerOpts
+        });
+        const pageEntries = manifest.filter((entry) =>
+            entry?.route_kind !== 'resource' &&
+            entry?.has_scoped_server_data === true &&
+            Array.isArray(entry?.scoped_server_data) &&
+            entry.scoped_server_data.length > 0
+        );
+        const scopedByPath = new Map();
+        if (pageEntries.length === 0) {
+            return scopedByPath;
+        }
+
+        const lowering = await getScopedServerDataLowering();
+        for (const entry of pageEntries) {
+            const pageFile = resolve(resolvedPagesDir, entry.file);
+            const pageSource = await readFile(pageFile, 'utf8');
+            const lowered = lowering.lowerRouteScopedServerData({
+                pageSource,
+                pageFile,
+                registry,
+                srcDir,
+                projectRoot,
+                compilerOpts,
+                scopedServerData: entry.scoped_server_data
+            });
+            scopedByPath.set(entry.path, {
+                has_scoped_server_data: true,
+                scoped_server_data: lowered.scopedServerData,
+                scoped_server_modules: lowered.modules.map((module) => ({
+                    module: module.module,
+                    source: module.source,
+                    sourcePath: module.sourcePath
+                }))
+            });
+        }
+        return scopedByPath;
     }
 
     async function _loadGlobalMiddlewareForRequests() {
@@ -271,7 +359,7 @@ export async function createDevServer(options) {
             logger.build('Initial build (id=0)', { onceKey: 'dev-initial-build' });
             const initialBuild = await buildSession.build();
             const cssReady = await _syncCssStateFromBuild(initialBuild, state.buildId);
-            state.currentRouteState = await loadRouteSurfaceState(outDir, configuredBasePath);
+            state.currentRouteState = await _mergeDevScopedServerData(await loadRouteSurfaceState(outDir, configuredBasePath));
             state.buildStatus = 'ok';
             state.buildError = null;
             state.lastBuildMs = Date.now();

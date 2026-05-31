@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { attachRouteAuth } from '../auth/route-auth.js';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
@@ -12,6 +13,24 @@ import { executeMatchedRoutePipeline } from '../server-contract/resolve.js';
 const MODULE_CACHE = new Map();
 const GLOBAL_MIDDLEWARE_MODULE_CACHE = new Map();
 const INTERNAL_QUERY_PREFIX = '__zenith_param_';
+const SCOPED_ROUTE_FIELD = ['scoped', 'server', 'data'].join('_');
+const HAS_SCOPED_ROUTE_FIELD = ['has', SCOPED_ROUTE_FIELD].join('_');
+let SCOPED_SERVER_DATA_RUNTIME_PROMISE = null;
+
+function hasRouteScopedServerData(route) {
+    return route?.route_kind !== 'resource' &&
+        route?.prerender !== true &&
+        route?.[HAS_SCOPED_ROUTE_FIELD] === true &&
+        Array.isArray(route?.[SCOPED_ROUTE_FIELD]) &&
+        route[SCOPED_ROUTE_FIELD].length > 0;
+}
+
+async function loadScopedServerDataRuntime() {
+    if (!SCOPED_SERVER_DATA_RUNTIME_PROMISE) {
+        SCOPED_SERVER_DATA_RUNTIME_PROMISE = import('../scoped-server-data/runtime.js');
+    }
+    return SCOPED_SERVER_DATA_RUNTIME_PROMISE;
+}
 
 function parseCookies(rawCookieHeader) {
     const out = Object.create(null);
@@ -236,7 +255,7 @@ function createRouteContext({ request, route, params, publicUrl, guardOnly = fal
  *   globalMiddlewareModulePath?: string | null,
  *   guardOnly?: boolean
  * }} options
- * @returns {Promise<{ publicUrl: URL, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
+ * @returns {Promise<{ publicUrl: URL, ctx: object, result: { kind: string, [key: string]: unknown }, trace: { guard: string, action: string, load: string }, status?: number, setCookies?: string[] }>}
  */
 export async function executeRouteRequest(options) {
     const {
@@ -263,6 +282,7 @@ export async function executeRouteRequest(options) {
 
     return {
         publicUrl,
+        ctx,
         result: resolved.result,
         trace: resolved.trace,
         status: resolved.status,
@@ -279,7 +299,8 @@ export async function executeRouteRequest(options) {
  *   globalMiddlewareModulePath?: string | null,
  *   shellHtmlPath: string,
  *   imageManifestPath?: string | null,
- *   imageConfig?: Record<string, unknown>
+ *   imageConfig?: Record<string, unknown>,
+ *   scopedModuleBaseDir?: string | null
  * }} options
  * @returns {Promise<Response>}
  */
@@ -292,12 +313,13 @@ export async function renderRouteRequest(options) {
         globalMiddlewareModulePath = null,
         shellHtmlPath,
         imageManifestPath = null,
-        imageConfig = {}
+        imageConfig = {},
+        scopedModuleBaseDir = null
     } = options;
 
     try {
         const {
-            publicUrl,
+            ctx,
             result,
             status,
             setCookies = []
@@ -329,6 +351,16 @@ export async function renderRouteRequest(options) {
         const ssrPayload = result.kind === 'data' && result.data && typeof result.data === 'object' && !Array.isArray(result.data)
             ? result.data
             : {};
+        let finalSsrPayload = ssrPayload;
+        if (hasRouteScopedServerData(route)) {
+            const scopedRuntime = await loadScopedServerDataRuntime();
+            const scopedPayload = await scopedRuntime.executeScopedServerData({
+                route,
+                ctx,
+                serverDir: scopedModuleBaseDir || dirname(dirname(dirname(dirname(routeModulePath))))
+            });
+            finalSsrPayload = scopedRuntime.mergeScopedSsrPayload(ssrPayload, scopedPayload);
+        }
 
         const localImages = await loadImageManifest(imageManifestPath);
         const imagePayload = createImageRuntimePayload(
@@ -346,7 +378,7 @@ export async function renderRouteRequest(options) {
                 ? route.image_materialization
                 : []
         });
-        html = injectSsrPayload(html, ssrPayload);
+        html = injectSsrPayload(html, finalSsrPayload);
         html = injectImageRuntimePayload(html, imagePayload);
 
         const headers = new Headers({
