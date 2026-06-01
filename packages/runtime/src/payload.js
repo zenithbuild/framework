@@ -182,6 +182,14 @@ export function _validatePayload(payload) {
     };
 }
 
+export function readSsrPayload(raw) {
+    const root = _ir(raw) ? raw : {};
+    return {
+        route: root,
+        scoped: _ir(root.scoped) ? root.scoped : {}
+    };
+}
+
 function _assertValidSourceSpan(source, contextLabel) {
     if (source === undefined || source === null) {
         return;
