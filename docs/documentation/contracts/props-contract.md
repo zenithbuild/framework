@@ -16,9 +16,11 @@ Contract: props are serialized by compiler and passed through bundler/runtime wi
 Banned:
 - Runtime prop inference from DOM.
 - Implicit prop reactivity conversion.
+- Runtime evaluation of dynamic props for Component Server Values.
 
 Definition of Done:
 - Compiler owns props serialization.
 - Runtime consumes props as explicit factory inputs only.
+- Scoped component server data accepts only static literal props in v1; dynamic expressions, spreads, functions, event handlers, and member expressions fail before output.
 
 Canonical source: `packages/compiler/PROPS_CONTRACT.md`.

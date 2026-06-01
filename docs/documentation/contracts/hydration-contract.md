@@ -13,9 +13,12 @@ tags: ["contracts", "runtime", "hydration"]
 
 Contract: hydration consumes explicit payload tables with stable index alignment.
 
+Component Server Values hydrate from serialized Scoped Server Data slices keyed by owner/runtime metadata. Missing scoped slices fail deterministically instead of falling back to empty data.
+
 Banned:
 - Runtime discovery passes.
 - Fallback behavior for broken payload contracts.
+- Client refetch or client execution of scoped server values during hydration.
 
 Definition of Done:
 - Payload validation throws on drift.

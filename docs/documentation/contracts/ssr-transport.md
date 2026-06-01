@@ -13,11 +13,12 @@ tags: ["ssr", "transport", "contracts"]
 
 Contract: SSR payload is injected inline exactly once per response using `#zenith-ssr-data`.
 
-Invariant: The payload is request-scoped and not reused across unrelated routes.
+Invariant: The payload is request-scoped and not reused across unrelated routes. Page route data remains flat-compatible, while Component Server Values add owner-local scoped slices for generated scoped bindings.
 
 Definition of Done:
 - Exactly one SSR data script exists in the HTML.
 - Payload is JSON-safe and parseable by client runtime.
+- Route expressions and scoped owner expressions resolve from their own serialized slices.
 
 Failure Modes:
 - Duplicate SSR script tags.

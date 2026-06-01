@@ -100,8 +100,41 @@ Fix:
 - Use full controlled triplet (`open` + `onOpenChange`).
 - Or use uncontrolled (`defaultOpen`) without external source-of-truth props.
 
+## 7. Treating Component Server Values Like Route Load
+
+Problem:
+
+Component and layout owners cannot export route APIs.
+
+```text
+<script server lang="ts">
+export const load = async (ctx) => ({ navigation: await getNavigation() })
+</script>
+```
+
+Fix:
+- Use a top-level server constant for local owner values.
+- Or use scoped `data(ctx, props)` for owner-local values that need `ctx` or static literal props.
+- Keep route authorization, redirects, denies, and mutations in page `guard(ctx)`, `load(ctx)`, and `action(ctx)`.
+
+## 8. Dynamic Props For Scoped Component Data
+
+Problem:
+
+Scoped component server data does not evaluate dynamic component props.
+
+```text
+<RepoStats repoId={data.repoId} />
+<RepoStats {...props} />
+```
+
+Fix:
+- Use static literal props when the component owns scoped server data.
+- Keep dynamic route-owned values in the page route payload until a later contract supports more.
+
 ## See Also
 
 - [Events](/docs/syntax/events)
 - [Bindings and Expressions](/docs/syntax/bindings-expressions)
 - [Controlled vs Uncontrolled Components](/docs/reactivity/controlled-uncontrolled-components)
+- [Component Server Values](/docs/components/component-server-values)

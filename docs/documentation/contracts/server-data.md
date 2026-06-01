@@ -17,6 +17,8 @@ Contract: Zenith has two explicit server route kinds with separate result helper
 
 Invariant: `guard(ctx)` is the route-protection gate for both route kinds. Page routes own HTML payloads. Resource routes own explicit non-HTML direct responses. Legacy payload exports may not mix with the canonical surface.
 
+Component Server Values are a separate owner-local surface for layouts and components. They may contribute serialized scoped values to a page render, but they do not change route payload ownership or add route APIs to components.
+
 Banned:
 - Exporting both `data` and `load` in one file.
 - Returning `data(...)` from `guard(ctx)`.
@@ -75,6 +77,14 @@ Resource routes return:
 Resource routes do **not** allow `data(...)`, `invalid(...)`, `prerender`, or `exportPaths`.
 Page routes do **not** allow `json(...)`, `text(...)`, `download(...)`, `stream(...)`, or `sse(...)`.
 
+### Layout And Component Owners
+
+Layouts and components allow:
+- Level 1 top-level server constants used by their own template
+- Level 2 scoped `data(ctx, props)` for owner-local values
+
+Layouts and components do **not** allow `guard(ctx)`, `load(ctx)`, `action(ctx)`, `redirect(...)`, `deny(...)`, resource helpers, arbitrary `Response`, or page-level server variable behavior. Component Server Values v1 also does not combine with `prerender = true`.
+
 ## Contract: Explicit Middleware Composition
 
 Contract: Zenith has two separate middleware surfaces: root global middleware and route-local handler composition.
@@ -102,6 +112,8 @@ Failure Modes:
 Contract: Server payload is a top-level plain object with JSON-safe values.
 
 Invariant: Non-serializable values fail with explicit diagnostics.
+
+For Component Server Values, each owner-local slice follows the same JSON-safe constraint. A scoped owner failure is fatal for the page render; Zenith does not silently omit the owner slice.
 
 Banned:
 - Circular payload objects.

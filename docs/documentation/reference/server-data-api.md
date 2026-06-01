@@ -17,6 +17,8 @@ Contract: Zenith exposes two explicit server route surfaces:
 
 Invariant: A page route uses exactly one payload source (`data` or `load`). A resource route uses `load(ctx)` for `GET` / `HEAD` and `action(ctx)` for `POST`. Both route kinds share the same `ctx`, `guard(ctx)`, auth, cookie, and request boundaries.
 
+Component Server Values are separate from route payload ownership. Layouts and components may declare owner-local server values with `<script server lang="ts">`, but they do not gain route `guard(ctx)`, `action(ctx)`, `load(ctx)`, redirect, deny, or resource response powers. See [Component Server Values](/docs/components/component-server-values).
+
 Banned:
 - Mixed payload source exports.
 - `guard(ctx)` returning `data(...)`.
@@ -38,6 +40,16 @@ Failure Modes:
 
 Evidence:
 - Server export validation tests enforce allowed combinations.
+
+## Component Server Values
+
+Component Server Values use the same server-only authoring block in layout and component owners, but they are not page `load(ctx)` and are not component loaders.
+
+Supported owner-local forms:
+- Level 1 top-level server constants used by the same owner template.
+- Level 2 `export const data = async (ctx, props) => ({ ... })` for owner-local data that needs `ctx` or static literal props.
+
+The public feature name is Component Server Values. The internal payload and manifest mechanism is Scoped Server Data.
 
 ### Page Route Results
 

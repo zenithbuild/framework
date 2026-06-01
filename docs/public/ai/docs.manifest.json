@@ -28,6 +28,13 @@
         "count": 6
       },
       {
+        "slug": "components",
+        "title": "Components",
+        "summary": "Structural component composition and usage patterns.",
+        "order": 40,
+        "count": 1
+      },
+      {
         "slug": "guides",
         "title": "Guides",
         "summary": "Task-oriented implementation walkthroughs.",
@@ -883,6 +890,33 @@
       ],
       "category_titles": [
         "Reactivity"
+      ],
+      "doc_order": 20,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "components/component-server-values",
+      "title": "Component Server Values",
+      "status": "canonical",
+      "tags": [
+        "components",
+        "server",
+        "data",
+        "hydration"
+      ],
+      "source_path": "documentation/components/component-server-values.md",
+      "url": "/docs/components/component-server-values",
+      "category": "components",
+      "category_title": "Components",
+      "category_order": 40,
+      "category_path": [
+        "components"
+      ],
+      "category_titles": [
+        "Components"
       ],
       "doc_order": 20,
       "level": null,
