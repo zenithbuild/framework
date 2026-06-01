@@ -1,5 +1,6 @@
 import { throwZenithRuntimeError, DOCS_LINKS } from './diagnostics.js';
 import { _fragment } from './markup.js';
+import { readSsrPayload } from './payload.js';
 
 export const UNRESOLVED_LITERAL = Symbol('unresolved_literal');
 const OWN = Object.prototype.hasOwnProperty;
@@ -78,7 +79,8 @@ export function _evaluateExpression(
     if (primitiveValue !== UNRESOLVED_LITERAL) {
         return primitiveValue;
     }
-    const canonicalRootValue = _rcr(trimmedLiteral, params, ssrData, runtimeProps);
+    const hydrationSsrData = _resolveHydrationSsrData(binding, ssrData);
+    const canonicalRootValue = _rcr(trimmedLiteral, params, hydrationSsrData, runtimeProps);
     if (canonicalRootValue !== UNRESOLVED_LITERAL) {
         return canonicalRootValue;
     }
@@ -88,7 +90,7 @@ export function _evaluateExpression(
         stateValues,
         stateKeys,
         params,
-        ssrData,
+        hydrationSsrData,
         mode,
         runtimeProps,
         binding.marker_index,
@@ -288,6 +290,24 @@ function _rcb(binding, componentBindings) {
         return undefined;
     }
     return instanceBindings[binding.component_binding];
+}
+
+function _resolveHydrationSsrData(binding, ssrData) {
+    const payload = readSsrPayload(ssrData);
+    const scopedDataKey = typeof binding?.scoped_data_key === 'string' && binding.scoped_data_key.length > 0
+        ? binding.scoped_data_key
+        : null;
+    if (!scopedDataKey) {
+        return payload.route;
+    }
+    if (!OWN.call(payload.scoped, scopedDataKey) || !_isObjectRecord(payload.scoped[scopedDataKey])) {
+        throw new Error(`[Zenith:ScopedServerData] Missing scoped hydration payload for ${scopedDataKey}`);
+    }
+    return payload.scoped[scopedDataKey];
+}
+
+function _isObjectRecord(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _rcr(literal, params, ssrData, props) {
