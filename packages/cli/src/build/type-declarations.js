@@ -3,6 +3,11 @@ import { mkdir } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { renderZenithEnvDts } from '../types/zenith-env-dts.js';
 
+const SCOPED_SERVER_TYPE_DECLARATIONS_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Type declaration helper is unavailable. Run the CLI build step before generating scoped server data type declarations.';
+
+let scopedTypeDeclarationRendererPromise = null;
+
 /**
  * @param {string} targetPath
  * @param {string} next
@@ -68,6 +73,28 @@ function renderZenithRouteDts(manifest) {
 }
 
 /**
+ * @returns {Promise<(input: { manifest: Array<{ scoped_server_data?: import('../scoped-server-data/types.js').ManifestScopedServerDataEntry[] }>, srcDir: string }) => string>}
+ */
+async function getScopedServerDataTypeRenderer() {
+    if (!scopedTypeDeclarationRendererPromise) {
+        scopedTypeDeclarationRendererPromise = import('../scoped-server-data/type-declarations.js')
+            .then((helper) => {
+                if (typeof helper.renderScopedServerDataDts !== 'function') {
+                    throw new Error(SCOPED_SERVER_TYPE_DECLARATIONS_HELPER_UNAVAILABLE);
+                }
+                return helper.renderScopedServerDataDts;
+            })
+            .catch((error) => {
+                if (error && error.message === SCOPED_SERVER_TYPE_DECLARATIONS_HELPER_UNAVAILABLE) {
+                    throw error;
+                }
+                throw new Error(SCOPED_SERVER_TYPE_DECLARATIONS_HELPER_UNAVAILABLE);
+            });
+    }
+    return scopedTypeDeclarationRendererPromise;
+}
+
+/**
  * @param {string} pagesDir
  * @returns {string}
  */
@@ -81,18 +108,25 @@ export function deriveProjectRootFromPagesDir(pagesDir) {
 }
 
 /**
- * @param {{ manifest: Array<{ path: string, file: string }>, pagesDir: string }} input
+ * @param {{ manifest: Array<{ path: string, file: string, scoped_server_data?: import('../scoped-server-data/types.js').ManifestScopedServerDataEntry[] }>, pagesDir: string }} input
  * @returns {Promise<void>}
  */
 export async function ensureZenithTypeDeclarations(input) {
     const projectRoot = deriveProjectRootFromPagesDir(input.pagesDir);
+    const srcDir = dirname(resolve(input.pagesDir));
     const zenithDir = resolve(projectRoot, '.zenith');
     await mkdir(zenithDir, { recursive: true });
 
     const envPath = join(zenithDir, 'zenith-env.d.ts');
     const routesPath = join(zenithDir, 'zenith-routes.d.ts');
+    const scopedPath = join(zenithDir, 'zenith-scoped-server-data.d.ts');
+    const renderScopedServerDataDts = await getScopedServerDataTypeRenderer();
     writeIfChanged(envPath, renderZenithEnvDts());
     writeIfChanged(routesPath, renderZenithRouteDts(input.manifest));
+    writeIfChanged(scopedPath, renderScopedServerDataDts({
+        manifest: input.manifest,
+        srcDir
+    }));
 
     const tsconfigPath = resolve(projectRoot, 'tsconfig.json');
     if (!existsSync(tsconfigPath)) {
