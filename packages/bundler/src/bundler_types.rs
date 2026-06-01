@@ -83,6 +83,10 @@ pub(crate) struct CompilerIr {
     pub(crate) guard_module_ref: Option<String>,
     #[serde(default)]
     pub(crate) load_module_ref: Option<String>,
+    #[serde(default)]
+    pub(crate) has_scoped_server_data: bool,
+    #[serde(default)]
+    pub(crate) scoped_server_data: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -224,6 +228,8 @@ pub(crate) struct CompilerExpressionBinding {
     pub(crate) compiled_expr: Option<String>,
     #[serde(default)]
     pub(crate) source: Option<CompilerSourceSpan>,
+    #[serde(default)]
+    pub(crate) scoped_data_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,6 +253,9 @@ pub(crate) struct RuntimeExpressionBinding {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) fn_index: Option<usize>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) scoped_data_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -299,6 +308,11 @@ pub(crate) struct RouterRouteEntry {
     pub(crate) guard_module_ref: Option<String>,
     #[serde(default)]
     pub(crate) load_module_ref: Option<String>,
+    #[serde(default)]
+    pub(crate) has_scoped_server_data: bool,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) scoped_server_data: Vec<serde_json::Value>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) image_materialization: Vec<ImageMaterializationEntry>,

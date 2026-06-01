@@ -9,6 +9,10 @@ import {
     mergeExpressionRewriteMaps,
     resolveStateKeyFromBindings
 } from './expression-rewrites.js';
+import {
+    applyScopedDataContextToExpressionRewrite,
+    resolveScopedExpressionContext
+} from './scoped-expression-context.js';
 import { mergeComponentIr } from './merge-component-ir.js';
 import { stripStyleBlocks } from './compiler-runtime.js';
 import { extractDeclaredIdentifiers } from './typescript-expression-utils.js';
@@ -337,6 +341,7 @@ export async function runPageComponentLoop({
     pageStats
 }) {
     let componentInstanceCounter = 0;
+    const scopedOccurrenceIndexByOwnerKey = new Map();
     for (const occurrence of componentOccurrences) {
         await cooperativeYield();
         const compName = occurrence.name;
@@ -350,7 +355,9 @@ export async function runPageComponentLoop({
         pageComponentLoopBreakdown.componentSourceReadMs += startupProfile.roundMs(
             performance.now() - componentSourceReadStartedAt
         );
-        const occurrenceCount = occurrenceCountByPath.get(compPath) || 0;
+        const occurrenceCount = occurrenceCountByPath.get(compPath)
+            || occurrenceCountByPath.get(compName)
+            || 0;
 
         const compIr = await resolveComponentIr({
             compPath,
@@ -380,6 +387,10 @@ export async function runPageComponentLoop({
             pageComponentLoopBreakdown,
             startupProfile
         });
+        const scopedContext = resolveScopedExpressionContext(pageIr, compPath, scopedOccurrenceIndexByOwnerKey);
+        const scopedExpressionRewrite = scopedContext
+            ? applyScopedDataContextToExpressionRewrite(expressionRewrite, scopedContext)
+            : expressionRewrite;
         const { attrExpressionRewrite } = await resolveOwnerRewriteContext({
             occurrence,
             sourceFile,
@@ -441,9 +452,12 @@ export async function runPageComponentLoop({
         pagePhase.mergeMs += startupProfile.roundMs(performance.now() - mergeStartedAt);
 
         if (useIsolatedInstance) {
+            const scopedInstanceRewrite = scopedContext
+                ? applyScopedDataContextToExpressionRewrite(instanceState.instanceRewrite, scopedContext)
+                : instanceState.instanceRewrite;
             componentOccurrencePlans.push({
-                rewrite: instanceState.instanceRewrite,
-                expressionSequence: instanceState.instanceRewrite.sequence,
+                rewrite: scopedInstanceRewrite,
+                expressionSequence: scopedInstanceRewrite.sequence,
                 refSequence: instanceState.refIdentifierPairs
             });
             continue;
@@ -453,7 +467,7 @@ export async function runPageComponentLoop({
             pageExpressionRewriteMap,
             pageExpressionBindingMap,
             pageAmbiguousExpressionMap,
-            expressionRewrite,
+            scopedExpressionRewrite,
             pageIrMergeCache,
             pageBindingResolutionBreakdown
         );

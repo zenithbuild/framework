@@ -60,6 +60,15 @@ export function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambig
         if (rewritten && rewritten !== current && bindings[index].literal === current) {
             bindings[index].literal = rewritten;
         }
+        if (
+            rewrittenBinding &&
+            typeof bindings[index].scoped_data_key === 'string' &&
+            bindings[index].scoped_data_key.length > 0 &&
+            !(typeof rewrittenBinding.scoped_data_key === 'string' && rewrittenBinding.scoped_data_key.length > 0)
+        ) {
+            continue;
+        }
+
         if (rewrittenBinding) {
             bindings[index].compiled_expr = rewrittenBinding.compiled_expr;
             bindings[index].signal_index = rewrittenBinding.signal_index;
@@ -67,6 +76,7 @@ export function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambig
             bindings[index].state_index = rewrittenBinding.state_index;
             bindings[index].component_instance = rewrittenBinding.component_instance;
             bindings[index].component_binding = rewrittenBinding.component_binding;
+            bindings[index].scoped_data_key = rewrittenBinding.scoped_data_key;
         } else if (rewritten && rewritten !== current && bindings[index].compiled_expr === current) {
             bindings[index].compiled_expr = rewritten;
         }

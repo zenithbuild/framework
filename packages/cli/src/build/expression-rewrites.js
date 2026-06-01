@@ -12,7 +12,8 @@ import { rewriteCompilerSignalMapReferences } from './compiler-signal-expression
  *     signal_indices: number[],
  *     state_index: number | null,
  *     component_instance: string | null,
- *     component_binding: string | null
+ *     component_binding: string | null,
+ *     scoped_data_key: string | null
  *   }>,
  *   signals: Array<{ id?: number, kind?: string, state_index?: number }>,
  *   stateBindings: Array<{ key?: string, value?: string }>,
@@ -66,6 +67,13 @@ export function buildComponentExpressionRewrite(
                 component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
             }
             : null;
+        if (
+            normalizedBinding &&
+            typeof binding.scoped_data_key === 'string' &&
+            binding.scoped_data_key.length > 0
+        ) {
+            normalizedBinding.scoped_data_key = binding.scoped_data_key;
+        }
 
         out.sequence.push({ raw, rewritten, binding: normalizedBinding });
 
@@ -236,7 +244,10 @@ export function resolveRewrittenBindingMetadata(
         signal_indices: [],
         state_index: null,
         component_instance: typeof binding.component_instance === 'string' ? binding.component_instance : null,
-        component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
+        component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null,
+        scoped_data_key: typeof binding.scoped_data_key === 'string' && binding.scoped_data_key.length > 0
+            ? binding.scoped_data_key
+            : null
     };
 
     if (typeof next.compiled_expr === 'string' && next.compiled_expr.includes('signalMap.get(')) {
@@ -399,6 +410,9 @@ function measureBindingSpecificity(binding, raw) {
         score += 1;
     }
     if (typeof binding.component_binding === 'string' && binding.component_binding.length > 0) {
+        score += 1;
+    }
+    if (typeof binding.scoped_data_key === 'string' && binding.scoped_data_key.length > 0) {
         score += 1;
     }
     return score;
