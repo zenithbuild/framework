@@ -157,6 +157,45 @@ describe('public contract truth', () => {
         }
     });
 
+    test('component server values docs preserve the scoped server data v1 contract', () => {
+        const guide = readRel('docs/documentation/components/component-server-values.md');
+        const supportingDocs = [
+            'docs/documentation/contracts/server-data.md',
+            'docs/documentation/reference/script-server.md',
+            'docs/documentation/reference/server-data-api.md',
+            'docs/documentation/contracts/routing.md',
+            'docs/documentation/contracts/ssr-transport.md',
+            'docs/documentation/contracts/hydration-contract.md',
+            'docs/documentation/contracts/props-contract.md',
+            'docs/documentation/errors/index.md'
+        ].map(readRel).join('\n');
+        const generatedDocs = [
+            readRel('docs/public/llms.txt'),
+            readRel('docs/public/ai/docs.index.jsonl')
+        ].join('\n');
+        const source = `${guide}\n${supportingDocs}\n${generatedDocs}`;
+
+        expect(guide).toContain('Pages anchor emitted documents. Routes control requests.');
+        expect(guide).toContain('Component Server Values');
+        expect(guide).toContain('Scoped Server Data');
+        expect(guide).toMatch(/not React Server Components/);
+        expect(guide).toContain('This is scoped `data(ctx, props)`. It is not `load(ctx)`');
+        expect(guide).toContain('component or layout `load(ctx)`');
+        expect(guide).toContain('component or layout route control such as `redirect(...)` or `deny(...)`');
+        expect(guide).toContain('dynamic component prop expressions for scoped data');
+        expect(guide).toContain('client-side scoped refetch');
+        expect(guide).toContain('build-time scoped prerender');
+
+        expect(source).toMatch(/guard\(ctx\).*action\(ctx\).*load\(ctx\)/s);
+        expect(source).toMatch(/owner-local (?:server )?values/);
+        expect(source).toMatch(/without client refetch|Client refetch or client execution/);
+        expect(source).toMatch(/static literal props/);
+        expect(source).toContain('CSV012');
+        expect(source).toContain('CSV013');
+        expect(generatedDocs).toContain('components/component-server-values');
+        expect(generatedDocs).toContain('not React Server Components');
+    });
+
     test('runtime and bundler package READMEs do not advertise removed public APIs', () => {
         const runtimeReadme = readFileSync(resolve(REPO_ROOT, 'packages/runtime/README.md'), 'utf8');
         const bundlerReadme = readFileSync(resolve(REPO_ROOT, 'packages/bundler/README.md'), 'utf8');

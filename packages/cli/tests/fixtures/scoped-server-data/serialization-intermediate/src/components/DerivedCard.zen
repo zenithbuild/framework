@@ -1,0 +1,7 @@
+<script server lang="ts">
+const raw = "CSV_INTERMEDIATE_RAW_SENTINEL"
+const derived = { label: "CSV_INTERMEDIATE_DERIVED", length: raw.length }
+const unused = "CSV_INTERMEDIATE_UNUSED_SENTINEL"
+</script>
+
+<p>{derived.label}</p>

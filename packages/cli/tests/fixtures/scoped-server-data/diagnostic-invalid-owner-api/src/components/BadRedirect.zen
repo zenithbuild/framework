@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const data = async (ctx) => ctx.redirect("/login", 307)
+</script>
+
+<div>{data.ok}</div>

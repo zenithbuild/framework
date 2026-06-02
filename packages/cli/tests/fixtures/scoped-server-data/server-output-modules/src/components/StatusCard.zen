@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const data = async () => ({ label: "CSV_OUTPUT_CARD_SENTINEL" })
+</script>
+
+<p>{data.label}</p>

@@ -1,0 +1,5 @@
+<script lang="ts">
+import BadReserved from "../components/BadReserved.zen";
+</script>
+
+<BadReserved />

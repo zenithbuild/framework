@@ -1,0 +1,9 @@
+<script server lang="ts">
+export const prerender = true;
+</script>
+
+<script lang="ts">
+import DefaultLayout from "../layouts/DefaultLayout.zen";
+</script>
+
+<DefaultLayout />

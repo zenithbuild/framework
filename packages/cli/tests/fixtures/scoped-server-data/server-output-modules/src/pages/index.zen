@@ -1,0 +1,6 @@
+<script lang="ts">
+import DefaultLayout from "../layouts/DefaultLayout.zen";
+import StatusCard from "../components/StatusCard.zen";
+</script>
+
+<DefaultLayout><StatusCard /></DefaultLayout>

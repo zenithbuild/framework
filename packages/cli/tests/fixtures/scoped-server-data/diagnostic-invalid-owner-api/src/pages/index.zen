@@ -1,0 +1,5 @@
+<script lang="ts">
+import BadLoad from "../components/BadLoad.zen";
+</script>
+
+<BadLoad />
