@@ -37,6 +37,8 @@ Start here (ordered):
   - /docs/reactivity/presence
   - /docs/reactivity/overlay-sheet-pattern
   - /docs/reactivity/controlled-uncontrolled-components
+- Components:
+  - /docs/components/component-server-values
 - Guides:
   - /docs/guides/using-ai-with-zenith
   - /docs/guides/common-mistakes

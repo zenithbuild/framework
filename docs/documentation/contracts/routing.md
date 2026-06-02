@@ -82,7 +82,8 @@ Execution order:
 6. If `action(ctx)` returns `data(...)` or `invalid(...)`, expose that result to `load(ctx)` through `ctx.action`.
 7. If global middleware, `guard(ctx)`, or `action(ctx)` returns `redirect(...)` or `deny(...)`, short-circuit rendering immediately.
 8. Run `load(ctx)` when present, otherwise use `data`, then legacy `ssr_data` / `props` / `ssr`, then `{}`.
-9. Inject the resolved payload into HTML and return the matched page.
+9. If the matched page uses Component Server Values, execute the discovered layout/component scoped owners.
+10. Inject the resolved route payload and any scoped owner slices into HTML and return the matched page.
 
 Global middleware V1 is TypeScript-only and is discovered from `middleware.ts` or `middleware/index.ts` at the directory that contains `pagesDir`. It runs for matched server page and resource routes, and it does not run for static assets, image endpoints, prerender/static HTML routes, unmatched 404s, or `/__zenith/route-check`.
 
@@ -102,6 +103,7 @@ Inline and adjacent `guard`, `action`, or `load` definitions may not duplicate e
 - `POST` action requests re-run the matched route and return HTML from the same server boundary.
 - Prerendered routes use the build-time server payload snapshot embedded in the output HTML.
 - `guard(ctx)`, `action(ctx)`, and `load(ctx)` cannot be combined with `prerender = true`.
+- Component Server Values execute only through matched non-prerender page renders and do not run for route-check, resource routes, static assets, image endpoints, unmatched 404s, or static HTML.
 
 ## Contract: Redirect, Deny, Error, and 404 Outcomes
 

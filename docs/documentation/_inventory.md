@@ -31,6 +31,7 @@ Definition of Done:
 | contracts/no-magic | No Magic Contract | contract | keep | Explicit behavior only |
 | contracts/dsl-syntax | DSL Syntax Contract | contract | keep | Event binding and expression rules |
 | contracts/server-data | Server Data Contract | contract | keep | Server export + serialization rules |
+| components/component-server-values | Component Server Values | guide | keep | Owner-local layout/component server values |
 | reference/zenlink | ZenLink Reference | reference | keep | Marker-based opt-in link behavior |
 | reference/script-server | Script Server Reference | reference | keep | Server script usage |
 | reference/markers | Marker Reference | reference | keep | Marker guarantees |

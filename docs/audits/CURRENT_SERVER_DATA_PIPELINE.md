@@ -4,6 +4,8 @@ Status: Read-only factual audit (2026-05-22)
 Scope: How Zenith server data fetching works today. No implementation guidance.
 Out of scope: Cache/revalidation (documented separately; not covered here).
 
+Status note, 2026-06-01: this audit captured the pre-v1 pipeline before Component Server Values / Scoped Server Data shipped. It is retained as historical analysis. Public current behavior lives in `docs/documentation/components/component-server-values.md` and the server data contract docs.
+
 This document separates **confirmed current behavior** (verified against the repo) from a **non-binding future hypothesis** (Section 9 only).
 
 ---

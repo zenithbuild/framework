@@ -17,6 +17,8 @@ Contract: Zenith has two explicit server route kinds:
 
 Invariant: `guard(ctx)`, `action(ctx)`, and `load(ctx)` accept exactly one argument. Page routes keep HTML ownership; resource routes keep non-HTML ownership. Zenith does not overload one route kind into the other.
 
+Layouts and components may also use `<script server lang="ts">` for Component Server Values. That owner-local surface supports Level 1 server constants and Level 2 scoped `data(ctx, props)`, but it does not support route `guard`, `action`, `load`, redirect, deny, resource helpers, or arbitrary response control.
+
 Definition of Done:
 - Public examples use only allowed exports for the route kind being documented.
 - Context access happens through `ctx` argument.
@@ -50,6 +52,14 @@ Page routes return HTML-oriented route results:
 - `deny(...)`
 
 Page routes do **not** support `json(...)`, `text(...)`, `stream(...)`, or `sse(...)`.
+
+### Layouts And Components
+
+Layouts and components support Component Server Values when they are used by a page render:
+- top-level server constants referenced in the same owner template
+- `export const data = async (ctx, props) => ({ ... })` for owner-local data
+
+This is Scoped Server Data internally. It is not route `load(ctx)`, and it does not make components independent server routes.
 
 ### Resource Routes
 

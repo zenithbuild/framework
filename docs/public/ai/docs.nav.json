@@ -367,6 +367,25 @@
       ]
     },
     {
+      "slug": "components",
+      "title": "Components",
+      "summary": "Structural component composition and usage patterns.",
+      "order": 40,
+      "docs": [
+        {
+          "slug": "components/component-server-values",
+          "title": "Component Server Values",
+          "label": "Component Server Values",
+          "url": "/docs/components/component-server-values",
+          "order": 20,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/components/component-server-values.md"
+        }
+      ]
+    },
+    {
       "slug": "guides",
       "title": "Guides",
       "summary": "Task-oriented implementation walkthroughs.",
@@ -667,6 +686,7 @@
     "/docs/reactivity/presence",
     "/docs/reactivity/overlay-sheet-pattern",
     "/docs/reactivity/controlled-uncontrolled-components",
+    "/docs/components/component-server-values",
     "/docs/guides/using-ai-with-zenith",
     "/docs/guides/common-mistakes",
     "/docs/guides/cms-unified-site",
