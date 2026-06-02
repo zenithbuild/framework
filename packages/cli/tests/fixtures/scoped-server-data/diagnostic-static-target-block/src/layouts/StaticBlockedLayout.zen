@@ -1,0 +1,5 @@
+<script server lang="ts">
+const navigation = { title: "static cannot execute scoped server data" }
+</script>
+
+<main>{navigation.title}<slot /></main>

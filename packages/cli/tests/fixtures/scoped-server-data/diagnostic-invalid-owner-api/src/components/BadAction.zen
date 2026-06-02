@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const action = async (ctx) => ctx.data({ ok: true })
+</script>
+
+<div>bad action</div>

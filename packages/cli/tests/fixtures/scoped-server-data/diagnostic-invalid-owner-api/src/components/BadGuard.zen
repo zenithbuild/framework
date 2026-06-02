@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const guard = async (ctx) => ctx.allow()
+</script>
+
+<div>bad guard</div>

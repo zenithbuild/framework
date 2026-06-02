@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const data = async (ctx, props) => ({ repoId: props.repoId })
+</script>
+
+<p>{data.repoId}</p>

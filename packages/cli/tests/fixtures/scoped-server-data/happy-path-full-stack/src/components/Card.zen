@@ -1,0 +1,9 @@
+<script server lang="ts">
+export const data = async (ctx, props) => ({
+  title: props.title,
+  count: props.count,
+  featured: props.featured === true
+})
+</script>
+
+<article class="card"><span class="title">{data.title}</span>:<span class="count">{data.count}</span></article>
