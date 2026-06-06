@@ -171,7 +171,7 @@ describe('Phase 1: CLI -> compiler process seam', () => {
   });
 
   test('compiler binary stdout is strict JSON IR with no warnings on stderr', async () => {
-    const project = await makePage('<div><button on:click={save}>Save</button></div>');
+    const project = await makePage('<script lang="ts">function save() {}</script><div><button on:click={save}>Save</button></div>');
     const entry = path.join(project.pagesDir, 'index.zen');
 
     const result = runCompilerBinary(entry);

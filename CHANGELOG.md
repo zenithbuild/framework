@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.7.12] - 2026-06-02
+
+### Changed
+
+#### Component Server Values v1
+
+- Added Component Server Values for layout/component-owned server values, implemented internally as Scoped Server Data.
+- Added the Component Server Values architecture lock, owner scanner, scoped diagnostics, and manifest/classification metadata that feed the Scoped Server Data pipeline.
+- Added request-time scoped execution across Node, dev, preview, Vercel, and Netlify server paths.
+- Added scoped server-output packaging, owner-local SSR template binding, runtime hydration from serialized scoped payloads, repeated component instance keys, static literal prop support, and generated scoped server data declarations.
+- Added CSV diagnostics and final regression fixtures covering invalid owner APIs, prerender conflicts, dynamic scoped props, server-source leakage, serialization, SSR, hydration, hosted parity, and type declarations.
+
+#### Server data, adapter, and middleware groundwork
+
+- Stabilized the server-data pipeline around route-owned `guard(ctx)`, `action(ctx)`, and `load(ctx)` while keeping Component Server Values owner-local.
+- Added TypeScript migration groundwork for hosted adapter infrastructure and adapter entrypoints without shipping a public adapter plugin API.
+- Added internal adapter driver types and an adapter plugin surface RFC as planning material only; this release does not ship a public adapter plugin API.
+- Added global middleware groundwork across runtime paths while preserving the current TypeScript-only root middleware contract and without shipping middleware arrays, nested scopes, controlled headers, or route-check participation.
+
+#### Config and release integrity
+
+- Added a conservative config-time V1 plugin surface for named plugin objects with an optional `config()` hook that may patch safe config keys only.
+- Kept plugin scope narrow: no transform, middleware, route/security policy, compiler, bundler, dev-server, or public adapter hooks are shipped.
+- Aligned the framework release publish surface and platform binary smoke/recovery checks so the lockstep train excludes standalone editor packages and verifies native binary packages more reliably.
+
+#### Docs and project hygiene
+
+- Added Component Server Values documentation and migration guidance, including the v1 non-goals: no React Server Components, no client scoped refetch, no build-time scoped prerender, and no component/layout route-control APIs.
+- Added current server-data pipeline audit and architecture-lock documentation for the completed Component Server Values v1 work.
+- Regenerated public AI docs artifacts for the updated server data, routing, hydration, props, diagnostics, and Component Server Values documentation.
+- Ignored generated Zenith output in create-zenith starter projects.
+
 ## [0.7.11] - 2026-05-17
 
 ### Changed

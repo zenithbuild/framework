@@ -16,7 +16,10 @@ describe('Phase 6: dev server stability', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': '<div><h1>{count}</h1></div>'
+        'index.zen': `
+<script lang="ts">const count = 0;</script>
+<div><h1>{count}</h1></div>
+`
       }
     });
 

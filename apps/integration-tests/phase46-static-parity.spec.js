@@ -11,9 +11,9 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { describe, test, expect, jest } from '@jest/globals';
 import { createTempProject, npmInstall, runCli, scaffoldZenithProject } from './helpers/project.js';
-import { assertSuccess, getFreePort, startProcess, waitForHttp } from './helpers/process.js';
+import { assertSuccess, getFreePort, startProcess } from './helpers/process.js';
 import { walkFilesDeterministic } from './helpers/fs.js';
-import { repoRoot } from './helpers/paths.js';
+import { cliEntry, repoRoot } from './helpers/paths.js';
 
 jest.setTimeout(240000);
 
@@ -23,6 +23,170 @@ function sha256Hex(input) {
 
 function countMatches(source, pattern) {
   return (source.match(pattern) || []).length;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForDevReady(dev, url, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const logs = dev.logs();
+    if (dev.proc.exitCode !== null) {
+      throw new Error(
+        `zenith dev exited early with code ${dev.proc.exitCode}\nSTDOUT:\n${logs.stdout}\nSTDERR:\n${logs.stderr}`
+      );
+    }
+    try {
+      const res = await fetch(url);
+      if (res.status === 200) {
+        return;
+      }
+    } catch {
+      // Keep polling until timeout.
+    }
+    await sleep(150);
+  }
+
+  const logs = dev.logs();
+  throw new Error(`Timed out waiting for ${url}\nSTDOUT:\n${logs.stdout}\nSTDERR:\n${logs.stderr}`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findBalancedObjectLiteral(source, openIndex) {
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+
+  for (let i = openIndex; i < source.length; i++) {
+    const ch = source[i];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') {
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(openIndex, i + 1);
+      }
+    }
+  }
+
+  throw new Error('Unable to extract embedded router manifest object');
+}
+
+function extractObjectPropertySource(manifestSource, property) {
+  const match = new RegExp(`['"]${escapeRegExp(property)}['"]\\s*:`).exec(manifestSource);
+  if (!match) {
+    throw new Error(`Missing embedded router manifest property: ${property}`);
+  }
+  let index = match.index + match[0].length;
+  while (/\s/.test(manifestSource[index] || '')) {
+    index += 1;
+  }
+  if (manifestSource[index] === '{') {
+    return findBalancedObjectLiteral(manifestSource, index);
+  }
+  throw new Error(`Unsupported embedded router manifest property value: ${property}`);
+}
+
+function quotedLiteralPattern(value) {
+  const escaped = escapeRegExp(value);
+  return `(?:'${escaped}'|"${escaped}")`;
+}
+
+function decodeQuotedLiteral(raw) {
+  if (raw.startsWith('"')) {
+    return JSON.parse(raw);
+  }
+
+  return raw
+    .slice(1, -1)
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\(['"\\/bfnrt])/g, (_, escaped) => {
+      switch (escaped) {
+        case 'b':
+          return '\b';
+        case 'f':
+          return '\f';
+        case 'n':
+          return '\n';
+        case 'r':
+          return '\r';
+        case 't':
+          return '\t';
+        default:
+          return escaped;
+      }
+    });
+}
+
+function parseStringMapObjectLiteral(objectSource) {
+  const stringLiteral = String.raw`(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`;
+  const pairPattern = new RegExp(`(${stringLiteral})\\s*:\\s*(${stringLiteral})`, 'g');
+  const keyPattern = new RegExp(`${stringLiteral}\\s*:`, 'g');
+  const entries = {};
+  let pairCount = 0;
+
+  for (const match of objectSource.matchAll(pairPattern)) {
+    pairCount += 1;
+    entries[decodeQuotedLiteral(match[1])] = decodeQuotedLiteral(match[2]);
+  }
+
+  const keyCount = Array.from(objectSource.matchAll(keyPattern)).length;
+  expect(pairCount).toBe(keyCount);
+
+  return entries;
+}
+
+function expectLiteralProperty(source, property, value) {
+  expect(source).toMatch(
+    new RegExp(`${quotedLiteralPattern(property)}\\s*:\\s*${quotedLiteralPattern(value)}`)
+  );
+}
+
+function validateEmbeddedManifest(routerSource, manifest) {
+  const manifestConst = 'const __ZENITH_MANIFEST__';
+  const constIndex = routerSource.indexOf(manifestConst);
+  expect(constIndex).toBeGreaterThanOrEqual(0);
+  const openIndex = routerSource.indexOf('{', constIndex + manifestConst.length);
+  expect(openIndex).toBeGreaterThan(constIndex);
+  const manifestSource = findBalancedObjectLiteral(routerSource, openIndex);
+  const chunksSource = extractObjectPropertySource(manifestSource, 'chunks');
+  const embeddedChunks = parseStringMapObjectLiteral(chunksSource);
+  expect(Object.keys(embeddedChunks).sort()).toEqual(Object.keys(manifest.chunks).sort());
+
+  for (const [route, chunk] of Object.entries(manifest.chunks)) {
+    expectLiteralProperty(chunksSource, route, chunk);
+    expect(embeddedChunks[route]).toBe(chunk);
+  }
+  expectLiteralProperty(manifestSource, 'css', manifest.css);
+  expectLiteralProperty(manifestSource, 'core', manifest.core);
+  expect(manifestSource).toMatch(new RegExp(`${quotedLiteralPattern('router')}\\s*:\\s*null`));
+
+  return {
+    chunks: embeddedChunks,
+    css: manifest.css,
+    core: manifest.core,
+    router: null
+  };
 }
 
 function contentTypeFor(filePath) {
@@ -112,9 +276,7 @@ async function readBuildSnapshot(root) {
 
   const routerFile = path.join(distDir, routerRel.replace(/^\//, ''));
   const routerSource = await fs.readFile(routerFile, 'utf8');
-  const embeddedManifestMatch = routerSource.match(/const __ZENITH_MANIFEST__ = (.+);/);
-  expect(embeddedManifestMatch).not.toBeNull();
-  const embeddedManifest = JSON.parse(embeddedManifestMatch[1]);
+  const embeddedManifest = validateEmbeddedManifest(routerSource, manifest);
 
   const routerName = path.basename(routerFile);
   const routerHashMatch = routerName.match(/^router\.([a-f0-9]{8})\.js$/);
@@ -199,8 +361,8 @@ describe('Phase 4.6: static serve parity & substrate certification', () => {
 
       // Byte parity: zenith dev must serve the same built HTML bytes.
       const devPort = await getFreePort();
-      dev = startProcess('npm', ['run', 'dev', '--silent', '--', String(devPort)], { cwd: root });
-      await waitForHttp(`http://localhost:${devPort}/`, { expectStatuses: [200], timeoutMs: 45000 });
+      dev = startProcess('node', [cliEntry, 'dev', String(devPort)], { cwd: root, env: { ...process.env } });
+      await waitForDevReady(dev, `http://localhost:${devPort}/`, 45000);
 
       for (const route of ['/', '/about', '/blog']) {
         const [staticRes, devRes] = await Promise.all([

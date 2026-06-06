@@ -69,7 +69,7 @@ async function buildFixture(options) {
   await scaffoldZenithProject(root, {
     router: options.router,
     pages: {
-      'index.zen': '<main><h1>{title}</h1><button on:click={save}>Save</button></main>',
+      'index.zen': '<script lang="ts">const title = "Home"; function save() {}</script><main><h1>{title}</h1><button on:click={save}>Save</button></main>',
       'about.zen': '<main><h1>About Static</h1></main>'
     }
   });
