@@ -101,7 +101,7 @@ async function buildFixture() {
   await scaffoldZenithProject(root, {
     router: false,
     pages: {
-      'index.zen': '<main><button on:click={inc}>{title}</button><a href={url}>Go</a></main>'
+      'index.zen': '<script lang="ts">const title = "Home"; const url = "/next"; function inc() {}</script><main><button on:click={inc}>{title}</button><a href={url}>Go</a></main>'
     }
   });
 

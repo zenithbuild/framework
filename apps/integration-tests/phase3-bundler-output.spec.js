@@ -90,7 +90,11 @@ async function buildOutDir() {
   const root = await createTempProject('zenith-phase3');
   const entry = path.join(root, 'index.zen');
   const outDir = path.join(root, 'dist');
-  await fsp.writeFile(entry, '<div><h1>{title}</h1><button on:click={save}>Save</button></div>', 'utf8');
+  await fsp.writeFile(
+    entry,
+    '<script lang="ts">const title = "Home"; function save() {}</script><div><h1>{title}</h1><button on:click={save}>Save</button></div>',
+    'utf8'
+  );
   const result = await pipeCompilerToBundler(entry, outDir);
   if (result.bundler.exitCode !== 0) {
     throw new Error(`Bundler failed:\n${result.bundler.stderr}`);

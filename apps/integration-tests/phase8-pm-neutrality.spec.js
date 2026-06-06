@@ -24,7 +24,10 @@ describe('Phase 8: package manager neutrality', () => {
     await scaffoldZenithProject(root, {
       router: false,
       pages: {
-        'index.zen': '<div><h1>{title}</h1></div>',
+        'index.zen': `
+<script lang="ts">const title = "Home";</script>
+<div><h1>{title}</h1></div>
+`,
         'about.zen': '<div><h1>About</h1></div>'
       }
     });

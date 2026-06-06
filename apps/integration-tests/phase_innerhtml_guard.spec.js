@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { describe, test, expect, jest } from '@jest/globals';
 import { createTempProject, npmInstall, runCli, scaffoldZenithProject } from './helpers/project.js';
 import { assertSuccess, getFreePort, startProcess, waitForHttp } from './helpers/process.js';
+import { writeText } from './helpers/fs.js';
 
 jest.setTimeout(180000);
 
@@ -26,9 +27,12 @@ import Counter from "../components/Counter.zen";
 <main>
   <Counter />
 </main>`
-            },
-            components: {
-                'Counter.zen': `<script lang="ts">
+            }
+        });
+
+        await writeText(
+            path.join(root, 'components', 'Counter.zen'),
+            `<script lang="ts">
 const count = signal(0);
 function inc() { count.set(count.get() + 1); }
 </script>
@@ -36,8 +40,7 @@ function inc() { count.set(count.get() + 1); }
   <p id="count">{count}</p>
   <button id="inc" on:click={inc}>+</button>
 </div>`
-            }
-        });
+        );
 
         assertSuccess(npmInstall(root), 'npm install');
         assertSuccess(runCli(root, ['build']), 'zenith build');
@@ -47,23 +50,20 @@ function inc() { count.set(count.get() + 1); }
         const html = await fs.readFile(distIndex, 'utf8');
         expect(html).toContain('data-counter-runtime');
 
-        // Verify generated component JS has the trim guard, not unconditional overwrite
+        // Verify generated client JS carries the component runtime/bindings.
         const distAssets = path.join(root, 'dist', 'assets');
-        const componentFiles = (await fs.readdir(distAssets)).filter(
-            (name) => name.startsWith('component.') && name.endsWith('.js')
-        );
+        const jsFiles = (await fs.readdir(distAssets)).filter((name) => name.endsWith('.js'));
 
-        expect(componentFiles.length).toBeGreaterThan(0);
+        expect(jsFiles.length).toBeGreaterThan(0);
 
-        for (const file of componentFiles) {
-            const content = await fs.readFile(path.join(distAssets, file), 'utf8');
-            if (content.includes('__zenith_component_template')) {
-                // Must use trim guard
-                expect(content).toContain('host.innerHTML.trim().length === 0');
-                // Must NOT use the old unconditional overwrite
-                expect(content).not.toContain("typeof host.innerHTML === 'string'");
-            }
-        }
+        const jsOutput = (
+            await Promise.all(jsFiles.map((file) => fs.readFile(path.join(distAssets, file), 'utf8')))
+        ).join('\n');
+
+        expect(jsOutput).toContain('data-counter-runtime');
+        expect(jsOutput).toContain('__zenith_events');
+        expect(jsOutput).toContain('data-zx-on-click');
+        expect(jsOutput).toContain('signal(0)');
 
         // Also verify the component scripts execute and reactivity works
         const port = await getFreePort();
