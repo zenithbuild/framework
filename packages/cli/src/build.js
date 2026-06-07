@@ -17,6 +17,7 @@ import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './b
 import { buildImageArtifacts } from './images/service.js';
 import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
+import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
 import { writeServerOutput } from './server-output.js';
@@ -194,6 +195,14 @@ export async function build(options) {
     await startupProfile.measureAsync(
         'inject_image_runtime_payload',
         () => injectImageRuntimePayloadIntoHtmlFiles(staticOutputDir, imageRuntimePayload)
+    );
+    await startupProfile.measureAsync(
+        'copy_public_assets',
+        () => copyPublicAssets({
+            projectRoot,
+            outDir: staticOutputDir,
+            reservedPaths: deriveReservedPublicAssetPaths(manifest)
+        })
     );
 
     const buildManifest = await startupProfile.measureAsync(

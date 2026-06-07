@@ -11,6 +11,7 @@ import { injectImageMaterializationIntoRouterManifest } from '../images/router-m
 import { buildImageArtifacts } from '../images/service.js';
 import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from '../images/payload.js';
+import { copyPublicAssets, deriveReservedPublicAssetPaths } from '../public-assets.js';
 import { writeResourceRouteManifest } from '../resource-manifest.js';
 import { createStartupProfiler } from '../startup-profile.js';
 import { resolveBuildAdapter } from '../adapters/resolve-adapter.js';
@@ -81,6 +82,17 @@ export function createDevBuildSession(options) {
         await startupProfile.measureAsync(
             'inject_image_runtime_payload',
             () => injectImageRuntimePayloadIntoHtmlFiles(outDir, state.imageRuntimePayload)
+        );
+    }
+
+    async function syncPublicAssets(startupProfile) {
+        await startupProfile.measureAsync(
+            'copy_public_assets',
+            () => copyPublicAssets({
+                projectRoot,
+                outDir,
+                reservedPaths: deriveReservedPublicAssetPaths(state.manifest)
+            })
         );
     }
 
@@ -178,6 +190,7 @@ export function createDevBuildSession(options) {
             () => writeResourceRouteManifest(outDir, state.manifest, basePath)
         );
         await syncImageState(startupProfile);
+        await syncPublicAssets(startupProfile);
 
         startupProfile.emit('build_complete', {
             pages: pageManifest.length,
@@ -202,6 +215,7 @@ export function createDevBuildSession(options) {
             { rebuildStrategy: 'bundle-only' }
         );
         await syncImageState(startupProfile);
+        await syncPublicAssets(startupProfile);
 
         startupProfile.emit('build_complete', {
             pages: pageManifestEntries().length,
@@ -265,6 +279,7 @@ export function createDevBuildSession(options) {
             }
         );
         await syncImageState(startupProfile);
+        await syncPublicAssets(startupProfile);
         startupProfile.emit('build_complete', {
             pages: pageManifestEntries().length,
             assets: assets.length,

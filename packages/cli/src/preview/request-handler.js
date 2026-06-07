@@ -8,25 +8,12 @@ import { readRequestBodyBuffer } from '../request-body.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
+import { STATIC_MIME_TYPES } from '../static-mime.js';
 import { loadPreviewGlobalMiddlewareSource } from '../global-middleware-runtime-source.js';
 import { loadRouteSurfaceState } from './manifest.js';
 import { injectSsrPayload } from './payload.js';
 import { fileExists, resolveWithinDist, toStaticFilePath } from './paths.js';
 import { executeServerRoute, routeIdFromSourcePath } from './server-runner.js';
-
-const MIME_TYPES = {
-  '.html': 'text/html',
-  '.js': 'application/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.avif': 'image/avif',
-  '.gif': 'image/gif'
-};
 
 const IMAGE_RUNTIME_TAG_RE = /<script\b[^>]*\bid=(["'])zenith-image-runtime\1[^>]*>[\s\S]*?<\/script>/i;
 
@@ -223,21 +210,21 @@ export function createPreviewRequestHandler(options) {
         throw new Error('not found');
       }
 
-      if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
-        const staticPath = isStaticExportTarget
-          ? resolveWithinDist(distDir, url.pathname)
-          : resolveWithinDist(distDir, canonicalPath);
-        if (!staticPath || !(await fileExists(staticPath))) {
-          throw new Error('not found');
-        }
-        const content = await readFile(staticPath);
-        const mime = MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': mime });
-        res.end(content);
-        return;
-      }
+      const canonicalUrl = new URL(url.toString());
+      canonicalUrl.pathname = canonicalPath;
 
       if (isStaticExportTarget) {
+        if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+          const staticPath = resolveWithinDist(distDir, url.pathname);
+          if (!staticPath || !(await fileExists(staticPath))) {
+            throw new Error('not found');
+          }
+          const content = await readFile(staticPath);
+          const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
+          res.writeHead(200, { 'Content-Type': mime });
+          res.end(content);
+          return;
+        }
         const directHtmlPath = toStaticFilePath(distDir, url.pathname);
         if (!directHtmlPath || !(await fileExists(directHtmlPath))) {
           throw new Error('not found');
@@ -248,8 +235,6 @@ export function createPreviewRequestHandler(options) {
         return;
       }
 
-      const canonicalUrl = new URL(url.toString());
-      canonicalUrl.pathname = canonicalPath;
       const resolvedResource = resolveRequestRoute(canonicalUrl, resourceRoutes);
       if (resolvedResource.matched && resolvedResource.route) {
         let globalMiddleware = null;
@@ -286,6 +271,18 @@ export function createPreviewRequestHandler(options) {
           return;
         }
         res.end(descriptor.body);
+        return;
+      }
+
+      if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+        const staticPath = resolveWithinDist(distDir, canonicalPath);
+        if (!staticPath || !(await fileExists(staticPath))) {
+          throw new Error('not found');
+        }
+        const content = await readFile(staticPath);
+        const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': mime });
+        res.end(content);
         return;
       }
 

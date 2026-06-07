@@ -39,23 +39,10 @@ import { createDevRequestHandler } from './dev-server/request-handler.js';
 import { createDevWatcher } from './dev-server/watcher.js';
 import { listenWithPortFallback } from './dev-server/port-fallback.js';
 import { loadDevGlobalMiddlewareSource } from './global-middleware-runtime-source.js';
+import { STATIC_MIME_TYPES } from './static-mime.js';
 
 const SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE =
     '[Zenith:ScopedServerData] Server-output lowering helper is unavailable. Run the CLI build step before packaging scoped server data modules.';
-
-const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpeg': 'image/jpeg',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
-    '.gif': 'image/gif'
-};
 
 const IMAGE_RUNTIME_TAG_RE = new RegExp(
     '<' + 'script\\b[^>]*\\bid=(["\'])zenith-image-runtime\\1[^>]*>[\\s\\S]*?<\\/' + 'script>',
@@ -433,7 +420,7 @@ export async function createDevServer(options) {
         buildNotFoundPayload,
         renderNotFoundHtml,
         appendSetCookieHeaders,
-        MIME_TYPES,
+        MIME_TYPES: STATIC_MIME_TYPES,
         EVENT_STREAM_MIME,
         LEGACY_DEV_STREAM_PATH,
         IMAGE_RUNTIME_TAG_RE
