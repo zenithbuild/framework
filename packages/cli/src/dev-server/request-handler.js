@@ -235,23 +235,6 @@ export function createDevRequestHandler(options) {
                 throw new Error('not found');
             }
 
-            const requestExt = extname(canonicalPath);
-            if (requestExt && requestExt !== '.html') {
-                const assetPath = isStaticExportTarget
-                    ? resolveWithinDist(outDir, pathname)
-                    : join(outDir, canonicalPath);
-                resolvedPathFor404 = assetPath;
-                staticRootFor404 = outDir;
-                if (!assetPath) {
-                    throw new Error('not found');
-                }
-                const asset = await readFileForRequest(assetPath);
-                const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
-                res.writeHead(200, { 'Content-Type': mime });
-                res.end(asset);
-                return;
-            }
-
             const routes = await loadRoutesForRequests();
             const canonicalUrl = new URL(url.toString());
             canonicalUrl.pathname = canonicalPath;
@@ -297,6 +280,23 @@ export function createDevRequestHandler(options) {
                     return;
                 }
                 res.end(descriptor.body);
+                return;
+            }
+
+            const requestExt = extname(canonicalPath);
+            if (requestExt && requestExt !== '.html') {
+                const assetPath = isStaticExportTarget
+                    ? resolveWithinDist(outDir, pathname)
+                    : join(outDir, canonicalPath);
+                resolvedPathFor404 = assetPath;
+                staticRootFor404 = outDir;
+                if (!assetPath) {
+                    throw new Error('not found');
+                }
+                const asset = await readFileForRequest(assetPath);
+                const mime = MIME_TYPES[requestExt] || 'application/octet-stream';
+                res.writeHead(200, { 'Content-Type': mime });
+                res.end(asset);
                 return;
             }
 

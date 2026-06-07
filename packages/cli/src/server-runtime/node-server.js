@@ -359,17 +359,6 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
     const canonicalUrl = new URL(url.toString());
     canonicalUrl.pathname = canonicalPath;
 
-    if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
-        const assetPath = resolveWithinRoot(context.staticDir, canonicalPath);
-        if (!assetPath || !(await fileExists(assetPath))) {
-            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-            res.end('404 Not Found');
-            return;
-        }
-        await sendStaticFile(res, assetPath, req.method);
-        return;
-    }
-
     const resourceResolved = resolveRequestRoute(canonicalUrl, context.resourceServerRoutes);
     if (resourceResolved.matched && resourceResolved.route) {
         const routeDir = join(context.serverDir, 'routes', resourceResolved.route.name);
@@ -382,6 +371,17 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             globalMiddlewareModulePath: context.globalMiddlewareModulePath
         });
         await sendFetchResponse(res, response, req.method);
+        return;
+    }
+
+    if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+        const assetPath = resolveWithinRoot(context.staticDir, canonicalPath);
+        if (!assetPath || !(await fileExists(assetPath))) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('404 Not Found');
+            return;
+        }
+        await sendStaticFile(res, assetPath, req.method);
         return;
     }
 

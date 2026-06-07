@@ -18,6 +18,17 @@ function normalizePublicPath(value) {
     return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
 }
 
+function routePathToPublicPath(routePath) {
+    if (typeof routePath !== 'string' || routePath.length === 0) {
+        return null;
+    }
+    if (routePath.includes(':') || routePath.includes('*')) {
+        return null;
+    }
+    const publicPath = normalizePublicPath(routePath);
+    return publicPath || null;
+}
+
 async function walkPublicRoot(rootDir) {
     const resolvedRoot = resolve(rootDir);
     const rootInfo = await maybeLstat(resolvedRoot);
@@ -75,13 +86,40 @@ export async function discoverPublicAssets(projectRoot) {
         .sort((left, right) => left.publicPath.localeCompare(right.publicPath));
 }
 
-export async function copyPublicAssets({ projectRoot, outDir }) {
+export function deriveReservedPublicAssetPaths(routeManifest) {
+    const reserved = new Set();
+    if (!Array.isArray(routeManifest)) {
+        return reserved;
+    }
+    for (const entry of routeManifest) {
+        const publicPath = routePathToPublicPath(entry?.path);
+        if (publicPath) {
+            reserved.add(publicPath);
+        }
+        if (typeof entry?.output === 'string') {
+            const outputPath = normalizePublicPath(entry.output);
+            if (outputPath) {
+                reserved.add(outputPath);
+            }
+        }
+    }
+    return reserved;
+}
+
+export async function copyPublicAssets({ projectRoot, outDir, reservedPaths = null }) {
     const resolvedOutDir = resolve(outDir);
     const assets = await discoverPublicAssets(projectRoot);
+    const reserved = reservedPaths instanceof Set
+        ? reservedPaths
+        : new Set(Array.isArray(reservedPaths) ? reservedPaths : []);
     let copied = 0;
     let skipped = 0;
 
     for (const asset of assets) {
+        if (reserved.has(asset.publicPath)) {
+            skipped += 1;
+            continue;
+        }
         const destinationPath = resolve(resolvedOutDir, asset.publicPath);
         if (!isWithin(resolvedOutDir, destinationPath)) {
             skipped += 1;

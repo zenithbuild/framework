@@ -191,6 +191,37 @@ describe('public assets', () => {
         expect(manifest.body).toContain('Zenith');
     });
 
+    test('route-owned extension paths are reserved before public assets copy', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main>Home</main>\n',
+            'src/pages/robots.txt.resource.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.text("resource-owned robots");',
+                '}'
+            ].join('\n'),
+            'public/robots.txt': 'root public robots',
+            'src/public/robots.txt': 'src public robots'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        expect(existsSync(join(project.outDir, 'robots.txt'))).toBe(false);
+
+        preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+        const previewResponse = await fetchText(`http://127.0.0.1:${preview.port}`, '/robots.txt');
+        expect(previewResponse.status).toBe(200);
+        expect(previewResponse.body).toBe('resource-owned robots');
+
+        dev = await createDevServer({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            projectRoot: project.root,
+            port: 0
+        });
+        const devResponse = await fetchText(`http://127.0.0.1:${dev.port}`, '/robots.txt');
+        expect(devResponse.status).toBe(200);
+        expect(devResponse.body).toBe('resource-owned robots');
+    });
+
     test('dev server serves public assets from initial builds and rebuilds', async () => {
         project = await makeProject({
             'src/pages/index.zen': '<main>Home</main>\n',
@@ -217,7 +248,14 @@ describe('public assets', () => {
     test('node target serves public assets without running middleware', async () => {
         project = await makeProject({
             'src/pages/index.zen': '<main>Home</main>\n',
+            'src/pages/robots.txt.resource.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.text("node resource robots");',
+                '}'
+            ].join('\n'),
             'src/public/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg"><title>Node</title></svg>\n',
+            'public/robots.txt': 'node root public robots',
+            'src/public/robots.txt': 'node src public robots',
             'src/middleware.ts': [
                 'export default async function middleware(ctx, next) {',
                 '  globalThis.__zenithPublicAssetMiddlewareRuns = (globalThis.__zenithPublicAssetMiddlewareRuns || 0) + 1;',
@@ -236,6 +274,11 @@ describe('public assets', () => {
         expect(response.status).toBe(200);
         expect(response.body).toContain('Node');
         expect(globalThis.__zenithPublicAssetMiddlewareRuns || 0).toBe(0);
+
+        expect(existsSync(join(project.outDir, 'robots.txt'))).toBe(false);
+        const resourceResponse = await fetchText(origin, '/robots.txt');
+        expect(resourceResponse.status).toBe(200);
+        expect(resourceResponse.body).toBe('node resource robots');
     });
 
     test('static-export with basePath serves public assets under the base path', async () => {

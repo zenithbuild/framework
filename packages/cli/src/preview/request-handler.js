@@ -210,21 +210,21 @@ export function createPreviewRequestHandler(options) {
         throw new Error('not found');
       }
 
-      if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
-        const staticPath = isStaticExportTarget
-          ? resolveWithinDist(distDir, url.pathname)
-          : resolveWithinDist(distDir, canonicalPath);
-        if (!staticPath || !(await fileExists(staticPath))) {
-          throw new Error('not found');
-        }
-        const content = await readFile(staticPath);
-        const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': mime });
-        res.end(content);
-        return;
-      }
+      const canonicalUrl = new URL(url.toString());
+      canonicalUrl.pathname = canonicalPath;
 
       if (isStaticExportTarget) {
+        if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+          const staticPath = resolveWithinDist(distDir, url.pathname);
+          if (!staticPath || !(await fileExists(staticPath))) {
+            throw new Error('not found');
+          }
+          const content = await readFile(staticPath);
+          const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
+          res.writeHead(200, { 'Content-Type': mime });
+          res.end(content);
+          return;
+        }
         const directHtmlPath = toStaticFilePath(distDir, url.pathname);
         if (!directHtmlPath || !(await fileExists(directHtmlPath))) {
           throw new Error('not found');
@@ -235,8 +235,6 @@ export function createPreviewRequestHandler(options) {
         return;
       }
 
-      const canonicalUrl = new URL(url.toString());
-      canonicalUrl.pathname = canonicalPath;
       const resolvedResource = resolveRequestRoute(canonicalUrl, resourceRoutes);
       if (resolvedResource.matched && resolvedResource.route) {
         let globalMiddleware = null;
@@ -273,6 +271,18 @@ export function createPreviewRequestHandler(options) {
           return;
         }
         res.end(descriptor.body);
+        return;
+      }
+
+      if (extname(canonicalPath) && extname(canonicalPath) !== '.html') {
+        const staticPath = resolveWithinDist(distDir, canonicalPath);
+        if (!staticPath || !(await fileExists(staticPath))) {
+          throw new Error('not found');
+        }
+        const content = await readFile(staticPath);
+        const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': mime });
+        res.end(content);
         return;
       }
 

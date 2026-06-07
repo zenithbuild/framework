@@ -11,7 +11,7 @@ import { injectImageMaterializationIntoRouterManifest } from '../images/router-m
 import { buildImageArtifacts } from '../images/service.js';
 import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from '../images/payload.js';
-import { copyPublicAssets } from '../public-assets.js';
+import { copyPublicAssets, deriveReservedPublicAssetPaths } from '../public-assets.js';
 import { writeResourceRouteManifest } from '../resource-manifest.js';
 import { createStartupProfiler } from '../startup-profile.js';
 import { resolveBuildAdapter } from '../adapters/resolve-adapter.js';
@@ -88,7 +88,11 @@ export function createDevBuildSession(options) {
     async function syncPublicAssets(startupProfile) {
         await startupProfile.measureAsync(
             'copy_public_assets',
-            () => copyPublicAssets({ projectRoot, outDir })
+            () => copyPublicAssets({
+                projectRoot,
+                outDir,
+                reservedPaths: deriveReservedPublicAssetPaths(state.manifest)
+            })
         );
     }
 
