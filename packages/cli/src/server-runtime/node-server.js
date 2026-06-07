@@ -26,7 +26,13 @@ const MIME_TYPES = {
     '.webp': 'image/webp',
     '.avif': 'image/avif',
     '.gif': 'image/gif',
-    '.txt': 'text/plain; charset=utf-8'
+    '.txt': 'text/plain; charset=utf-8',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
+    '.webmanifest': 'application/manifest+json'
 };
 
 let runtimeContextPromise = null;
