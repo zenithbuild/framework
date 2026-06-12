@@ -78,6 +78,8 @@ describe('public contract truth', () => {
         expect(readme).toContain('### `zenith dev`');
         expect(readme).toContain('### `zenith build`');
         expect(readme).toContain('### `zenith preview`');
+        expect(readme).toContain('### `zenith plugin`');
+        expect(readme).toContain('### `zenith adapter`');
     });
 
     test('public docs keep the plugin surface limited to config-time V1 support', () => {
@@ -104,6 +106,39 @@ describe('public contract truth', () => {
             expect(source).not.toMatch(/\bpublic\s+plugin\s+API\s+(?:is\s+)?(?:available|open)\b/i);
             expect(source).not.toMatch(/\bframework\s+installer\s+command\s+for\s+plugins?\b/i);
             expect(source).not.toMatch(/\bplugins?\s+(?:can|may)\s+(?:transform|register middleware|mutate routes|mutate security)\b/i);
+        }
+    });
+
+    test('docs keep unsupported plugin and adapter commands future-only', () => {
+        const docsRoot = resolve(REPO_ROOT, 'docs');
+        const packageRoot = resolve(REPO_ROOT, 'packages');
+        const files = [
+            ...collectFiles(docsRoot, (file) => file.endsWith('.md') && !file.includes('/public/ai/')),
+            ...collectFiles(packageRoot, (file) => file.endsWith('.md'))
+        ].filter((file) => !isLegacyArchive(file));
+        const unsupportedCommands = [
+            'zenith plugin add',
+            'zenith plugin remove',
+            'zenith plugin create',
+            'zenith adapter add',
+            'zenith adapter create'
+        ];
+        const allowedUnsupportedContext = /\b(future|not part of the current|not exposed|unsupported|unknown|requires separate contract)\b/i;
+
+        for (const file of files) {
+            const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+            for (const [index, line] of lines.entries()) {
+                for (const command of unsupportedCommands) {
+                    if (!line.includes(command)) {
+                        continue;
+                    }
+                    if (!allowedUnsupportedContext.test(line)) {
+                        throw new Error(
+                            `${file.replace(`${REPO_ROOT}/`, '')}:${index + 1} mentions ${command} without future/unsupported context`
+                        );
+                    }
+                }
+            }
         }
     });
 

@@ -1,0 +1,37 @@
+{
+  "name": "@zenithbuild/extension-registry",
+  "version": "0.7.12",
+  "description": "Official Zenith extension registry manifest and metadata types",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "registry.json",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/extension-registry"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp registry.json dist/registry.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "^5.7.3"
+  },
+  "private": false
+}

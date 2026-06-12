@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "@zenithbuild/adapter-vercel",
+      "type": "adapter",
+      "alias": "vercel",
+      "official": true,
+      "installable": false,
+      "fallbackTarget": "vercel",
+      "displayName": "Vercel Adapter",
+      "description": "Builds Zenith apps for Vercel deployment."
+    },
+    {
+      "name": "@zenithbuild/adapter-netlify",
+      "type": "adapter",
+      "alias": "netlify",
+      "official": true,
+      "installable": false,
+      "fallbackTarget": "netlify",
+      "displayName": "Netlify Adapter",
+      "description": "Builds Zenith apps for Netlify deployment."
+    },
+    {
+      "name": "@zenithbuild/plugin-image",
+      "type": "plugin",
+      "alias": "image",
+      "official": true,
+      "installable": false,
+      "displayName": "Image Plugin",
+      "description": "Optimized image component and image asset pipeline."
+    },
+    {
+      "name": "@zenithbuild/plugin-content",
+      "type": "plugin",
+      "alias": "content",
+      "official": true,
+      "installable": false,
+      "displayName": "Content Plugin",
+      "description": "Markdown/content loading pipeline with remark support."
+    }
+  ]
+}

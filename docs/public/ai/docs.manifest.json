@@ -11,7 +11,7 @@
         "title": "Contracts",
         "summary": "Normative framework contracts and invariants.",
         "order": 10,
-        "count": 23
+        "count": 24
       },
       {
         "slug": "syntax",
@@ -303,6 +303,33 @@
       ],
       "source_path": "documentation/contracts/extension-contract.md",
       "url": "/docs/contracts/extension-contract",
+      "category": "contracts",
+      "category_title": "Contracts",
+      "category_order": 10,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": null,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/extension-hooks-audit",
+      "title": "Extension Hooks Audit",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "plugins",
+        "extensions",
+        "adapters"
+      ],
+      "source_path": "documentation/contracts/extension-hooks-audit.md",
+      "url": "/docs/contracts/extension-hooks-audit",
       "category": "contracts",
       "category_title": "Contracts",
       "category_order": 10,

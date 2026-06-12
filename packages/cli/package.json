@@ -35,6 +35,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@zenithbuild/extension-registry": "0.7.12",
     "@zenithbuild/compiler": "0.7.12",
     "@zenithbuild/bundler": "0.7.12",
     "picocolors": "^1.1.1",

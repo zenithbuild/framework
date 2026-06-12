@@ -3,7 +3,7 @@ title: "CLI Contract"
 description: "Public CLI guarantees for command behavior, exit semantics, and deployment-aware build outputs."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-03-29"
+last_updated: "2026-06-07"
 tags: ["contracts", "cli", "commands"]
 ---
 
@@ -24,6 +24,12 @@ Invariant: CLI must not implement compiler semantics, runtime behavior, or hidde
 | `zenith dev` | starts development server and rebuild loop |
 | `zenith build` | emits deterministic build output for the selected deployment target |
 | `zenith preview` | serves or boots the built target output without compilation |
+| `zenith plugin list` | lists official plugins from `@zenithbuild/extension-registry` |
+| `zenith plugin search <term>` | searches registry metadata only (no network crawl) |
+| `zenith plugin info <name\|alias>` | shows registry metadata and local `package.json` `zenith` block if installed |
+| `zenith adapter list` | lists registry adapters and built-in deployment targets |
+
+Read-only plugin/adapter commands must not import or execute extension package entrypoints. Install and config-mutation commands are not part of the current CLI surface.
 
 ## Output Contract
 

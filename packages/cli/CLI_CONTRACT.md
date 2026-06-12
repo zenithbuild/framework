@@ -26,7 +26,7 @@ The CLI:
 The CLI does **not**:
 - Own navigation, hydration, reactivity, mounting, or diffing
 - Those belong to `@zenithbuild/runtime` and `@zenithbuild/router`
-- Ship plugin install/remove commands as part of the public CLI surface
+- Execute extension package entrypoints during read-only discovery commands
 
 ---
 
@@ -37,6 +37,10 @@ The CLI does **not**:
 | `zenith dev` | Dev server + HMR + in-memory compilation |
 | `zenith build` | Canonical build output plus target adaptation under `/dist` |
 | `zenith preview` | Target-aware preview over built output (no compile, no bundle) |
+| `zenith plugin list` | List official plugins from `@zenithbuild/extension-registry` |
+| `zenith plugin search <term>` | Search official plugin metadata (no network crawl) |
+| `zenith plugin info <name\|alias>` | Show registry metadata and local `package.json` `zenith` block if installed |
+| `zenith adapter list` | List official adapters and built-in deployment targets |
 
 ---
 
