@@ -108,6 +108,7 @@
       "dependencies": {
         "@zenithbuild/bundler": "0.7.12",
         "@zenithbuild/compiler": "0.7.12",
+        "@zenithbuild/extension-registry": "0.7.12",
         "picocolors": "^1.1.1",
         "sharp": "^0.34.4",
       },
@@ -183,6 +184,14 @@
       "devDependencies": {
         "@types/gradient-string": "^1.1.6",
         "@types/node": "^20.0.0",
+      },
+    },
+    "packages/extension-registry": {
+      "name": "@zenithbuild/extension-registry",
+      "version": "0.7.12",
+      "devDependencies": {
+        "@types/node": "latest",
+        "typescript": "^5.7.3",
       },
     },
     "packages/language": {
@@ -727,6 +736,8 @@
     "@zenithbuild/compiler-win32-x64": ["@zenithbuild/compiler-win32-x64@workspace:packages/compiler-win32-x64"],
 
     "@zenithbuild/core": ["@zenithbuild/core@workspace:packages/core"],
+
+    "@zenithbuild/extension-registry": ["@zenithbuild/extension-registry@workspace:packages/extension-registry"],
 
     "@zenithbuild/language": ["@zenithbuild/language@workspace:packages/language"],
 

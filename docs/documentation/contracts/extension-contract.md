@@ -1,9 +1,9 @@
 ---
 title: "Extension Contract"
 description: "Formal definition of Zenith's stance on plugins and extensions."
-version: "0.3"
+version: "0.4"
 status: "canonical"
-last_updated: "2026-05-25"
+last_updated: "2026-06-07"
 tags: ["contracts", "plugins", "extensions"]
 ---
 
@@ -37,6 +37,21 @@ The `adapter` is an **advanced deployment configuration surface**, not a general
 - It has no access to the compilation phase, manifest generation, or client runtime execution.
 
 Built-in `vercel` and `netlify` global middleware support is current adapter compatibility. It does not define a public adapter plugin middleware API.
+
+## CLI Extension Discovery Commands
+
+The CLI exposes read-only discovery namespaces for plugins and adapters:
+
+- `zenith plugin list|search|info` — metadata-only discovery from `@zenithbuild/extension-registry`
+- `zenith adapter list` — registry adapters plus built-in `target` values
+
+Rules:
+
+- Discovery commands must not import or execute extension package entrypoints.
+- `zenith plugin info` may read an installed package's `package.json` `zenith` metadata block only.
+- Install, remove, and config-mutation CLI commands are future work and are not part of the current public surface.
+
+See also: `extension-hooks-audit.md`.
 
 ## Removability and Explicitness
 

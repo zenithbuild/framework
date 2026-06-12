@@ -11,6 +11,7 @@ fi
 bun run --cwd packages/runtime build
 bun run --cwd packages/router build
 bun run --cwd packages/core build
+bun run --cwd packages/extension-registry build
 bun run --cwd packages/cli build
 bun run --cwd packages/create-zenith build
 bun run --cwd packages/language-server build

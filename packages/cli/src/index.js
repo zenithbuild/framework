@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createZenithLogger } from './ui/logger.js';
 import { loadConfig, resolveConfigOutDir, resolveConfigPagesDir } from './config.js';
 
-const COMMANDS = ['dev', 'build', 'preview'];
+const COMMANDS = ['dev', 'build', 'preview', 'plugin', 'adapter'];
 const DEFAULT_VERSION = '0.0.0';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,6 +37,8 @@ function printUsage(logger) {
     logger.print('  zenith dev [port|--port <port>]      Start development server');
     logger.print('  zenith build                         Build static site to the configured output dir');
     logger.print('  zenith preview [port|--port <port>]  Preview the configured output dir statically');
+    logger.print('  zenith plugin list|search|info        List and inspect official plugins');
+    logger.print('  zenith adapter list                   List official adapters and built-in targets');
     logger.print('');
     logger.print('Options:');
     logger.print('  -h, --help        Show this help message');
@@ -113,6 +115,13 @@ export async function cli(args, cwd) {
     }
 
     const projectRoot = resolve(cwd || process.cwd());
+
+    if (command === 'plugin' || command === 'adapter') {
+        const mod = await import(`./commands/${command}/index.js`);
+        const exitCode = await mod.runCommand(args.slice(1), { projectRoot, logger });
+        process.exit(exitCode ?? 0);
+    }
+
     const config = await loadConfig(projectRoot);
     const pagesDir = resolveConfigPagesDir(projectRoot, config);
     const outDir = resolveConfigOutDir(projectRoot, config);

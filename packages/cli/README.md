@@ -95,9 +95,17 @@ Current limitations:
 - `node`, `vercel`, and `netlify` expose deployed `/_zenith/image` endpoints on the packaged image contract.
 - Hosted `vercel` and `netlify` targets skip advisory `/__zenith/route-check`; direct HTML requests remain the server-side route boundary.
 - Image materialization is route-artifact-driven. Bundler owns final build/static HTML image materialization, while preview and server render still materialize at runtime from structured `image_materialization` metadata. No path executes page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
-- There is no shipped plugin install/remove command surface in this CLI.
+- Extension discovery commands are read-only; they do not install packages or mutate `zenith.config`.
 
 ## Commands
+
+### `zenith plugin`
+- `zenith plugin list` — official registry plugins
+- `zenith plugin search <term>` — metadata search
+- `zenith plugin info <name|alias>` — registry metadata and local `package.json` `zenith` block if installed
+
+### `zenith adapter`
+- `zenith adapter list` — registry adapters and built-in targets
 
 ### `zenith dev`
 Starts the development server on `localhost:3000`.
