@@ -13,6 +13,7 @@ Start here (ordered):
   - /docs/contracts/dsl-syntax
   - /docs/contracts/editor-integration
   - /docs/contracts/extension-contract
+  - /docs/contracts/extension-hooks-audit
   - /docs/contracts/hmr-v1-contract
   - /docs/contracts/hydration-contract
   - /docs/contracts/ir-envelope

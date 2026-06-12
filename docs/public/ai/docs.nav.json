@@ -107,6 +107,17 @@
           "source_path": "documentation/contracts/extension-contract.md"
         },
         {
+          "slug": "contracts/extension-hooks-audit",
+          "title": "Extension Hooks Audit",
+          "label": "Extension Hooks Audit",
+          "url": "/docs/contracts/extension-hooks-audit",
+          "order": null,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/contracts/extension-hooks-audit.md"
+        },
+        {
           "slug": "contracts/hmr-v1-contract",
           "title": "HMR V1 Contract",
           "label": "HMR V1 Contract",
@@ -664,6 +675,7 @@
     "/docs/contracts/dsl-syntax",
     "/docs/contracts/editor-integration",
     "/docs/contracts/extension-contract",
+    "/docs/contracts/extension-hooks-audit",
     "/docs/contracts/hmr-v1-contract",
     "/docs/contracts/hydration-contract",
     "/docs/contracts/ir-envelope",
