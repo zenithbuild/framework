@@ -60,7 +60,7 @@ test('framework and scaffolder selections resolve from one matrix', () => {
     const framework = selectPublishMatrixEntries({ selection: 'framework' });
     const scaffolder = selectPublishMatrixEntries({ selection: 'scaffolder' });
 
-    assert.equal(framework.length, 14);
+    assert.equal(framework.length, 15);
     assert.equal(scaffolder.length, 1);
     assert.equal(scaffolder[0].dir, 'packages/create-zenith');
     assert.equal(framework.some((entry) => entry.dir === 'packages/create-zenith'), false);
@@ -86,6 +86,7 @@ test('framework release selection excludes standalone-owned editor packages', ()
         'packages/runtime',
         'packages/router',
         'packages/core',
+        'packages/extension-registry',
         'packages/cli'
     ]);
     assert.equal(languagePackage.private, true);
@@ -359,5 +360,5 @@ test('verifyPublishSurface uses shell mode for npm pack on win32', () => {
 });
 
 test('matrix stays aligned with expected publish targets', () => {
-    assert.equal(PUBLISH_SURFACE_MATRIX.length, 15);
+    assert.equal(PUBLISH_SURFACE_MATRIX.length, 16);
 });
