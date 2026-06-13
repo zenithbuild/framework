@@ -1,21 +1,31 @@
 import { normalizeBasePath, prependBasePath } from '../base-path.js';
 
-function splitRouteSegments(routePath) {
+interface StaticRoute {
+    path: string;
+    html: string;
+}
+
+interface VercelRoute {
+    src: string;
+    dest: string;
+}
+
+function splitRouteSegments(routePath: string): string[] {
     return String(routePath || '').split('/').filter(Boolean);
 }
 
-function escapeRegex(value) {
+function escapeRegex(value: string): string {
     return String(value).replace(/[|\\{}()[\]^$+*?.-]/g, '\\$&');
 }
 
-function buildNetlifyPatternSegment(segment) {
+function buildNetlifyPatternSegment(segment: string): string {
     if (segment.startsWith(':')) {
         return segment;
     }
     return segment;
 }
 
-export function createNetlifyBasePathAssetRules(basePath) {
+export function createNetlifyBasePathAssetRules(basePath: string): string[] {
     const normalizedBasePath = normalizeBasePath(basePath);
     if (normalizedBasePath === '/') {
         return [];
@@ -26,11 +36,11 @@ export function createNetlifyBasePathAssetRules(basePath) {
     ];
 }
 
-export function createNetlifyImageEndpointRule(basePath) {
+export function createNetlifyImageEndpointRule(basePath: string): string {
     return `${prependBasePath(basePath, '/_zenith/image')} /.netlify/functions/__zenith_image 200!`;
 }
 
-export function createNetlifyRewriteRules(route, basePath = '/') {
+export function createNetlifyRewriteRules(route: StaticRoute, basePath = '/'): string[] {
     const segments = splitRouteSegments(route.path);
     if (segments.length === 0) {
         return [`${prependBasePath(basePath, '/')} ${route.html} 200`];
@@ -58,7 +68,7 @@ export function createNetlifyRewriteRules(route, basePath = '/') {
     return [`${prependBasePath(basePath, path)} ${route.html} 200`];
 }
 
-export function createVercelBasePathAssetRoutes(basePath) {
+export function createVercelBasePathAssetRoutes(basePath: string): VercelRoute[] {
     const normalizedBasePath = normalizeBasePath(basePath);
     if (normalizedBasePath === '/') {
         return [];
@@ -76,14 +86,14 @@ export function createVercelBasePathAssetRoutes(basePath) {
     ];
 }
 
-export function createVercelImageEndpointRoute(basePath) {
+export function createVercelImageEndpointRoute(basePath: string): VercelRoute {
     return {
         src: createVercelRouteSource('/_zenith/image', basePath),
         dest: '/__zenith/image'
     };
 }
 
-export function createVercelRouteSource(routePath, basePath = '/') {
+export function createVercelRouteSource(routePath: string, basePath = '/'): string {
     const segments = splitRouteSegments(routePath);
     if (segments.length === 0) {
         const rootPath = prependBasePath(basePath, '/');
