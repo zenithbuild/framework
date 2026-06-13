@@ -23,7 +23,17 @@ const MISSING_SCOPED_RUNTIME_ERROR =
 const MISSING_SCOPED_MODULES_ERROR =
     '[Zenith:ScopedServerData] Compiled scoped server data modules are missing from server output.';
 
-function createSharpRuntimeSource() {
+interface HostedPageRuntimeOptions {
+    includeScopedServerData?: boolean;
+}
+
+interface ServerManifest {
+    global_middleware?: {
+        module?: unknown;
+    };
+}
+
+function createSharpRuntimeSource(): string {
     const sharpPath = PACKAGE_REQUIRE.resolve('sharp');
     const fallbackUrl = pathToFileURL(sharpPath).href;
     return [
@@ -43,7 +53,7 @@ function createSharpRuntimeSource() {
     ].join('\n');
 }
 
-async function readServerManifest(coreOutput) {
+async function readServerManifest(coreOutput: string): Promise<ServerManifest | null> {
     try {
         return JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
     } catch {
@@ -51,7 +61,7 @@ async function readServerManifest(coreOutput) {
     }
 }
 
-function normalizeGlobalMiddlewareModulePath(modulePath) {
+function normalizeGlobalMiddlewareModulePath(modulePath: unknown): string {
     if (typeof modulePath !== 'string' || modulePath.length === 0 || isAbsolute(modulePath) || /^[A-Za-z]:[\\/]/.test(modulePath)) {
         throw new Error(INVALID_GLOBAL_MIDDLEWARE_MODULE_PATH_ERROR);
     }
@@ -70,7 +80,7 @@ function normalizeGlobalMiddlewareModulePath(modulePath) {
     return normalized;
 }
 
-async function assertPathExists(filePath, message) {
+async function assertPathExists(filePath: string, message: string): Promise<void> {
     try {
         await stat(filePath);
     } catch {
@@ -78,7 +88,7 @@ async function assertPathExists(filePath, message) {
     }
 }
 
-async function copyHostedScopedServerDataRuntime(coreOutput, targetDir) {
+async function copyHostedScopedServerDataRuntime(coreOutput: string, targetDir: string): Promise<void> {
     const serverDir = join(coreOutput, 'server');
     const runtimeRoot = join(serverDir, 'scoped-server-data');
     const scopedRoot = join(serverDir, 'scoped');
@@ -88,7 +98,11 @@ async function copyHostedScopedServerDataRuntime(coreOutput, targetDir) {
     await cp(scopedRoot, join(targetDir, 'scoped'), { recursive: true, force: true });
 }
 
-export async function copyHostedPageRuntime(coreOutput, targetDir, options = {}) {
+export async function copyHostedPageRuntime(
+    coreOutput: string,
+    targetDir: string,
+    options: HostedPageRuntimeOptions = {}
+): Promise<void> {
     const serverDir = join(coreOutput, 'server');
     await mkdir(targetDir, { recursive: true });
 
@@ -117,7 +131,7 @@ export async function copyHostedPageRuntime(coreOutput, targetDir, options = {})
     }
 }
 
-export async function copyHostedGlobalMiddlewareRuntime(coreOutput, targetDir) {
+export async function copyHostedGlobalMiddlewareRuntime(coreOutput: string, targetDir: string): Promise<string | null> {
     const manifest = await readServerManifest(coreOutput);
     const modulePath = manifest?.global_middleware?.module;
     if (modulePath == null) {

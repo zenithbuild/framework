@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
 import { cli } from '../dist/index.js';
 import { executeScopedServerData } from '../dist/scoped-server-data/runtime.js';
-import { copyHostedPageRuntime } from '../src/adapters/copy-hosted-page-runtime.js';
+import { copyHostedPageRuntime } from '../dist/adapters/copy-hosted-page-runtime.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';

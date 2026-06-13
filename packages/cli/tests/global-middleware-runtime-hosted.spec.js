@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
 import { cli } from '../dist/index.js';
-import { copyHostedGlobalMiddlewareRuntime } from '../src/adapters/copy-hosted-page-runtime.js';
+import { copyHostedGlobalMiddlewareRuntime } from '../dist/adapters/copy-hosted-page-runtime.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
