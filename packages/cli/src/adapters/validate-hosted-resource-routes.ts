@@ -1,7 +1,13 @@
+import type { AdapterManifestEntry, AdapterRouteManifest } from './adapter-types.js';
+
 const HOSTED_RESOURCE_DOWNLOAD_RE = /\b(?:ctx\.)?download\s*\(/;
 
-export function validateHostedResourceRoutes(manifest, targetName) {
-    for (const route of Array.isArray(manifest) ? manifest : []) {
+export function validateHostedResourceRoutes(manifest: AdapterRouteManifest | unknown, targetName: string): void {
+    const routes = Array.isArray(manifest)
+        ? manifest as Array<Partial<AdapterManifestEntry>>
+        : [];
+
+    for (const route of routes) {
         if (route?.route_kind !== 'resource') {
             continue;
         }
