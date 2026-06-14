@@ -59,7 +59,7 @@
   "devDependencies": {
     "@types/node": "latest",
     "@types/vscode": "^1.90.0",
-    "esbuild": "^0.25.11",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.3",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.2.0"
