@@ -2,18 +2,11 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { compareRouteSpecificity } from '../server/resolve-request-route.js';
 import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
+import { createHostedAdapterContext } from './hosted-adapter-context.js';
 import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteSource } from './route-rules.js';
 import { validateHostedResourceRoutes } from './validate-hosted-resource-routes.js';
-import type { AdapterDriver, AdapterManifestEntry, BuildManifest } from './adapter-types.js';
-
-interface HostedRoute extends AdapterManifestEntry {
-    name: string;
-    page_asset_file?: string;
-    image_manifest_file?: string;
-    image_config?: unknown;
-    has_scoped_server_data?: boolean;
-    scoped_server_data?: unknown[];
-}
+import type { AdapterDriver, BuildManifest } from './adapter-types.js';
+import type { HostedServerManifest, HostedServerManifestRoute } from './hosted-adapter-context.js';
 
 interface AdapterConfig {
     images?: unknown;
@@ -25,7 +18,7 @@ interface VercelConfigRoute {
     handle?: 'filesystem';
 }
 
-function buildVercelServerDest(route: HostedRoute) {
+function buildVercelServerDest(route: HostedServerManifestRoute) {
     const base = `/__zenith/${route.name}`;
     if (!Array.isArray(route.params) || route.params.length === 0) {
         return base;
@@ -34,7 +27,7 @@ function buildVercelServerDest(route: HostedRoute) {
     return `${base}?${query}`;
 }
 
-function buildVercelConfig(buildManifest: BuildManifest, serverRoutes: HostedRoute[]) {
+function buildVercelConfig(buildManifest: BuildManifest, serverRoutes: HostedServerManifestRoute[]) {
     const routes: VercelConfigRoute[] = [...createVercelBasePathAssetRoutes(buildManifest.base_path)];
     for (const route of [...serverRoutes].sort((left, right) => compareRouteSpecificity(left.path, right.path))) {
         routes.push({
@@ -77,7 +70,7 @@ function createImageFunctionSource(imagesConfig: unknown) {
     ].join('\n');
 }
 
-function createFunctionSource(route: HostedRoute, globalMiddlewareModulePath: string | null) {
+function createFunctionSource(route: HostedServerManifestRoute, globalMiddlewareModulePath: string | null) {
     const globalMiddlewarePathExpression = globalMiddlewareModulePath
         ? "join(__dirname, 'global-middleware', 'entry.js')"
         : 'null';
@@ -127,19 +120,25 @@ function createFunctionSource(route: HostedRoute, globalMiddlewareModulePath: st
     ].join('\n');
 }
 
-function hasHostedScopedServerData(route: HostedRoute) {
+function hasHostedScopedServerData(route: HostedServerManifestRoute) {
     return route.route_kind !== 'resource' &&
         route.has_scoped_server_data === true &&
         Array.isArray(route.scoped_server_data) &&
         route.scoped_server_data.length > 0;
 }
 
-async function loadServerManifest(coreOutput: string): Promise<HostedRoute[]> {
+async function loadServerManifest(coreOutput: string): Promise<HostedServerManifest | null> {
     try {
         const parsed = JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
-        return Array.isArray(parsed.routes) ? parsed.routes : [];
+        if (!parsed || typeof parsed !== 'object') {
+            return { routes: [] };
+        }
+        return {
+            ...parsed,
+            routes: Array.isArray(parsed.routes) ? parsed.routes : []
+        };
     } catch {
-        return [];
+        return null;
     }
 }
 
@@ -166,29 +165,40 @@ export const vercelAdapter: AdapterDriver = {
         validateHostedResourceRoutes(manifest, 'vercel');
     },
     async adapt(options) {
-        const staticDir = join(options.coreOutput, 'static');
         // Route meaning is fixed upstream in the manifest/server package.
         // The adapter only maps already-classified output into Vercel's layout.
-        const serverRoutes = await loadServerManifest(options.coreOutput);
-        await rm(options.outDir, { recursive: true, force: true });
-        await mkdir(join(options.outDir, 'static'), { recursive: true });
-        await cp(staticDir, join(options.outDir, 'static'), { recursive: true, force: true });
+        const serverManifest = await loadServerManifest(options.coreOutput);
+        const hostedContext = createHostedAdapterContext({
+            adapterName: 'vercel',
+            target: options.manifest.target,
+            buildManifest: options.manifest,
+            routeManifest: serverManifest?.routes ?? [],
+            serverManifest,
+            coreOutput: options.coreOutput,
+            outDir: options.outDir,
+            config: options.config
+        });
+        const serverRoutes = (hostedContext.serverManifest?.routes ?? hostedContext.routeManifest) as HostedServerManifestRoute[];
+        const staticDir = join(hostedContext.coreOutput, 'static');
+        await rm(hostedContext.outDir, { recursive: true, force: true });
+        await mkdir(join(hostedContext.outDir, 'static'), { recursive: true });
+        await cp(staticDir, join(hostedContext.outDir, 'static'), { recursive: true, force: true });
 
         await writeHostedFunctionBundle(
-            join(options.outDir, 'functions', '__zenith', 'image.func'),
-            options.coreOutput,
-            createImageFunctionSource((options.config as AdapterConfig | null | undefined)?.images || {})
+            join(hostedContext.outDir, 'functions', '__zenith', 'image.func'),
+            hostedContext.coreOutput,
+            createImageFunctionSource((hostedContext.config as AdapterConfig | null | undefined)?.images || {})
         );
 
         for (const route of serverRoutes) {
-            const functionDir = join(options.outDir, 'functions', '__zenith', `${route.name}.func`);
+            const functionDir = join(hostedContext.outDir, 'functions', '__zenith', `${route.name}.func`);
             await mkdir(functionDir, { recursive: true });
-            await copyHostedPageRuntime(options.coreOutput, functionDir, {
+            await copyHostedPageRuntime(hostedContext.coreOutput, functionDir, {
                 includeScopedServerData: hasHostedScopedServerData(route)
             });
-            const globalMiddlewareModulePath = await copyHostedGlobalMiddlewareRuntime(options.coreOutput, functionDir);
+            const globalMiddlewareModulePath = await copyHostedGlobalMiddlewareRuntime(hostedContext.coreOutput, functionDir);
             await cp(
-                join(options.coreOutput, 'server', 'routes', route.name),
+                join(hostedContext.coreOutput, 'server', 'routes', route.name),
                 join(functionDir, 'routes', route.name),
                 { recursive: true, force: true }
             );
@@ -198,8 +208,8 @@ export const vercelAdapter: AdapterDriver = {
         }
 
         await writeFile(
-            join(options.outDir, 'config.json'),
-            `${JSON.stringify(buildVercelConfig(options.manifest, serverRoutes), null, 2)}\n`,
+            join(hostedContext.outDir, 'config.json'),
+            `${JSON.stringify(buildVercelConfig(hostedContext.buildManifest, serverRoutes), null, 2)}\n`,
             'utf8'
         );
     }
