@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+node ./scripts/security/check-esbuild-ghsa-gv7w-rqvm-qjhr.mjs
+
 bash ./scripts/build.sh
 node ./scripts/verify-compiler-shipped-surface.mjs
 node ./scripts/verify-publish-surface.mjs --selection release
