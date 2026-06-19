@@ -51,9 +51,15 @@ export function state<T extends PlainState>(initialValue: T): ZenithState<T> {
             return current;
         },
         set(nextPatch) {
-            const nextValue = typeof nextPatch === 'function'
-                ? nextPatch(current)
-                : { ...current, ...nextPatch };
+            let nextValue: T;
+            if (typeof nextPatch === 'function') {
+                nextValue = nextPatch(current);
+            } else {
+                if (!isPlainObject(nextPatch)) {
+                    throw new Error('[Zenith Runtime] state.set(next) must resolve to a plain object');
+                }
+                nextValue = { ...current, ...nextPatch } as T;
+            }
 
             if (!isPlainObject(nextValue)) {
                 throw new Error('[Zenith Runtime] state.set(next) must resolve to a plain object');

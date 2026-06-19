@@ -163,6 +163,38 @@ describe('public assets', () => {
         expect(await readFile(join(project.outDir, 'assets', 'router-manifest.json'), 'utf8')).not.toBe('{"public":true}');
     });
 
+    test('build applies public asset precedence and reserved output paths by public URL', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main>Generated index</main>\n',
+            'src/pages/about.zen': '<main>Generated about</main>\n',
+            'public/shared.txt': 'root shared',
+            'src/public/shared.txt': 'src shared',
+            'public/nested/asset.txt': 'root nested',
+            'src/public/nested/asset.txt': 'src nested',
+            'public/about/index.html': 'public about index',
+            'public/assets/router-manifest.json': '{"from":"public"}'
+        });
+
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: { router: true }
+        });
+
+        const cases = [
+            ['shared.txt', 'src shared'],
+            ['nested/asset.txt', 'src nested'],
+            ['about/index.html', 'Generated about']
+        ];
+
+        for (const [relativePath, expected] of cases) {
+            await expect(readFile(join(project.outDir, relativePath), 'utf8')).resolves.toContain(expected);
+        }
+
+        const routerManifest = await readFile(join(project.outDir, 'assets', 'router-manifest.json'), 'utf8');
+        expect(routerManifest).not.toContain('"from":"public"');
+    });
+
     test('preview serves copied public assets with static MIME types', async () => {
         project = await makeProject({
             'src/pages/index.zen': '<main>Home</main>\n',

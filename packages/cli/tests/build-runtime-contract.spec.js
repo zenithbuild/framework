@@ -232,13 +232,16 @@ describe('build runtime contract', () => {
         await expect(evaluateBuiltModule(pageAsset, pageAssetPath)).resolves.toBeUndefined();
     });
 
-    test('prints compiler warnings during build for unknown events', async () => {
+    test.each([
+        ['click typo', 'clcik', "Did you mean 'click'?"],
+        ['double-click typo', 'dbclick', "Did you mean 'dblclick'?"]
+    ])('prints compiler warnings during build for unknown events: %s', async (_label, eventName, suggestion) => {
         project = await makeProject({
             'index.zen': [
                 '<script lang="ts">',
                 'function handleClick() {}',
                 '</script>',
-                '<button on:clcik={handleClick}>Tap</button>'
+                `<button on:${eventName}={handleClick}>Tap</button>`
             ].join('\n')
         });
 
@@ -255,7 +258,7 @@ describe('build runtime contract', () => {
         }
 
         expect(warned.some((line) => line.includes('warning[ZEN-EVT-UNKNOWN]'))).toBe(true);
-        expect(warned.some((line) => line.includes("Did you mean 'click'?"))).toBe(true);
+        expect(warned.some((line) => line.includes(suggestion))).toBe(true);
     });
 
     test('emitted JS never contains injected querySelector/addEventListener fallbacks (drift killer)', async () => {
@@ -311,9 +314,16 @@ describe('build runtime contract', () => {
         const warned = [];
         const emit = createCompilerWarningEmitter((line) => warned.push(line));
 
-        emit('a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
-        emit('a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
-        emit('a.zen:2:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?');
+        const cases = [
+            'a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?',
+            'a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?',
+            'a.zen:2:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?',
+            'a.zen:2:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?'
+        ];
+
+        for (const line of cases) {
+            emit(line);
+        }
 
         expect(warned).toEqual([
             'a.zen:1:2: warning[ZEN-EVT-UNKNOWN] Unknown DOM event \'clcik\'. Did you mean \'click\'?',

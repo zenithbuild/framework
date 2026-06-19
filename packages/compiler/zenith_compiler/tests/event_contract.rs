@@ -57,14 +57,17 @@ fn rejects_direct_call_event_handlers() {
 
 #[test]
 fn rejects_direct_call_event_handler_variants() {
-    for source in [
-        r#"<button on:click={(doThing())}></button>"#,
-        r#"<button on:click={handlers["save"]()}></button>"#,
-        r#"<button on:click={doThing?.()}></button>"#,
-        r#"<button on:click={factory().handler}></button>"#,
+    for (label, source) in [
+        ("parenthesized direct call", r#"<button on:click={(doThing())}></button>"#),
+        ("member call", r#"<button on:click={handlers["save"]()}></button>"#),
+        ("optional call", r#"<button on:click={doThing?.()}></button>"#),
+        ("factory call", r#"<button on:click={factory().handler}></button>"#),
     ] {
         let error = compile_structured(source).unwrap_err();
-        assert!(error.contains("must not be direct call expressions"));
+        assert!(
+            error.contains("must not be direct call expressions"),
+            "{label} should reject direct calls, got: {error}"
+        );
     }
 }
 
@@ -83,19 +86,24 @@ fn allows_inline_arrow_function_handlers() {
 
 #[test]
 fn emits_unknown_event_warning_with_suggestion() {
-    let (_, warnings) = compile_structured_with_source_options_and_warnings(
-        r#"<script lang="ts">function handleClick() {}</script><button on:clcik={handleClick}></button>"#,
-        "event-contract.zen",
-        CompileOptions::default(),
-    )
-    .expect("compile");
+    for (event_name, suggestion) in [("clcik", "click"), ("dbclick", "dblclick")] {
+        let source = format!(
+            r#"<script lang="ts">function handleClick() {{}}</script><button on:{event_name}={{handleClick}}></button>"#
+        );
+        let (_, warnings) = compile_structured_with_source_options_and_warnings(
+            &source,
+            "event-contract.zen",
+            CompileOptions::default(),
+        )
+        .expect("compile");
 
-    assert_eq!(warnings.len(), 1);
-    assert_eq!(warnings[0].code, "ZEN-EVT-UNKNOWN");
-    assert!(warnings[0].message.contains("Unknown DOM event 'clcik'"));
-    assert!(warnings[0].message.contains("Did you mean 'click'"));
-    assert!(warnings[0].line >= 1);
-    assert!(warnings[0].column >= 1);
+        assert_eq!(warnings.len(), 1, "{event_name} should emit one warning");
+        assert_eq!(warnings[0].code, "ZEN-EVT-UNKNOWN");
+        assert!(warnings[0].message.contains(&format!("Unknown DOM event '{event_name}'")));
+        assert!(warnings[0].message.contains(&format!("Did you mean '{suggestion}'")));
+        assert!(warnings[0].line >= 1);
+        assert!(warnings[0].column >= 1);
+    }
 }
 
 #[test]
