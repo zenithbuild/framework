@@ -84,6 +84,85 @@ describe('Server routing errors and origin handling', () => {
         expect(emptyPreview.body).toContain('window.__zenith_ssr_data = {};');
     });
 
+    test('thrown guard, load, and action errors return sanitized 500 responses in dev and preview', async () => {
+        project = await makeProject({
+            'throw-guard.zen': [
+                '<script server lang="ts">',
+                'export async function guard(ctx) {',
+                '  void ctx;',
+                '  throw new Error("GUARD_SECRET_SHOULD_NOT_LEAK");',
+                '}',
+                'export async function load(ctx) {',
+                '  return ctx.data({ shouldNotRun: true });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Guard</main></body></html>'
+            ].join('\n'),
+            'throw-load.zen': [
+                '<script server lang="ts">',
+                'export async function guard(ctx) {',
+                '  return ctx.allow();',
+                '}',
+                'export async function load(ctx) {',
+                '  void ctx;',
+                '  throw new Error("LOAD_SECRET_SHOULD_NOT_LEAK");',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Load</main></body></html>'
+            ].join('\n'),
+            'throw-action.zen': [
+                '<script server lang="ts">',
+                'export async function guard(ctx) {',
+                '  return ctx.allow();',
+                '}',
+                'export async function action(ctx) {',
+                '  void ctx;',
+                '  throw new Error("ACTION_SECRET_SHOULD_NOT_LEAK");',
+                '}',
+                'export async function load(ctx) {',
+                '  return ctx.data({ shouldNotRun: true });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Action</main></body></html>'
+            ].join('\n')
+        });
+
+        const expectedServerErrors = jest.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+            dev = await createDevServer({ pagesDir: project.pagesDir, outDir: project.outDir, port: 0 });
+            preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+
+            const cases = [
+                { path: '/throw-guard', secret: 'GUARD_SECRET_SHOULD_NOT_LEAK' },
+                { path: '/throw-load', secret: 'LOAD_SECRET_SHOULD_NOT_LEAK' },
+                {
+                    path: '/throw-action',
+                    secret: 'ACTION_SECRET_SHOULD_NOT_LEAK',
+                    options: {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                        body: 'save=1'
+                    }
+                }
+            ];
+
+            for (const testCase of cases) {
+                const devResponse = await fetchText(origin(dev.port), testCase.path, testCase.options || {});
+                const previewResponse = await fetchText(origin(preview.port), testCase.path, testCase.options || {});
+
+                for (const response of [devResponse, previewResponse]) {
+                    expect(response.status).toBe(500);
+                    expect(response.body).toBe('Internal Server Error');
+                    expect(response.body).not.toContain(testCase.secret);
+                }
+                expect(previewResponse.body).toBe(devResponse.body);
+            }
+        } finally {
+            expectedServerErrors.mockRestore();
+        }
+    });
+
     test('dev and preview ignore untrusted Host when reconstructing ctx.url.origin', async () => {
         project = await makeProject({
             'origin.zen': [

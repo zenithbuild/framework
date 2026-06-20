@@ -183,4 +183,125 @@ describe('Server routing actions', () => {
         });
         expect(extractSsrPayload(successPreview.body)).toEqual(extractSsrPayload(successDev.body));
     });
+
+    test('action result kinds preserve dev and preview parity', async () => {
+        project = await makeProject({
+            'action-redirect.zen': [
+                '<script server lang="ts">',
+                'export async function action(ctx) {',
+                '  void ctx;',
+                '  return ctx.redirect("/done", 303);',
+                '}',
+                'export async function load(ctx) {',
+                '  void ctx;',
+                '  throw new Error("load should not run after action redirect");',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Redirect</main></body></html>'
+            ].join('\n'),
+            'action-deny.zen': [
+                '<script server lang="ts">',
+                'export async function action(ctx) {',
+                '  void ctx;',
+                '  return ctx.deny(403, "Action denied");',
+                '}',
+                'export async function load(ctx) {',
+                '  void ctx;',
+                '  throw new Error("load should not run after action deny");',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Deny</main></body></html>'
+            ].join('\n'),
+            'action-invalid.zen': [
+                '<script server lang="ts">',
+                'export async function action(ctx) {',
+                '  void ctx;',
+                '  return ctx.invalid({ field: "title", message: "Title required" }, 422);',
+                '}',
+                'export async function load(ctx) {',
+                '  return ctx.data({ route: ctx.route.pattern, action: ctx.action });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Invalid</main></body></html>'
+            ].join('\n'),
+            'action-data.zen': [
+                '<script server lang="ts">',
+                'export async function action(ctx) {',
+                '  void ctx;',
+                '  return ctx.data({ saved: true });',
+                '}',
+                'export async function load(ctx) {',
+                '  return ctx.data({ route: ctx.route.pattern, action: ctx.action });',
+                '}',
+                '</script>',
+                '<html><head></head><body><main>Data</main></body></html>'
+            ].join('\n')
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        dev = await createDevServer({ pagesDir: project.pagesDir, outDir: project.outDir, port: 0 });
+        preview = await createPreviewServer({ distDir: project.outDir, port: 0 });
+
+        const cases = [
+            {
+                path: '/action-redirect',
+                assertResult(response) {
+                    expect(response.status).toBe(303);
+                    expect(response.headers.get('location')).toBe('/done');
+                    expect(response.body).toBe('');
+                }
+            },
+            {
+                path: '/action-deny',
+                assertResult(response) {
+                    expect(response.status).toBe(403);
+                    expect(response.body).toBe('Action denied');
+                }
+            },
+            {
+                path: '/action-invalid',
+                assertResult(response) {
+                    expect(response.status).toBe(422);
+                    expect(extractSsrPayload(response.body)).toEqual({
+                        route: '/action-invalid',
+                        action: {
+                            ok: false,
+                            status: 422,
+                            data: { field: 'title', message: 'Title required' }
+                        }
+                    });
+                }
+            },
+            {
+                path: '/action-data',
+                assertResult(response) {
+                    expect(response.status).toBe(200);
+                    expect(extractSsrPayload(response.body)).toEqual({
+                        route: '/action-data',
+                        action: {
+                            ok: true,
+                            status: 200,
+                            data: { saved: true }
+                        }
+                    });
+                }
+            }
+        ];
+
+        for (const testCase of cases) {
+            const options = {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: 'title='
+            };
+            const devResponse = await fetchText(origin(dev.port), testCase.path, options);
+            const previewResponse = await fetchText(origin(preview.port), testCase.path, options);
+
+            testCase.assertResult(devResponse);
+            testCase.assertResult(previewResponse);
+            expect(previewResponse.status).toBe(devResponse.status);
+            expect(previewResponse.body).toBe(devResponse.body);
+            expect(previewResponse.headers.get('location')).toBe(devResponse.headers.get('location'));
+        }
+    });
 });

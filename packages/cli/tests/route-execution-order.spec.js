@@ -98,6 +98,103 @@ describe('route guard/load execution order', () => {
     });
 
     test.each([
+        [
+            'guard redirect',
+            {
+                guardResult: redirect('/login', 307),
+                actionResult: data({ saved: true }),
+                loadResult: data({ loaded: true }),
+                expectedCalls: ['guard'],
+                expectedTrace: { guard: 'redirect', action: 'none', load: 'none' },
+                expectedResult: redirect('/login', 307)
+            }
+        ],
+        [
+            'guard deny',
+            {
+                guardResult: deny(401, 'sign in'),
+                actionResult: data({ saved: true }),
+                loadResult: data({ loaded: true }),
+                expectedCalls: ['guard'],
+                expectedTrace: { guard: 'deny', action: 'none', load: 'none' },
+                expectedResult: deny(401, 'sign in')
+            }
+        ],
+        [
+            'action redirect',
+            {
+                guardResult: allow(),
+                actionResult: redirect('/done', 303),
+                loadResult: data({ loaded: true }),
+                expectedCalls: ['guard', 'action'],
+                expectedTrace: { guard: 'allow', action: 'redirect', load: 'none' },
+                expectedResult: redirect('/done', 303)
+            }
+        ],
+        [
+            'action deny',
+            {
+                guardResult: allow(),
+                actionResult: deny(403, 'blocked'),
+                loadResult: data({ loaded: true }),
+                expectedCalls: ['guard', 'action'],
+                expectedTrace: { guard: 'allow', action: 'deny', load: 'none' },
+                expectedResult: deny(403, 'blocked')
+            }
+        ],
+        [
+            'load redirect',
+            {
+                guardResult: allow(),
+                actionResult: data({ saved: true }),
+                loadResult: redirect('/after-load', 302),
+                expectedCalls: ['guard', 'action', 'load'],
+                expectedTrace: { guard: 'allow', action: 'data', load: 'redirect' },
+                expectedResult: redirect('/after-load', 302)
+            }
+        ],
+        [
+            'load deny',
+            {
+                guardResult: allow(),
+                actionResult: data({ saved: true }),
+                loadResult: deny(404, 'missing'),
+                expectedCalls: ['guard', 'action', 'load'],
+                expectedTrace: { guard: 'allow', action: 'data', load: 'deny' },
+                expectedResult: deny(404, 'missing')
+            }
+        ]
+    ])('page POST %s preserves execution contract', async (_name, scenario) => {
+        const calls = [];
+        const result = await resolveRouteResult({
+            routeKind: 'page',
+            filePath: 'page.ts',
+            ctx: createContext('POST'),
+            exports: {
+                guard(ctx) {
+                    void ctx;
+                    calls.push('guard');
+                    return scenario.guardResult;
+                },
+                action(ctx) {
+                    void ctx;
+                    calls.push('action');
+                    return scenario.actionResult;
+                },
+                load(ctx) {
+                    void ctx;
+                    calls.push('load');
+                    return scenario.loadResult;
+                }
+            }
+        });
+
+        expect(calls).toEqual(scenario.expectedCalls);
+        expect(result.result).toMatchObject(scenario.expectedResult);
+        expect(result.trace).toEqual(scenario.expectedTrace);
+    });
+
+    test.each([
         ['redirect', redirect('/next', 303)],
         ['deny', deny(403, 'blocked')]
     ])('page load %s result is preserved', async (_name, loadResult) => {

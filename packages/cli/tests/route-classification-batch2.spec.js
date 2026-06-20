@@ -35,6 +35,26 @@ function protectedPrerenderPage(kind) {
     ].join('\n');
 }
 
+function protectedAdjacentPrerenderFiles(kind) {
+    const handlerSource = [
+        `export async function ${kind}(ctx) {`,
+        kind === 'guard'
+            ? '  return ctx.allow();'
+            : '  return ctx.data({ ok: true });',
+        '}'
+    ].join('\n');
+
+    return {
+        'pages/index.zen': [
+            '<script server lang="ts">',
+            'export const prerender = true;',
+            '</script>',
+            '<main>protected</main>'
+        ].join('\n'),
+        [`pages/page.${kind}.ts`]: handlerSource
+    };
+}
+
 describe('Batch 2 route classification', () => {
     let project = null;
 
@@ -51,6 +71,17 @@ describe('Batch 2 route classification', () => {
             project = await createProject({
                 'pages/index.zen': protectedPrerenderPage(kind)
             });
+
+            await expect(generateManifest(project.pagesDir)).rejects.toThrow(
+                'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
+            );
+        }
+    );
+
+    test.each(['guard', 'load', 'action'])(
+        'manifest rejects prerender=true combined with adjacent page.%s.ts',
+        async (kind) => {
+            project = await createProject(protectedAdjacentPrerenderFiles(kind));
 
             await expect(generateManifest(project.pagesDir)).rejects.toThrow(
                 'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
@@ -87,4 +118,15 @@ describe('Batch 2 route classification', () => {
             'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
         );
     });
+
+    test.each(['guard', 'load', 'action'])(
+        'build rejects prerender=true combined with adjacent page.%s.ts',
+        async (kind) => {
+            project = await createProject(protectedAdjacentPrerenderFiles(kind));
+
+            await expect(cli(['build'], project.root)).rejects.toThrow(
+                'Cannot prerender a static route with a `guard`, `load`, or `action` function.'
+            );
+        }
+    );
 });
