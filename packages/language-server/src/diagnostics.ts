@@ -67,7 +67,7 @@ export interface DiagnosticsCollectorOptions {
   readonly loadCompiler?: CompilerLoader;
 }
 
-let compilerModulePromise: Promise<CompilerModule> | undefined;
+const compilerModulePromises = new Map<string, Promise<CompilerModule>>();
 
 export function createDiagnosticsCollector(
   options: DiagnosticsCollectorOptions = {}
@@ -109,16 +109,48 @@ export function createDiagnosticsCollector(
 export const collectDiagnosticsFromSource = createDiagnosticsCollector();
 
 async function loadCompiler(filePath: string): Promise<CompilerModule> {
-  compilerModulePromise ??= importWorkspaceCompiler(filePath)
-    .catch(() => import('@zenithbuild/compiler'))
-    .catch(() => import(pathToFileURL(resolveCompilerFallbackPath()).href)) as Promise<CompilerModule>;
-  return compilerModulePromise;
+  const workspaceEntry = resolveWorkspaceCompilerEntry(filePath);
+  if (workspaceEntry) {
+    return importCachedCompiler(workspaceEntry, () => importWorkspaceCompiler(workspaceEntry));
+  }
+
+  return importCachedCompiler('package:@zenithbuild/compiler', importBundledCompiler);
 }
 
-async function importWorkspaceCompiler(filePath: string): Promise<CompilerModule> {
+function resolveWorkspaceCompilerEntry(filePath: string): string | undefined {
   const requireFromDocument = createRequire(pathToFileURL(filePath).href);
-  const compilerEntry = requireFromDocument.resolve('@zenithbuild/compiler');
-  return import(pathToFileURL(compilerEntry).href) as Promise<CompilerModule>;
+  try {
+    return requireFromDocument.resolve('@zenithbuild/compiler');
+  } catch {
+    return undefined;
+  }
+}
+
+function importCachedCompiler(
+  cacheKey: string,
+  importer: () => Promise<CompilerModule>
+): Promise<CompilerModule> {
+  const existing = compilerModulePromises.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const next = importer().catch((error) => {
+    compilerModulePromises.delete(cacheKey);
+    throw error;
+  });
+  compilerModulePromises.set(cacheKey, next);
+  return next;
+}
+
+async function importWorkspaceCompiler(compilerEntry: string): Promise<CompilerModule> {
+  return import(pathToFileURL(compilerEntry).href)
+    .catch(() => importBundledCompiler()) as Promise<CompilerModule>;
+}
+
+async function importBundledCompiler(): Promise<CompilerModule> {
+  return import('@zenithbuild/compiler')
+    .catch(() => import(pathToFileURL(resolveCompilerFallbackPath()).href)) as Promise<CompilerModule>;
 }
 
 function resolveCompilerFallbackPath(): string {

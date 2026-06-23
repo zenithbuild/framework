@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { DiagnosticSeverity } from 'vscode-languageserver/node';
 import {
   collectDiagnosticsFromSource,
@@ -177,4 +180,47 @@ describe('diagnostics', () => {
     expect(first[0]?.message).not.toContain('raw-stack');
     expect(second).toEqual([]);
   });
+
+  test('compiler resolution cache stays isolated per workspace compiler package', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'zenith-lsp-compiler-cache-'));
+    try {
+      const workspaceA = join(root, 'workspace-a');
+      const workspaceB = join(root, 'workspace-b');
+      writeCompilerPackage(workspaceA, 'WORKSPACE_A');
+      writeCompilerPackage(workspaceB, 'WORKSPACE_B');
+
+      const collect = createDiagnosticsCollector();
+      const first = await collect('<main>A</main>', join(workspaceA, 'src', 'Page.zen'), false);
+      const second = await collect('<main>B</main>', join(workspaceB, 'src', 'Page.zen'), false);
+      const repeated = await collect('<main>A again</main>', join(workspaceA, 'src', 'Other.zen'), false);
+
+      expect(first[0]?.code).toBe('WORKSPACE_A');
+      expect(second[0]?.code).toBe('WORKSPACE_B');
+      expect(repeated[0]?.code).toBe('WORKSPACE_A');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
+
+function writeCompilerPackage(workspaceDir: string, diagnosticCode: string): void {
+  const packageDir = join(workspaceDir, 'node_modules', '@zenithbuild', 'compiler');
+  mkdirSync(packageDir, { recursive: true });
+  writeFileSync(
+    join(packageDir, 'package.json'),
+    JSON.stringify({ type: 'module', exports: './index.js' }),
+    'utf8'
+  );
+  writeFileSync(
+    join(packageDir, 'index.js'),
+    [
+      'export function compile() {',
+      '  return {',
+      '    schemaVersion: 1,',
+      `    diagnostics: [{ code: ${JSON.stringify(diagnosticCode)}, message: ${JSON.stringify(diagnosticCode)}, severity: 'warning' }]`,
+      '  };',
+      '}'
+    ].join('\n'),
+    'utf8'
+  );
+}
