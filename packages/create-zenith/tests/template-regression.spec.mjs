@@ -179,11 +179,17 @@ function assertToolingSelection(projectDir, { eslint, prettier }) {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
     const devDependencies = pkg.devDependencies || {};
     const scripts = pkg.scripts || {};
+    const eslintConfigPath = join(projectDir, 'eslint.config.js');
 
-    assert.equal(existsSync(join(projectDir, 'eslint.config.js')), eslint, 'eslint config presence mismatch');
+    assert.equal(existsSync(eslintConfigPath), eslint, 'eslint config presence mismatch');
     assert.equal(existsSync(join(projectDir, '.eslintrc.json')), false, 'legacy eslint config should never be scaffolded');
     assert.equal(existsSync(join(projectDir, '.prettierrc')), prettier, 'prettier config presence mismatch');
     assert.equal(existsSync(join(projectDir, '.prettierignore')), prettier, 'prettier ignore presence mismatch');
+
+    if (eslint) {
+        const eslintConfig = readFileSync(eslintConfigPath, 'utf8');
+        assert.match(eslintConfig, /['"]\.zenith-output\/\*\*['"]/, 'eslint config must ignore generated .zenith-output/');
+    }
 
     assert.equal(typeof scripts.lint === 'string', eslint, 'lint script presence mismatch');
     assert.equal(typeof scripts.format === 'string', prettier, 'format script presence mismatch');
