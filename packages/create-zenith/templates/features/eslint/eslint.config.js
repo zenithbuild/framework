@@ -3,7 +3,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin'
 
 export default [
     {
-        ignores: ['.zenith/**', 'dist/**', 'node_modules/**']
+        ignores: ['.zenith/**', '.zenith-output/**', 'dist/**', 'node_modules/**']
     },
     {
         files: ['**/*.{js,mjs,cjs,ts}'],

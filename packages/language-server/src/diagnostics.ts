@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -55,30 +56,101 @@ interface CompilerModule {
   readonly compile: (input: { source: string; filePath: string }) => CompilerEnvelope;
 }
 
-let compilerModulePromise: Promise<CompilerModule> | undefined;
-
-export async function collectDiagnosticsFromSource(
+type CompilerLoader = (filePath: string) => Promise<CompilerModule>;
+type SourceDiagnosticsCollector = (
   source: string,
   filePath: string,
   strictDomLints: boolean
-): Promise<Diagnostic[]> {
-  try {
-    const { compile } = await loadCompiler();
-    const result = compile({ source, filePath }) as CompilerEnvelope;
-    if (result.schemaVersion !== 1) {
-      return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
+) => Promise<Diagnostic[]>;
+
+export interface DiagnosticsCollectorOptions {
+  readonly loadCompiler?: CompilerLoader;
+}
+
+const compilerModulePromises = new Map<string, Promise<CompilerModule>>();
+
+export function createDiagnosticsCollector(
+  options: DiagnosticsCollectorOptions = {}
+): SourceDiagnosticsCollector {
+  const loadCompilerModule = options.loadCompiler ?? loadCompiler;
+  let compilerUnavailableReported = false;
+
+  return async function collectDiagnostics(
+    source: string,
+    filePath: string,
+    strictDomLints: boolean
+  ): Promise<Diagnostic[]> {
+    let compile: CompilerModule['compile'];
+
+    try {
+      ({ compile } = await loadCompilerModule(filePath));
+      compilerUnavailableReported = false;
+    } catch {
+      if (compilerUnavailableReported) {
+        return [];
+      }
+      compilerUnavailableReported = true;
+      return [compilerUnavailableDiagnostic()];
     }
 
-    return mapCompilerEnvelopeToDiagnostics(result, strictDomLints);
-  } catch (error) {
-    return [compilerContractDiagnostic(String(error))];
+    try {
+      const result = compile({ source, filePath }) as CompilerEnvelope;
+      if (result.schemaVersion !== 1) {
+        return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
+      }
+
+      return mapCompilerEnvelopeToDiagnostics(result, strictDomLints);
+    } catch (error) {
+      return [compilerContractDiagnostic(String(error))];
+    }
+  };
+}
+
+export const collectDiagnosticsFromSource = createDiagnosticsCollector();
+
+async function loadCompiler(filePath: string): Promise<CompilerModule> {
+  const workspaceEntry = resolveWorkspaceCompilerEntry(filePath);
+  if (workspaceEntry) {
+    return importCachedCompiler(workspaceEntry, () => importWorkspaceCompiler(workspaceEntry));
+  }
+
+  return importCachedCompiler('package:@zenithbuild/compiler', importBundledCompiler);
+}
+
+function resolveWorkspaceCompilerEntry(filePath: string): string | undefined {
+  const requireFromDocument = createRequire(pathToFileURL(filePath).href);
+  try {
+    return requireFromDocument.resolve('@zenithbuild/compiler');
+  } catch {
+    return undefined;
   }
 }
 
-async function loadCompiler(): Promise<CompilerModule> {
-  compilerModulePromise ??= import('@zenithbuild/compiler')
+function importCachedCompiler(
+  cacheKey: string,
+  importer: () => Promise<CompilerModule>
+): Promise<CompilerModule> {
+  const existing = compilerModulePromises.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const next = importer().catch((error) => {
+    compilerModulePromises.delete(cacheKey);
+    throw error;
+  });
+  compilerModulePromises.set(cacheKey, next);
+  return next;
+}
+
+async function importWorkspaceCompiler(compilerEntry: string): Promise<CompilerModule> {
+  return import(pathToFileURL(compilerEntry).href)
+    .catch(() => importBundledCompiler()) as Promise<CompilerModule>;
+}
+
+async function importBundledCompiler(): Promise<CompilerModule> {
+  return import('@zenithbuild/compiler')
     .catch(() => import(pathToFileURL(resolveCompilerFallbackPath()).href)) as Promise<CompilerModule>;
-  return compilerModulePromise;
 }
 
 function resolveCompilerFallbackPath(): string {
@@ -187,6 +259,23 @@ function compilerContractDiagnostic(message: string): Diagnostic {
     code: 'ZENITH-COMPILER',
     message,
     severity: DiagnosticSeverity.Error,
+    range: {
+      start: { line: 0, character: 0 },
+      end: { line: 0, character: 1 }
+    }
+  };
+}
+
+function compilerUnavailableDiagnostic(): Diagnostic {
+  return {
+    source: 'zenith',
+    code: 'ZENITH-COMPILER-UNAVAILABLE',
+    message: [
+      'Zenith compiler package is unavailable to the language server.',
+      'Run your package manager install from the workspace root, ensure @zenithbuild/compiler is installed, and restart the editor.',
+      'Build commands are unchanged; this only disables editor diagnostics until the compiler package resolves.'
+    ].join(' '),
+    severity: DiagnosticSeverity.Warning,
     range: {
       start: { line: 0, character: 0 },
       end: { line: 0, character: 1 }
