@@ -23,7 +23,7 @@ The current file-size audit reports:
 - allowlisted over limit: 1
 - non-allowlisted violations: 23
 
-The audit currently scans source-like files and excludes generated/public docs directories and `packages/compiler/_legacy_v1/`. It does not scan Markdown docs, so long docs pages are listed separately below.
+The audit currently scans source-like files and excludes generated/public docs directories. The archived compiler V1 snapshot was removed from the repository surface, so it is no longer part of active refactor debt. The audit does not scan Markdown docs, so long docs pages are listed separately below.
 
 Previously named issue targets have changed:
 

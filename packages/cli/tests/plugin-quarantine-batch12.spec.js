@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,14 +25,7 @@ describe('Batch 12 plugin quarantine', () => {
         }
     });
 
-    test('legacy compiler package is private and does not advertise plugin exports', () => {
-        const manifest = readJson('packages/compiler/_legacy_v1/package.json');
-        const exportKeys = Object.keys(manifest.exports || {});
-
-        expect(manifest.private).toBe(true);
-        expect(manifest.publishConfig).toBeUndefined();
-        expect(manifest.description).toMatch(/Archived internal legacy compiler snapshot/);
-        expect(exportKeys).not.toContain('./plugins');
-        expect(exportKeys).not.toContain('./registry');
+    test('legacy compiler V1 package is removed from the repository surface', () => {
+        expect(existsSync(resolve(REPO_ROOT, 'packages/compiler/_legacy_v1'))).toBe(false);
     });
 });
