@@ -35,8 +35,7 @@ const EXCLUDED_PATH_FRAGMENTS = [
   '/docs/public/',
   '/apps/benchmarks/results/',
   '/apps/benchmarks/.tmp/',
-  '/apps/benchmarks/tmp/',
-  '/packages/compiler/_legacy_v1/'
+  '/apps/benchmarks/tmp/'
 ];
 
 function parseArgs(argv) {

@@ -15,6 +15,9 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^5.7.3"
   },
+  "overrides": {
+    "ws": "8.21.0"
+  },
   "scripts": {
     "build": "bash ./scripts/build.sh",
     "ci": "bash ./scripts/ci.sh",
