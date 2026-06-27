@@ -14,6 +14,12 @@
       "urgency": "immediate_split"
     },
     {
+      "path": "packages/router/tests/fixtures/router-template.golden.js",
+      "maxLines": 1500,
+      "reason": "#79 full-template golden fixture retained for byte-level router contract coverage",
+      "urgency": "golden_fixture_policy"
+    },
+    {
       "path": "packages/compiler/zenith_compiler/src/compiler.rs",
       "maxLines": 5000,
       "reason": "First-wave follow-up decomposition target",
