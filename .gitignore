@@ -10,3 +10,6 @@ test-results/
 *.log
 /cms/
 .vercel
+
+# Graphify local repo-context output
+graphify-out/
