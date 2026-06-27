@@ -41,6 +41,7 @@ node --test scripts/publish-packages-existing-package.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
 node --test scripts/verify-platform-binary-smoke.spec.mjs
 node --test scripts/workflow-trust-boundary.spec.mjs
+node --test scripts/file-size-audit.spec.mjs
 node --test apps/integration-tests/scripts/*.spec.mjs
 
 cargo test --manifest-path packages/compiler/Cargo.toml

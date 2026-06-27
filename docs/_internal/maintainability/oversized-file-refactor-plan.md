@@ -14,16 +14,18 @@ Do not use this plan as approval to change runtime, compiler, bundler, CLI, rout
 
 The current file-size audit reports:
 
-- scanned files: 789
-- `<=500`: 765
-- `501-800`: 15
-- `801-1200`: 8
+- scanned files: 871
+- `<=500`: 853
+- `501-800`: 13
+- `801-1200`: 4
 - `1201-2000`: 1
-- over preferred limit: 24
-- allowlisted over limit: 1
-- non-allowlisted violations: 23
+- over preferred limit: 18
+- allowlisted over limit: 2
+- non-allowlisted violations: 16
 
-The audit currently scans source-like files and excludes generated/public docs directories. The archived compiler V1 snapshot was removed from the repository surface, so it is no longer part of active refactor debt. The audit does not scan Markdown docs, so long docs pages are listed separately below.
+The audit currently scans source-like files and excludes generated/public docs directories, generated language package output, and archived compiler/bundler legacy snapshots. It does not scan Markdown docs, so long docs pages are listed separately below.
+
+This policy calibration covers generated package output, full golden fixture allowlisting, and archived legacy snapshot scanning only. It does not close #76, #77, #78, #80, or #81.
 
 Previously named issue targets have changed:
 
@@ -144,8 +146,8 @@ Minimum checks after each split:
 
 Files:
 
-- `packages/router/tests/fixtures/router-template.golden.js` - 1298 lines
-- `packages/language/out/server.mjs` - 932 lines
+- `packages/router/tests/fixtures/router-template.golden.js` - 1298 lines, explicitly allowlisted
+- `packages/language/out/server.mjs` - generated output, excluded from active refactor debt
 
 Why oversized:
 
@@ -156,6 +158,7 @@ Safe split boundaries:
 
 - Prefer regenerating or snapshotting smaller focused router template sections instead of manually editing the golden file.
 - Do not split generated language output by hand. Reduce the source package if needed, then rebuild output.
+- Keep future work to split router golden sections as a separate test-only PR.
 
 Do not touch casually:
 
@@ -270,7 +273,8 @@ Why oversized:
 Safe split boundaries:
 
 - Do not refactor legacy files as normal product work.
-- If audit noise becomes a problem, handle it as a guardrail calibration issue: either exclude archived `_legacy_v1` consistently or document an explicit allowlist rationale.
+- Archived `_legacy_v1` snapshots are excluded from active file-size scans unless a separate approved change directly targets legacy files.
+- If audit noise returns, handle it as guardrail calibration rather than refactoring archived code.
 
 Minimum checks:
 
@@ -302,7 +306,9 @@ Future guardrail work should:
 - keep touched-file enforcement as the default release gate
 - require allowlist entries to have an owner or linked follow-up issue
 - remove stale allowlist entries when files fall under 500 lines
-- avoid counting generated artifacts and archived legacy snapshots as active refactor debt unless they are edited
+- exclude generated package outputs from active refactor debt
+- require full golden fixtures to be explicitly allowlisted with clear rationale
+- avoid counting archived legacy snapshots as active refactor debt unless a separate approved change targets them
 
 ## Proposed Follow-up Issues
 
