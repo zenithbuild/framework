@@ -18,17 +18,24 @@ Forbidden:
 - Global `querySelectorAll('*')` discovery passes.
 - Runtime inference of binding intent from HTML shape.
 
-## 2. No Implicit Reactivity
+## 2. Reactivity Model
 
 Runtime primitives are explicit:
 - `signal(initial)`
 - `state(initialObject)`
-- `zeneffect(dependencies, fn)`
+- `zeneffect(dependencies, fn, options?)` or `zeneffect(fn, options?)`
 
-Forbidden:
-- Proxy-based tracking.
-- Implicit dependency capture contexts.
-- Scheduler/queue abstractions.
+`zeneffect` (and the `effect` alias) supports two modes:
+- Explicit dependency mode: `zeneffect([dep1, dep2], (ctx) => { ... }, options?)`.
+- Auto-tracked mode: `zeneffect((ctx) => { dep.get(); ... }, options?)`.
+
+`zenEffect(callback, options?)` is auto-tracked only; its first argument must
+be a callback function. It does not accept a dependency array.
+
+Auto-tracked effects capture signal reads made during the effect body. The
+runtime effect scheduler supports `flush: 'sync' | 'post'` and at most one of
+`debounceMs`, `throttleMs`, or `raf`. Default effects are scheduled on the
+microtask queue (`flush: 'post'`).
 
 ## 3. Deterministic Ordering
 
@@ -42,22 +49,25 @@ Required:
 
 ## 4. Explicit Bootstrap
 
-Hydration is explicit and called by bundler bootstrap only:
+Hydration is explicit and called by bundler/bootstrap only:
 
 ```js
 hydrate({
   ir_version: 1,
   root: document,
-  expressions: __zenith_expr,
-  markers: __zenith_markers,
-  events: __zenith_events,
-  state_values: __zenith_state_values,
-  signals: __zenith_signals,
-  components: __zenith_components
+  expressions: [],
+  markers: [],
+  events: [],
+  refs: [],
+  state_values: [],
+  signals: [],
+  components: []
 });
 ```
 
-Runtime must export functions only. Runtime must not auto-run.
+The actual tables are assembled by the bundler/bootstrap from compiler-lowered
+descriptors, bundler-generated selectors, and runtime-owned values. Runtime must
+export functions only. Runtime must not auto-run.
 
 ## 5. Component Factory Payload
 
