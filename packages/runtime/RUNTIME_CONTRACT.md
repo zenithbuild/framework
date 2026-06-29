@@ -105,16 +105,16 @@ The runtime **must never**:
 
 ## 4. Data Attribute Contract
 
-Runtime consumes selector tables assembled by the bundler/bootstrap. The bundler contract still owns emitted markup details and should be aligned in a separate bundler contract truth batch. This runtime contract defines only what the runtime consumes from the hydration payload.
+Runtime consumes selector tables assembled by the bundler/bootstrap. The bundler contract owns emitted markup details and selector-table assembly. This runtime contract defines only what the runtime consumes from the hydration payload.
 
 | Attribute | Format | Runtime Action |
 |---|---|---|
 | `data-zx-e` | `"<index>"` or `"<i0> <i1> ..."` | Resolve selector from marker table and bind expression result to matched node(s) |
 | `data-zx-on-<event>` | `"<index>"` | Resolve selector from event table and attach `addEventListener(event, handler)` |
 | `data-zx-ref` | `"<index>"` | Resolve selector from ref table and assign matched node to `ref.current` |
-| `data-zx-c` | `"<instance>"` | Resolve selector from component table for component host nodes |
+| `data-zx-c` | `"<instance>"` or `"<i0> <i1> ..."` | Resolve selector from component table for component host nodes |
 
-Index values are 0-based integers matching `payload.expressions` positions. The runtime only sees these markers as selectors in payload tables; it must not scan for them independently.
+`data-zx-e` values identify expression marker/binding positions. `data-zx-on-*` values identify event marker/expression positions used by event-table selectors. `data-zx-ref` values identify ref-table entries that map to `state_index`. `data-zx-c` values identify component instance keys/selectors, for example `c0` or `c0 c1`. The runtime only sees these markers as selectors in payload tables; it must not infer DOM shape or perform full-tree marker discovery.
 
 ---
 
