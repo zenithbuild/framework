@@ -365,6 +365,61 @@
           "source_path": "documentation/reactivity/overlay-sheet-pattern.md"
         },
         {
+          "slug": "reactivity/overlay-sheet-focus-dismissal",
+          "title": "Overlay Sheet: Focus and Dismissal",
+          "label": "Overlay Sheet: Focus and Dismissal",
+          "url": "/docs/reactivity/overlay-sheet-focus-dismissal",
+          "order": 15,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-focus-dismissal.md"
+        },
+        {
+          "slug": "reactivity/overlay-sheet-accessibility",
+          "title": "Overlay Sheet: Accessibility",
+          "label": "Overlay Sheet: Accessibility",
+          "url": "/docs/reactivity/overlay-sheet-accessibility",
+          "order": 16,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-accessibility.md"
+        },
+        {
+          "slug": "reactivity/overlay-sheet-actions",
+          "title": "Overlay Sheet: Actions",
+          "label": "Overlay Sheet: Actions",
+          "url": "/docs/reactivity/overlay-sheet-actions",
+          "order": 17,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-actions.md"
+        },
+        {
+          "slug": "reactivity/overlay-sheet-settings",
+          "title": "Overlay Sheet: Settings",
+          "label": "Overlay Sheet: Settings",
+          "url": "/docs/reactivity/overlay-sheet-settings",
+          "order": 18,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-settings.md"
+        },
+        {
+          "slug": "reactivity/overlay-sheet-styling-cleanup",
+          "title": "Overlay Sheet: Styling and Cleanup",
+          "label": "Overlay Sheet: Styling and Cleanup",
+          "url": "/docs/reactivity/overlay-sheet-styling-cleanup",
+          "order": 19,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/reactivity/overlay-sheet-styling-cleanup.md"
+        },
+        {
           "slug": "reactivity/controlled-uncontrolled-components",
           "title": "Controlled vs Uncontrolled Components",
           "label": "Controlled vs Uncontrolled Components",
@@ -697,6 +752,11 @@
     "/docs/reactivity/dom-and-environment",
     "/docs/reactivity/presence",
     "/docs/reactivity/overlay-sheet-pattern",
+    "/docs/reactivity/overlay-sheet-focus-dismissal",
+    "/docs/reactivity/overlay-sheet-accessibility",
+    "/docs/reactivity/overlay-sheet-actions",
+    "/docs/reactivity/overlay-sheet-settings",
+    "/docs/reactivity/overlay-sheet-styling-cleanup",
     "/docs/reactivity/controlled-uncontrolled-components",
     "/docs/components/component-server-values",
     "/docs/guides/using-ai-with-zenith",

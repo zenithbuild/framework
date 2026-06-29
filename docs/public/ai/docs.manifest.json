@@ -25,7 +25,7 @@
         "title": "Reactivity",
         "summary": "State, memoization, and reactive execution model.",
         "order": 30,
-        "count": 6
+        "count": 11
       },
       {
         "slug": "components",
@@ -893,6 +893,151 @@
         "Reactivity"
       ],
       "doc_order": 14,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-focus-dismissal",
+      "title": "Overlay Sheet: Focus and Dismissal",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "focus",
+        "dismissal"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-focus-dismissal.md",
+      "url": "/docs/reactivity/overlay-sheet-focus-dismissal",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 15,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-accessibility",
+      "title": "Overlay Sheet: Accessibility",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "accessibility",
+        "aria"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-accessibility.md",
+      "url": "/docs/reactivity/overlay-sheet-accessibility",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 16,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-actions",
+      "title": "Overlay Sheet: Actions",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "actions",
+        "confirmation"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-actions.md",
+      "url": "/docs/reactivity/overlay-sheet-actions",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 17,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-settings",
+      "title": "Overlay Sheet: Settings",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "settings",
+        "forms"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-settings.md",
+      "url": "/docs/reactivity/overlay-sheet-settings",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 18,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-styling-cleanup",
+      "title": "Overlay Sheet: Styling and Cleanup",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "styling",
+        "cleanup"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-styling-cleanup.md",
+      "url": "/docs/reactivity/overlay-sheet-styling-cleanup",
+      "category": "reactivity",
+      "category_title": "Reactivity",
+      "category_order": 30,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 19,
       "level": null,
       "hidden": false,
       "prerequisites": []
