@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeMap;
 
 fn assert_module_parses(source: &str) {
     let allocator = Allocator::default();
