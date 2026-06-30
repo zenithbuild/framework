@@ -1,4 +1,11 @@
 import { readFile } from "node:fs/promises";
+import type {
+  DocumentationDetail,
+  DocumentationDetailLookup,
+  DocumentationNavEntry,
+  DocumentationSectionGroup,
+  DocumentationTag,
+} from "./documentationSource";
 
 interface LocalDocsIndexRecord {
   doc?: string;
@@ -180,4 +187,172 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+export function groupDocumentationEntries(entries: DocumentationDetail[]): DocumentationSectionGroup[] {
+  const groups = new Map<string, DocumentationSectionGroup>();
+
+  for (const entry of entries) {
+    const key = entry.section.slug;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.entries.push(toNavEntry(entry));
+      continue;
+    }
+
+    groups.set(key, {
+      section: entry.section,
+      entries: [toNavEntry(entry)],
+    });
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      section: group.section,
+      entries: [...group.entries].sort(compareNavEntries),
+    }))
+    .sort((left, right) => {
+      if (left.section.order !== right.section.order) {
+        return left.section.order - right.section.order;
+      }
+      return left.section.slug.localeCompare(right.section.slug);
+    });
+}
+
+function toNavEntry(entry: DocumentationDetail): DocumentationNavEntry {
+  const tags = entry.tags.map(cloneDocumentationTag);
+  const tagSlugs = tags.map((tag) => tag.slug);
+  const tagTitles = tags.map((tag) => tag.title);
+
+  return {
+    slug: entry.slug,
+    title: entry.title,
+    description: entry.description,
+    excerpt: entry.excerpt,
+    path: entry.path,
+    sourcePath: entry.sourcePath,
+    section: {
+      slug: entry.section.slug,
+      title: entry.section.title,
+      description: entry.section.description,
+      order: entry.section.order,
+      path: entry.section.path,
+    },
+    tags,
+    tagSlugs,
+    tagTitles,
+    searchText: [
+      entry.title,
+      entry.description,
+      entry.excerpt,
+      entry.slug,
+      entry.path,
+      entry.sourcePath || "",
+      entry.section.title,
+      entry.section.slug,
+      ...tagTitles,
+      ...tagSlugs,
+    ]
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+      .join(" "),
+    docOrder: entry.docOrder,
+  };
+}
+
+export function collectDocumentationTags(entries: DocumentationDetail[]): DocumentationTag[] {
+  const tags = new Map<string, DocumentationTag>();
+
+  for (const entry of entries) {
+    for (const tag of entry.tags) {
+      if (!tags.has(tag.slug)) {
+        tags.set(tag.slug, cloneDocumentationTag(tag));
+      }
+    }
+  }
+
+  return [...tags.values()].sort((left, right) => {
+    const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    return left.title.localeCompare(right.title);
+  });
+}
+
+function cloneDocumentationTag(tag: DocumentationTag): DocumentationTag {
+  return {
+    slug: tag.slug,
+    title: tag.title,
+    color: tag.color,
+    order: tag.order,
+  };
+}
+
+export function compareDocumentationEntries(left: DocumentationDetail, right: DocumentationDetail): number {
+  if (left.section.order !== right.section.order) {
+    return left.section.order - right.section.order;
+  }
+
+  const leftOrder = left.docOrder ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = right.docOrder ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  const titleOrder = left.title.localeCompare(right.title);
+  if (titleOrder !== 0) {
+    return titleOrder;
+  }
+
+  return (left.sourcePath || left.slug).localeCompare(right.sourcePath || right.slug);
+}
+
+function compareNavEntries(left: DocumentationNavEntry, right: DocumentationNavEntry): number {
+  const leftOrder = left.docOrder ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = right.docOrder ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+  return left.path.localeCompare(right.path);
+}
+export function formatSectionPath(sectionSlug: string): string {
+  return formatSectionRoute(sectionSlug, "/docs");
+}
+
+export function formatSectionRoute(sectionSlug: string, routeBase: string): string {
+  const base = routeBase || "/docs";
+  return sectionSlug === "root" ? base : `${base}/${sectionSlug}`;
+}
+
+export function toInteger(value: unknown): number | null {
+  return Number.isInteger(value) ? Number(value) : null;
+}
+
+export function normalizeDocumentationLookup(lookupInput: string | DocumentationDetailLookup) {
+  if (typeof lookupInput !== "string") {
+    return {
+      slug: deriveDocumentationLeafSlug(lookupInput.slug),
+      sectionSlug: lookupInput.sectionSlug ?? "root",
+    };
+  }
+
+  const normalized = String(lookupInput || "").replace(/^\/?docs\/?/, "").replace(/\/$/, "");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length <= 1) {
+    return {
+      slug: deriveDocumentationLeafSlug(normalized),
+      sectionSlug: "root",
+    };
+  }
+
+  return {
+    slug: deriveDocumentationLeafSlug(parts[parts.length - 1] || ""),
+    sectionSlug: parts[parts.length - 2] || "root",
+  };
+}
+
+export function matchesDocumentationLookup(entry: DocumentationDetail, lookup: { slug: string; sectionSlug: string }) {
+  return entry.slug === lookup.slug && entry.section.slug === lookup.sectionSlug;
 }
