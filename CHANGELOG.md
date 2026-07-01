@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Removed the legacy V1 compiler `ws` surface and pinned the workspace to a patched `ws` version.
 - Closed the v0.8 editor/tooling diagnostics follow-up for the framework language-server path.
 - Updated esbuild to address GHSA-gv7w-rqvm-qjhr.
+- Removed the benchmark/performance surface that pulled in benchmark-only Astro, Vite, Nuxt, and Next dependencies after high-severity Dependabot alerts; no active `astro` manifest or lockfile references remain.
+- Verified the post-removal dependency surface with `bun audit --audit-level high`.
 - Added route data contract edge-case coverage and reliability fixes for framework server behavior.
 
 #### Maintainability and release hygiene
@@ -35,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Split oversized CLI drift-gate, dev-server, and server-routing contract test suites into focused owner-area suites.
 - Split oversized runtime dom-binding and integration test suites while preserving existing behavior.
 - Split active bundler helper clusters and the main output phase into smaller modules under the file-size policy.
-- Split docs/site generation helpers, overlay sheet documentation, AI endpoint generation, benchmark helpers, and site workspace public-asset helpers into narrower files.
+- Split docs/site generation helpers, overlay sheet documentation, AI endpoint generation, and site workspace public-asset helpers into narrower files.
 - Calibrated generated/legacy file-size audit policy and documented Graphify/Kimi scoped evaluation as optional maintainer context, not required workflow.
 - Added internal audits for Rolldown bundler integration and contract truth alignment for runtime, hydration, and bundler payload ownership.
 
