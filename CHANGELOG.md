@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-01
+
+### Changed
+
+#### Adapter and plugin boundary groundwork
+
+- Confirmed the internal adapter contract around `AdapterDriver` and `resolveBuildAdapter(...)` without shipping a public adapter plugin API.
+- Verified built-in Vercel and Netlify adapters already route through the normalized internal adapter contract and shared hosted infrastructure.
+- Added the delegated adapter surface RFC as planning material only, keeping `target` as the stable deployment selector and the raw `adapter` object as an advanced surface.
+- Aligned the framework publish surface so `@zenithbuild/extension-registry` publishes with the lockstep framework train used by `@zenithbuild/cli`.
+
+#### Middleware and route-check planning
+
+- Closed the post-V1 middleware expansion design lane with explicit decisions: arrays deferred, nested scopes rejected, controlled header staging deferred, and route-check participation deferred.
+- Kept global middleware V1 narrow: TypeScript root middleware only, `next` / `redirect` / `deny` only, no arbitrary headers, no nested scopes, no arrays, and no route-check participation.
+- Confirmed JavaScript-authored middleware remains unsupported until a separate project language-mode contract is approved.
+
+#### Security, editor tooling, and dependency cleanup
+
+- Removed the legacy V1 compiler `ws` surface and pinned the workspace to a patched `ws` version.
+- Closed the v0.8 editor/tooling diagnostics follow-up for the framework language-server path.
+- Updated esbuild to address GHSA-gv7w-rqvm-qjhr.
+- Added route data contract edge-case coverage and reliability fixes for framework server behavior.
+
+#### Maintainability and release hygiene
+
+- Split oversized CLI drift-gate, dev-server, and server-routing contract test suites into focused owner-area suites.
+- Split oversized runtime dom-binding and integration test suites while preserving existing behavior.
+- Split active bundler helper clusters and the main output phase into smaller modules under the file-size policy.
+- Split docs/site generation helpers, overlay sheet documentation, AI endpoint generation, benchmark helpers, and site workspace public-asset helpers into narrower files.
+- Calibrated generated/legacy file-size audit policy and documented Graphify/Kimi scoped evaluation as optional maintainer context, not required workflow.
+- Added internal audits for Rolldown bundler integration and contract truth alignment for runtime, hydration, and bundler payload ownership.
+
+#### What this release does not change
+
+- No public adapter plugin API ships in this release.
+- No middleware arrays, nested middleware scopes, controlled response headers, `middleware.js`, or route-check middleware participation ship in this release.
+- No Graphify workflow is required for issue closeout or framework development.
+- No native binary distribution migration is introduced.
+
 ## [0.7.12] - 2026-06-02
 
 ### Changed
