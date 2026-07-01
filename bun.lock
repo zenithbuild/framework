@@ -10,12 +10,6 @@
         "typescript": "^5.7.3",
       },
     },
-    "apps/benchmarks": {
-      "name": "zenith-benchmarks",
-      "devDependencies": {
-        "playwright": "1.60.0",
-      },
-    },
     "apps/integration-tests": {
       "name": "zenith-integration-tests",
       "devDependencies": {
@@ -1349,8 +1343,6 @@
     "yargs-parser": ["yargs-parser@21.1.1", "", {}, "sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw=="],
 
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
-
-    "zenith-benchmarks": ["zenith-benchmarks@workspace:apps/benchmarks"],
 
     "zenith-docs-site": ["zenith-docs-site@workspace:docs"],
 
