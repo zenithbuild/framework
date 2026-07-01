@@ -2,7 +2,7 @@ use super::*;
 
 pub(crate) struct BundlerOutputPhaseRequest<'a> {
     pub(crate) out_dir: &'a Path,
-    pub(crate) emitted_root: &'a Path,
+    pub(crate) emitted_root: &'a PathBuf,
     pub(crate) inputs: &'a [BundlerInput],
     pub(crate) processed_htmls: Vec<String>,
     pub(crate) output_mode: OutputMode,
