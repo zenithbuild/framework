@@ -1,21 +1,45 @@
 <script setup="ts">
+import { zenDocument } from "@zenithbuild/core";
 import "../styles/globals.css";
+
+const doc = zenDocument();
+
+function applyTheme(theme: "light" | "dark") {
+    doc.documentElement.setAttribute("data-theme", theme);
+}
+
+function toggleTheme() {
+    const current = doc.documentElement.getAttribute("data-theme") ?? "dark";
+    applyTheme(current === "dark" ? "light" : "dark");
+}
+
+const isDark = () => (doc.documentElement.getAttribute("data-theme") ?? "dark") === "dark";
 </script>
 
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zenith Framework</title>
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
-    <header class="border-b border-slate-800">
-        <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-            <a href="/" class="flex items-center gap-2 font-semibold text-slate-100">
-                <span class="inline-flex h-6 w-6 rounded-md bg-gradient-to-br from-sky-400 to-violet-500"></span>
+<body class="min-h-screen bg-background font-body text-foreground antialiased">
+    <header class="border-b border-border">
+        <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+            <a href="/" class="flex items-center gap-3 font-display font-bold tracking-tight text-foreground">
+                <img src="/logo.svg" alt="Zenith" class="h-9 w-9" />
                 Zenith
             </a>
+
+            <button
+                type="button"
+                on:click={toggleTheme}
+                class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground transition hover:border-accent-cyan"
+                aria-label="Toggle theme"
+            >
+                <span aria-hidden="true">{isDark() ? "🌙" : "☀️"}</span>
+                <span class="hidden sm:inline">{isDark() ? "Dark" : "Light"}</span>
+            </button>
         </div>
     </header>
     <main class="flex flex-col">

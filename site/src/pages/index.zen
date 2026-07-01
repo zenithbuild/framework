@@ -6,32 +6,49 @@ function cn(...inputs: (string | false | null | undefined)[]) {
 }
 
 const primary = cn(
-    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-semibold transition",
-    "bg-sky-500 text-slate-950 hover:bg-sky-400"
+    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-display font-semibold transition",
+    "bg-accent-blue text-white hover:bg-accent-cyan hover:text-background"
 );
 
 const secondary = cn(
-    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-semibold transition",
-    "border border-slate-700 bg-slate-900 text-slate-100 hover:border-sky-500"
+    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-display font-semibold transition",
+    "border border-border bg-surface text-foreground hover:border-accent-cyan"
+);
+
+const kicker = cn(
+    "inline-block rounded-full border border-border bg-surface px-3 py-1",
+    "font-mono text-sm font-medium text-accent-cyan"
 );
 </script>
 
 <DefaultLayout>
-    <section class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-6 py-12 text-center">
-        <div class="max-w-2xl space-y-6">
-            <span class="inline-block rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-400">
-                Zenith Framework
-            </span>
-            <h1 class="text-4xl font-extrabold tracking-tight text-slate-50 sm:text-6xl">
-                Build reactive UIs with <em class="text-sky-400 not-italic">clarity</em>.
+    <section class="relative flex min-h-[calc(100vh-5.5rem)] flex-col items-center justify-center overflow-hidden px-6 py-16 text-center">
+        <div class="pointer-events-none absolute inset-0 opacity-60 dark:opacity-40" aria-hidden="true">
+            <div class="absolute left-1/2 top-1/4 h-64 w-64 -translate-x-1/2 rounded-full bg-accent-blue/20 blur-3xl" />
+            <div class="absolute bottom-1/4 right-1/4 h-56 w-56 rounded-full bg-accent-violet/20 blur-3xl" />
+        </div>
+
+        <div class="relative z-10 max-w-3xl space-y-8">
+            <span class={kicker}>0.8.0 foundation release</span>
+
+            <h1 class="font-display text-5xl font-bold tracking-tight text-foreground sm:text-7xl">
+                Build faster.
+                <span class="block text-accent-blue">Ship safer.</span>
+                <span class="block text-accent-cyan">Scale with confidence.</span>
             </h1>
-            <p class="text-lg text-slate-400 sm:text-xl">
-                A minimal, deterministic framework for the modern web. No bloat, no surprises.
+
+            <p class="mx-auto max-w-xl text-lg text-muted sm:text-xl">
+                Zenith is a minimal, deterministic framework for the modern web. No bloat, no surprises.
             </p>
+
             <div class="flex flex-wrap items-center justify-center gap-4">
                 <a href="#docs" class={primary}>Get started</a>
                 <a href="#github" class={secondary}>View on GitHub</a>
             </div>
+
+            <p class="font-mono text-sm text-muted">
+                Version 0.8.0 — stability and security foundations.
+            </p>
         </div>
     </section>
 </DefaultLayout>
