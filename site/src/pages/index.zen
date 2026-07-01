@@ -1,20 +1,36 @@
 <script setup="ts">
-// Minimal homepage hero. CTAs are placeholders for future routes.
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: (string | false | null | undefined)[]) {
+    return twMerge(inputs.filter(Boolean).join(" "));
+}
+
+const primary = cn(
+    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-semibold transition",
+    "bg-sky-500 text-slate-950 hover:bg-sky-400"
+);
+
+const secondary = cn(
+    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-semibold transition",
+    "border border-slate-700 bg-slate-900 text-slate-100 hover:border-sky-500"
+);
 </script>
 
 <DefaultLayout>
-    <section class="hero">
-        <div class="hero-content">
-            <span class="eyebrow">Zenith Framework</span>
-            <h1 class="hero-title">
-                Build reactive UIs with <em>clarity</em>.
+    <section class="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-6 py-12 text-center">
+        <div class="max-w-2xl space-y-6">
+            <span class="inline-block rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-400">
+                Zenith Framework
+            </span>
+            <h1 class="text-4xl font-extrabold tracking-tight text-slate-50 sm:text-6xl">
+                Build reactive UIs with <em class="text-sky-400 not-italic">clarity</em>.
             </h1>
-            <p class="hero-subtitle">
+            <p class="text-lg text-slate-400 sm:text-xl">
                 A minimal, deterministic framework for the modern web. No bloat, no surprises.
             </p>
-            <div class="hero-actions">
-                <a href="#docs" class="button button-primary">Get started</a>
-                <a href="#github" class="button button-secondary">View on GitHub</a>
+            <div class="flex flex-wrap items-center justify-center gap-4">
+                <a href="#docs" class={primary}>Get started</a>
+                <a href="#github" class={secondary}>View on GitHub</a>
             </div>
         </div>
     </section>

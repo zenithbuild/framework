@@ -10,9 +10,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@zenithbuild/core": "^0.8.0"
+    "@zenithbuild/core": "^0.8.0",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
     "@types/bun": "latest"
   }
 }
