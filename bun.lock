@@ -29,7 +29,7 @@
       "name": "smoke-test",
       "version": "0.6.10",
       "dependencies": {
-        "@zenithbuild/core": "0.7.12",
+        "@zenithbuild/core": "0.8.0",
       },
       "devDependencies": {
         "@playwright/test": "^1.60.0",
@@ -37,11 +37,11 @@
         "@types/bun": "latest",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
         "@typescript-eslint/parser": "^8.53.0",
-        "@zenithbuild/bundler": "0.7.12",
-        "@zenithbuild/cli": "0.7.12",
-        "@zenithbuild/compiler": "0.7.12",
-        "@zenithbuild/router": "0.7.12",
-        "@zenithbuild/runtime": "0.7.12",
+        "@zenithbuild/bundler": "0.8.0",
+        "@zenithbuild/cli": "0.8.0",
+        "@zenithbuild/compiler": "0.8.0",
+        "@zenithbuild/router": "0.8.0",
+        "@zenithbuild/runtime": "0.8.0",
         "eslint": "^9.39.2",
         "playwright": "^1.60.0",
         "prettier": "^3.7.4",
@@ -52,12 +52,12 @@
       "name": "zenith-docs-site",
       "version": "0.6.6",
       "dependencies": {
-        "@zenithbuild/bundler": "0.7.12",
-        "@zenithbuild/cli": "0.7.12",
-        "@zenithbuild/compiler": "0.7.12",
-        "@zenithbuild/core": "0.7.12",
-        "@zenithbuild/router": "0.7.12",
-        "@zenithbuild/runtime": "0.7.12",
+        "@zenithbuild/bundler": "0.8.0",
+        "@zenithbuild/cli": "0.8.0",
+        "@zenithbuild/compiler": "0.8.0",
+        "@zenithbuild/core": "0.8.0",
+        "@zenithbuild/router": "0.8.0",
+        "@zenithbuild/runtime": "0.8.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -66,10 +66,10 @@
     },
     "packages/bundler": {
       "name": "@zenithbuild/bundler",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "dependencies": {
-        "@zenithbuild/router": "0.7.12",
-        "@zenithbuild/runtime": "0.7.12",
+        "@zenithbuild/router": "0.8.0",
+        "@zenithbuild/runtime": "0.8.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -77,38 +77,38 @@
         "typescript": "^5",
       },
       "optionalDependencies": {
-        "@zenithbuild/bundler-darwin-arm64": "0.7.12",
-        "@zenithbuild/bundler-darwin-x64": "0.7.12",
-        "@zenithbuild/bundler-linux-x64": "0.7.12",
-        "@zenithbuild/bundler-win32-x64": "0.7.12",
+        "@zenithbuild/bundler-darwin-arm64": "0.8.0",
+        "@zenithbuild/bundler-darwin-x64": "0.8.0",
+        "@zenithbuild/bundler-linux-x64": "0.8.0",
+        "@zenithbuild/bundler-win32-x64": "0.8.0",
       },
     },
     "packages/bundler-darwin-arm64": {
       "name": "@zenithbuild/bundler-darwin-arm64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/bundler-darwin-x64": {
       "name": "@zenithbuild/bundler-darwin-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/bundler-linux-x64": {
       "name": "@zenithbuild/bundler-linux-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/bundler-win32-x64": {
       "name": "@zenithbuild/bundler-win32-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/cli": {
       "name": "@zenithbuild/cli",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "bin": {
         "zenith": "./dist/index.js",
       },
       "dependencies": {
-        "@zenithbuild/bundler": "0.7.12",
-        "@zenithbuild/compiler": "0.7.12",
-        "@zenithbuild/extension-registry": "0.7.12",
+        "@zenithbuild/bundler": "0.8.0",
+        "@zenithbuild/compiler": "0.8.0",
+        "@zenithbuild/extension-registry": "0.8.0",
         "picocolors": "^1.1.1",
         "sharp": "^0.34.4",
       },
@@ -122,46 +122,46 @@
     },
     "packages/compiler": {
       "name": "@zenithbuild/compiler",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "devDependencies": {
         "@types/node": "latest",
         "typescript": "^5",
       },
       "optionalDependencies": {
-        "@zenithbuild/compiler-darwin-arm64": "0.7.12",
-        "@zenithbuild/compiler-darwin-x64": "0.7.12",
-        "@zenithbuild/compiler-linux-x64": "0.7.12",
-        "@zenithbuild/compiler-win32-x64": "0.7.12",
+        "@zenithbuild/compiler-darwin-arm64": "0.8.0",
+        "@zenithbuild/compiler-darwin-x64": "0.8.0",
+        "@zenithbuild/compiler-linux-x64": "0.8.0",
+        "@zenithbuild/compiler-win32-x64": "0.8.0",
       },
     },
     "packages/compiler-darwin-arm64": {
       "name": "@zenithbuild/compiler-darwin-arm64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/compiler-darwin-x64": {
       "name": "@zenithbuild/compiler-darwin-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/compiler-linux-x64": {
       "name": "@zenithbuild/compiler-linux-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/compiler-win32-x64": {
       "name": "@zenithbuild/compiler-win32-x64",
-      "version": "0.7.12",
+      "version": "0.8.0",
     },
     "packages/core": {
       "name": "@zenithbuild/core",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "bin": {
         "zenith": "bin/zenith.js",
       },
       "dependencies": {
-        "@zenithbuild/bundler": "0.7.12",
-        "@zenithbuild/cli": "0.7.12",
-        "@zenithbuild/compiler": "0.7.12",
-        "@zenithbuild/router": "0.7.12",
-        "@zenithbuild/runtime": "0.7.12",
+        "@zenithbuild/bundler": "0.8.0",
+        "@zenithbuild/cli": "0.8.0",
+        "@zenithbuild/compiler": "0.8.0",
+        "@zenithbuild/router": "0.8.0",
+        "@zenithbuild/runtime": "0.8.0",
       },
       "devDependencies": {
         "@jest/globals": "^30.2.0",
@@ -188,7 +188,7 @@
     },
     "packages/extension-registry": {
       "name": "@zenithbuild/extension-registry",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "devDependencies": {
         "@types/node": "latest",
         "typescript": "^5.7.3",
@@ -196,9 +196,9 @@
     },
     "packages/language": {
       "name": "@zenithbuild/language",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "dependencies": {
-        "@zenithbuild/compiler": "0.7.12",
+        "@zenithbuild/compiler": "0.8.0",
         "vscode-languageclient": "^9.0.1",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-textdocument": "^1.0.11",
@@ -214,12 +214,12 @@
     },
     "packages/language-server": {
       "name": "@zenithbuild/language-server",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "bin": {
         "zenith-language-server": "bin/zenith-language-server.js",
       },
       "dependencies": {
-        "@zenithbuild/compiler": "0.7.12",
+        "@zenithbuild/compiler": "0.8.0",
         "vscode-languageserver": "^9.0.1",
         "vscode-languageserver-textdocument": "^1.0.11",
       },
@@ -232,7 +232,7 @@
     },
     "packages/router": {
       "name": "@zenithbuild/router",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "devDependencies": {
         "@jest/globals": "^30.2.0",
         "@napi-rs/cli": "^2.18.4",
@@ -246,7 +246,7 @@
     },
     "packages/runtime": {
       "name": "@zenithbuild/runtime",
-      "version": "0.7.12",
+      "version": "0.8.0",
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.8.9",
         "@jest/globals": "^30.2.0",
