@@ -1,4 +1,4 @@
-import { listExtensions } from '@zenithbuild/extension-registry';
+import { listExtensions } from '../../extensions/registry.js';
 import type { CommandContext } from '../shared/context.js';
 
 export function runPluginList(ctx: CommandContext): number {

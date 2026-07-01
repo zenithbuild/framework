@@ -28,7 +28,6 @@ export const PUBLISH_SURFACE_MATRIX = [
     entry('packages/runtime', '@zenithbuild/runtime', 'release', ['dist/index.js', 'dist/template.js']),
     entry('packages/router', '@zenithbuild/router', 'release', ['dist/index.js', 'dist/ZenLink.zen', 'template.js']),
     entry('packages/core', '@zenithbuild/core', 'release', ['dist/index.js', 'bin/zenith.js']),
-    entry('packages/extension-registry', '@zenithbuild/extension-registry', 'release', ['dist/index.js', 'dist/registry.json']),
     entry('packages/cli', '@zenithbuild/cli', 'release', ['dist/index.js']),
     entry('packages/create-zenith', 'create-zenith', 'scaffolder', ['dist/cli.js'])
 ];

@@ -130,29 +130,6 @@ jobs:
             exit 1
           fi
 
-      - name: Verify release-train package names are bootstrapped
-        shell: bash
-        run: |
-          set -euo pipefail
-          registry="https://registry.npmjs.org/"
-          packages=(
-            "@zenithbuild/extension-registry"
-          )
-
-          missing=()
-          for package in "${packages[@]}"; do
-            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
-              missing+=("${package}")
-            fi
-          done
-
-          if [[ "${#missing[@]}" -gt 0 ]]; then
-            joined="$(IFS=, ; echo "${missing[*]}")"
-            echo "Release-train packages are not bootstrapped on npm: ${joined}" >&2
-            echo "Bootstrap each missing package once (manual publish with a temporary token), then re-run publish." >&2
-            exit 1
-          fi
-
   publish_platforms:
     name: Publish Platform Packages
     needs: preflight
@@ -434,7 +411,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/extension-registry,packages/cli
+          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli
         run: ./scripts/publish-packages.sh
 
   verify_registry:

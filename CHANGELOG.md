@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Confirmed the internal adapter contract around `AdapterDriver` and `resolveBuildAdapter(...)` without shipping a public adapter plugin API.
 - Verified built-in Vercel and Netlify adapters already route through the normalized internal adapter contract and shared hosted infrastructure.
 - Added the delegated adapter surface RFC as planning material only, keeping `target` as the stable deployment selector and the raw `adapter` object as an advanced surface.
-- Aligned the framework publish surface so `@zenithbuild/extension-registry` publishes with the lockstep framework train used by `@zenithbuild/cli`.
+- Kept extension registry source internal for this train while preserving the read-only plugin and adapter discovery commands in `@zenithbuild/cli`.
 
 #### Middleware and route-check planning
 

@@ -1,5 +1,5 @@
-import { listExtensions } from '@zenithbuild/extension-registry';
 import { KNOWN_TARGETS } from '../../adapters/adapter-types.js';
+import { listExtensions } from '../../extensions/registry.js';
 import type { CommandContext } from '../shared/context.js';
 
 export function runAdapterList(ctx: CommandContext): number {

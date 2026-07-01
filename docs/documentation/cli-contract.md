@@ -24,12 +24,12 @@ Invariant: CLI must not implement compiler semantics, runtime behavior, or hidde
 | `zenith dev` | starts development server and rebuild loop |
 | `zenith build` | emits deterministic build output for the selected deployment target |
 | `zenith preview` | serves or boots the built target output without compilation |
-| `zenith plugin list` | lists official plugins from `@zenithbuild/extension-registry` |
+| `zenith plugin list` | lists official plugins from CLI-bundled registry metadata |
 | `zenith plugin search <term>` | searches registry metadata only (no network crawl) |
 | `zenith plugin info <name\|alias>` | shows registry metadata and local `package.json` `zenith` block if installed |
 | `zenith adapter list` | lists registry adapters and built-in deployment targets |
 
-Read-only plugin/adapter commands must not import or execute extension package entrypoints. Install and config-mutation commands are not part of the current CLI surface.
+Read-only plugin/adapter commands must not import or execute extension package entrypoints. The registry metadata is bundled with the CLI for this release; `@zenithbuild/extension-registry` remains repo-internal until separately bootstrapped. Install and config-mutation commands are not part of the current CLI surface.
 
 ## Output Contract
 

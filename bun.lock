@@ -102,7 +102,6 @@
       "dependencies": {
         "@zenithbuild/bundler": "0.8.0",
         "@zenithbuild/compiler": "0.8.0",
-        "@zenithbuild/extension-registry": "0.8.0",
         "picocolors": "^1.1.1",
         "sharp": "^0.34.4",
       },

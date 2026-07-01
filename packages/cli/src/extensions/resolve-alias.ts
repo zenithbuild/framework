@@ -2,7 +2,7 @@ import {
     resolveExtension,
     type ZenithExtensionMeta,
     type ZenithExtensionType
-} from '@zenithbuild/extension-registry';
+} from './registry.js';
 
 export function resolveExtensionAlias(
     query: string,
