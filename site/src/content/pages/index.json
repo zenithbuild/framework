@@ -1,48 +1,4 @@
 {
   "title": "Home",
-  "description": "ZenithBuild framework homepage and ecosystem overview.",
-  "benchmarking": {
-    "eyebrow": "Next Proof Layer",
-    "title": "Benchmarking is the next validation pass.",
-    "body": [
-      "Zenith is being hardened through real framework and product work first. The next phase is measured comparison under public, repeatable conditions rather than advance performance claims.",
-      "That work will compare equivalent pages against established frameworks and publish the methodology alongside the results so bundle size, build behavior, startup cost, and runtime cost are interpreted in context.",
-      "The goal is to prove where Zenith is competitive, where tradeoffs exist, and where a different tool may be better suited."
-    ],
-    "measurements": [
-      {
-        "label": "Bundle sizing",
-        "detail": "Track shipped client output and page assets for equivalent implementations without folding unrelated application code into the comparison."
-      },
-      {
-        "label": "Cold build time",
-        "detail": "Measure clean builds to show how the compiler and bundling path behave before caches or warmed state reduce the workload."
-      },
-      {
-        "label": "Dev startup time",
-        "detail": "Record the time required to boot a fresh development session so local iteration cost is visible alongside production output."
-      },
-      {
-        "label": "Rebuild behavior",
-        "detail": "Measure change response during active development to show how quickly edits propagate and where rebuild overhead appears."
-      },
-      {
-        "label": "Hydration and runtime cost",
-        "detail": "Inspect the browser-side work required to make equivalent pages interactive, including hydration scope and runtime execution surface."
-      },
-      {
-        "label": "Equivalent page comparisons",
-        "detail": "Use comparable page shapes and feature sets so the benchmark measures framework behavior rather than mismatched workloads."
-      },
-      {
-        "label": "Established framework comparisons",
-        "detail": "Compare Zenith against widely used frameworks with methodology and environment details published beside the results."
-      }
-    ],
-    "methodology": {
-      "label": "Methodology Commitment",
-      "title": "Results will be published with context, not headlines.",
-      "text": "Each benchmark will document what was measured, what the metric represents, how the setup was reproduced, and where the comparison should be interpreted carefully. Zenith is being positioned as a tool for specific needs, not as a universal winner across every workload."
-    }
-  }
+  "description": "ZenithBuild framework homepage and ecosystem overview."
 }

@@ -27,7 +27,6 @@ export const load = async (_ctx) => {
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import HomeBenchmarkProof from "@/components/sections/home/HomeBenchmarkProof.zen";
 import HomeHero from "@/components/sections/home/HomeHero.zen";
 import HomeIdentity from "@/components/sections/home/HomeIdentity.zen";
 import HomePrinciples from "@/components/sections/home/HomePrinciples.zen";
@@ -40,7 +39,6 @@ import HomeSponsors from "@/components/sections/home/HomeSponsors.zen";
     <!-- Content Grid -->
     <div class="relative z-10 grid w-full grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 px-6 lg:px-12 py-12 lg:py-24">
         <HomeHero />
-        <HomeBenchmarkProof content={data.page.benchmarking} />
         <HomeIdentity />
         <HomePrinciples />
         <HomeProof />

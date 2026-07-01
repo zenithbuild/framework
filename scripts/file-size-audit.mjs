@@ -33,9 +33,6 @@ const EXCLUDED_DIR_NAMES = new Set([
 ]);
 const EXCLUDED_PATH_FRAGMENTS = [
   '/docs/public/',
-  '/apps/benchmarks/results/',
-  '/apps/benchmarks/.tmp/',
-  '/apps/benchmarks/tmp/',
   '/packages/bundler/_legacy_v1/',
   '/packages/language/out/',
   '/packages/compiler/_legacy_v1/'

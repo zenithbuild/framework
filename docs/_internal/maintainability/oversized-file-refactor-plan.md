@@ -178,7 +178,6 @@ Files:
 
 - `packages/bundler/tests/css_framework_contract.rs` - 828 lines
 - `docs/scripts/generate-ai-endpoints.mjs` - 886 lines
-- `apps/benchmarks/scripts/run-bundle-analysis.mjs` - 613 lines
 - `site/src/server/documentationSource.ts` - 573 lines
 - `site/scripts/zenith-workspace.mjs` - 541 lines
 
@@ -186,7 +185,6 @@ Why oversized:
 
 - CSS framework tests combine import policy, path security, Tailwind entry compilation, and CSS merge determinism.
 - AI endpoint generation combines frontmatter parsing, doc/blog discovery, category building, nav generation, RSS, llms text, and output drift checks.
-- Benchmark analysis combines asset discovery, source analysis, contributor ranking, directory stats, and report writing.
 - Site documentation source combines local AI metadata loading, Directus query mapping, navigation grouping, and lookup normalization.
 - Site workspace wrapper combines binary resolution, public asset sync, dev-state polling, and CLI spawning.
 
@@ -194,7 +192,6 @@ Safe split boundaries:
 
 - Split bundler CSS tests by policy, local entry compilation, and deterministic merge behavior.
 - Split AI endpoint generation into frontmatter parsing, content discovery, category/nav building, output writers, and drift comparison.
-- Split benchmark analysis into asset readers, source analyzers, contributor summaries, and report assembly.
 - Split site documentation source into local loader, Directus mapper, grouping/navigation helpers, and lookup helpers.
 - Split site workspace wrapper into binary resolution, public asset sync, dev-state polling, and process spawning.
 
@@ -203,7 +200,6 @@ Minimum checks after each split:
 - `cargo test --manifest-path packages/bundler/Cargo.toml --test css_framework_contract`
 - `bun run --cwd docs docs:gate`
 - `bun run --cwd docs test`
-- `bun run --cwd apps/benchmarks run:bundle-analysis` when benchmark script behavior changes
 - `bun run --cwd site build`
 - `bun run --cwd site test`
 
