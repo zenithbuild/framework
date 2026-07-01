@@ -28,7 +28,7 @@ This document records what the framework supports today versus what remains bloc
 
 - `zenith plugin list|search|info`
 - `zenith adapter list`
-- Metadata sourced from `@zenithbuild/extension-registry` only
+- Metadata sourced from CLI-bundled registry metadata; the `@zenithbuild/extension-registry` package source remains internal until separately bootstrapped
 - `zenith plugin info` may read installed `package.json` `zenith` metadata; it must not import extension entrypoints
 
 ## Blocked / not public

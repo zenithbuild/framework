@@ -42,12 +42,13 @@ Built-in `vercel` and `netlify` global middleware support is current adapter com
 
 The CLI exposes read-only discovery namespaces for plugins and adapters:
 
-- `zenith plugin list|search|info` — metadata-only discovery from `@zenithbuild/extension-registry`
+- `zenith plugin list|search|info` — metadata-only discovery from CLI-bundled registry metadata
 - `zenith adapter list` — registry adapters plus built-in `target` values
 
 Rules:
 
 - Discovery commands must not import or execute extension package entrypoints.
+- The `@zenithbuild/extension-registry` package source remains internal until its npm package is separately bootstrapped.
 - `zenith plugin info` may read an installed package's `package.json` `zenith` metadata block only.
 - Install, remove, and config-mutation CLI commands are future work and are not part of the current public surface.
 

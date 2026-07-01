@@ -21,9 +21,6 @@
     "url": "https://github.com/zenithbuild/framework",
     "directory": "packages/extension-registry"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && cp registry.json dist/registry.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -33,5 +30,5 @@
     "@types/node": "latest",
     "typescript": "^5.7.3"
   },
-  "private": false
+  "private": true
 }

@@ -1,4 +1,4 @@
-import { resolveExtension, listExtensions } from '@zenithbuild/extension-registry';
+import { resolveExtension, listExtensions } from '../dist/extensions/registry.js';
 import { runCommand as runPluginCommand } from '../dist/commands/plugin/index.js';
 import { runCommand as runAdapterCommand } from '../dist/commands/adapter/index.js';
 import { createZenithLogger } from '../dist/ui/logger.js';

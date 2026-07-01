@@ -1,4 +1,4 @@
-import { searchExtensions } from '@zenithbuild/extension-registry';
+import { searchExtensions } from '../../extensions/registry.js';
 import type { CommandContext } from '../shared/context.js';
 
 export function runPluginSearch(ctx: CommandContext, term: string): number {

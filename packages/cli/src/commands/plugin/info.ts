@@ -1,5 +1,5 @@
-import { resolveExtension } from '@zenithbuild/extension-registry';
 import { readInstalledZenithMetadata } from '../../extensions/local-package.js';
+import { resolveExtension } from '../../extensions/registry.js';
 import { formatResolvedExtension } from '../../extensions/resolve-alias.js';
 import type { CommandContext } from '../shared/context.js';
 
