@@ -21,13 +21,13 @@ const isDark = () => (doc.documentElement.getAttribute("data-theme") ?? "dark") 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zenith Framework</title>
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" type="image/png" href="/zenith.PNG" />
 </head>
 <body class="min-h-screen bg-background font-body text-foreground antialiased">
     <header class="border-b border-border">
         <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
             <a href="/" class="flex items-center gap-3 font-display font-bold tracking-tight text-foreground">
-                <img src="/logo.svg" alt="Zenith" class="h-9 w-9" />
+                <img src="/zenith.PNG" alt="Zenith" class="h-9 w-9" />
                 Zenith
             </a>
 
