@@ -15,7 +15,6 @@
     "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.2",
     "@types/bun": "latest"
   }
 }
