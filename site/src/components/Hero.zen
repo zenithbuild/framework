@@ -1,0 +1,95 @@
+<script setup="ts">
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: (string | false | null | undefined)[]) {
+    return twMerge(inputs.filter(Boolean).join(" "));
+}
+
+const badge = cn(
+    "inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1",
+    "font-mono text-xs font-medium text-muted"
+);
+
+const goldDot = "h-1.5 w-1.5 rounded-full bg-accent-gold";
+
+const primary = cn(
+    "group inline-flex items-center gap-2 rounded-lg px-5 py-2.5 font-display font-semibold transition",
+    "bg-accent-blue text-white hover:bg-accent-cyan hover:text-background"
+);
+
+const secondary = cn(
+    "inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-5 py-2.5",
+    "font-display font-semibold text-foreground transition hover:border-accent-cyan"
+);
+
+const card = cn(
+    "flex items-center gap-4 rounded-xl border border-border bg-surface/80 p-4 backdrop-blur-sm"
+);
+</script>
+
+<section class="relative flex min-h-[calc(100vh-5.5rem)] flex-col overflow-hidden px-6 py-16 lg:py-24">
+    <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div class="absolute left-[8%] top-0 h-full w-px bg-gradient-to-b from-transparent via-border to-transparent" />
+        <div class="absolute bottom-[12%] left-0 h-px w-2/3 bg-gradient-to-r from-border via-transparent to-transparent" />
+        <div class="absolute right-[18%] top-[14%] h-48 w-48 rounded-full border border-accent-blue/20 opacity-60" />
+        <div class="absolute right-[10%] top-[22%] h-3 w-3 rounded-full bg-accent-gold/80" />
+        <div class="absolute bottom-[22%] left-[12%] h-2 w-2 rounded-full bg-accent-orange/80" />
+        <div class="absolute bottom-[18%] right-[26%] h-32 w-32 rounded-full border border-accent-violet/15" />
+    </div>
+
+    <div class="relative z-10 mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 items-center gap-16 lg:grid-cols-12 lg:gap-8">
+        <div class="lg:col-span-7">
+            <span class={badge}>
+                <span class={goldDot} />
+                0.8.0 · Security & integrity release
+            </span>
+
+            <h1 class="mt-8 font-display text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+                Build the web
+                <span class="block text-accent-blue">from a cleaner</span>
+                <span class="block text-muted">foundation.</span>
+            </h1>
+
+            <p class="mt-6 max-w-lg text-lg leading-relaxed text-muted sm:text-xl">
+                Zenith is a modern framework focused on fast builds, clear routing, and server-first control without giving up a clean developer experience.
+            </p>
+
+            <div class="mt-8 flex flex-wrap items-center gap-4">
+                <a href="#docs" class={primary}>
+                    Explore the framework
+                    <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <path d="M5 12l5-5.5L5 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </a>
+                <a href="#release" class={secondary}>
+                    View release notes
+                </a>
+            </div>
+        </div>
+
+        <aside class="relative lg:col-span-5 lg:justify-self-end">
+            <div class="pointer-events-none absolute -left-16 top-1/2 hidden h-px w-24 -translate-y-1/2 -rotate-[25deg] bg-accent-blue/30 lg:block" />
+
+            <div class="flex flex-col gap-5">
+                <div class={card}>
+                    <span class="h-2 w-2 shrink-0 rounded-full bg-accent-cyan" />
+                    <span class="font-mono text-sm font-semibold tracking-wide text-foreground">Fast builds</span>
+                </div>
+                <div class={card}>
+                    <span class="h-2 w-2 shrink-0 rounded-full bg-accent-blue" />
+                    <span class="font-mono text-sm font-semibold tracking-wide text-foreground">Typed routes</span>
+                </div>
+                <div class={card}>
+                    <span class="h-2 w-2 shrink-0 rounded-full bg-accent-violet" />
+                    <span class="font-mono text-sm font-semibold tracking-wide text-foreground">Server-first control</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="relative z-10 mx-auto mt-auto w-full max-w-7xl pt-16">
+        <p class="font-mono text-xs text-muted">
+            Zenith Framework · Built for clarity.
+        </p>
+    </div>
+</section>

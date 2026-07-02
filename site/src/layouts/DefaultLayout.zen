@@ -25,7 +25,7 @@ const isDark = () => (doc.documentElement.getAttribute("data-theme") ?? "dark") 
 </head>
 <body class="min-h-screen bg-background font-body text-foreground antialiased">
     <header class="border-b border-border">
-        <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
             <a href="/" class="flex items-center gap-3 font-display font-bold tracking-tight text-foreground">
                 <img src="/zenith.PNG" alt="Zenith" class="h-9 w-9" />
                 Zenith
