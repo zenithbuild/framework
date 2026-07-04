@@ -5,12 +5,19 @@ import path from "node:path";
 import {
   DOCS_ROOT,
   DOC_STATUS_VALUES,
+  findEmptyRequiredCategories,
+  isPublicDocStatus,
   parseFrontmatter,
   listMarkdown,
   toRelative,
 } from "./shared.mjs";
 
 const REQUIRED_DOC_KEYS = ["title", "status"];
+
+// Categories that must contain at least one public markdown page, not just a
+// _category.yml. Onboarding categories belong here so the first-run path can
+// never silently regress to an empty category.
+const REQUIRED_NON_EMPTY_CATEGORIES = ["getting-started"];
 
 function fail(violations) {
   if (violations.length === 0) {
@@ -26,6 +33,8 @@ function fail(violations) {
 async function main() {
   const docsFiles = await listMarkdown(DOCS_ROOT, { excludeSegments: ["_legacy"] });
   const violations = [];
+  // { category, public } per doc, for required-category coverage checks.
+  const categoryRecords = [];
 
   for (const fullPath of docsFiles) {
     const rel = toRelative(fullPath);
@@ -67,6 +76,22 @@ async function main() {
     if ("version" in meta && "since" in meta) {
       violations.push(`${rel}: use either 'version' or 'since', not both`);
     }
+
+    // Track category coverage for required non-empty categories. A category is
+    // covered when it has at least one public-status markdown page. Top-level
+    // docs (no directory segment) are not category coverage candidates.
+    const relToDocs = path.relative(DOCS_ROOT, fullPath).replace(/\\/g, "/");
+    const firstSegment = relToDocs.split("/")[0];
+    categoryRecords.push({
+      category: firstSegment && firstSegment !== relToDocs ? firstSegment : null,
+      public: isPublicDocStatus(status),
+    });
+  }
+
+  for (const category of findEmptyRequiredCategories(categoryRecords, REQUIRED_NON_EMPTY_CATEGORIES)) {
+    violations.push(
+      `documentation/${category}/: required category has no public page. Add at least one canonical/draft/deprecated markdown page (a _category.yml alone is not enough).`,
+    );
   }
 
   fail(violations);

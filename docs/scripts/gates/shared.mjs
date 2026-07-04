@@ -327,3 +327,31 @@ export function hasDocStatus(status) {
 export function isPublicDocStatus(status) {
   return PUBLIC_DOC_STATUS_VALUES.has(String(status || ""));
 }
+
+/**
+ * Compute required categories that have no public page.
+ *
+ * records: array of { category: string | null, public: boolean } where
+ *   `category` is the first path segment under DOCS_ROOT (null for top-level
+ *   docs) and `public` is true when the doc has a public status.
+ * required: iterable of category names that must contain at least one public
+ *   page (a _category.yml alone does not count).
+ *
+ * Returns the list of required category names with no public page, preserving
+ * the iteration order of `required`.
+ */
+export function findEmptyRequiredCategories(records, required) {
+  const covered = new Set();
+  for (const rec of records) {
+    if (rec && rec.category && rec.public) {
+      covered.add(rec.category);
+    }
+  }
+  const missing = [];
+  for (const category of required) {
+    if (!covered.has(category)) {
+      missing.push(category);
+    }
+  }
+  return missing;
+}
