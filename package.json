@@ -23,5 +23,6 @@
     "ci": "bash ./scripts/ci.sh",
     "smoke": "bash ./scripts/smoke.sh",
     "test": "bun run ci"
-  }
+  },
+  "packageManager": "bun@1.3.14"
 }

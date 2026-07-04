@@ -1,9 +1,9 @@
 ---
 title: "Install and Compatibility"
 description: "Supported install flow and compatibility guarantees for Zenith stable and beta scaffolds."
-version: "0.4"
+version: "0.5"
 status: "canonical"
-last_updated: "2026-03-04"
+last_updated: "2026-07-03"
 tags: ["install", "compatibility", "release"]
 ---
 
@@ -23,6 +23,17 @@ npx zenith build
 ```
 
 `create-zenith` is the canonical scaffold entry point for stable users. Beta installs remain available when explicitly requested.
+
+## Toolchain Pinning Policy
+
+Zenith ships native compiler and bundler packages, so the build toolchain is pinned for reproducible installs and releases.
+
+- **Package manager:** the root `package.json` declares `"packageManager": "bun@1.3.14"`. Use Bun 1.3.14 for install and scripts.
+- **Bun in CI/release:** CI and publish workflows pin `bun-version: "1.3.14"` instead of `latest`, so a bad Bun release cannot become a user install failure.
+- **Node policy:** CI runs on Node 20 (the oldest runtime Zenith tests for compatibility). Publish runs on Node 24 (current LTS, required for npm Trusted Publishing and provenance). This split is intentional: CI guards the oldest supported runtime, and the release path uses the newest LTS.
+- **Native platforms:** the supported native package set is listed in [Native Toolchain Packages](#native-toolchain-packages) below. No additional native targets are published in this milestone.
+
+Bump the pinned Bun or Node versions deliberately; a toolchain change is a release decision, not an automatic update.
 
 ## Optional Tooling
 
