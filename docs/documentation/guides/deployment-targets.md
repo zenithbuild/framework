@@ -28,8 +28,8 @@ Definition of Done:
 | --- | --- | --- | --- | --- | --- |
 | `static` | Prerender only | `dist/` static site | N/A | N/A | N/A |
 | `static-export` | Prerender only | Rewrite-free concrete public files | N/A | N/A | N/A |
-| `vercel` | Prerender + Hosted Routes | Vercel Build Output API layout | Support | Support | Deferred (501) |
-| `netlify` | Prerender + Hosted Routes | Netlify deploy root | Support | Support | Deferred (501) |
+| `vercel` | Prerender + Hosted Routes | Vercel Build Output API layout | Support | Support | Rejected at build time |
+| `netlify` | Prerender + Hosted Routes | Netlify deploy root | Support | Support | Rejected at build time |
 | `node` | Prerender + Server Routes | Standalone Node artifact | Support | Support | Support |
 
 Static-only targets fail fast if the route manifest contains server-classified routes.
@@ -113,7 +113,7 @@ For larger files, we recommend using a direct-to-storage upload strategy (e.g., 
 - `bundler-owned final build/static HTML image materialization` remains the hard boundary; runtime paths only consume route artifacts.
 - `/__zenith/route-check` is deployed by local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` targets currently skip advisory route-check and rely on the direct HTML request instead.
 - Hosted `vercel` and `netlify` targets now support `multipart/form-data` parsing plus resource-route `stream(...)` and `sse(...)`.
-- **Hosted Downloads**: `ctx.download()` returns a 501 on hosted targets (`vercel`, `netlify`) in this milestone.
+- **Hosted Downloads**: direct hosted `ctx.download()` resource routes are rejected at build time for `vercel` and `netlify`. Generated hosted wrappers still include a defensive 501 fallback if a download-shaped response reaches them. Packaged `node` supports resource downloads. This is hosted adapter product parity work, not a confirmed security bypass, and remains separate from route-check parity.
 
 ## Adapter Rule
 
