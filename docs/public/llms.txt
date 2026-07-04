@@ -3,6 +3,8 @@ Project: Zenith (compiler-first UI)
 Docs: /docs
 
 Start here (ordered):
+- Start Here:
+  - /docs/getting-started/quickstart
 - Contracts:
   - /docs/contracts/bundler-contract
   - /docs/contracts/compiler-boundary

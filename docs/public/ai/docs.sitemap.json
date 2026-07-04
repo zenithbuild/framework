@@ -1,6 +1,7 @@
 {
   "generated_at": "2026-02-22",
   "urls": [
+    "/docs/getting-started/quickstart",
     "/docs/contracts/bundler-contract",
     "/docs/contracts/compiler-boundary",
     "/docs/contracts/component-script-hoisting",

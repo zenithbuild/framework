@@ -7,6 +7,13 @@
   "navigation": {
     "categories": [
       {
+        "slug": "getting-started",
+        "title": "Start Here",
+        "summary": "Foundational setup and first steps for new Zenith users.",
+        "order": 0,
+        "count": 1
+      },
+      {
         "slug": "contracts",
         "title": "Contracts",
         "summary": "Normative framework contracts and invariants.",
@@ -79,6 +86,32 @@
     ]
   },
   "items": [
+    {
+      "kind": "doc",
+      "slug": "getting-started/quickstart",
+      "title": "Quickstart",
+      "status": "canonical",
+      "tags": [
+        "getting-started",
+        "quickstart",
+        "install"
+      ],
+      "source_path": "documentation/getting-started/quickstart.md",
+      "url": "/docs/getting-started/quickstart",
+      "category": "getting-started",
+      "category_title": "Start Here",
+      "category_order": 0,
+      "category_path": [
+        "getting-started"
+      ],
+      "category_titles": [
+        "Start Here"
+      ],
+      "doc_order": 1,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
     {
       "kind": "doc",
       "slug": "contracts/bundler-contract",

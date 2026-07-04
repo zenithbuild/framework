@@ -2,6 +2,25 @@
   "generated_at": "2026-02-22",
   "categories": [
     {
+      "slug": "getting-started",
+      "title": "Start Here",
+      "summary": "Foundational setup and first steps for new Zenith users.",
+      "order": 0,
+      "docs": [
+        {
+          "slug": "getting-started/quickstart",
+          "title": "Quickstart",
+          "label": "Quickstart",
+          "url": "/docs/getting-started/quickstart",
+          "order": 1,
+          "level": null,
+          "status": "canonical",
+          "prerequisites": [],
+          "source_path": "documentation/getting-started/quickstart.md"
+        }
+      ]
+    },
+    {
       "slug": "contracts",
       "title": "Contracts",
       "summary": "Normative framework contracts and invariants.",
@@ -721,6 +740,7 @@
     }
   ],
   "start_here": [
+    "/docs/getting-started/quickstart",
     "/docs/contracts/bundler-contract",
     "/docs/contracts/compiler-boundary",
     "/docs/contracts/component-script-hoisting",
