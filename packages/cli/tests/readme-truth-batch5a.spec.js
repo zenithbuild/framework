@@ -9,7 +9,7 @@ describe('Batch 5A CLI README truth', () => {
         const readme = readFileSync(resolve(REPO_ROOT, 'packages/cli/README.md'), 'utf8');
 
         expect(readme).toContain('`node`, `vercel`, and `netlify` expose deployed `/_zenith/image` endpoints');
-        expect(readme).toContain('Hosted `vercel` and `netlify` targets skip advisory `/__zenith/route-check`');
+        expect(readme).toContain('Hosted `vercel` and `netlify` targets expose advisory `/__zenith/route-check`');
         expect(readme).not.toContain('`vercel` and `netlify` do not yet emit a deployed `/_zenith/image` endpoint');
     });
 });

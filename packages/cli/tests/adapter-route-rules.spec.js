@@ -1,9 +1,11 @@
 import {
     createNetlifyBasePathAssetRules,
     createNetlifyImageEndpointRule,
+    createNetlifyRouteCheckRule,
     createNetlifyRewriteRules,
     createVercelBasePathAssetRoutes,
     createVercelImageEndpointRoute,
+    createVercelRouteCheckRoute,
     createVercelRouteSource
 } from '../dist/adapters/route-rules.js';
 
@@ -17,6 +19,10 @@ describe('adapter route rule helpers', () => {
         expect(createVercelImageEndpointRoute('/docs')).toEqual({
             src: '^/docs/_zenith/image/?$',
             dest: '/__zenith/image'
+        });
+        expect(createVercelRouteCheckRoute('/docs')).toEqual({
+            src: '^/docs/__zenith/route\\-check/?$',
+            dest: '/__zenith/route-check'
         });
     });
 
@@ -35,6 +41,7 @@ describe('adapter route rule helpers', () => {
             '/base/files/* /files/__splat_path/index.html 200'
         ]);
         expect(createNetlifyImageEndpointRule('/docs')).toBe('/docs/_zenith/image /.netlify/functions/__zenith_image 200!');
+        expect(createNetlifyRouteCheckRule('/docs')).toBe('/docs/__zenith/route-check /.netlify/functions/__zenith_route_check 200!');
     });
 
     test('preserve basePath asset forwarding without duplicating packaged assets', () => {

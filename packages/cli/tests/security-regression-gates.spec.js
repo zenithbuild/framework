@@ -254,28 +254,22 @@ describe('Track A security regression gates', () => {
     test('unsupported route-check targets fail honestly instead of pretending support', async () => {
         project = await makeProject({
             'pages/index.zen': '<main>Home</main>\n',
-            'pages/secure/index.zen': '<main>Secure</main>\n',
-            'pages/secure/page.guard.ts': [
-                'export async function guard(ctx) {',
-                '  if (ctx.url.searchParams.get("auth") !== "yes") return ctx.redirect("/login", 307);',
-                '  return ctx.allow();',
-                '}'
-            ].join('\n')
+            'pages/about.zen': '<main>About</main>\n'
         });
 
         await build({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
-            config: { target: 'vercel', router: true }
+            config: { target: 'static-export', router: true }
         });
         dev = await createDevServer({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
             port: 0,
-            config: { target: 'vercel', router: true }
+            config: { target: 'static-export', router: true }
         });
 
-        const response = await fetch(`${origin(dev.port)}/__zenith/route-check?path=%2Fsecure`, {
+        const response = await fetch(`${origin(dev.port)}/__zenith/route-check?path=%2Fabout`, {
             headers: { 'x-zenith-route-check': '1' }
         });
         expect(response.status).toBe(501);
@@ -362,7 +356,7 @@ describe('Track A security regression gates', () => {
 
         expect(cliContract).toContain('Neither bundler nor CLI runtime paths may execute emitted page assets');
         expect(deploymentGuide).toContain('bundler-owned final build/static HTML image materialization');
-        expect(deploymentGuide).toContain('Hosted `vercel` and `netlify` targets currently skip advisory route-check');
+        expect(deploymentGuide).toContain('hosted `vercel` / `netlify` targets as an advisory soft-navigation preflight');
         expect(routeProtectionDoc).toContain('/__zenith/route-check` does not grant security');
         expect(routeProtectionDoc).toContain('setAdvisoryRoutePolicy');
         expect(routeProtectionDoc).toContain('never authorization');

@@ -285,7 +285,7 @@ Routes using `guard(ctx)`, `action(ctx)`, or `load(ctx)` **cannot be statically 
 ### Client Router (Advisory Preflight, Server-Authoritative Commit)
 When navigating via marked soft-nav links (`<a data-zen-link>`), the router may preflight guarded server routes through `/__zenith/route-check` using the target pathname plus query string when the configured target exposes that endpoint. That preflight is advisory only.
 
-Today, advisory route-check is available in local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` server adapters skip advisory route-check and rely on the direct same-origin HTML request instead.
+Today, advisory route-check is available in local dev/preview, the packaged `node` target, and hosted `vercel` / `netlify` server adapters.
 
 Global middleware does not run for route-check in V1. Route-check remains guard-only and advisory, so real navigation may redirect or deny through global middleware even when route-check would allow.
 

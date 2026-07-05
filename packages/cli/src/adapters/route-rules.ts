@@ -40,6 +40,10 @@ export function createNetlifyImageEndpointRule(basePath: string): string {
     return `${prependBasePath(basePath, '/_zenith/image')} /.netlify/functions/__zenith_image 200!`;
 }
 
+export function createNetlifyRouteCheckRule(basePath: string): string {
+    return `${prependBasePath(basePath, '/__zenith/route-check')} /.netlify/functions/__zenith_route_check 200!`;
+}
+
 export function createNetlifyRewriteRules(route: StaticRoute, basePath = '/'): string[] {
     const segments = splitRouteSegments(route.path);
     if (segments.length === 0) {
@@ -90,6 +94,13 @@ export function createVercelImageEndpointRoute(basePath: string): VercelRoute {
     return {
         src: createVercelRouteSource('/_zenith/image', basePath),
         dest: '/__zenith/image'
+    };
+}
+
+export function createVercelRouteCheckRoute(basePath: string): VercelRoute {
+    return {
+        src: createVercelRouteSource('/__zenith/route-check', basePath),
+        dest: '/__zenith/route-check'
     };
 }
 
