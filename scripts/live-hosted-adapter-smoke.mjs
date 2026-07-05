@@ -68,6 +68,28 @@ function publicUrl(baseUrl, basePath, path) {
     return new URL(publicPath(basePath, path), `${baseUrl}/`).toString();
 }
 
+function redirectMatchesExpectedLogin(location, normalized) {
+    if (!location) {
+        return { ok: false, detail: 'location=<missing>' };
+    }
+    let parsed;
+    try {
+        parsed = new URL(location, `${normalized.baseUrl}/`);
+    } catch {
+        return { ok: false, detail: `location=${location}` };
+    }
+    const expectedLoginPath = publicPath(normalized.basePath, '/login');
+    const expectedNextPath = publicPath(normalized.basePath, '/secure?auth=no');
+    const actualNext = parsed.searchParams.get('next') || '';
+    const absoluteLocation = /^[a-z][a-z0-9+.-]*:\/\//i.test(location) || location.startsWith('//');
+    const sameOrigin = !absoluteLocation || parsed.origin === normalized.baseUrl;
+    const ok = sameOrigin && parsed.pathname === expectedLoginPath && actualNext === expectedNextPath;
+    return {
+        ok,
+        detail: `location=${location} expected=${expectedLoginPath}?next=${encodeURIComponent(expectedNextPath)}`
+    };
+}
+
 async function tryReadJson(response) {
     const text = await response.text();
     try {
@@ -98,10 +120,11 @@ export async function runHostedAdapterSmoke(options, dependencies = {}) {
 
     const denied = await fetchImpl(deniedUrl, { redirect: 'manual' });
     const deniedLocation = denied.headers.get('location') || '';
+    const deniedRedirect = redirectMatchesExpectedLogin(deniedLocation, normalized);
     checks.push(check(
         'guarded direct request redirects when denied',
-        denied.status >= 300 && denied.status < 400 && deniedLocation.includes('/login'),
-        `status=${denied.status} location=${deniedLocation || '<missing>'}`
+        denied.status >= 300 && denied.status < 400 && deniedRedirect.ok,
+        `status=${denied.status} ${deniedRedirect.detail}`
     ));
 
     const allowed = await fetchImpl(allowedUrl, { redirect: 'manual' });
@@ -115,13 +138,17 @@ export async function runHostedAdapterSmoke(options, dependencies = {}) {
     const routeCheckHeaders = { 'x-zenith-route-check': '1' };
     const deniedCheck = await fetchImpl(routeCheckUrl('/secure?auth=no'), { headers: routeCheckHeaders });
     const deniedPayload = await tryReadJson(deniedCheck);
+    const routeCheckRedirect = redirectMatchesExpectedLogin(
+        String(deniedPayload.value?.result?.location || ''),
+        normalized
+    );
     checks.push(check(
         'route-check returns sanitized redirect for denied guarded route',
         deniedCheck.status === 200 &&
             deniedPayload.value?.result?.kind === 'redirect' &&
             deniedPayload.value.result.status === 307 &&
-            String(deniedPayload.value.result.location || '').includes('/login'),
-        deniedPayload.error || `status=${deniedCheck.status} result=${JSON.stringify(deniedPayload.value?.result || null)}`
+            routeCheckRedirect.ok,
+        deniedPayload.error || `status=${deniedCheck.status} ${routeCheckRedirect.detail}`
     ));
 
     const allowedCheck = await fetchImpl(routeCheckUrl('/secure?auth=yes'), { headers: routeCheckHeaders });

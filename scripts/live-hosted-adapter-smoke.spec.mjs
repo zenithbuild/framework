@@ -21,46 +21,63 @@ async function withSmokeServer(handler, callback) {
     }
 }
 
-function smokeHandler(request, response) {
-    const url = new URL(request.url || '/', 'http://127.0.0.1');
-    if (url.pathname === '/docs/secure' && url.searchParams.get('auth') === 'no') {
-        response.writeHead(307, { location: '/docs/login?next=%2Fdocs%2Fsecure%3Fauth%3Dno' });
-        response.end();
-        return;
-    }
-    if (url.pathname === '/docs/secure' && url.searchParams.get('auth') === 'yes') {
-        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        response.end('<main>Secure</main>');
-        return;
-    }
-    if (url.pathname === '/docs/__zenith/route-check') {
-        if (request.headers['x-zenith-route-check'] !== '1') {
-            json(response, 403, { error: 'forbidden' });
+function joinBasePath(basePath, path) {
+    return `${basePath === '/' ? '' : basePath}${path}`;
+}
+
+function createSmokeHandler({
+    basePath = '/docs',
+    directRedirectLocation,
+    routeCheckRedirectLocation
+} = {}) {
+    const deniedPath = joinBasePath(basePath, '/secure?auth=no');
+    const allowedPath = joinBasePath(basePath, '/secure?auth=yes');
+    const loginPath = joinBasePath(basePath, '/login');
+    const expectedRedirect = `${loginPath}?next=${encodeURIComponent(deniedPath)}`;
+    const directLocation = directRedirectLocation || expectedRedirect;
+    const routeCheckLocation = routeCheckRedirectLocation || expectedRedirect;
+
+    return function smokeHandler(request, response) {
+        const url = new URL(request.url || '/', 'http://127.0.0.1');
+        if (url.pathname === joinBasePath(basePath, '/secure') && url.searchParams.get('auth') === 'no') {
+            response.writeHead(307, { location: directLocation });
+            response.end();
             return;
         }
-        const target = url.searchParams.get('path');
-        if (target === '/docs/secure?auth=no') {
-            json(response, 200, {
-                result: {
-                    kind: 'redirect',
-                    status: 307,
-                    location: '/docs/login?next=%2Fdocs%2Fsecure%3Fauth%3Dno'
-                },
-                routeId: 'secure'
-            });
+        if (url.pathname === joinBasePath(basePath, '/secure') && url.searchParams.get('auth') === 'yes') {
+            response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+            response.end('<main>Secure</main>');
             return;
         }
-        if (target === '/docs/secure?auth=yes') {
-            json(response, 200, { result: { kind: 'allow' }, routeId: 'secure' });
-            return;
+        if (url.pathname === joinBasePath(basePath, '/__zenith/route-check')) {
+            if (request.headers['x-zenith-route-check'] !== '1') {
+                json(response, 403, { error: 'forbidden' });
+                return;
+            }
+            const target = url.searchParams.get('path');
+            if (target === deniedPath) {
+                json(response, 200, {
+                    result: {
+                        kind: 'redirect',
+                        status: 307,
+                        location: routeCheckLocation
+                    },
+                    routeId: 'secure'
+                });
+                return;
+            }
+            if (target === allowedPath) {
+                json(response, 200, { result: { kind: 'allow' }, routeId: 'secure' });
+                return;
+            }
+            if (target === joinBasePath(basePath, '/api/ping')) {
+                json(response, 404, { error: 'route_not_found' });
+                return;
+            }
         }
-        if (target === '/docs/api/ping') {
-            json(response, 404, { error: 'route_not_found' });
-            return;
-        }
-    }
-    response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-    response.end('not found');
+        response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        response.end('not found');
+    };
 }
 
 test('parseArgs normalizes provider, origin, and base path', () => {
@@ -78,7 +95,7 @@ test('parseArgs normalizes provider, origin, and base path', () => {
 });
 
 test('runHostedAdapterSmoke passes against the expected hosted smoke shape', async () => {
-    await withSmokeServer(smokeHandler, async (baseUrl) => {
+    await withSmokeServer(createSmokeHandler(), async (baseUrl) => {
         const result = await runHostedAdapterSmoke({
             provider: 'netlify',
             baseUrl,
@@ -86,6 +103,47 @@ test('runHostedAdapterSmoke passes against the expected hosted smoke shape', asy
         });
         assert.equal(result.ok, true);
         assert.deepEqual(result.checks.map((entry) => entry.ok), [true, true, true, true, true, true]);
+    });
+});
+
+test('runHostedAdapterSmoke accepts root base path redirects to root login', async () => {
+    await withSmokeServer(createSmokeHandler({ basePath: '/' }), async (baseUrl) => {
+        const result = await runHostedAdapterSmoke({
+            provider: 'vercel',
+            baseUrl,
+            basePath: '/'
+        });
+        assert.equal(result.ok, true);
+    });
+});
+
+test('runHostedAdapterSmoke rejects non-root direct redirects without the base path', async () => {
+    await withSmokeServer(createSmokeHandler({
+        directRedirectLocation: '/login?next=%2Fsecure%3Fauth%3Dno'
+    }), async (baseUrl) => {
+        const result = await runHostedAdapterSmoke({
+            provider: 'netlify',
+            baseUrl,
+            basePath: '/docs'
+        });
+        assert.equal(result.ok, false);
+        assert.equal(result.checks[0].ok, false);
+        assert.match(result.checks[0].detail, /expected=\/docs\/login/);
+    });
+});
+
+test('runHostedAdapterSmoke rejects non-root route-check redirects without the base path', async () => {
+    await withSmokeServer(createSmokeHandler({
+        routeCheckRedirectLocation: '/login?next=%2Fsecure%3Fauth%3Dno'
+    }), async (baseUrl) => {
+        const result = await runHostedAdapterSmoke({
+            provider: 'vercel',
+            baseUrl,
+            basePath: '/docs'
+        });
+        assert.equal(result.ok, false);
+        assert.equal(result.checks[2].ok, false);
+        assert.match(result.checks[2].detail, /expected=\/docs\/login/);
     });
 });
 
