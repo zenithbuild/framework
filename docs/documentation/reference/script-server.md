@@ -174,7 +174,8 @@ Failure Modes:
 - Router docs imply resource routes participate in soft-nav HTML commits or `data-zen-form` HTML enhancement.
 
 Evidence:
-- Dev, preview, packaged-node, and hosted parity tests cover JSON, text, attachment downloads, stream, SSE, auth, cookies, and multipart POSTs on dedicated resource routes.
+- Dev, preview, and packaged-node parity tests cover JSON, text, attachment downloads, stream, SSE, auth, cookies, and multipart POSTs on dedicated resource routes.
+- Hosted parity tests cover JSON, text, stream, SSE, auth, cookies, multipart POSTs, and build-time rejection for direct `ctx.download()` resource routes.
 
 ## Contract: Route-Owned Cookie Sessions
 
