@@ -93,7 +93,7 @@ Current limitations:
 - There is no separate `assetPrefix` knob. Assets intentionally follow `basePath`.
 - `static-export` does not expose deployed `/_zenith/image` or `/__zenith/route-check` endpoints. A plain static file server is the contract.
 - `node`, `vercel`, and `netlify` expose deployed `/_zenith/image` endpoints on the packaged image contract.
-- Hosted `vercel` and `netlify` targets skip advisory `/__zenith/route-check`; direct HTML requests remain the server-side route boundary.
+- Hosted `vercel` and `netlify` targets expose advisory `/__zenith/route-check` for guarded soft navigation; direct HTML requests remain the server-side route boundary.
 - Image materialization is route-artifact-driven. Bundler owns final build/static HTML image materialization, while preview and server render still materialize at runtime from structured `image_materialization` metadata. No path executes page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
 - Extension discovery commands are read-only; they do not install packages or mutate `zenith.config`.
 

@@ -111,7 +111,7 @@ For larger files, we recommend using a direct-to-storage upload strategy (e.g., 
 - `/_zenith/image` is deployed by `node`, `vercel`, and `netlify` on the same packaged image contract today.
 - Remote image optimization only fetches URLs allowed by `images.remotePatterns`. The image endpoint validates the resolved remote target before fetch, repeats that validation for redirects, and fetches through the validated target while preserving the original host semantics.
 - `bundler-owned final build/static HTML image materialization` remains the hard boundary; runtime paths only consume route artifacts.
-- `/__zenith/route-check` is deployed by local dev/preview and the packaged `node` target. Hosted `vercel` and `netlify` targets currently skip advisory route-check and rely on the direct HTML request instead.
+- `/__zenith/route-check` is deployed by local dev/preview, packaged `node`, and hosted `vercel` / `netlify` targets as an advisory soft-navigation preflight. Server-side `guard(ctx)` / `load(ctx)` remains the security boundary for direct requests.
 - Hosted `vercel` and `netlify` targets now support `multipart/form-data` parsing plus resource-route `stream(...)` and `sse(...)`.
 - **Hosted Downloads**: direct hosted `ctx.download()` resource routes are rejected at build time for `vercel` and `netlify`. Generated hosted wrappers still include a defensive 501 fallback if a download-shaped response reaches them. Packaged `node` supports resource downloads. This is hosted adapter product parity work, not a confirmed security bypass, and remains separate from route-check parity.
 

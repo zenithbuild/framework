@@ -46,45 +46,52 @@ describe('route-check target support', () => {
         }
     });
 
-    test('vercel target disables router route-check and dev reports the endpoint as unsupported', async () => {
-        project = await createProject({
-            'pages/index.zen': '<main>Home</main>\n',
-            'pages/secure/index.zen': '<main>Secure</main>\n',
-            'pages/secure/page.guard.ts': [
-                'export async function guard(ctx) {',
-                '  if (ctx.url.searchParams.get("auth") !== "yes") return ctx.redirect("/login", 307);',
-                '  return ctx.allow();',
-                '}'
-            ].join('\n')
-        });
+    test.each(['vercel', 'netlify'])(
+        '%s target enables router route-check and dev exposes the advisory endpoint',
+        async (target) => {
+            project = await createProject({
+                'pages/index.zen': '<main>Home</main>\n',
+                'pages/secure/index.zen': '<main>Secure</main>\n',
+                'pages/secure/page.guard.ts': [
+                    'export async function guard(ctx) {',
+                    '  if (ctx.url.searchParams.get("auth") !== "yes") return ctx.redirect("/login", 307);',
+                    '  return ctx.allow();',
+                    '}'
+                ].join('\n')
+            });
 
-        await build({
-            pagesDir: project.pagesDir,
-            outDir: project.outDir,
-            config: {
-                target: 'vercel',
-                router: true
-            }
-        });
+            await build({
+                pagesDir: project.pagesDir,
+                outDir: project.outDir,
+                config: {
+                    target,
+                    router: true
+                }
+            });
 
-        expect(await readRouterSource(project.root)).toMatch(/const\s+__ZENITH_ROUTE_CHECK_ENABLED__\s*=\s*false;/);
+            expect(await readRouterSource(project.root)).toMatch(/const\s+__ZENITH_ROUTE_CHECK_ENABLED__\s*=\s*true;/);
 
-        dev = await createDevServer({
-            pagesDir: project.pagesDir,
-            outDir: project.outDir,
-            port: 0,
-            config: {
-                target: 'vercel',
-                router: true
-            }
-        });
+            dev = await createDevServer({
+                pagesDir: project.pagesDir,
+                outDir: project.outDir,
+                port: 0,
+                config: {
+                    target,
+                    router: true
+                }
+            });
 
-        const response = await fetch(`http://127.0.0.1:${dev.port}/__zenith/route-check?path=%2Fsecure`, {
-            headers: { 'x-zenith-route-check': '1' }
-        });
-        expect(response.status).toBe(501);
-        expect(await response.json()).toEqual({ error: 'route_check_unsupported' });
-    });
+            const response = await fetch(`http://127.0.0.1:${dev.port}/__zenith/route-check?path=%2Fsecure`, {
+                headers: { 'x-zenith-route-check': '1' }
+            });
+            expect(response.status).toBe(200);
+            expect((await response.json()).result).toEqual({
+                kind: 'redirect',
+                location: '/login',
+                status: 307
+            });
+        }
+    );
 
     test('node target keeps router route-check enabled', async () => {
         project = await createProject({

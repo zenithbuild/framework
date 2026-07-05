@@ -3,7 +3,8 @@ import { basename, join } from 'node:path';
 import { compareRouteSpecificity } from '../server/resolve-request-route.js';
 import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
 import { createHostedAdapterContext } from './hosted-adapter-context.js';
-import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteSource } from './route-rules.js';
+import { createHostedRouteCheckSource } from './hosted-route-check-source.js';
+import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteCheckRoute, createVercelRouteSource } from './route-rules.js';
 import { validateHostedResourceRoutes } from './validate-hosted-resource-routes.js';
 import type { AdapterDriver, BuildManifest } from './adapter-types.js';
 import type { HostedServerManifest, HostedServerManifestRoute } from './hosted-adapter-context.js';
@@ -29,6 +30,7 @@ function buildVercelServerDest(route: HostedServerManifestRoute) {
 
 function buildVercelConfig(buildManifest: BuildManifest, serverRoutes: HostedServerManifestRoute[]) {
     const routes: VercelConfigRoute[] = [...createVercelBasePathAssetRoutes(buildManifest.base_path)];
+    routes.push(createVercelRouteCheckRoute(buildManifest.base_path));
     for (const route of [...serverRoutes].sort((left, right) => compareRouteSpecificity(left.path, right.path))) {
         routes.push({
             src: createVercelRouteSource(route.path, buildManifest.base_path),
@@ -127,6 +129,10 @@ function hasHostedScopedServerData(route: HostedServerManifestRoute) {
         route.scoped_server_data.length > 0;
 }
 
+function isHostedPageRoute(route: HostedServerManifestRoute) {
+    return route.route_kind !== 'resource';
+}
+
 async function loadServerManifest(coreOutput: string): Promise<HostedServerManifest | null> {
     try {
         const parsed = JSON.parse(await readFile(join(coreOutput, 'server', 'manifest.json'), 'utf8'));
@@ -159,6 +165,32 @@ async function writeHostedFunctionBundle(functionDir: string, coreOutput: string
     await writeFile(join(functionDir, '.vc-config.json'), vercelFunctionConfig(), 'utf8');
 }
 
+async function writeRouteCheckFunctionBundle(
+    functionDir: string,
+    coreOutput: string,
+    buildManifest: BuildManifest,
+    pageServerRoutes: HostedServerManifestRoute[]
+) {
+    await writeHostedFunctionBundle(
+        functionDir,
+        coreOutput,
+        createHostedRouteCheckSource({
+            buildManifest,
+            pageServerRoutes,
+            runtimeBasePath: '.',
+            routeModuleBaseSegments: ['routes'],
+            exportKind: 'vercel'
+        })
+    );
+    for (const route of pageServerRoutes) {
+        await cp(
+            join(coreOutput, 'server', 'routes', route.name),
+            join(functionDir, 'routes', route.name),
+            { recursive: true, force: true }
+        );
+    }
+}
+
 export const vercelAdapter: AdapterDriver = {
     name: 'vercel',
     validateRoutes(manifest) {
@@ -188,6 +220,12 @@ export const vercelAdapter: AdapterDriver = {
             join(hostedContext.outDir, 'functions', '__zenith', 'image.func'),
             hostedContext.coreOutput,
             createImageFunctionSource((hostedContext.config as AdapterConfig | null | undefined)?.images || {})
+        );
+        await writeRouteCheckFunctionBundle(
+            join(hostedContext.outDir, 'functions', '__zenith', 'route-check.func'),
+            hostedContext.coreOutput,
+            hostedContext.buildManifest,
+            serverRoutes.filter(isHostedPageRoute)
         );
 
         for (const route of serverRoutes) {
