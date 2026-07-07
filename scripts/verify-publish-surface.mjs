@@ -7,7 +7,7 @@ import {
 
 function usage() {
     console.error(
-        'Usage: node scripts/verify-publish-surface.mjs [--selection all|framework|platform|release|scaffolder] [--filter csv] [--list]'
+        'Usage: node scripts/verify-publish-surface.mjs [--selection all|framework|platform|release|scaffolder|manual] [--filter csv] [--list]'
     );
 }
 

@@ -161,3 +161,18 @@ test('interactive-menu.zen uses state for DOM-driven open state', () => {
     'interactive-menu.zen must not use signal() for local open state'
   );
 });
+
+// 7. protected-route.zen uses the contracted guard/load export shape
+test('protected-route.zen uses const guard/load exports', () => {
+  const content = read('examples/protected-route.zen');
+  assert.match(content, /export const guard = async \(ctx\) =>/);
+  assert.match(content, /export const load = async \(ctx\) =>/);
+  assert.ok(
+    !content.includes('export async function guard'),
+    'protected-route.zen must not use function guard export'
+  );
+  assert.ok(
+    !content.includes('export async function load'),
+    'protected-route.zen must not use function load export'
+  );
+});
