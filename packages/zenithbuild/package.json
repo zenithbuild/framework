@@ -1,0 +1,42 @@
+{
+  "name": "zenithbuild",
+  "version": "0.1.0",
+  "description": "Agent-ready skills and rules for building Zenith framework projects.",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "author": "Zenith Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/zenithbuild"
+  },
+  "bugs": {
+    "url": "https://github.com/zenithbuild/framework/issues"
+  },
+  "homepage": "https://github.com/zenithbuild/framework#readme",
+  "keywords": [
+    "zenith",
+    "zenith-framework",
+    "agent-skill",
+    "ai-coding",
+    "agent-rules",
+    "framework-contract"
+  ],
+  "files": [
+    "README.md",
+    "AGENTS.md",
+    "SKILL.md",
+    "install.md",
+    "detection.md",
+    "rules/**",
+    "examples/**",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

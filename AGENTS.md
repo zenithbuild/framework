@@ -84,3 +84,12 @@ Use Tailwind tokens and `dark:` variants. Do not use raw CSS variables or hardco
 - `guard(ctx)` must return `allow()`, `redirect(url)`, or `deny()`. It evaluates before anything else.
 - `load(ctx)` may return `data(payload)`, `redirect(url)`, or `deny()`. It evaluates after `guard`.
 - A route protected by `guard`/`load` cannot be statically generated (`prerender = true`).
+
+## Packaged Agent Rules
+
+The Zenith agent contract is also published as a standalone npm package for agents and projects:
+
+- `packages/zenithbuild/` in this repo
+- package name: `zenithbuild`
+
+Use it to install or copy the canonical rules into any Zenith project. See `packages/zenithbuild/README.md` for install, copy, and detection instructions.
