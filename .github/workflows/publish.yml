@@ -411,7 +411,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli
+          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/zenithbuild
         run: ./scripts/publish-packages.sh
 
   verify_registry:

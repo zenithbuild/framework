@@ -1,0 +1,36 @@
+<!-- Protected route using server guard and load -->
+
+<script server lang="ts">
+  import { allow, deny, data } from 'zenith:server-contract'
+
+  export async function guard(ctx) {
+    const session = await ctx.auth.requireSession({ redirectTo: '/login', status: 302 })
+    if (session.role !== 'admin') {
+      return deny(403, 'Admins only')
+    }
+    ctx.env.userId = String(session.userId || '')
+    return allow()
+  }
+
+  export async function load(ctx) {
+    const metrics = await fetchDashboardMetrics(ctx.env.userId)
+    if (!metrics) {
+      return deny(404, 'No metrics found')
+    }
+    return data({ user: { id: ctx.env.userId }, metrics })
+  }
+
+  // This route cannot be statically generated because it uses guard/load.
+  export const prerender = false
+</script>
+
+<main class="p-8">
+  <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+  <p class="mt-4 text-slate-700 dark:text-slate-300">
+    Welcome, {data.user.id}.
+  </p>
+  <section class="mt-6 rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+    <h2 class="text-lg font-semibold">Metrics</h2>
+    <p class="mt-2">Revenue: {data.metrics.revenue}</p>
+  </section>
+</main>

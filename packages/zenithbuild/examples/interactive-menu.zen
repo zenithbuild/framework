@@ -1,0 +1,74 @@
+<!-- Interactive menu supporting controlled and uncontrolled usage -->
+
+<script setup="ts">
+  interface Props {
+    open?: boolean
+    defaultOpen?: boolean
+    onOpenChange?: (next: boolean) => void
+  }
+
+  const incoming = props as Props
+
+  state localOpen = incoming.defaultOpen ?? false
+
+  function isOpen() {
+    return incoming.open !== undefined ? incoming.open : localOpen
+  }
+
+  function setOpen(next: boolean) {
+    if (incoming.open === undefined) {
+      localOpen = next
+    }
+    if (typeof incoming.onOpenChange === 'function') {
+      incoming.onOpenChange(next)
+    }
+  }
+
+  function toggle() {
+    setOpen(!isOpen())
+  }
+
+  const triggerRef = ref<HTMLButtonElement>()
+  const panelRef = ref<HTMLDivElement>()
+
+  zenMount((ctx) => {
+    const doc = zenDocument()
+    if (!doc) return
+
+    const off = zenOn(doc, 'keydown', (e) => {
+      if (e.key === 'Escape' && isOpen()) {
+        setOpen(false)
+      }
+    })
+
+    ctx.cleanup(off)
+  })
+</script>
+
+<div class="relative inline-block">
+  <button
+    ref={triggerRef}
+    on:click={toggle}
+    on:hoverin={() => setOpen(true)}
+    on:hoverout={() => setOpen(false)}
+    class="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+  >
+    Menu
+  </button>
+
+  <div
+    ref={panelRef}
+    class={isOpen()
+      ? 'absolute z-10 mt-2 w-48 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800'
+      : 'hidden'}
+  >
+    <ul class="py-1">
+      <li>
+        <a href="/profile" class="block px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700">Profile</a>
+      </li>
+      <li>
+        <a href="/settings" class="block px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700">Settings</a>
+      </li>
+    </ul>
+  </div>
+</div>
