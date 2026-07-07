@@ -56,13 +56,16 @@ test('publish surface matrix coverage normalizes Windows-style manifest candidat
     );
 });
 
-test('framework and scaffolder selections resolve from one matrix', () => {
+test('framework, manual, and scaffolder selections resolve from one matrix', () => {
     const framework = selectPublishMatrixEntries({ selection: 'framework' });
+    const manual = selectPublishMatrixEntries({ selection: 'manual' });
     const scaffolder = selectPublishMatrixEntries({ selection: 'scaffolder' });
 
     assert.equal(framework.length, 14);
+    assert.deepEqual(manual.map((entry) => entry.dir), ['packages/zenithbuild']);
     assert.equal(scaffolder.length, 1);
     assert.equal(scaffolder[0].dir, 'packages/create-zenith');
+    assert.equal(framework.some((entry) => entry.dir === 'packages/zenithbuild'), false);
     assert.equal(framework.some((entry) => entry.dir === 'packages/create-zenith'), false);
     assert.deepEqual(
         selectPublishMatrixEntries({
@@ -94,6 +97,7 @@ test('framework release selection excludes standalone-owned editor packages', ()
     assert.equal(frameworkDirs.includes('packages/language'), false);
     assert.equal(allDirs.includes('packages/language-server'), false);
     assert.equal(allDirs.includes('packages/language'), false);
+    assert.equal(allDirs.includes('packages/zenithbuild'), true);
 });
 
 test('verifyPublishSurface passes for a valid package surface', () => {
@@ -359,5 +363,5 @@ test('verifyPublishSurface uses shell mode for npm pack on win32', () => {
 });
 
 test('matrix stays aligned with expected publish targets', () => {
-    assert.equal(PUBLISH_SURFACE_MATRIX.length, 15);
+    assert.equal(PUBLISH_SURFACE_MATRIX.length, 16);
 });
