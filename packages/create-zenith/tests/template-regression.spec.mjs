@@ -11,12 +11,14 @@ import {
     writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { assertAgentScaffold } from './agent-scaffold-assertions.mjs';
 
-const CLI_PATH = resolve(process.cwd(), 'dist', 'cli.js');
-const PACKAGE_ROOT = resolve(process.cwd());
-const WORKSPACE_ROOT = resolve(process.cwd(), '..', '..');
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = resolve(TEST_DIR, '..');
+const WORKSPACE_ROOT = resolve(PACKAGE_ROOT, '..', '..');
+const CLI_PATH = resolve(PACKAGE_ROOT, 'dist', 'cli.js');
 const LOCAL_ZENITH_PACKAGES = [
     resolve(WORKSPACE_ROOT, 'packages', 'core'),
     resolve(WORKSPACE_ROOT, 'packages', 'cli'),
@@ -233,6 +235,7 @@ function assertTemplateShape(projectDir, template) {
     }
 
     assert.equal(pkg.name, basename(projectDir), 'scaffolded package name should match project directory');
+    assertAgentScaffold(projectDir);
 }
 
 function installForBuild(projectDir, template) {
@@ -355,6 +358,7 @@ test('scaffolder works without examples present', () => {
 
         assert.equal(existsSync(join(projectDir, 'package.json')), true, 'scaffolded package.json missing');
         assert.equal(existsSync(join(projectDir, 'src', 'pages', 'index.zen')), true, 'template source missing');
+        assertAgentScaffold(projectDir);
     } finally {
         rmSync(tempRoot, { recursive: true, force: true });
         rmSync(fixture.fixtureRoot, { recursive: true, force: true });

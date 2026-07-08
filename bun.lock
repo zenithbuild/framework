@@ -165,7 +165,7 @@
     },
     "packages/create-zenith": {
       "name": "create-zenith",
-      "version": "1.3.20",
+      "version": "1.3.21",
       "bin": {
         "create-zenith": "dist/cli.js",
       },
