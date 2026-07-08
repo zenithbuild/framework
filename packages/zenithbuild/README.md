@@ -30,6 +30,22 @@ npm install -D zenithbuild
 
 After installation, agents can read the rules from `node_modules/zenithbuild/rules/` or copy them into the repo under `.agents/skills/zenith/`.
 
+## skills.sh install
+
+Install the Zenith agent skill directly from the framework repository:
+
+```bash
+npx skills add zenithbuild/framework --skill zenithbuild
+```
+
+Direct path install:
+
+```bash
+npx skills add https://github.com/zenithbuild/framework/tree/master/skills/zenithbuild
+```
+
+The skills.sh folder at `skills/zenithbuild/` is mirrored by this npm package. The package readiness test keeps `SKILL.md`, `rules/`, and `examples/` in sync.
+
 ## Future global install
 
 A global install lets agents find the canonical Zenith rules from one place:
