@@ -166,6 +166,18 @@ test('skills.sh metadata is valid', () => {
   );
 });
 
+test('skills.sh SKILL.md points to installed skill files', () => {
+  const content = readSkill('SKILL.md');
+  assert.ok(
+    !content.includes('AGENTS.md'),
+    'skills.sh SKILL.md must not point to missing AGENTS.md'
+  );
+  assert.ok(
+    content.includes('1. `SKILL.md` — fastest path to non-negotiable authoring rules.'),
+    'skills.sh SKILL.md must use SKILL.md as the entrypoint'
+  );
+});
+
 // 3. File size rule
 test('no package file exceeds 500 lines', () => {
   const allFiles = walkFiles(PKG_ROOT);
@@ -269,4 +281,32 @@ test('protected-route.zen uses const guard/load exports', () => {
     !content.includes('export async function load'),
     'protected-route.zen must not use function load export'
   );
+});
+
+test('routing rule examples use const guard/load exports', () => {
+  const roots = [
+    { content: read('rules/zenith-routing-rules.md'), label: relative('rules/zenith-routing-rules.md') },
+    { content: readSkill('rules/zenith-routing-rules.md'), label: skillRelative('rules/zenith-routing-rules.md') },
+  ];
+
+  for (const item of roots) {
+    assert.match(
+      item.content,
+      /export const guard = async \(ctx\) =>/,
+      `${item.label} must use const guard export`
+    );
+    assert.match(
+      item.content,
+      /export const load = async \(ctx\) =>/,
+      `${item.label} must use const load export`
+    );
+    assert.ok(
+      !item.content.includes('export async function guard'),
+      `${item.label} must not use function guard export`
+    );
+    assert.ok(
+      !item.content.includes('export async function load'),
+      `${item.label} must not use function load export`
+    );
+  }
 });

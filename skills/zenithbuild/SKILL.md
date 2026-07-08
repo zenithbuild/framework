@@ -21,7 +21,7 @@ Zenith is a compiler-first UI framework.
 
 Read in this order unless the task is clearly narrower:
 
-1. `AGENTS.md` (this package) — fastest path to non-negotiable authoring rules.
+1. `SKILL.md` — fastest path to non-negotiable authoring rules.
 2. `rules/zenith-agent-contract.md` — concise contract summary.
 3. `rules/zenith-dom-rules.md` — refs, `zenWindow`, `zenDocument`, `zenOn`, `zenResize`, `collectRefs`.
 4. `rules/zenith-routing-rules.md` — `guard` / `load`, server-first security.

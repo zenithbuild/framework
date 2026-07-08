@@ -47,7 +47,7 @@ export const prerender = true
 <script server lang="ts">
   import { allow, deny, data } from 'zenith:server-contract'
 
-  export async function guard(ctx) {
+  export const guard = async (ctx) => {
     const session = await ctx.auth.requireSession({ redirectTo: '/login', status: 302 })
     if (session.role !== 'admin') {
       return deny(403, 'Admins only')
@@ -56,7 +56,7 @@ export const prerender = true
     return allow()
   }
 
-  export async function load(ctx) {
+  export const load = async (ctx) => {
     const metrics = await fetchDashboardMetrics(ctx.env.userId)
     if (!metrics) {
       return deny(404, 'No metrics found')
