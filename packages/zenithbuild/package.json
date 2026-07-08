@@ -1,6 +1,6 @@
 {
   "name": "zenithbuild",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent-ready skills and rules for building Zenith framework projects.",
   "license": "MIT",
   "type": "module",

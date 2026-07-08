@@ -8,9 +8,24 @@ Start with [`./docs/README.md`](./docs/README.md).
 
 ## What Lives Here
 - `packages/` for core packages: compiler, bundler, runtime, router, CLI, core, and `create-zenith`
+- `skills/zenithbuild/` for the skills.sh-installable Zenith agent skill
 - `docs/` for canonical documentation and release notes
 - `apps/` for monorepo apps and smoke fixtures
 - `governance/` and `contracts/` for repo rules and canonical contracts
+
+## Agent Skill
+
+Install the Zenith agent skill with skills.sh:
+
+```bash
+npx skills add zenithbuild/framework --skill zenithbuild
+```
+
+Direct path install:
+
+```bash
+npx skills add https://github.com/zenithbuild/framework/tree/master/skills/zenithbuild
+```
 
 ## What Stays Separate
 - Plugins live in separate repositories.
