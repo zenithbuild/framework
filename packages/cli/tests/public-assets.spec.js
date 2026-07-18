@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -9,6 +9,7 @@ import { build } from '../dist/build.js';
 import { cli } from '../dist/index.js';
 import { createDevServer } from '../dist/dev-server.js';
 import { createPreviewServer } from '../dist/preview.js';
+import { removePublicAssetOutputs } from '../dist/public-assets.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
@@ -103,6 +104,86 @@ describe('public assets', () => {
             await rm(project.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
             project = null;
         }
+    });
+
+    test('dev cleanup removes only selected files and rejects invalid paths', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main>Home</main>\n',
+            'outside.txt': 'keep outside',
+            'dist/stale.txt': 'remove stale asset',
+            'dist/generated/runtime.js': 'keep generated asset',
+            'dist/directory/keep.txt': 'keep directory contents'
+        });
+
+        const result = await removePublicAssetOutputs({
+            outDir: project.outDir,
+            publicPaths: [
+                'stale.txt',
+                '../outside.txt',
+                join(project.root, 'outside.txt'),
+                'C:\\outside.txt',
+                '.',
+                'directory',
+                'missing.txt',
+                'missing/asset.txt'
+            ]
+        });
+
+        expect(result).toEqual({ removed: 1, skipped: 5 });
+        expect(existsSync(join(project.outDir, 'stale.txt'))).toBe(false);
+        expect(await readFile(join(project.root, 'outside.txt'), 'utf8')).toBe('keep outside');
+        expect(await readFile(join(project.outDir, 'generated', 'runtime.js'), 'utf8')).toBe('keep generated asset');
+        expect(await readFile(join(project.outDir, 'directory', 'keep.txt'), 'utf8')).toBe('keep directory contents');
+    });
+
+    test('dev cleanup rejects a stale asset beneath a symlinked ancestor', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main>Home</main>\n',
+            'outside/index.html': 'keep outside index',
+            'dist/unrelated.txt': 'keep unrelated output'
+        });
+        const adminLink = join(project.outDir, 'admin');
+        await symlink(
+            join(project.root, 'outside'),
+            adminLink,
+            process.platform === 'win32' ? 'junction' : 'dir'
+        );
+
+        let error = null;
+        try {
+            await removePublicAssetOutputs({
+                outDir: project.outDir,
+                publicPaths: ['admin/index.html']
+            });
+        } catch (caught) {
+            error = caught;
+        }
+
+        expect(error).toMatchObject({ code: 'ZENITH_PUBLIC_ASSET_OUTSIDE_OUTPUT' });
+        expect(error.message).toContain('admin/index.html');
+        expect(await readFile(join(project.root, 'outside', 'index.html'), 'utf8')).toBe('keep outside index');
+        expect((await lstat(adminLink)).isSymbolicLink()).toBe(true);
+        expect(await readFile(join(project.outDir, 'unrelated.txt'), 'utf8')).toBe('keep unrelated output');
+    });
+
+    test('dev cleanup unlinks a final symlink without modifying its target', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main>Home</main>\n',
+            'outside/target.html': 'keep symlink target',
+            'dist/unrelated.txt': 'keep unrelated output'
+        });
+        const linkPath = join(project.outDir, 'link.html');
+        await symlink(join(project.root, 'outside', 'target.html'), linkPath, 'file');
+
+        const result = await removePublicAssetOutputs({
+            outDir: project.outDir,
+            publicPaths: ['link.html']
+        });
+
+        expect(result).toEqual({ removed: 1, skipped: 0 });
+        expect(existsSync(linkPath)).toBe(false);
+        expect(await readFile(join(project.root, 'outside', 'target.html'), 'utf8')).toBe('keep symlink target');
+        expect(await readFile(join(project.outDir, 'unrelated.txt'), 'utf8')).toBe('keep unrelated output');
     });
 
     test('build copies root and src public files while preserving image indexing', async () => {
@@ -257,7 +338,8 @@ describe('public assets', () => {
     test('dev server serves public assets from initial builds and rebuilds', async () => {
         project = await makeProject({
             'src/pages/index.zen': '<main>Home</main>\n',
-            'src/public/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg"><title>Initial</title></svg>\n'
+            'src/public/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg"><title>Initial</title></svg>\n',
+            'src/public/admin/index.html': '<main>Production Tina admin</main>\n'
         });
 
         dev = await createDevServer({
@@ -271,6 +353,20 @@ describe('public assets', () => {
         const initial = await fetchText(origin, '/logo.svg');
         expect(initial.status).toBe(200);
         expect(initial.body).toContain('Initial');
+
+        for (const pathname of ['/admin', '/admin/', '/admin/index.html']) {
+            const admin = await fetchText(origin, pathname);
+            expect(admin.status).toBe(200);
+            expect(admin.body).toContain('Production Tina admin');
+        }
+
+        await writeFile(
+            join(project.root, 'src', 'public', 'admin', 'index.html'),
+            '<main>Local Tina admin</main>\n'
+        );
+        for (const pathname of ['/admin', '/admin/', '/admin/index.html']) {
+            await waitForText(origin, pathname, '<main>Local Tina admin</main>\n');
+        }
 
         await mkdir(join(project.root, 'src', 'public'), { recursive: true });
         await writeFile(join(project.root, 'src', 'public', 'new.txt'), 'new-public-file');

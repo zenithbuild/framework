@@ -11,7 +11,12 @@ import { injectImageMaterializationIntoRouterManifest } from '../images/router-m
 import { buildImageArtifacts } from '../images/service.js';
 import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from '../images/payload.js';
-import { copyPublicAssets, deriveReservedPublicAssetPaths } from '../public-assets.js';
+import {
+    copyPublicAssets,
+    deriveReservedPublicAssetPaths,
+    discoverPublicAssets,
+    removePublicAssetOutputs
+} from '../public-assets.js';
 import { writeResourceRouteManifest } from '../resource-manifest.js';
 import { createStartupProfiler } from '../startup-profile.js';
 import { resolveBuildAdapter } from '../adapters/resolve-adapter.js';
@@ -52,6 +57,7 @@ export function createDevBuildSession(options) {
         experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true,
         strictDomLints: config.strictDomLints === true
     };
+    let previousPublicAssetPaths = new Set();
 
     ensureToolchainCompatibility(bundlerBin);
 
@@ -86,13 +92,29 @@ export function createDevBuildSession(options) {
     }
 
     async function syncPublicAssets(startupProfile) {
-        await startupProfile.measureAsync(
+        const result = await startupProfile.measureAsync(
             'copy_public_assets',
             () => copyPublicAssets({
                 projectRoot,
                 outDir,
                 reservedPaths: deriveReservedPublicAssetPaths(state.manifest)
             })
+        );
+        previousPublicAssetPaths = new Set(result.assets);
+    }
+
+    async function clearPublicAssetOutputs(startupProfile) {
+        const assets = await startupProfile.measureAsync(
+            'discover_public_assets',
+            () => discoverPublicAssets(projectRoot)
+        );
+        const publicPaths = new Set([
+            ...previousPublicAssetPaths,
+            ...assets.map((asset) => asset.publicPath)
+        ]);
+        await startupProfile.measureAsync(
+            'remove_stale_public_assets',
+            () => removePublicAssetOutputs({ outDir, publicPaths })
         );
     }
 
@@ -107,6 +129,8 @@ export function createDevBuildSession(options) {
         if (!orderedEnvelopes || orderedEnvelopes.length === 0) {
             throw new Error('Dev rebuild cache is incomplete; full rebuild required.');
         }
+
+        await clearPublicAssetOutputs(startupProfile);
 
         await startupProfile.measureAsync(
             'run_bundler',
@@ -321,6 +345,9 @@ export function createDevBuildSession(options) {
         },
         getImageRuntimePayload() {
             return state.imageRuntimePayload;
+        },
+        getPublicAssetPaths() {
+            return previousPublicAssetPaths;
         }
     };
 }

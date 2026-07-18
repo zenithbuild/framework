@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname, join, relative } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { readRequestBodyBuffer } from '../request-body.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
@@ -327,7 +327,18 @@ export function createDevRequestHandler(options) {
                     : resolved.route.output;
                 filePath = resolveWithinDist(outDir, output);
             } else {
-                filePath = null;
+                const staticHtmlPath = toStaticFilePath(outDir, canonicalPath);
+                const rel = staticHtmlPath && relative(outDir, staticHtmlPath).replace(/\\/g, '/');
+                if (staticHtmlPath && buildSession?.getPublicAssetPaths?.()?.has(rel)) {
+                    try {
+                        await readFileForRequest(staticHtmlPath);
+                        filePath = staticHtmlPath;
+                    } catch {
+                        filePath = null;
+                    }
+                } else {
+                    filePath = null;
+                }
             }
 
             resolvedPathFor404 = filePath;

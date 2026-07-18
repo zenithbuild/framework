@@ -1,5 +1,5 @@
-import { copyFile, lstat, mkdir, readdir } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { copyFile, lstat, mkdir, readdir, realpath, unlink } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve, win32 } from 'node:path';
 
 function isWithin(parent, child) {
     const rel = relative(parent, child);
@@ -16,6 +16,21 @@ async function maybeLstat(filePath) {
 
 function normalizePublicPath(value) {
     return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+function isMissingPathError(error) {
+    return error?.code === 'ENOENT' || error?.code === 'ENOTDIR';
+}
+
+async function realpathOrNull(filePath) {
+    try {
+        return await realpath(filePath);
+    } catch (error) {
+        if (isMissingPathError(error)) {
+            return null;
+        }
+        throw error;
+    }
 }
 
 function routePathToPublicPath(routePath) {
@@ -104,6 +119,66 @@ export function deriveReservedPublicAssetPaths(routeManifest) {
         }
     }
     return reserved;
+}
+
+export async function removePublicAssetOutputs({ outDir, publicPaths }) {
+    const resolvedOutDir = resolve(outDir);
+    const physicalOutDir = await realpathOrNull(resolvedOutDir);
+    if (!physicalOutDir) {
+        return { removed: 0, skipped: 0 };
+    }
+    let removed = 0;
+    let skipped = 0;
+
+    for (const value of publicPaths || []) {
+        const rawPublicPath = String(value || '');
+        const publicPath = normalizePublicPath(rawPublicPath);
+        if (!publicPath || isAbsolute(rawPublicPath) || win32.isAbsolute(rawPublicPath)) {
+            skipped += 1;
+            continue;
+        }
+        const destinationPath = resolve(resolvedOutDir, publicPath);
+        if (!isWithin(resolvedOutDir, destinationPath) || destinationPath === resolvedOutDir) {
+            skipped += 1;
+            continue;
+        }
+        const physicalParent = await realpathOrNull(dirname(destinationPath));
+        if (!physicalParent) {
+            continue;
+        }
+        if (!isWithin(physicalOutDir, physicalParent)) {
+            const error = new Error(
+                `[Zenith] Refusing to remove public asset "${publicPath}": `
+                + `physical parent "${physicalParent}" is outside output directory "${physicalOutDir}".`
+            );
+            error.code = 'ZENITH_PUBLIC_ASSET_OUTSIDE_OUTPUT';
+            throw error;
+        }
+        let info;
+        try {
+            info = await lstat(destinationPath);
+        } catch (error) {
+            if (isMissingPathError(error)) {
+                continue;
+            }
+            throw error;
+        }
+        if (!info.isFile() && !info.isSymbolicLink()) {
+            skipped += 1;
+            continue;
+        }
+        try {
+            await unlink(destinationPath);
+        } catch (error) {
+            if (isMissingPathError(error)) {
+                continue;
+            }
+            throw error;
+        }
+        removed += 1;
+    }
+
+    return { removed, skipped };
 }
 
 export async function copyPublicAssets({ projectRoot, outDir, reservedPaths = null }) {
