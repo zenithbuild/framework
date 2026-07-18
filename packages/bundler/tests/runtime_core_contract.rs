@@ -196,12 +196,27 @@ fn runtime_core_is_emitted_and_helper_imports_are_rewritten() {
         .count();
     assert_eq!(core_assets, 1, "core asset must be emitted exactly once");
 
-    let helper_path = out_dir.join("assets/modules/src/components/helpers/Logic.js");
-    assert!(
-        helper_path.exists(),
-        "helper module missing: {}",
-        helper_path.display()
-    );
+    fn find_emitted_helper_path(out_dir: &Path, rel_dir: &str, stem: &str) -> Option<PathBuf> {
+        let dir = out_dir.join(rel_dir);
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if (name == format!("{stem}.js")
+                        || (name.starts_with(&format!("{stem}.")) && name.ends_with(".js")))
+                        && path.is_file()
+                    {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    let helper_path =
+        find_emitted_helper_path(&out_dir, "assets/modules/src/components/helpers", "Logic")
+            .expect("helper module missing Logic");
     let helper_source = fs::read_to_string(&helper_path).expect("read helper module");
     assert!(
         helper_source.contains("from '/assets/core."),

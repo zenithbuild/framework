@@ -29,8 +29,18 @@ function isFile(candidate) {
     }
 }
 
+/**
+ * Normalizes an absolute path or relative path into a canonical relative module ID ending in .js
+ * e.g., /path/to/site/src/components/search/SearchModal.zen -> components/search/SearchModal.js
+ *
+ * @param {string} filePath
+ * @param {string} srcDir
+ * @returns {string}
+ */
 export function getCanonicalModuleId(filePath, srcDir) {
-    if (!filePath || !srcDir) return '';
+    if (!filePath || !srcDir) {
+        return '';
+    }
     let rel = filePath;
     if (filePath.startsWith(srcDir) || filePath.startsWith('/')) {
         rel = relative(srcDir, filePath);
@@ -40,16 +50,33 @@ export function getCanonicalModuleId(filePath, srcDir) {
     return withoutExt.replace(/\\/g, '/') + '.js';
 }
 
+/**
+ * Extracts import specifier from a single static import declaration line.
+ *
+ * @param {string} line
+ * @returns {string|null}
+ */
 export function extractImportSpecifier(line) {
     if (typeof line !== 'string') return null;
     const match = line.match(/^\s*import(?:\s+[^'"]+?\s+from)?\s*['"]([^'"]+)['"]\s*;?\s*$/);
     return match ? match[1] : null;
 }
 
+/**
+ * @param {string} spec
+ * @returns {boolean}
+ */
 export function isRelativeSpecifier(spec) {
     return typeof spec === 'string' && (spec.startsWith('./') || spec.startsWith('../'));
 }
 
+/**
+ * Returns whether a static relative specifier can represent a browser runtime helper.
+ * Explicit extensions are authoritative; extensionless specifiers are resolved later.
+ *
+ * @param {string} spec
+ * @returns {boolean}
+ */
 export function isRelativeRuntimeHelperSpecifier(spec) {
     if (!isRelativeSpecifier(spec)) return false;
     const normalized = stripSpecifierSuffix(spec);
@@ -57,18 +84,38 @@ export function isRelativeRuntimeHelperSpecifier(spec) {
     return extension === '' || RUNTIME_HELPER_EXTENSIONS.includes(extension);
 }
 
+/**
+ * Creates source-aware import records for an array of hoisted import declaration strings.
+ *
+ * @param {string[]} hoistedImports
+ * @param {string} sourceFile
+ * @param {string} srcDir
+ * @returns {Array<{occurrence_index: number, importer_module_id: string, specifier: string, raw_source: string, resolved_module_id: string|null}>}
+ */
 export function createSourceImportRecords(hoistedImports, sourceFile, srcDir) {
     const list = Array.isArray(hoistedImports) ? hoistedImports : [];
     const importerModuleId = getCanonicalModuleId(sourceFile, srcDir);
-    return list.map((line, occurrenceIndex) => ({
-        occurrence_index: occurrenceIndex,
-        importer_module_id: importerModuleId,
-        specifier: extractImportSpecifier(line) || '',
-        raw_source: line,
-        resolved_module_id: null
-    }));
+    const records = [];
+    for (let i = 0; i < list.length; i++) {
+        const line = list[i];
+        const spec = extractImportSpecifier(line) || '';
+        records.push({
+            occurrence_index: i,
+            importer_module_id: importerModuleId,
+            specifier: spec,
+            raw_source: line,
+            resolved_module_id: null
+        });
+    }
+    return records;
 }
 
+/**
+ * Collects relative import specifiers from raw source code.
+ *
+ * @param {string} source
+ * @returns {string[]}
+ */
 export function collectRelativeSpecifiersFromSource(source) {
     const results = [];
     if (typeof source !== 'string') return results;
@@ -80,11 +127,28 @@ export function collectRelativeSpecifiersFromSource(source) {
             results.push(spec);
         }
     }
+    const reexportRegex = /export(?:\s+[^'"]+?\s+from|\s*\*\s*from)\s*['"](\.[^'"]+)['"]/g;
+    while ((match = reexportRegex.exec(source)) !== null) {
+        const spec = match[1];
+        if (isRelativeRuntimeHelperSpecifier(spec) && !results.includes(spec)) {
+            results.push(spec);
+        }
+    }
     return results;
 }
 
+/**
+ * Resolves a relative import specifier against a base directory to an existing file on disk.
+ *
+ * @param {string} specifier
+ * @param {string} baseDir
+ * @param {string} sourceBoundary
+ * @returns {string|null}
+ */
 export function resolveRelativeSpecifierToFile(specifier, baseDir, sourceBoundary) {
-    if (!isRelativeRuntimeHelperSpecifier(specifier) || !baseDir || !sourceBoundary) return null;
+    if (!isRelativeRuntimeHelperSpecifier(specifier) || !baseDir || !sourceBoundary) {
+        return null;
+    }
     const normalizedSpecifier = stripSpecifierSuffix(specifier);
     const targetPath = resolve(baseDir, normalizedSpecifier);
     const explicitExtension = extname(normalizedSpecifier).toLowerCase();
@@ -93,26 +157,51 @@ export function resolveRelativeSpecifierToFile(specifier, baseDir, sourceBoundar
             ? targetPath
             : null;
     }
+
     for (const ext of RUNTIME_HELPER_EXTENSIONS) {
         const candidate = targetPath + ext;
-        if (isWithinSourceBoundary(candidate, sourceBoundary) && isFile(candidate)) return candidate;
+        if (isWithinSourceBoundary(candidate, sourceBoundary) && isFile(candidate)) {
+            return candidate;
+        }
     }
     for (const ext of RUNTIME_HELPER_EXTENSIONS) {
-        const candidate = resolve(targetPath, `index${ext}`);
-        if (isWithinSourceBoundary(candidate, sourceBoundary) && isFile(candidate)) return candidate;
+        const candidateIndex = resolve(targetPath, `index${ext}`);
+        if (isWithinSourceBoundary(candidateIndex, sourceBoundary) && isFile(candidateIndex)) {
+            return candidateIndex;
+        }
     }
     return null;
 }
 
-export function synthesizeLegacyHelperModules(
+/**
+ * Main helper discovery and transpilation engine using structured import records.
+ *
+ * @param {object} pageIr
+ * @param {string} sourceFile
+ * @param {string} srcDir
+ * @param {object|null} [transformCache]
+ * @param {Record<string, number>|null} [mergeMetrics]
+ */
+export function synthesizeAndResolveHelperModules(
     pageIr,
     sourceFile,
     srcDir,
     transformCache = null,
     mergeMetrics = null
 ) {
-    if (!pageIr || typeof sourceFile !== 'string' || typeof srcDir !== 'string') return;
-    const pageDir = dirname(sourceFile);
+    if (!pageIr || typeof sourceFile !== 'string' || typeof srcDir !== 'string') {
+        return;
+    }
+
+    const pageModuleId = getCanonicalModuleId(sourceFile, srcDir);
+    pageIr.page_module_id = pageModuleId;
+
+    if (!Array.isArray(pageIr.import_records)) {
+        pageIr.import_records = createSourceImportRecords(pageIr.hoisted?.imports || [], sourceFile, srcDir);
+    }
+
+    pageIr.modules = Array.isArray(pageIr.modules) ? pageIr.modules : [];
+
     const pending = [];
     const seenPaths = new Set();
 
@@ -122,30 +211,39 @@ export function synthesizeLegacyHelperModules(
         pending.push(absolutePath);
     }
 
-    function scanForHelpers(source, baseDir) {
-        for (const spec of collectRelativeSpecifiersFromSource(source)) {
-            enqueueHelper(resolveRelativeSpecifierToFile(spec, baseDir, srcDir));
+    for (const record of pageIr.import_records) {
+        if (!record || typeof record !== 'object') continue;
+        const spec = record.specifier;
+        if (!isRelativeRuntimeHelperSpecifier(spec)) {
+            continue;
+        }
+
+        const importerModuleId = record.importer_module_id;
+        if (!importerModuleId || typeof importerModuleId !== 'string') {
+            throw new Error(
+                `ERROR: Emission failed - cannot resolve relative helper import because importer provenance was lost.\n` +
+                `  Specifier: ${spec}\n` +
+                `  Page: ${pageModuleId}`
+            );
+        }
+
+        const importerAbsDir = dirname(resolve(srcDir, importerModuleId));
+        const absoluteHelperPath = resolveRelativeSpecifierToFile(spec, importerAbsDir, srcDir);
+
+        if (absoluteHelperPath) {
+            const targetModuleId = getCanonicalModuleId(absoluteHelperPath, srcDir);
+            record.resolved_module_id = targetModuleId;
+            enqueueHelper(absoluteHelperPath);
+        } else {
+            throw new Error(
+                `ERROR: Emission failed - unresolved page import\n` +
+                `  unresolved_specifier: ${spec}\n` +
+                `  importer: ${importerModuleId}\n` +
+                `  page: ${pageModuleId}`
+            );
         }
     }
 
-    for (const imp of Array.isArray(pageIr?.hoisted?.imports) ? pageIr.hoisted.imports : []) {
-        scanForHelpers(imp, pageDir);
-    }
-    for (const block of Array.isArray(pageIr?.hoisted?.code) ? pageIr.hoisted.code : []) {
-        scanForHelpers(block, pageDir);
-    }
-    for (const imp of Array.isArray(pageIr?.imports) ? pageIr.imports : []) {
-        if (imp && typeof imp.spec === 'string') scanForHelpers(imp.spec, pageDir);
-    }
-    for (const script of Object.values(pageIr?.components_scripts || {})) {
-        if (!script || typeof script !== 'object') continue;
-        for (const imp of Array.isArray(script.imports) ? script.imports : []) {
-            scanForHelpers(imp, pageDir);
-        }
-        if (typeof script.code === 'string') scanForHelpers(script.code, pageDir);
-    }
-
-    pageIr.modules = Array.isArray(pageIr.modules) ? pageIr.modules : [];
     while (pending.length > 0) {
         const absolutePath = pending.shift();
         let rawSource;
@@ -154,21 +252,33 @@ export function synthesizeLegacyHelperModules(
         } catch {
             continue;
         }
-        scanForHelpers(rawSource, dirname(absolutePath));
+
+        const expanded = expandScopedShorthandPropertiesInSource(rawSource);
         const transpiled = transpileTypeScriptToJs(
-            expandScopedShorthandPropertiesInSource(rawSource),
+            expanded,
             absolutePath,
             transformCache,
             mergeMetrics,
             { target: 'esnext' }
         );
+
         const id = getCanonicalModuleId(absolutePath, srcDir);
-        const deps = collectRelativeSpecifiersFromSource(rawSource)
-            .map((spec) => resolveRelativeSpecifierToFile(spec, dirname(absolutePath), srcDir))
-            .filter(Boolean)
-            .map((absoluteDep) => getCanonicalModuleId(absoluteDep, srcDir));
-        if (!pageIr.modules.some((module) => module.id === id)) {
-            pageIr.modules.push({ id, source: transpiled, deps: [...new Set(deps)] });
+        const deps = [];
+        const baseDir = dirname(absolutePath);
+
+        for (const spec of collectRelativeSpecifiersFromSource(rawSource)) {
+            const absoluteDep = resolveRelativeSpecifierToFile(spec, baseDir, srcDir);
+            if (absoluteDep) {
+                const depId = getCanonicalModuleId(absoluteDep, srcDir);
+                if (!deps.includes(depId)) {
+                    deps.push(depId);
+                }
+                enqueueHelper(absoluteDep);
+            }
+        }
+
+        if (!pageIr.modules.some((m) => m.id === id)) {
+            pageIr.modules.push({ id, source: transpiled, deps });
         }
     }
 }

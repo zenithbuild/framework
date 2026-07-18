@@ -4,7 +4,7 @@ import {
     expandScopedShorthandPropertiesInSource,
     normalizeTypeScriptExpression
 } from './typescript-expression-utils.js';
-import { synthesizeLegacyHelperModules } from './relative-helper-modules.js';
+import { synthesizeAndResolveHelperModules } from './relative-helper-modules.js';
 
 export function synthesizeRelativeTypeScriptHelperModules(
     pageIr,
@@ -13,7 +13,49 @@ export function synthesizeRelativeTypeScriptHelperModules(
     transformCache = null,
     mergeMetrics = null
 ) {
-    synthesizeLegacyHelperModules(pageIr, sourceFile, srcDir, transformCache, mergeMetrics);
+    synthesizeAndResolveHelperModules(pageIr, sourceFile, srcDir, transformCache, mergeMetrics);
+}
+
+/**
+ * Collapse multi-line static import/export-from statements to a single line.
+ * This works around a vendor-bundler regex that cannot match specifiers across
+ * newlines inside named import blocks. It is a whitespace-only transformation.
+ *
+ * @param {string} source
+ * @returns {string}
+ */
+function collapseMultiLineImportStatements(source) {
+    if (typeof source !== 'string' || source.indexOf('\n') === -1) {
+        return source;
+    }
+    // Fast, linear pass: collapse only statements that start a line with import/export
+    // and span more than one line, ending at the first line that contains a semicolon.
+    // This avoids the catastrophic backtracking of a greedy regex across the whole source.
+    const lines = source.split('\n');
+    const out = [];
+    let buffer = null;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (buffer === null) {
+            const trimmed = line.trimStart();
+            if (/^(?:import|export)\b/.test(trimmed) && !trimmed.includes(';')) {
+                buffer = [line];
+            } else {
+                out.push(line);
+            }
+        } else {
+            buffer.push(line);
+            if (line.includes(';')) {
+                out.push(buffer.join(' ').replace(/\s+/g, ' '));
+                buffer = null;
+            }
+        }
+    }
+    if (buffer !== null) {
+        // Unterminated import/export: preserve original to avoid corruption.
+        out.push(...buffer);
+    }
+    return out.join('\n');
 }
 
 /**
@@ -142,6 +184,13 @@ export function normalizeHoistedSourcePayload(
         });
     }
 
+    const imports = Array.isArray(pageIr?.hoisted?.imports) ? pageIr.hoisted.imports : null;
+    if (imports) {
+        pageIr.hoisted.imports = imports.map((entry) =>
+            typeof entry === 'string' ? collapseMultiLineImportStatements(entry) : entry
+        );
+    }
+
     const codeBlocks = Array.isArray(pageIr?.hoisted?.code) ? pageIr.hoisted.code : null;
     if (codeBlocks) {
         pageIr.hoisted.code = codeBlocks.map((entry, index) => {
@@ -159,6 +208,15 @@ export function normalizeHoistedSourcePayload(
         });
     }
 
+    const irImports = Array.isArray(pageIr?.imports) ? pageIr.imports : null;
+    if (irImports) {
+        for (const imp of irImports) {
+            if (imp && typeof imp === 'object' && typeof imp.spec === 'string') {
+                imp.spec = collapseMultiLineImportStatements(imp.spec);
+            }
+        }
+    }
+
     const componentScripts = pageIr?.components_scripts && typeof pageIr.components_scripts === 'object'
         ? pageIr.components_scripts
         : null;
@@ -167,7 +225,12 @@ export function normalizeHoistedSourcePayload(
             if (!script || typeof script !== 'object' || typeof script.code !== 'string') {
                 continue;
             }
-            const expanded = expandScopedShorthandPropertiesInSource(script.code);
+            if (Array.isArray(script.imports)) {
+                script.imports = script.imports.map((entry) =>
+                    typeof entry === 'string' ? collapseMultiLineImportStatements(entry) : entry
+                );
+            }
+            const expanded = expandScopedShorthandPropertiesInSource(collapseMultiLineImportStatements(script.code));
             script.code = transpileTypeScriptToJs(
                 expanded,
                 `${sourceFile}#component-${hoistId}.ts`,
@@ -187,7 +250,7 @@ export function normalizeHoistedSourcePayload(
             const moduleId = typeof module.id === 'string' && module.id.length > 0
                 ? module.id
                 : `${sourceFile}#module-${index}.ts`;
-            const expanded = expandScopedShorthandPropertiesInSource(module.source);
+            const expanded = expandScopedShorthandPropertiesInSource(collapseMultiLineImportStatements(module.source));
             return {
                 ...module,
                 source: transpileTypeScriptToJs(

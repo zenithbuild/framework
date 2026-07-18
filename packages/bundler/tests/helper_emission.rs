@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use serde_json::json;
@@ -130,6 +130,24 @@ fn missing_helper_module_hard_fails_with_diagnostic() {
     );
 }
 
+fn find_emitted_helper_path(out_dir: &Path, rel_dir: &str, stem: &str) -> Option<PathBuf> {
+    let dir = out_dir.join(rel_dir);
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if (name == format!("{stem}.js")
+                    || (name.starts_with(&format!("{stem}.")) && name.ends_with(".js")))
+                    && path.is_file()
+                {
+                    return Some(path);
+                }
+            }
+        }
+    }
+    None
+}
+
 #[test]
 fn transitive_helper_modules_are_emitted() {
     let tmp = tempfile::tempdir().expect("temp dir");
@@ -187,18 +205,12 @@ fn transitive_helper_modules_are_emitted() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let helper_one = out_dir.join("assets/modules/src/components/helpers/One.js");
-    let helper_two = out_dir.join("assets/modules/src/components/helpers/Two.js");
-    assert!(
-        helper_one.exists(),
-        "missing emitted helper module {}",
-        helper_one.display()
-    );
-    assert!(
-        helper_two.exists(),
-        "missing emitted transitive helper module {}",
-        helper_two.display()
-    );
+    let _helper_one =
+        find_emitted_helper_path(&out_dir, "assets/modules/src/components/helpers", "One")
+            .expect("missing emitted helper module One");
+    let _helper_two =
+        find_emitted_helper_path(&out_dir, "assets/modules/src/components/helpers", "Two")
+            .expect("missing emitted transitive helper module Two");
 
     let assets_dir = out_dir.join("assets");
     let component_asset = fs::read_dir(&assets_dir)
@@ -213,7 +225,8 @@ fn transitive_helper_modules_are_emitted() {
         .expect("component asset must exist");
     let source = fs::read_to_string(&component_asset).expect("read component asset");
     assert!(
-        source.contains("from './modules/src/components/helpers/One.js'"),
+        source.contains("from './modules/src/components/helpers/One.js'")
+            || source.contains("from './modules/src/components/helpers/One."),
         "component asset did not rewrite helper specifier:\n{}",
         source
     );
@@ -271,12 +284,9 @@ fn component_dynamic_imports_are_emitted_and_rewritten() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let helper_dynamic = out_dir.join("assets/modules/src/components/helpers/Dynamic.js");
-    assert!(
-        helper_dynamic.exists(),
-        "missing emitted dynamic helper module {}",
-        helper_dynamic.display()
-    );
+    let _helper_dynamic =
+        find_emitted_helper_path(&out_dir, "assets/modules/src/components/helpers", "Dynamic")
+            .expect("missing emitted dynamic helper module Dynamic");
 
     let assets_dir = out_dir.join("assets");
     let component_asset = fs::read_dir(&assets_dir)
@@ -291,7 +301,8 @@ fn component_dynamic_imports_are_emitted_and_rewritten() {
         .expect("component asset must exist");
     let source = fs::read_to_string(&component_asset).expect("read component asset");
     assert!(
-        source.contains("import('./modules/src/components/helpers/Dynamic.js')"),
+        source.contains("import('./modules/src/components/helpers/Dynamic.js')")
+            || source.contains("import('./modules/src/components/helpers/Dynamic."),
         "component dynamic import was not rewritten:\n{}",
         source
     );

@@ -78,7 +78,7 @@ pub(crate) fn emit_helper_module_recursive(
             )
         })?;
 
-        emit_helper_module_recursive(
+        let dep_rel = emit_helper_module_recursive(
             out_dir,
             module_registry,
             &dep_id,
@@ -89,13 +89,12 @@ pub(crate) fn emit_helper_module_recursive(
             output_mode,
         )?;
 
-        let dep_rel = helper_asset_rel_path(&dep_id)?;
         let dep_spec = public_asset_path(base_path, &dep_rel.replace('\\', "/"));
         rewritten_source = rewrite_js_import_specifiers(&rewritten_source, &spec, &dep_spec)?;
     }
     stack.pop();
 
-    let rel = helper_asset_rel_path(module_id)?;
+    let rel = helper_asset_rel_path(module_id, output_mode, &rewritten_source)?;
     let path = out_dir.join(&rel);
     write_file_for_mode(&path, &rewritten_source, output_mode)
         .map_err(|e| format!("failed to write helper asset '{}': {e}", path.display()))?;
@@ -103,7 +102,11 @@ pub(crate) fn emit_helper_module_recursive(
     Ok(rel)
 }
 
-pub(crate) fn helper_asset_rel_path(module_id: &str) -> Result<String, String> {
+pub(crate) fn helper_asset_rel_path(
+    module_id: &str,
+    output_mode: OutputMode,
+    source: &str,
+) -> Result<String, String> {
     let normalized = normalize_module_id(module_id);
     if normalized.starts_with('/') || normalized.contains("../") {
         return Err(format!(
@@ -111,7 +114,34 @@ pub(crate) fn helper_asset_rel_path(module_id: &str) -> Result<String, String> {
             module_id
         ));
     }
-    Ok(format!("assets/modules/{normalized}"))
+    if output_mode.is_dev_stable() {
+        let path = std::path::Path::new(&normalized);
+        let parent = path
+            .parent()
+            .unwrap_or(std::path::Path::new(""))
+            .to_string_lossy()
+            .replace('\\', "/");
+        let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+        if parent.is_empty() {
+            Ok(format!("assets/modules/{stem}.dev.js"))
+        } else {
+            Ok(format!("assets/modules/{parent}/{stem}.dev.js"))
+        }
+    } else {
+        let hash = stable_hash_8(source);
+        let path = std::path::Path::new(&normalized);
+        let parent = path
+            .parent()
+            .unwrap_or(std::path::Path::new(""))
+            .to_string_lossy()
+            .replace('\\', "/");
+        let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+        if parent.is_empty() {
+            Ok(format!("assets/modules/{stem}.{hash}.js"))
+        } else {
+            Ok(format!("assets/modules/{parent}/{stem}.{hash}.js"))
+        }
+    }
 }
 
 pub(crate) fn helper_asset_specifier_from_rel(rel: &str) -> Result<String, String> {
