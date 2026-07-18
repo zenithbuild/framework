@@ -316,6 +316,8 @@ fn derive_binding_tables_supports_comment_text_markers() {
         event_bindings: Default::default(),
         ref_bindings: Default::default(),
         style_blocks: Default::default(),
+        import_records: Vec::new(),
+        page_module_id: None,
         has_guard: false,
         has_load: false,
         guard_module_ref: None,

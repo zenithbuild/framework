@@ -17,16 +17,15 @@ use zenith_bundler::CompilerOutput;
 use zenith_compiler::deterministic::sha256_hex;
 use zenith_compiler::script::ExtractedStyleBlock;
 
-mod image_materialization;
 mod bundler_cli;
-mod bundler_css;
 mod bundler_contracts;
-mod bundler_graph;
+mod bundler_css;
 mod bundler_emit_assets;
 mod bundler_emit_assets_helpers;
 mod bundler_emit_assets_imports;
 mod bundler_emit_page;
 mod bundler_emit_page_tables;
+mod bundler_graph;
 mod bundler_hash;
 mod bundler_html_emit;
 mod bundler_input;
@@ -37,44 +36,44 @@ mod bundler_paths;
 mod bundler_runtime_profile;
 mod bundler_server_script;
 mod bundler_types;
+mod image_materialization;
 mod output_mode;
 mod page_runtime;
 mod template_bridge;
 mod vendor;
 
 use bundler_cli::parse_cli_options;
+use bundler_contracts::{has_runtime_zen_reference, validate_payload, verify_emitted_js_imports};
+use bundler_css::build_css_bundle;
+use bundler_emit_assets::{
+    collect_dynamic_import_expressions, collect_js_import_specifiers, component_owner_module_id,
+    emit_component_assets, emit_page_helper_assets, ensure_core_asset, ensure_runtime_asset,
+    extract_static_import_specifier, is_browser_js_module, is_css_specifier,
+    is_relative_or_absolute_specifier, normalize_module_id, rewrite_import_specifier_literal,
+    strip_css_import_statements, strip_zen_import_statements,
+};
+use bundler_emit_page::{
+    derive_binding_tables, generate_component_bootstrap_js, generate_core_module_js,
+    guard_component_bindings, inject_runtime_hook_aliases, render_compacted_page_payload_tables_js,
+    runtime_import_specifier,
+};
 use bundler_graph::{
     build_global_graph, build_module_registry, collect_fast_path_vendor_map,
     compute_global_graph_hash, derive_fast_path_component_assets,
 };
-use bundler_contracts::{
-    has_runtime_zen_reference, validate_payload, verify_emitted_js_imports,
-};
-use bundler_css::build_css_bundle;
 use bundler_hash::{compute_manifest_hash, stable_hash_8};
 use bundler_html_emit::{
     ensure_document_html, inject_script_once, inject_stylesheet_link_once, write_file,
 };
 use bundler_input::read_bundler_inputs_from_stdin;
-use bundler_emit_assets::{
-    collect_dynamic_import_expressions, collect_js_import_specifiers, component_owner_module_id,
-    emit_component_assets, ensure_core_asset, ensure_runtime_asset, extract_static_import_specifier,
-    is_browser_js_module, is_css_specifier, is_relative_or_absolute_specifier, normalize_module_id,
-    rewrite_import_specifier_literal, strip_css_import_statements, strip_zen_import_statements,
-};
-use bundler_emit_page::{
-    derive_binding_tables, generate_component_bootstrap_js, generate_core_module_js,
-    guard_component_bindings, inject_runtime_hook_aliases,
-    render_compacted_page_payload_tables_js, runtime_import_specifier,
-};
 use bundler_minify::{
     maybe_minify_page_for_output, maybe_minify_router_for_output, maybe_minify_runtime_for_output,
 };
 use bundler_output_phase::{emit_output_phase, BundlerOutputPhaseRequest};
 use bundler_page_entry::generate_entry_js;
 use bundler_paths::{
-    normalize_path_for_contract, normalize_text_newlines, public_asset_path,
-    route_to_output_path, sanitize_asset_token, sanitize_route_to_token, strip_import_suffix,
+    normalize_path_for_contract, normalize_text_newlines, public_asset_path, route_to_output_path,
+    sanitize_asset_token, sanitize_route_to_token, strip_import_suffix,
 };
 use bundler_runtime_profile::{
     resolve_bundler_version, runtime_presence_required, runtime_profile_for_output,
@@ -380,6 +379,8 @@ fn run() -> Result<(), String> {
         .map(|js| stable_hash_8(js))
         .unwrap_or_else(|| "00000000".to_string());
 
+    let module_registry = build_module_registry(&inputs)?;
+
     let component_assets = if fast_path {
         let derived = derive_fast_path_component_assets(&inputs, &changed_routes, output_mode);
         for rel in derived.values() {
@@ -394,7 +395,6 @@ fn run() -> Result<(), String> {
                 all_component_scripts.insert(id.clone(), script.clone());
             }
         }
-        let module_registry = build_module_registry(&inputs)?;
 
         // Emit Components
         let emitted = emit_component_assets(
@@ -432,6 +432,7 @@ fn run() -> Result<(), String> {
         runtime_import_spec: &runtime_import_spec,
         core_import_spec_str,
         component_assets: &component_assets,
+        module_registry: &module_registry,
         global_graph_hash: &global_graph_hash,
         runtime_profile: &runtime_profile,
         vendor_result: vendor_result.as_ref(),

@@ -20,6 +20,7 @@ pub(crate) struct BundlerOutputPhaseRequest<'a> {
     pub(crate) runtime_import_spec: &'a str,
     pub(crate) core_import_spec_str: &'a str,
     pub(crate) component_assets: &'a BTreeMap<String, String>,
+    pub(crate) module_registry: &'a BTreeMap<String, CompilerModule>,
     pub(crate) global_graph_hash: &'a str,
     pub(crate) runtime_profile: &'a str,
     pub(crate) vendor_result: Option<&'a vendor::VendorBuildResult>,
@@ -49,6 +50,7 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
         runtime_import_spec,
         core_import_spec_str,
         component_assets,
+        module_registry,
         global_graph_hash,
         runtime_profile,
         vendor_result,
@@ -63,6 +65,7 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
     let mut manifest_chunks = BTreeMap::new();
     let mut server_runtime_routes = BTreeSet::new();
     let mut page_assets = Vec::new();
+    let mut emitted_helper_assets = BTreeMap::new();
 
     // Process each page
     for (input, html_stripped) in inputs.iter().zip(processed_htmls) {
@@ -93,6 +96,20 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
             input.ir.ssr_data.clone()
         };
 
+        let page_helper_assets = if input.requires_js {
+            emit_page_helper_assets(
+                emitted_root,
+                &input.ir,
+                module_registry,
+                &mut emitted_helper_assets,
+                core_import_spec_str,
+                base_path,
+                output_mode,
+            )?
+        } else {
+            BTreeMap::new()
+        };
+
         let js_rel = if should_emit_page_bundle && input.requires_js {
             let js = generate_entry_js(
                 &input.ir,
@@ -100,6 +117,7 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
                 &markers,
                 &events,
                 component_assets,
+                &page_helper_assets,
                 &input.route,
                 prerender_ssr_data.as_ref(),
                 global_graph_hash,
@@ -132,9 +150,7 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
 
         manifest_chunks.insert(
             input.route.clone(),
-            js_rel
-                .as_ref()
-                .map(|rel| public_asset_path(base_path, rel)),
+            js_rel.as_ref().map(|rel| public_asset_path(base_path, rel)),
         );
         if input.ir.server_script.is_some() && !input.ir.prerender {
             server_runtime_routes.insert(input.route.clone());
@@ -164,6 +180,10 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
             input.ir.has_scoped_server_data,
             input.ir.scoped_server_data.clone(),
         ));
+    }
+
+    for rel in emitted_helper_assets.values() {
+        known_emitted_assets.insert(rel.clone());
     }
 
     // 6. Generate Router & Manifest

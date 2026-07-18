@@ -58,6 +58,10 @@ pub(crate) struct CompilerIr {
     #[serde(default)]
     pub(crate) modules: Vec<CompilerModule>,
     #[serde(default)]
+    pub(crate) import_records: Vec<CompilerImportRecord>,
+    #[serde(default)]
+    pub(crate) page_module_id: Option<String>,
+    #[serde(default)]
     pub(crate) server_script: Option<CompilerServerScript>,
     #[serde(default)]
     pub(crate) prerender: bool,
@@ -138,6 +142,21 @@ pub(crate) struct CompilerModule {
     pub(crate) source: String,
     #[serde(default)]
     pub(crate) deps: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CompilerImportRecord {
+    #[serde(default)]
+    pub(crate) occurrence_index: usize,
+    #[serde(default)]
+    pub(crate) importer_module_id: String,
+    #[serde(default)]
+    pub(crate) specifier: String,
+    #[serde(default)]
+    pub(crate) raw_source: String,
+    #[serde(default)]
+    pub(crate) resolved_module_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

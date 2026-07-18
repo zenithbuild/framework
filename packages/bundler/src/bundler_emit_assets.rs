@@ -65,6 +65,160 @@ pub(crate) fn ensure_core_asset(
     Ok((core_rel, core_hash))
 }
 
+pub(crate) fn emit_page_helper_assets(
+    out_dir: &PathBuf,
+    ir: &CompilerIr,
+    module_registry: &BTreeMap<String, CompilerModule>,
+    emitted_helper_assets: &mut BTreeMap<String, String>,
+    core_import_spec: &str,
+    base_path: &str,
+    output_mode: OutputMode,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut rewrite_map = BTreeMap::new();
+
+    if !ir.import_records.is_empty() {
+        for record in &ir.import_records {
+            let import_line_trimmed = record.raw_source.trim();
+            if import_line_trimmed.is_empty() {
+                continue;
+            }
+            let spec = if !record.specifier.is_empty() {
+                record.specifier.clone()
+            } else {
+                match extract_static_import_specifier(import_line_trimmed) {
+                    Some(s) => s,
+                    None => continue,
+                }
+            };
+            if spec.ends_with(".zen")
+                || spec == "zenith:core"
+                || spec.starts_with("zenith:")
+                || is_css_specifier(&spec)
+            {
+                continue;
+            }
+            if !is_relative_or_absolute_specifier(&spec) || spec.starts_with('/') {
+                continue;
+            }
+
+            let owner_module_id = if !record.importer_module_id.is_empty() {
+                record.importer_module_id.clone()
+            } else {
+                return Err(format!(
+                    "ERROR: Emission failed - cannot resolve relative helper import because importer provenance was lost.\n  unresolved_specifier: {}\n  referenced_from_asset: <page>",
+                    spec
+                ));
+            };
+
+            let target_module_id = if let Some(resolved) = &record.resolved_module_id {
+                resolved.clone()
+            } else {
+                resolve_module_id_for_spec(module_registry, &owner_module_id, &spec)
+                    .ok_or_else(|| {
+                        format!(
+                            "ERROR: Emission failed - unresolved page import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <page>\n  importer: {owner_module_id}\n  dependency_chain:\n    {owner_module_id} -> {spec}"
+                        )
+                    })?
+            };
+
+            let helper_rel = emit_helper_module_recursive(
+                out_dir,
+                module_registry,
+                &target_module_id,
+                emitted_helper_assets,
+                &mut vec![owner_module_id.clone()],
+                core_import_spec,
+                base_path,
+                output_mode,
+            )?;
+
+            let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
+            let page_module_id = ir.page_module_id.as_deref().unwrap_or("");
+            let is_page_importer =
+                page_module_id.is_empty() || record.importer_module_id == page_module_id || {
+                    let rec_base = record
+                        .importer_module_id
+                        .rsplit_once('.')
+                        .map(|(b, _)| b)
+                        .unwrap_or(&record.importer_module_id);
+                    let page_base = page_module_id
+                        .rsplit_once('.')
+                        .map(|(b, _)| b)
+                        .unwrap_or(page_module_id);
+                    rec_base == page_base
+                };
+            if is_page_importer {
+                rewrite_map.insert(spec.clone(), helper_spec.clone());
+                if let Some(hoisted_spec) = extract_static_import_specifier(import_line_trimmed) {
+                    rewrite_map.insert(hoisted_spec, helper_spec.clone());
+                }
+            }
+            if record.occurrence_index < ir.hoisted.imports.len() {
+                if let Some(hoisted_line_spec) =
+                    extract_static_import_specifier(&ir.hoisted.imports[record.occurrence_index])
+                {
+                    rewrite_map.insert(hoisted_line_spec, helper_spec);
+                }
+            }
+        }
+    } else {
+        let owner_module_id = ir
+            .page_module_id
+            .clone()
+            .unwrap_or_else(|| "pages/index.js".to_string());
+        for import_line in &ir.hoisted.imports {
+            let import_line_trimmed = import_line.trim();
+            if import_line_trimmed.is_empty() {
+                continue;
+            }
+            let Some(spec) = extract_static_import_specifier(import_line_trimmed) else {
+                continue;
+            };
+            if spec.ends_with(".zen")
+                || spec == "zenith:core"
+                || spec.starts_with("zenith:")
+                || is_css_specifier(&spec)
+            {
+                continue;
+            }
+            if !is_relative_or_absolute_specifier(&spec) || spec.starts_with('/') {
+                continue;
+            }
+
+            if ir.page_module_id.is_none() {
+                return Err(format!(
+                    "ERROR: Emission failed - cannot resolve relative helper import because importer provenance was lost.\n  unresolved_specifier: {}\n  referenced_from_asset: <page>",
+                    spec
+                ));
+            }
+
+            let target_module_id =
+                resolve_module_id_for_spec(module_registry, &owner_module_id, &spec)
+                    .ok_or_else(|| {
+                        format!(
+                            "ERROR: Emission failed - unresolved page import\n  unresolved_specifier: {spec}\n  referenced_from_asset: <page>\n  importer: {owner_module_id}\n  dependency_chain:\n    {owner_module_id} -> {spec}"
+                        )
+                    })?;
+
+            let helper_rel = emit_helper_module_recursive(
+                out_dir,
+                module_registry,
+                &target_module_id,
+                emitted_helper_assets,
+                &mut vec![owner_module_id.clone()],
+                core_import_spec,
+                base_path,
+                output_mode,
+            )?;
+
+            let helper_spec = helper_asset_specifier_from_rel(&helper_rel)?;
+            rewrite_map.insert(spec.clone(), helper_spec);
+        }
+    }
+
+    Ok(rewrite_map)
+}
+
 pub(crate) fn emit_component_assets(
     out_dir: &PathBuf,
     components: &BTreeMap<String, CompilerComponentScript>,

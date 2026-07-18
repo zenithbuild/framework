@@ -4,6 +4,17 @@ import {
     expandScopedShorthandPropertiesInSource,
     normalizeTypeScriptExpression
 } from './typescript-expression-utils.js';
+import { synthesizeLegacyHelperModules } from './relative-helper-modules.js';
+
+export function synthesizeRelativeTypeScriptHelperModules(
+    pageIr,
+    sourceFile,
+    srcDir,
+    transformCache = null,
+    mergeMetrics = null
+) {
+    synthesizeLegacyHelperModules(pageIr, sourceFile, srcDir, transformCache, mergeMetrics);
+}
 
 /**
  * @param {object} pageIr

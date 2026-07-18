@@ -6,6 +6,7 @@ pub(crate) fn generate_entry_js(
     markers: &[MarkerBinding],
     events: &[EventBinding],
     component_assets: &BTreeMap<String, String>,
+    page_helper_assets: &BTreeMap<String, String>,
     route_pattern: &str,
     ssr_data: Option<&serde_json::Value>,
     global_graph_hash: &str,
@@ -49,16 +50,40 @@ pub(crate) fn generate_entry_js(
         .map_err(|e| format!("failed to serialize event table: {e}"))?;
     let refs_json = serde_json::to_string(&map_runtime_ref_bindings(ir)?)
         .map_err(|e| format!("failed to serialize ref table: {e}"))?;
+    let (component_imports, components_table) =
+        generate_component_bootstrap_js(ir, component_assets, base_path)?;
 
     let mut js = zenith_bundler::utils::generate_virtual_entry(&compiler_output);
-    js.push_str("\nconst __zenith_component_bootstraps = [];\n");
+    if !component_imports.is_empty() {
+        js.push('\n');
+        js.push_str(&component_imports);
+    }
+    for import_line in hoisted_runtime_imports(ir) {
+        let import_line_trimmed = import_line.trim();
+        let mut rewritten_line = import_line.clone();
+        if let Some(spec) = extract_static_import_specifier(import_line_trimmed) {
+            if let Some(rewritten_spec) = page_helper_assets.get(&spec) {
+                rewritten_line =
+                    rewrite_import_specifier_literal(import_line_trimmed, &spec, rewritten_spec)?;
+            }
+        }
+        js.push_str(&rewritten_line);
+        js.push('\n');
+    }
+    js.push_str(&format!(
+        "import {{ hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }} from '{}';\n",
+        runtime_import_spec
+    ));
+    js.push_str("function __zenith_create_page_instance() {\n");
+    js.push_str("const __zenith_component_bootstraps = [];\n");
     let ssr_json = serde_json::to_string(
         ssr_data.unwrap_or(&serde_json::Value::Object(serde_json::Map::new())),
     )
     .map_err(|e| format!("failed to serialize ssr_data: {e}"))?;
     js.push_str(&page_runtime::render_runtime_data_helpers(&ssr_json));
     for block in &ir.hoisted.code {
-        let trimmed = block.trim();
+        let executable = strip_hoisted_import_declarations(block, &ir.hoisted.imports);
+        let trimmed = executable.trim();
         if !trimmed.is_empty() {
             js.push('\n');
             js.push_str(trimmed);
@@ -118,15 +143,6 @@ pub(crate) fn generate_entry_js(
             &runtime_expression_bindings,
         )?);
     }
-    let (component_imports, components_table) =
-        generate_component_bootstrap_js(ir, component_assets, base_path)?;
-    if !component_imports.is_empty() {
-        js.push_str(&component_imports);
-    }
-    js.push_str(&format!(
-        "import {{ hydrate, signal, state, ref, zeneffect, zenEffect, zenMount, zenWindow, zenDocument, zenOn, zenResize, collectRefs }} from '{}';\n",
-        runtime_import_spec
-    ));
     let route_pattern_json = serde_json::to_string(route_pattern)
         .map_err(|e| format!("failed to serialize route pattern: {e}"))?;
     js.push_str(&format!(
@@ -227,20 +243,92 @@ pub(crate) fn generate_entry_js(
     js.push_str("  }\n");
     js.push_str("  return __zenith_unmount;\n");
     js.push_str("}\n");
-    js.push_str("export { __zm as __zenith_mount };\n");
+    if needs_non_router_param_resolution {
+        js.push_str("return { mount: __zm, resolveParams(pathname) {\n");
+        js.push_str("  return __zrp(__zenith_route_pattern, pathname);\n");
+        js.push_str("} };\n");
+    } else {
+        js.push_str("return { mount: __zm };\n");
+    }
+    js.push_str("}\n");
+    js.push_str("function __zenith_mount(root = document, params = {}) {\n");
+    js.push_str("  return __zenith_create_page_instance().mount(root, params);\n");
+    js.push_str("}\n");
+    js.push_str("export { __zenith_mount };\n");
     if !router_enabled {
+        js.push_str("const __zenith_initial_page_instance = __zenith_create_page_instance();\n");
         if needs_non_router_param_resolution {
             js.push_str(
                 "const __zip = typeof location === 'object' && typeof location.pathname === 'string' ? location.pathname : '/';\n",
             );
-            js.push_str("const __zipa = __zrp(__zenith_route_pattern, __zip);\n");
-            js.push_str("__zm(document, __zipa);\n");
+            js.push_str("const __zipa = __zenith_initial_page_instance.resolveParams(__zip);\n");
+            js.push_str("__zenith_initial_page_instance.mount(document, __zipa);\n");
         } else {
-            js.push_str("__zm(document, {});\n");
+            js.push_str("__zenith_initial_page_instance.mount(document, {});\n");
         }
     }
 
     Ok(js)
+}
+
+fn hoisted_runtime_imports(ir: &CompilerIr) -> Vec<String> {
+    let mut imports = Vec::new();
+    for import_line in &ir.hoisted.imports {
+        let trimmed = import_line.trim();
+        if trimmed.starts_with("import type ") {
+            continue;
+        }
+        let runtime_import = strip_named_type_imports(trimmed);
+        let Some(specifier) = extract_static_import_specifier(&runtime_import) else {
+            continue;
+        };
+        if is_css_specifier(&specifier) || strip_import_suffix(&specifier).ends_with(".zen") {
+            continue;
+        }
+        let key = runtime_import
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect::<String>();
+        if !imports.iter().any(|existing: &String| {
+            existing
+                .chars()
+                .filter(|character| !character.is_whitespace())
+                .eq(key.chars())
+        }) {
+            imports.push(runtime_import);
+        }
+    }
+    imports
+}
+
+fn strip_named_type_imports(import_line: &str) -> String {
+    let trailing_type =
+        Regex::new(r#",\s*type\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?"#)
+            .expect("trailing named type import regex must compile");
+    let leading_type = Regex::new(
+        r#"\btype\s+[A-Za-z_$][A-Za-z0-9_$]*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s*,\s*"#,
+    )
+    .expect("leading named type import regex must compile");
+    let without_trailing_types = trailing_type.replace_all(import_line, "");
+    leading_type
+        .replace_all(&without_trailing_types, "")
+        .trim()
+        .to_string()
+}
+
+fn strip_hoisted_import_declarations(source: &str, known_imports: &[String]) -> String {
+    let without_known = known_imports
+        .iter()
+        .fold(source.to_string(), |code, import_line| {
+            code.replace(import_line.trim(), "")
+        });
+    let remaining_imports =
+        Regex::new(r#"(?m)^\s*import(?:\s+[^'"\n;]*?\s+from)?\s*['"][^'"]+['"]\s*;?\s*$"#)
+            .expect("static import declaration regex must compile");
+    let without_imports = remaining_imports.replace_all(&without_known, "");
+    let empty_exports =
+        Regex::new(r#"(?m)^\s*export\s*\{\s*\}\s*;?\s*"#).expect("empty export regex must compile");
+    empty_exports.replace_all(&without_imports, "").to_string()
 }
 
 fn route_pattern_has_dynamic_segments(route_pattern: &str) -> bool {
@@ -328,10 +416,11 @@ pub(crate) fn build_expression_fns_and_bindings(
     let mut expr_fns = Vec::<(String, Option<String>)>::new();
     let mut fn_index_by_binding = std::collections::BTreeMap::new();
     for (i, b) in bindings.iter().enumerate() {
-        let expression = b
-            .compiled_expr
-            .as_ref()
-            .or_else(|| b.literal.as_ref().filter(|literal| expression_reads_ssr_data(literal)));
+        let expression = b.compiled_expr.as_ref().or_else(|| {
+            b.literal
+                .as_ref()
+                .filter(|literal| expression_reads_ssr_data(literal))
+        });
         if let Some(expr) = expression {
             let fn_idx = expr_fns.len();
             expr_fns.push((expr.clone(), b.scoped_data_key.clone()));

@@ -18,9 +18,11 @@ import {
     normalizeExpressionPayload,
     normalizeHoistedSourcePayload,
     rewriteLegacyMarkupIdentifiers,
-    rewriteRefBindingIdentifiers
+    rewriteRefBindingIdentifiers,
+    synthesizeRelativeTypeScriptHelperModules
 } from './page-ir-normalization.js';
 import { deferComponentRuntimeBlock } from './hoisted-code-transforms.js';
+import { createSourceImportRecords } from './relative-helper-modules.js';
 import {
     addBreakdown,
     emitPageLoopSummary,
@@ -157,6 +159,14 @@ export async function buildPageEnvelopes(input) {
         );
         pageCompileMs = startupProfile.roundMs(performance.now() - pageCompileStartedAt);
 
+        if (pageIr && !pageIr.import_records) {
+            pageIr.import_records = createSourceImportRecords(
+                pageIr.hoisted?.imports || [],
+                sourceFile,
+                srcDir
+            );
+        }
+
         const composedServer = composeServerScriptEnvelope({
             sourceFile,
             inlineServerScript: extractedServer.serverScript,
@@ -229,6 +239,7 @@ export async function buildPageEnvelopes(input) {
             componentOccurrences,
             occurrenceCountByPath,
             sourceFile,
+            srcDir,
             registry,
             compilerOpts,
             compilerBin,
@@ -289,6 +300,7 @@ export async function buildPageEnvelopes(input) {
         const normalizeStartedAt = performance.now();
         normalizeExpressionPayload(pageIr);
         normalizeHoistedSourcePayload(pageIr, sourceFile, hoistedCodeTransformCache, expressionRewriteMetrics);
+        synthesizeRelativeTypeScriptHelperModules(pageIr, sourceFile, srcDir, hoistedCodeTransformCache, expressionRewriteMetrics);
         if (Array.isArray(pageIr?.hoisted?.code) && pageIr.hoisted.code.length > 0) {
             pageIr.hoisted.code = pageIr.hoisted.code
                 .map((entry) => deferComponentRuntimeBlock(entry, hoistedCodeTransformCache, expressionRewriteMetrics))

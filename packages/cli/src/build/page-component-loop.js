@@ -16,6 +16,7 @@ import {
 import { mergeComponentIr } from './merge-component-ir.js';
 import { stripStyleBlocks } from './compiler-runtime.js';
 import { extractDeclaredIdentifiers } from './typescript-expression-utils.js';
+import { createSourceImportRecords } from './relative-helper-modules.js';
 
 function createEmptyExpressionRewrite() {
     return {
@@ -83,9 +84,14 @@ function escapeRegExp(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function ensureImportRecords(ir, path, srcDir) {
+    if (ir && !ir.import_records) ir.import_records = createSourceImportRecords(ir.hoisted?.imports || [], path, srcDir);
+}
+
 async function resolveComponentIr({
     compPath,
     componentSource,
+    srcDir,
     compilerOpts,
     compilerBin,
     timedRunCompiler,
@@ -116,6 +122,8 @@ async function resolveComponentIr({
         pageStats.pageComponentCacheMisses += 1;
         componentIrCache.set(compPath, compIr);
     }
+
+    ensureImportRecords(compIr, compPath, srcDir || compilerOpts?.srcDir || '');
 
     return compIr;
 }
@@ -162,6 +170,7 @@ function resolveComponentExpressionRewrite({
 async function resolveOwnerRewriteContext({
     occurrence,
     sourceFile,
+    srcDir,
     compilerOpts,
     compilerBin,
     timedRunCompiler,
@@ -212,6 +221,8 @@ async function resolveOwnerRewriteContext({
         compilerTotals.componentCacheHits += 1;
         pageStats.pageComponentCacheHits += 1;
     }
+
+    ensureImportRecords(ownerIr, ownerPath, srcDir || compilerOpts?.srcDir || '');
 
     let attrExpressionRewrite = componentExpressionRewriteCache.get(ownerPath);
     if (!attrExpressionRewrite) {
@@ -338,7 +349,8 @@ export async function runPageComponentLoop({
     pageMergeBreakdown,
     pageComponentLoopBreakdown,
     hoistedCodeTransformCache,
-    pageStats
+    pageStats,
+    srcDir
 }) {
     let componentInstanceCounter = 0;
     const scopedOccurrenceIndexByOwnerKey = new Map();
@@ -362,6 +374,7 @@ export async function runPageComponentLoop({
         const compIr = await resolveComponentIr({
             compPath,
             componentSource,
+            srcDir,
             compilerOpts,
             compilerBin,
             timedRunCompiler,
@@ -394,6 +407,7 @@ export async function runPageComponentLoop({
         const { attrExpressionRewrite } = await resolveOwnerRewriteContext({
             occurrence,
             sourceFile,
+            srcDir,
             compilerOpts,
             compilerBin,
             timedRunCompiler,
@@ -441,7 +455,8 @@ export async function runPageComponentLoop({
                 componentAttrs: typeof occurrence.attrs === 'string' ? occurrence.attrs : '',
                 componentAttrsRewrite: {
                     expressionRewrite: attrExpressionRewrite
-                }
+                },
+                srcDir
             },
             seenStaticImports,
             knownRefKeys,
