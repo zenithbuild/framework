@@ -76,6 +76,30 @@ fn lowers_nested_markup_inside_markup_interpolations() {
 }
 
 #[test]
+fn preserves_unicode_inside_embedded_markup() {
+    let input = r#"
+<script lang="ts">const items = ["compiler"]</script>
+<main>{items.map((item) => <span title="Café…">{item} · Open result →</span>)}</main>
+"#;
+
+    let output = compile_with_embedded_markup(input).expect("compile should succeed");
+    let expr = output.expressions.first().cloned().unwrap_or_default();
+
+    assert!(
+        expr.contains("Café…"),
+        "attribute text was corrupted: {expr}"
+    );
+    assert!(
+        expr.contains("· Open result →"),
+        "text content was corrupted: {expr}"
+    );
+    assert!(
+        !expr.contains("Ã") && !expr.contains("â"),
+        "mojibake leaked: {expr}"
+    );
+}
+
+#[test]
 fn rejects_script_tags_inside_embedded_markup() {
     let input = r#"<main>{cond ? (<div><ScRiPt>alert(1)</ScRiPt></div>) : null}</main>"#;
     let err = compile_with_embedded_markup(input).expect_err("compile should fail");

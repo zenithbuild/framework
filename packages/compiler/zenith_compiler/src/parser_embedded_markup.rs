@@ -90,26 +90,25 @@ pub(super) fn lower_embedded_markup_expression(raw: &str) -> String {
     let mut i = 0usize;
     let mut quote: Option<u8> = None;
     let mut escaped = false;
-
     while i < bytes.len() {
         let b = bytes[i];
-
         if let Some(q) = quote {
-            out.push(b as char);
+            let ch = raw[i..].chars().next().expect("valid UTF-8 boundary");
+            out.push(ch);
             if escaped {
                 escaped = false;
-                i += 1;
+                i += ch.len_utf8();
                 continue;
             }
-            if b == b'\\' {
+            if ch == '\\' {
                 escaped = true;
-                i += 1;
+                i += ch.len_utf8();
                 continue;
             }
-            if b == q {
+            if ch == q as char {
                 quote = None;
             }
-            i += 1;
+            i += ch.len_utf8();
             continue;
         }
 
@@ -130,8 +129,9 @@ pub(super) fn lower_embedded_markup_expression(raw: &str) -> String {
             }
         }
 
-        out.push(b as char);
-        i += 1;
+        let ch = raw[i..].chars().next().expect("valid UTF-8 boundary");
+        out.push(ch);
+        i += ch.len_utf8();
     }
 
     out
@@ -327,8 +327,9 @@ fn markup_literal_to_template(markup: &str) -> String {
             continue;
         }
 
-        out.push(b as char);
-        i += 1;
+        let ch = markup[i..].chars().next().expect("valid UTF-8 boundary");
+        out.push(ch);
+        i += ch.len_utf8();
     }
 
     out.push('`');
@@ -346,26 +347,26 @@ fn read_balanced_braces(source: &str, start: usize) -> Option<(String, usize)> {
     let mut quote: Option<u8> = None;
     let mut escaped = false;
     let mut out = String::new();
-
     while i < bytes.len() {
         let b = bytes[i];
 
         if let Some(q) = quote {
-            out.push(b as char);
+            let ch = source[i..].chars().next().expect("valid UTF-8 boundary");
+            out.push(ch);
             if escaped {
                 escaped = false;
-                i += 1;
+                i += ch.len_utf8();
                 continue;
             }
-            if b == b'\\' {
+            if ch == '\\' {
                 escaped = true;
-                i += 1;
+                i += ch.len_utf8();
                 continue;
             }
-            if b == q {
+            if ch == q as char {
                 quote = None;
             }
-            i += 1;
+            i += ch.len_utf8();
             continue;
         }
 
@@ -392,8 +393,9 @@ fn read_balanced_braces(source: &str, start: usize) -> Option<(String, usize)> {
             continue;
         }
 
-        out.push(b as char);
-        i += 1;
+        let ch = source[i..].chars().next().expect("valid UTF-8 boundary");
+        out.push(ch);
+        i += ch.len_utf8();
     }
 
     None
