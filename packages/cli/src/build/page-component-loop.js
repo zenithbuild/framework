@@ -486,5 +486,11 @@ export async function runPageComponentLoop({
             pageIrMergeCache,
             pageBindingResolutionBreakdown
         );
+
+        componentOccurrencePlans.push({
+            rewrite: scopedExpressionRewrite,
+            expressionSequence: scopedExpressionRewrite.sequence,
+            refSequence: instanceState.refIdentifierPairs
+        });
     }
 }

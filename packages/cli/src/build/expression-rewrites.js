@@ -326,6 +326,62 @@ export function resolveRewrittenBindingMetadata(
  * @param {object} pageBindingContext
  * @param {Record<string, number> | null} [bindingResolutionMetrics]
  */
+function compiledExprUsesSignalMap(compiledExpr) {
+    return typeof compiledExpr === 'string' && compiledExpr.includes('signalMap.get(');
+}
+
+function chooseMergedBinding(existing, resolved, raw) {
+    if (!existing || typeof existing !== 'object') {
+        return 'resolved';
+    }
+    const existingUsesSignal = compiledExprUsesSignalMap(existing.compiled_expr);
+    const resolvedUsesSignal = compiledExprUsesSignalMap(resolved.compiled_expr);
+    if (resolvedUsesSignal && !existingUsesSignal) {
+        return 'resolved';
+    }
+    if (existingUsesSignal && !resolvedUsesSignal) {
+        return 'existing';
+    }
+    const existingIsRaw = existing.compiled_expr === raw;
+    const resolvedIsRaw = resolved.compiled_expr === raw;
+    if (!resolvedIsRaw && existingIsRaw) {
+        return 'resolved';
+    }
+    if (resolvedIsRaw && !existingIsRaw) {
+        return 'existing';
+    }
+    // Both bindings have a real compiled expression. Prefer the resolved binding
+    // unless the existing one is strictly more specific, and keep either when the
+    // compiled expressions are identical after remapping. Only fall back to
+    // ambiguous when two different compiled expressions compete for the same raw.
+    if (resolvedUsesSignal && existingUsesSignal) {
+        if (existing.compiled_expr === resolved.compiled_expr) {
+            return 'resolved';
+        }
+        return null;
+    }
+    const existingSpecificity = measureBindingSpecificity(existing, raw);
+    const resolvedSpecificity = measureBindingSpecificity(resolved, raw);
+    if (resolvedSpecificity > existingSpecificity) {
+        return 'resolved';
+    }
+    if (existingSpecificity > resolvedSpecificity) {
+        return 'existing';
+    }
+    if (existing.compiled_expr === resolved.compiled_expr) {
+        return 'resolved';
+    }
+    return null;
+}
+
+/**
+ * @param {Map<string, string>} pageMap
+ * @param {Map<string, object>} pageBindingMap
+ * @param {Set<string>} pageAmbiguous
+ * @param {object} componentRewrite
+ * @param {object} pageBindingContext
+ * @param {Record<string, number> | null} [bindingResolutionMetrics]
+ */
 export function mergeExpressionRewriteMaps(
     pageMap,
     pageBindingMap,
@@ -340,6 +396,7 @@ export function mergeExpressionRewriteMaps(
         pageBindingMap.delete(raw);
     }
 
+    const resolvedRaws = new Set();
     for (const [raw, binding] of componentRewrite.bindings.entries()) {
         if (pageAmbiguous.has(raw)) {
             continue;
@@ -351,26 +408,35 @@ export function mergeExpressionRewriteMaps(
             bindingResolutionMetrics
         );
         const existing = pageBindingMap.get(raw);
-        if (existing && JSON.stringify(existing) !== JSON.stringify(resolved)) {
-            const existingWeight = measureBindingSpecificity(existing, raw);
-            const resolvedWeight = measureBindingSpecificity(resolved, raw);
-            if (resolvedWeight > existingWeight && existingWeight === 0) {
-                pageBindingMap.set(raw, resolved);
-                continue;
-            }
-            if (existingWeight > resolvedWeight && resolvedWeight === 0) {
-                continue;
-            }
+        const preference = chooseMergedBinding(existing, resolved, raw);
+        if (preference === null) {
             pageAmbiguous.add(raw);
             pageMap.delete(raw);
             pageBindingMap.delete(raw);
+            resolvedRaws.add(raw);
             continue;
         }
-        pageBindingMap.set(raw, resolved);
+        const chosenBinding = preference === 'resolved' ? resolved : existing;
+        pageBindingMap.set(raw, chosenBinding);
+
+        const existingMap = pageMap.get(raw);
+        const componentMap = componentRewrite.map.get(raw);
+        let chosenMap;
+        if (preference === 'resolved') {
+            chosenMap = componentMap !== undefined
+                ? componentMap
+                : (existingMap !== undefined ? existingMap : (typeof resolved.compiled_expr === 'string' ? resolved.compiled_expr : undefined));
+        } else {
+            chosenMap = existingMap !== undefined ? existingMap : componentMap;
+        }
+        if (chosenMap !== undefined) {
+            pageMap.set(raw, chosenMap);
+        }
+        resolvedRaws.add(raw);
     }
 
     for (const [raw, rewritten] of componentRewrite.map.entries()) {
-        if (pageAmbiguous.has(raw)) {
+        if (pageAmbiguous.has(raw) || resolvedRaws.has(raw)) {
             continue;
         }
         const existing = pageMap.get(raw);
@@ -383,7 +449,6 @@ export function mergeExpressionRewriteMaps(
         pageMap.set(raw, rewritten);
     }
 }
-
 function measureBindingSpecificity(binding, raw) {
     if (!binding || typeof binding !== 'object') {
         return 0;

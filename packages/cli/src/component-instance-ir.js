@@ -313,8 +313,11 @@ function addApplyMetric(applyMetrics, key, value) {
     applyMetrics[key] = (applyMetrics[key] || 0) + value;
 }
 
-function findNextExpressionIndex(expressions, raw, startIndex) {
-    for (let index = startIndex; index < expressions.length; index++) {
+function findNextExpressionIndex(expressions, raw, claimed) {
+    for (let index = 0; index < expressions.length; index++) {
+        if (claimed.has(index)) {
+            continue;
+        }
         if (expressions[index] === raw) {
             return index;
         }
@@ -322,8 +325,11 @@ function findNextExpressionIndex(expressions, raw, startIndex) {
     return -1;
 }
 
-function findNextRefIndex(refBindings, raw, startIndex) {
-    for (let index = startIndex; index < refBindings.length; index++) {
+function findNextRefIndex(refBindings, raw, claimed) {
+    for (let index = 0; index < refBindings.length; index++) {
+        if (claimed.has(index)) {
+            continue;
+        }
         if (refBindings[index]?.identifier === raw) {
             return index;
         }
@@ -428,8 +434,8 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
     const bindings = Array.isArray(pageIr?.expression_bindings) ? pageIr.expression_bindings : [];
     const refBindings = Array.isArray(pageIr?.ref_bindings) ? pageIr.ref_bindings : [];
 
-    let exprCursor = 0;
-    let refCursor = 0;
+    const claimedExpressions = new Set();
+    const claimedRefs = new Set();
 
     for (const plan of occurrencePlans) {
         const sequence = Array.isArray(plan?.expressionSequence) ? plan.expressionSequence : [];
@@ -438,11 +444,12 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 continue;
             }
             const expressionLookupStartedAt = performance.now();
-            const found = findNextExpressionIndex(expressions, item.raw, exprCursor);
+            const found = findNextExpressionIndex(expressions, item.raw, claimedExpressions);
             addApplyMetric(applyMetrics, 'expressionLookupMs', performance.now() - expressionLookupStartedAt);
             if (found === -1) {
                 continue;
             }
+            claimedExpressions.add(found);
             const rewritten = typeof item.rewritten === 'string' && item.rewritten.length > 0
                 ? item.rewritten
                 : item.raw;
@@ -459,7 +466,11 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 const resolved = resolveBindingMetadata(plan.rewrite, item.binding);
                 addApplyMetric(applyMetrics, 'bindingResolutionMs', performance.now() - bindingResolutionStartedAt);
                 if (resolved) {
-                    binding.compiled_expr = resolved.compiled_expr;
+                    if (resolved.compiled_expr === null) {
+                        binding.compiled_expr = null;
+                    } else if (typeof resolved.compiled_expr === 'string' && resolved.compiled_expr.includes('signalMap.get(')) {
+                        binding.compiled_expr = resolved.compiled_expr;
+                    }
                     binding.signal_index = resolved.signal_index;
                     binding.signal_indices = resolved.signal_indices;
                     binding.state_index = resolved.state_index;
@@ -468,7 +479,6 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                     binding.scoped_data_key = resolved.scoped_data_key;
                 }
             }
-            exprCursor = found + 1;
         }
 
         const refSequence = Array.isArray(plan?.refSequence) ? plan.refSequence : [];
@@ -477,13 +487,13 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 continue;
             }
             const refLookupStartedAt = performance.now();
-            const found = findNextRefIndex(refBindings, refItem.raw, refCursor);
+            const found = findNextRefIndex(refBindings, refItem.raw, claimedRefs);
             addApplyMetric(applyMetrics, 'refLookupMs', performance.now() - refLookupStartedAt);
             if (found === -1) {
                 continue;
             }
+            claimedRefs.add(found);
             refBindings[found].identifier = refItem.rewritten;
-            refCursor = found + 1;
         }
     }
 }
