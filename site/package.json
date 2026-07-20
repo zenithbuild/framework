@@ -1,23 +1,35 @@
 {
-    "name": "site",
-    "version": "0.1.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "node ./scripts/zenith-workspace.mjs dev",
-        "build": "node ./scripts/zenith-workspace.mjs build",
-        "preview": "node ./scripts/zenith-workspace.mjs preview",
-        "test": "bun test"
-    },
-    "dependencies": {
-        "@zenithbuild/core": "^0.7.1",
-        "@zenithbuild/router": "file:../packages/router",
-        "gsap": "^3.14.2",
-        "tailwind-merge": "^3.5.0"
-    },
-    "devDependencies": {
-        "@tailwindcss/cli": "^4.2.1",
-        "@types/bun": "^1.3.10",
-        "tailwindcss": "^4.2.1"
-    }
+  "name": "site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "zenith dev",
+    "cms:dev": "tinacms dev --noTelemetry -c \"bun run dev\"",
+    "cms:build": "tinacms build --local --skip-cloud-checks --noTelemetry",
+    "cms:audit": "tinacms audit --noTelemetry",
+    "build": "zenith build",
+    "preview": "zenith preview",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@zenithbuild/core": "^0.8.0",
+    "gray-matter": "^4.0.3",
+    "gsap": "^3.15.0",
+    "marked": "^18.0.6",
+    "sanitize-html": "^2.17.6",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "@tinacms/cli": "2.5.5",
+    "@types/bun": "^1.3.14",
+    "@types/sanitize-html": "^2.16.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "tailwindcss": "^4.3.2",
+    "tinacms": "3.10.1"
+  }
 }
