@@ -170,7 +170,8 @@ pub fn emit_runtime_expression_function(compiled_expr: &str) -> Result<String, S
     let uses_data = expression_references_identifier(compiled_expr, "data");
     let uses_ssr = expression_references_identifier(compiled_expr, "ssr");
     let uses_ssr_data = expression_references_identifier(compiled_expr, "ssrData");
-    let uses_component_bindings = expression_references_identifier(compiled_expr, "componentBindings");
+    let uses_component_bindings =
+        expression_references_identifier(compiled_expr, "componentBindings");
     let needs_ssr_data = uses_ssr_data || uses_data || uses_ssr;
 
     let mut source = String::new();

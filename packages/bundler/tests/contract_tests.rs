@@ -29,8 +29,7 @@ fn sha256(data: &str) -> String {
 }
 
 /// Standard test input for contract snapshots.
-const CONTRACT_INPUT: &str =
-    r#"<div id="app"><h1>{props.title}</h1><button on:click={props.handler}>Click</button><p>{props.count}</p></div>"#;
+const CONTRACT_INPUT: &str = r#"<div id="app"><h1>{props.title}</h1><button on:click={props.handler}>Click</button><p>{props.count}</p></div>"#;
 
 // ===========================================================================
 // 8.2 — Contract Snapshot Tests

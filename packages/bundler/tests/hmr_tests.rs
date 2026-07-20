@@ -58,8 +58,7 @@ fn hmr_footer_structure() {
 /// In dev mode, appending HMR footer to compiled output works correctly.
 #[test]
 fn hmr_footer_appended_in_dev() {
-    let (js, _) =
-        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     // Simulate what the transform hook does
     let with_hmr = format!("{}{}", js, HMR_FOOTER);
@@ -74,8 +73,7 @@ fn hmr_footer_appended_in_dev() {
 /// In prod mode, no HMR code should be present.
 #[test]
 fn hmr_footer_absent_in_prod() {
-    let (js, _) =
-        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &prod_config()).unwrap();
+    let (js, _) = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &prod_config()).unwrap();
 
     assert!(!js.contains(HMR_MARKER), "HMR marker found in prod output");
     assert!(
@@ -115,8 +113,7 @@ fn hmr_does_not_mutate_expressions() {
 /// Multiple rebuilds must not duplicate the HMR footer.
 #[test]
 fn hmr_multiple_rebuilds_no_duplication() {
-    let (js, _) =
-        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     // Simulate 5 rebuilds
     let mut code = format!("{}{}", js, HMR_FOOTER);
@@ -329,8 +326,7 @@ async fn dev_and_prod_expressions_identical() {
 /// Brutal HMR rebuild cycle: 10 iterations, exactly one marker.
 #[test]
 fn hmr_brutal_rebuild_cycles() {
-    let (js, _) =
-        compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
+    let (js, _) = compile_zen_source("<h1>{props.title}</h1>", "page.zen", &dev_config()).unwrap();
 
     let mut code = js.clone();
     for _ in 0..10 {

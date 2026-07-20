@@ -10,18 +10,18 @@ const DEFAULT_IMAGE_SIZES: [u32; 8] = [16, 32, 48, 64, 96, 128, 256, 384];
 const DEFAULT_FORMATS: [&str; 2] = ["webp", "avif"];
 const DEFAULT_QUALITY: u32 = 75;
 
-#[path = "image_materialization_paths.rs"]
-mod paths;
-#[path = "image_materialization_remote.rs"]
-mod remote;
 #[path = "image_materialization_attrs.rs"]
 mod attrs;
 #[path = "image_materialization_markup.rs"]
 mod markup;
-pub(crate) use markup::materialize_image_markup_in_build_html;
+#[path = "image_materialization_paths.rs"]
+mod paths;
+#[path = "image_materialization_remote.rs"]
+mod remote;
 use self::attrs::{build_attr, build_source_tags, escape_html, merge_style};
 use self::paths::{build_local_variant_path, mime_type_for_format, prepend_base_path};
 use self::remote::{match_remote_pattern, RemotePattern};
+pub(crate) use markup::materialize_image_markup_in_build_html;
 use regex::Regex;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

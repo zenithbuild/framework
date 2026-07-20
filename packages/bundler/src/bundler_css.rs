@@ -7,7 +7,10 @@ pub(crate) struct CssFragment {
     pub(crate) content: String,
 }
 
-pub(crate) fn build_css_bundle(inputs: &[BundlerInput], project_root: &Path) -> Result<String, String> {
+pub(crate) fn build_css_bundle(
+    inputs: &[BundlerInput],
+    project_root: &Path,
+) -> Result<String, String> {
     let mut ordered_inputs: Vec<&BundlerInput> = inputs.iter().collect();
     ordered_inputs.sort_by(|a, b| {
         a.route.cmp(&b.route).then_with(|| {

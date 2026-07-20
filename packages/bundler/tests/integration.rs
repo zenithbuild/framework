@@ -276,8 +276,7 @@ async fn bundle_emits_diagnostics() {
 
 #[tokio::test]
 async fn expressions_never_mutated() {
-    let file =
-        create_temp_zen(r#"<div title={props.myVar}><span>{props.other_var}</span></div>"#);
+    let file = create_temp_zen(r#"<div title={props.myVar}><span>{props.other_var}</span></div>"#);
     let plan = BundlePlan {
         page_path: file.path().to_string_lossy().to_string(),
         out_dir: None,

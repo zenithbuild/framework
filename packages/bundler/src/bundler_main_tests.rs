@@ -4,8 +4,8 @@ use super::bundler_minify::{
 };
 use super::bundler_page_entry::build_expression_fns_and_bindings;
 use super::{
-    CompilerExpressionBinding, CompilerIr, CompilerSourcePosition, CompilerSourceSpan, MarkerBinding,
-    MarkerKind, OutputMode,
+    CompilerExpressionBinding, CompilerIr, CompilerSourcePosition, CompilerSourceSpan,
+    MarkerBinding, MarkerKind, OutputMode,
 };
 use oxc_allocator::Allocator;
 use oxc_parser::Parser;
@@ -148,9 +148,8 @@ fn compact_page_payload_tables_emit_canonical_inflate_scaffold() {
     assert!(scaffold.contains("const __zenith_payload_files = ["));
     assert!(scaffold.contains("const __zenith_payload_expression_rows = ["));
     assert!(scaffold.contains("const __zenith_payload_marker_rows = ["));
-    assert!(
-        scaffold.contains("const __zenith_expression_bindings = __zenith_payload_expression_rows.map")
-    );
+    assert!(scaffold
+        .contains("const __zenith_expression_bindings = __zenith_payload_expression_rows.map"));
     assert!(scaffold.contains("const __zenith_markers = __zenith_payload_marker_rows.map"));
 
     let module = format!(
@@ -173,7 +172,10 @@ fn compiled_expression_bindings_emit_fn_index_and_signal_indices() {
             compiled_expr: Some("signalMap.get(0).get() ? \"on\" : \"off\"".to_string()),
             source: Some(CompilerSourceSpan {
                 file: "src/pages/index.zen".to_string(),
-                start: CompilerSourcePosition { line: 12, column: 5 },
+                start: CompilerSourcePosition {
+                    line: 12,
+                    column: 5,
+                },
                 end: CompilerSourcePosition {
                     line: 12,
                     column: 30,

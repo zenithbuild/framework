@@ -382,9 +382,7 @@ pub(crate) fn render_compacted_page_payload_tables_js(
     js.push_str(
         "const __zenith_expression_bindings = __zenith_payload_expression_rows.map(__zie);\n",
     );
-    js.push_str(
-        "const __zenith_markers = __zenith_payload_marker_rows.map(__zim);\n",
-    );
+    js.push_str("const __zenith_markers = __zenith_payload_marker_rows.map(__zim);\n");
 
     Ok(js)
 }

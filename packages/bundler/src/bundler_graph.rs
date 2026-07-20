@@ -146,7 +146,8 @@ pub(crate) fn derive_fast_path_component_assets(
         for hoist_id in input.ir.components_scripts.keys() {
             out.insert(
                 hoist_id.clone(),
-                output_mode.component_rel(&crate::bundler_paths::sanitize_asset_token(hoist_id), ""),
+                output_mode
+                    .component_rel(&crate::bundler_paths::sanitize_asset_token(hoist_id), ""),
             );
         }
     }

@@ -35,21 +35,22 @@ fn input_requires_presence(input: &BundlerInput) -> bool {
             .expressions
             .iter()
             .any(|expression| source_mentions_presence(expression))
+        || input.ir.expression_bindings.iter().any(|binding| {
+            binding
+                .literal
+                .as_ref()
+                .is_some_and(|literal| source_mentions_presence(literal))
+                || binding
+                    .compiled_expr
+                    .as_ref()
+                    .is_some_and(|compiled| source_mentions_presence(compiled))
+        })
         || input
             .ir
-            .expression_bindings
+            .hoisted
+            .code
             .iter()
-            .any(|binding| {
-                binding
-                    .literal
-                    .as_ref()
-                    .is_some_and(|literal| source_mentions_presence(literal))
-                    || binding
-                        .compiled_expr
-                        .as_ref()
-                        .is_some_and(|compiled| source_mentions_presence(compiled))
-            })
-        || input.ir.hoisted.code.iter().any(|code| source_mentions_presence(code))
+            .any(|code| source_mentions_presence(code))
         || input
             .ir
             .hoisted
@@ -59,11 +60,9 @@ fn input_requires_presence(input: &BundlerInput) -> bool {
         || input.ir.hoisted.state.iter().any(|binding| {
             source_mentions_presence(&binding.key) || source_mentions_presence(&binding.value)
         })
-        || input
-            .ir
-            .modules
-            .iter()
-            .any(|module| source_mentions_presence(&module.id) || source_mentions_presence(&module.source))
+        || input.ir.modules.iter().any(|module| {
+            source_mentions_presence(&module.id) || source_mentions_presence(&module.source)
+        })
         || input.ir.components_scripts.values().any(|script| {
             source_mentions_presence(&script.code)
                 || source_mentions_presence(&script.factory)
