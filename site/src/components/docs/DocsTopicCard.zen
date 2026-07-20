@@ -1,0 +1,25 @@
+<script lang="ts">
+export interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+  href: string;
+  actionLabel?: string;
+}
+
+const incoming = props as Props;
+const topicEyebrow = incoming.eyebrow || "Documentation";
+const topicTitle = incoming.title || "Zenith concept";
+const topicDescription = incoming.description || "";
+const topicHref = incoming.href || "/docs";
+const topicActionLabel = incoming.actionLabel || "Open topic";
+const topicAriaLabel = `${topicActionLabel}: ${topicTitle}`;
+const topicSoftNav = topicHref === "/docs/getting-started" ? "true" : undefined;
+</script>
+
+<a href={topicHref} data-zen-link={topicSoftNav} aria-label={topicAriaLabel} class="group flex h-full flex-col rounded-lg border border-border bg-card p-6 text-card-foreground transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+  <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{topicEyebrow}</p>
+  <h3 class="mt-8 font-heading text-3xl font-semibold leading-none text-foreground">{topicTitle}</h3>
+  <p class="mt-5 text-sm leading-7 text-muted-foreground sm:text-base">{topicDescription}</p>
+  <span class="mt-auto pt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">{topicActionLabel}</span>
+</a>

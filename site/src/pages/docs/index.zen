@@ -1,29 +1,179 @@
 <script server lang="ts">
-import { pageContent, siteContent } from "../../content/index";
+import { siteContent } from "../../content/index";
+import { createPageMetadata } from "../../content/site/metadata";
 import { loadDocumentationLandingSource } from "../../server/documentationPageSource";
+import { loadSearchIndex } from "../../server/searchIndexLoader";
 
-export const load = async (_ctx) => {
-    const docsPageContent = pageContent.docs;
-    const docsSource = await loadDocumentationLandingSource();
-
-    return {
-        pageTitle: docsPageContent.pageTitle,
-        pageDescription: docsPageContent.description,
-        pageContent: docsPageContent,
-        docsSource,
-        site: {
-            navigation: siteContent.navigation,
-            footer: siteContent.footer,
-        }
-    };
+export const load = async (ctx) => {
+  const source = await loadDocumentationLandingSource();
+  const firstArticle = source.sections[0]?.entries[0];
+  if (!firstArticle) return ctx.deny(404);
+  const searchIndex = await loadSearchIndex();
+  return ctx.data({
+    pageTitle: "Documentation",
+    pageDescription: "Start with Zenith, learn the .zen component model, and follow the canonical routing, reactivity, DOM, and deployment contracts.",
+    metadata: createPageMetadata("/docs"),
+    firstArticlePath: firstArticle.path,
+    sections: source.sections,
+    searchIndex,
+    site: { navigation: siteContent.navigation, footer: siteContent.footer },
+  });
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import DocsLandingSurface from "@/components/surfaces/DocsLandingSurface.zen";
+import PageHeader from "@/components/layout/PageHeader.zen";
+import DocsTopicCard from "@/components/docs/DocsTopicCard.zen";
+import CodePanel from "@/components/CodePanel.zen";
+import SearchTrigger from "@/components/search/SearchTrigger.zen";
+import Callout from "@/components/Callout.zen";
+import Links from "@/components/ui/Links.zen";
+import MotionController from "@/components/motion/MotionController.zen";
+import DocumentationSectionCards from "@/components/docs/DocumentationSectionCards.zen";
+
+const docsRootRef = ref<HTMLElement>();
+const docsStartRef = ref<HTMLElement>();
+const docsFoundationsRef = ref<HTMLElement>();
+const docsServerRef = ref<HTMLElement>();
+const docsDeliveryRef = ref<HTMLElement>();
+
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <DocsLandingSurface content={data.pageContent} sections={data.docsSource.sections} sourceMode={data.docsSource.sourceMode} />
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/docs" searchIndex={data.searchIndex}>
+  <div ref={docsRootRef} data-page-shell="docs" class="bg-background text-foreground">
+    <PageHeader
+      eyebrow="Zenith documentation"
+      title="The public contract, close to the code."
+      description="Learn the compiler-owned component model, explicit reactive primitives, server route boundaries, and the tooling that keeps authored intent traceable."
+      asideLabel="Current train"
+      asideText="These demo docs follow the repository’s canonical Zenith agent, DOM, routing, and Tailwind contracts for the 0.8 package line."
+    />
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8"><SearchTrigger scope="docs" label="Search docs" variant="inline" /></div>
+
+    <section ref={docsStartRef} data-motion-section="docs-start" id="getting-started" aria-labelledby="getting-started-title" class="border-b border-border bg-muted px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-4">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Start here</p>
+          <h2 id="getting-started-title" class="mt-5 font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl">From an empty directory to a working route.</h2>
+          <p class="mt-6 max-w-xl text-base leading-8 text-muted-foreground md:text-lg">Create a project, open the generated page, and work directly in a `.zen` file. The scaffold keeps the first path narrow.</p>
+          <div class="mt-8">
+            <Links href={data.firstArticlePath} surface="button" variant="primary" size="lg">Open getting started</Links>
+          </div>
+        </div>
+
+        <div class="col-span-4 md:col-span-7 md:col-start-6">
+          <CodePanel filename="terminal" label="Create a project">
+<span class="text-primary">$</span> npm create zenith@latest my-app
+<span class="text-primary">$</span> cd my-app
+<span class="text-primary">$</span> npm run dev
+          </CodePanel>
+          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-lg border border-border bg-card p-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">01</p>
+              <p class="mt-3 text-sm font-medium text-foreground">Route file created</p>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">02</p>
+              <p class="mt-3 text-sm font-medium text-foreground">Tailwind v4 ready</p>
+            </div>
+            <div class="rounded-lg border border-border bg-card p-4">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">03</p>
+              <p class="mt-3 text-sm font-medium text-foreground">Agent contract included</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section ref={docsFoundationsRef} data-motion-section="docs-foundations" aria-labelledby="foundations-title" class="bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto w-full max-w-7xl">
+        <div class="grid grid-cols-4 gap-x-6 gap-y-8 md:grid-cols-12 lg:gap-x-12">
+          <p class="col-span-4 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground md:col-span-3">Foundations</p>
+          <h2 id="foundations-title" class="col-span-4 font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl md:col-span-8 md:col-start-4 lg:text-7xl">Understand the ownership model first.</h2>
+        </div>
+
+        <div class="mt-14 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div id="project-structure"><DocsTopicCard eyebrow="Getting started" title="Project structure" description="See where pages, layouts, components, public assets, and the Tailwind entry file belong." href="/docs/getting-started/project-structure" actionLabel="View structure" /></div>
+          <div id="zen-files"><DocsTopicCard eyebrow="Language" title=".zen files" description="Compose server scripts, component setup, explicit bindings, and semantic markup in one compiler-owned format." href="/docs/getting-started/first-page" actionLabel="Read the file model" /></div>
+          <DocsTopicCard eyebrow="Components" title="Props and slots" description="Keep component boundaries structural and preserve parent scope through slot composition." href="/docs/components/components-props-and-slots" actionLabel="Read components" />
+          <div id="reactivity"><DocsTopicCard eyebrow="Reactivity" title="State, signals, refs" description="Choose DOM-reactive state, stable explicit signals, or element refs according to ownership." href="/docs/reactivity/reactivity-model" actionLabel="Read reactivity" /></div>
+          <DocsTopicCard eyebrow="Events" title="Universal event syntax" description="Bind function-valued handlers with on:event and use documented aliases for pointer and Escape behavior." href="/docs/syntax/events" actionLabel="Read events" />
+          <div id="routing"><DocsTopicCard eyebrow="Routing" title="Pages and layouts" description="Let pathname-owned routes compose through shared layouts while the server remains the authority." href="/docs/routing/pages-layouts-and-dynamic-routes" actionLabel="Read routing" /></div>
+        </div>
+
+        <div data-docs-section-grid="true" class="mt-20 border-t border-border pt-12" aria-labelledby="section-directory-title">
+          <div class="grid grid-cols-4 gap-x-6 gap-y-5 md:grid-cols-12 lg:gap-x-12">
+            <div class="col-span-4 md:col-span-3">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Learning path</p>
+            </div>
+            <div class="col-span-4 md:col-span-8 md:col-start-4">
+              <h3 id="section-directory-title" class="font-heading text-4xl font-semibold uppercase leading-none tracking-tight text-foreground sm:text-5xl">Choose a section, then keep moving forward.</h3>
+              <p class="mt-5 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">The same ordered section model drives these entry points, the reader sidebar, and previous and next navigation.</p>
+            </div>
+          </div>
+          <div class="mt-10"><DocumentationSectionCards sections={data.sections} /></div>
+        </div>
+      </div>
+    </section>
+
+    <section ref={docsServerRef} data-motion-section="docs-server" id="server" aria-labelledby="server-title" class="border-y border-border bg-card px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-4">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Server capabilities</p>
+          <h2 id="server-title" class="mt-5 font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl">Route data and protection stay explicit.</h2>
+          <p class="mt-6 text-base leading-8 text-muted-foreground">Guard runs before load. Protected routes remain server-rendered security boundaries, even when client navigation improves the handoff.</p>
+        </div>
+
+        <div class="col-span-4 md:col-span-7 md:col-start-6">
+          <CodePanel filename="src/pages/account.zen" label="Server route">
+<span class="text-primary">&lt;script server lang="ts"&gt;</span>
+<span class="text-primary">export const</span> guard = async (ctx) =&gt; &#123;
+  const session = await ctx.auth.requireSession();
+  return session ? ctx.allow() : ctx.redirect(<span class="text-accent">"/login"</span>);
+&#125;;
+
+<span class="text-primary">export const</span> load = async (ctx) =&gt; &#123;
+  return ctx.data(&#123; account: await readAccount(ctx) &#125;);
+&#125;;
+<span class="text-primary">&lt;/script&gt;</span>
+          </CodePanel>
+          <Callout label="Server is security" title="Client checks are advisory UX, not authorization." description="Direct requests still execute the route guard before protected HTML is rendered." tone="blue" />
+        </div>
+      </div>
+    </section>
+
+    <section ref={docsDeliveryRef} data-motion-section="docs-delivery" aria-labelledby="delivery-title" class="bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-3">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Delivery</p>
+        </div>
+        <div class="col-span-4 md:col-span-9">
+          <h2 id="delivery-title" class="font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl lg:text-7xl">Style, build, and deploy without changing the component model.</h2>
+          <div class="mt-14 grid border-t border-border md:grid-cols-3">
+            <div id="tailwind" class="border-b border-border py-8 md:border-b-0 md:border-r md:pr-8">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Tailwind v4</p>
+              <h3 class="mt-4 font-heading text-3xl font-semibold text-foreground">Token-backed styling</h3>
+              <p class="mt-4 text-sm leading-7 text-muted-foreground">Import a local Tailwind entry and use the same theme utilities in light and dark modes.</p>
+            </div>
+            <div class="border-b border-border py-8 md:border-b-0 md:border-r md:px-8">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-gold">CLI</p>
+              <h3 class="mt-4 font-heading text-3xl font-semibold text-foreground">One project surface</h3>
+              <p class="mt-4 text-sm leading-7 text-muted-foreground">Develop and build through the Zenith CLI while compiler diagnostics stay visible.</p>
+            </div>
+            <div id="deployment" class="py-8 md:pl-8">
+              <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-blue">Adapters</p>
+              <h3 class="mt-4 font-heading text-3xl font-semibold text-foreground">Explicit targets</h3>
+              <p class="mt-4 text-sm leading-7 text-muted-foreground">Select a supported target such as node, Vercel, or Netlify through configuration.</p>
+            </div>
+          </div>
+          <div class="mt-12 flex flex-wrap gap-3">
+            <Links href="/docs/getting-started" surface="button" variant="primary" size="lg">Build the first route</Links>
+            <Links surface="button" variant="outline" size="lg" href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer">Inspect source</Links>
+          </div>
+        </div>
+      </div>
+    </section>
+    <MotionController rootRef={docsRootRef} targetARef={docsStartRef} targetBRef={docsFoundationsRef} targetCRef={docsServerRef} targetDRef={docsDeliveryRef} distance={16} start="top 92%" />
+  </div>
 </DefaultLayout>

@@ -1,0 +1,18 @@
+<script lang="ts">
+export interface Props {
+  filename?: string;
+  label?: string;
+}
+
+const incoming = props as Props;
+const codePanelFilename = incoming.filename || "example.zen";
+const codePanelLabel = incoming.label || "Code example";
+</script>
+
+<div class="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+  <div class="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+    <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{codePanelLabel}</span>
+    <span class="font-mono text-[10px] text-muted-foreground">{codePanelFilename}</span>
+  </div>
+  <pre class="overflow-x-auto bg-background p-5 font-mono text-sm leading-7 text-foreground sm:p-6"><code><slot /></code></pre>
+</div>

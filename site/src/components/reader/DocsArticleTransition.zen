@@ -1,0 +1,130 @@
+<script lang="ts">
+import { gsap } from "gsap";
+import { on, off, type NavigationLifecyclePayload } from "@zenithbuild/router";
+
+interface ElementRef<T> { current?: T | null; }
+interface Props { articleRegionRef: ElementRef<HTMLElement>; currentPath: string; }
+interface DocsTransitionRecord { navigationId: number; fromPath: string; toPath: string; phase: "leaving" | "ready" | "entering"; }
+interface DocsTransitionWindow extends Window {
+  __zenithDocsTransition?: DocsTransitionRecord;
+  __zenithDocsTransitionCount?: number;
+}
+
+const docsTransitionProps = props as Props;
+let docsTransitionTimeline: gsap.core.Timeline | null = null;
+let docsTransitionResolve: (() => void) | null = null;
+let docsTransitionNavigationId = 0;
+
+function docsTransitionPath(value: URL | null | undefined): string {
+  if (!value) return "";
+  const path = value.pathname.replace(/\/+$/, "") || "/";
+  return path;
+}
+
+function docsArticlePath(path: string): boolean {
+  return /^\/docs\/[^/]+(?:\/[^/]+)?$/.test(path);
+}
+
+function docsTransitionFinishPending() {
+  const resolve = docsTransitionResolve;
+  docsTransitionResolve = null;
+  if (resolve) resolve();
+}
+
+function docsTransitionKill() {
+  docsTransitionTimeline?.kill();
+  docsTransitionTimeline = null;
+  docsTransitionFinishPending();
+}
+
+function docsTransitionReduced(win: Window): boolean {
+  return win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+zenMount((ctx) => {
+  const win = zenWindow() as DocsTransitionWindow | null;
+  const region = docsTransitionProps.articleRegionRef.current;
+  if (!win || !region) return;
+
+  const pending = win.__zenithDocsTransition;
+  if (pending && pending.toPath === docsTransitionProps.currentPath) {
+    pending.phase = "ready";
+    if (!docsTransitionReduced(win)) gsap.set(region, { autoAlpha: 0, y: 8 });
+    else gsap.set(region, { autoAlpha: 1, y: 0 });
+  } else {
+    gsap.set(region, { clearProps: "opacity,visibility,transform" });
+  }
+
+  async function handleBeforeLeave(payloadValue: unknown) {
+    const payload = payloadValue as NavigationLifecyclePayload;
+    const fromPath = docsTransitionPath(payload.from);
+    const toPath = docsTransitionPath(payload.to);
+    if (!docsArticlePath(fromPath) || !docsArticlePath(toPath) || fromPath === toPath) return;
+    docsTransitionKill();
+    docsTransitionNavigationId = payload.navigationId;
+    win.__zenithDocsTransition = { navigationId: payload.navigationId, fromPath, toPath, phase: "leaving" };
+    win.__zenithDocsTransitionCount = (win.__zenithDocsTransitionCount || 0) + 1;
+    region.dataset.docsTransitionPhase = "leaving";
+    if (docsTransitionReduced(win)) return;
+    await new Promise<void>((resolve) => {
+      docsTransitionResolve = resolve;
+      docsTransitionTimeline = gsap.timeline({ onComplete: docsTransitionFinishPending })
+        .to(region, { autoAlpha: 0, y: -8, duration: 0.16, ease: "power2.in", overwrite: true });
+    });
+  }
+
+  async function handleBeforeEnter(payloadValue: unknown) {
+    const payload = payloadValue as NavigationLifecyclePayload;
+    const record = win.__zenithDocsTransition;
+    if (!record || payload.navigationId !== record.navigationId || record.toPath !== docsTransitionProps.currentPath) return;
+    docsTransitionKill();
+    record.phase = "entering";
+    region.dataset.docsTransitionPhase = "entering";
+    if (docsTransitionReduced(win)) {
+      gsap.set(region, { autoAlpha: 1, y: 0 });
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      docsTransitionResolve = resolve;
+      docsTransitionTimeline = gsap.timeline({ onComplete: docsTransitionFinishPending })
+        .to(region, { autoAlpha: 1, y: 0, duration: 0.26, ease: "power2.out", overwrite: true });
+    });
+  }
+
+  function handleEnterComplete(payloadValue: unknown) {
+    const payload = payloadValue as NavigationLifecyclePayload;
+    const record = win.__zenithDocsTransition;
+    if (!record || payload.navigationId !== record.navigationId) return;
+    region.dataset.docsTransitionPhase = "idle";
+    gsap.set(region, { clearProps: "opacity,visibility,transform" });
+    win.__zenithDocsTransition = undefined;
+  }
+
+  function handleAbort(payloadValue: unknown) {
+    const payload = payloadValue as NavigationLifecyclePayload;
+    if (payload.navigationId !== docsTransitionNavigationId) return;
+    docsTransitionKill();
+    gsap.set(region, { clearProps: "opacity,visibility,transform" });
+    win.__zenithDocsTransition = undefined;
+  }
+
+  on("navigation:before-leave", handleBeforeLeave);
+  on("navigation:before-enter", handleBeforeEnter);
+  on("navigation:enter-complete", handleEnterComplete);
+  on("navigation:abort", handleAbort);
+  on("navigation:error", handleAbort);
+
+  ctx.cleanup(() => {
+    off("navigation:before-leave", handleBeforeLeave);
+    off("navigation:before-enter", handleBeforeEnter);
+    off("navigation:enter-complete", handleEnterComplete);
+    off("navigation:abort", handleAbort);
+    off("navigation:error", handleAbort);
+    docsTransitionKill();
+    const record = win.__zenithDocsTransition;
+    if (record && win.location.pathname !== record.toPath) win.__zenithDocsTransition = undefined;
+  });
+});
+</script>
+
+<span data-docs-transition-controller="true" class="hidden" aria-hidden="true"></span>

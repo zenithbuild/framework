@@ -1,0 +1,95 @@
+<script lang="ts">
+import type { DocumentationViewModel } from "@/server/documentationViewModel";
+import ReaderToc from "@/components/reader/ReaderToc.zen";
+import DocumentationSidebarEntries from "@/components/docs/DocumentationSidebarEntries.zen";
+
+interface Props {
+  view: DocumentationViewModel;
+}
+
+const documentationProps = props as Props;
+const documentationView = documentationProps.view;
+const documentationPrevious = documentationView.previous;
+const documentationNext = documentationView.next;
+const documentationArticleRef = ref<HTMLElement>();
+const documentationArticleEndRef = ref<HTMLElement>();
+
+function documentationEscapeHtml(value: unknown): string {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function documentationRenderBreadcrumbs(): string {
+  return documentationView.breadcrumbs.map((item, index) => {
+    const label = documentationEscapeHtml(item.label);
+    const current = item.current || index === documentationView.breadcrumbs.length - 1;
+    return current
+      ? '<li aria-current="page" class="text-foreground">' + label + "</li>"
+      : '<li><a href="' + documentationEscapeHtml(item.path) + '" data-zen-link="true" class="transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">' + label + "</a></li>";
+  }).join('<li aria-hidden="true" class="text-border">/</li>');
+}
+
+function documentationRenderSidebar(): string {
+  return documentationView.sections.map((section) => {
+    const links = section.entries.map((entry) => {
+      const active = entry.current ? "border-primary text-foreground" : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground";
+      const current = entry.current ? ' aria-current="page"' : "";
+      return '<a href="' + documentationEscapeHtml(entry.path) + '"' + current + ' data-zen-link="true" class="block border-l py-2 pl-4 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ' + active + '">' + documentationEscapeHtml(entry.sidebarLabel || entry.title) + "</a>";
+    }).join("");
+    return '<section><h2 class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">' + documentationEscapeHtml(section.title) + '</h2><div class="mt-3 grid">' + links + "</div></section>";
+  }).join("");
+}
+</script>
+
+<div data-page-shell="docs-article" data-docs-shell="true" class="bg-background px-4 pb-0 pt-28 text-foreground sm:px-6 sm:pt-32 lg:px-8 lg:pt-36">
+  <div data-docs-layout="true" class="mx-auto grid w-full max-w-7xl gap-10 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_13rem] xl:gap-14">
+    <aside data-docs-sidebar="true" aria-label="Documentation sections" class="hidden lg:block lg:col-start-1 lg:row-start-1">
+      <nav class="sticky top-28 grid max-h-[calc(100vh-8rem)] gap-8 overflow-y-auto pb-12">
+        <DocumentationSidebarEntries html={documentationRenderSidebar()} class="grid gap-8" />
+      </nav>
+    </aside>
+
+    <div data-docs-on-this-page="true" class="lg:col-start-2 lg:row-start-1 xl:col-start-3">
+      <div class="sticky top-28">
+        <ReaderToc
+          headings={documentationView.headings}
+          articleRef={documentationArticleRef}
+          endRef={documentationArticleEndRef}
+          labelId="docs-on-this-page"
+          surface="docs"
+        />
+      </div>
+    </div>
+
+    <div id="app" class="w-full max-w-[44rem] min-w-0 lg:col-start-2 lg:row-start-2 xl:row-start-1">
+      <main data-docs-article-region="true" data-docs-transition-phase="idle" class="min-w-0">
+        <header data-docs-article-header="true" class="border-b border-border pb-12 lg:pb-16">
+          <nav aria-label="Breadcrumb">
+            <ol class="flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground" unsafeHTML={documentationRenderBreadcrumbs()}></ol>
+          </nav>
+          <p class="mt-10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{documentationView.sectionTitle}</p>
+          <h1 data-route-title="true" class="mt-5 max-w-4xl font-heading text-[clamp(2.5rem,5vw,4.75rem)] font-semibold leading-[0.92] text-foreground">{documentationView.title}</h1>
+          <p class="mt-7 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{documentationView.description}</p>
+        </header>
+
+        <article ref={documentationArticleRef} data-docs-article="true" class="docs-richtext min-w-0 py-12 lg:py-16" unsafeHTML={documentationView.htmlRendered}></article>
+        <span ref={documentationArticleEndRef} data-reader-article-end="docs" class="block h-px" aria-hidden="true"></span>
+
+        <nav aria-label="Documentation pagination" class="grid gap-5 border-t border-border py-12 sm:grid-cols-2">
+          <a href={documentationPrevious ? documentationPrevious.path : "/docs"} data-zen-link="true" class="rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+            <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Previous</span>
+            <span class="mt-3 block font-heading text-2xl font-semibold text-foreground">{documentationPrevious ? documentationPrevious.title : "Documentation"}</span>
+          </a>
+          <a href={documentationNext ? documentationNext.path : "/docs"} data-zen-link="true" class="rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+            <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Next</span>
+            <span class="mt-3 block font-heading text-2xl font-semibold text-foreground">{documentationNext ? documentationNext.title : "Documentation"}</span>
+          </a>
+        </nav>
+      </main>
+    </div>
+  </div>
+</div>

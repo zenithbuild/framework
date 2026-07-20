@@ -1,0 +1,51 @@
+<script server lang="ts">
+import { siteContent } from "../../content/index";
+import { createContentMetadata } from "../../content/site/metadata";
+import { loadDocumentationPageSource } from "../../server/documentationPageSource";
+import { loadSearchIndex } from "../../server/searchIndexLoader";
+import { createDocumentationViewModel } from "../../server/documentationViewModel";
+
+export const load = async (ctx) => {
+  const routeSegments = String(ctx.params?.slug || "").split("/").filter(Boolean);
+  if (routeSegments.length < 1 || routeSegments.length > 2) return ctx.deny(404);
+  const slug = routeSegments.at(-1) || "";
+  const sectionSlug = routeSegments.length === 2 ? routeSegments[0] : "root";
+  const source = await loadDocumentationPageSource({ slug, sectionSlug });
+  if (!source.document) return ctx.deny(404);
+  const document = source.document;
+  const view = createDocumentationViewModel(document, source.sections, source.sourceMode);
+  const searchIndex = await loadSearchIndex();
+  const metadata = createContentMetadata({
+    path: document.path,
+    title: document.seoTitle || document.title,
+    description: document.seoDescription || document.description,
+    label: document.title,
+    kind: "tech-article",
+    breadcrumbs: [
+      { name: "Documentation", path: "/docs" },
+      { name: document.section.title, path: document.section.path },
+      { name: document.title, path: document.path },
+    ],
+  });
+  return ctx.data({
+    pageTitle: document.title,
+    pageDescription: document.description,
+    metadata,
+    document,
+    sections: source.sections,
+    sourceMode: source.sourceMode,
+    searchIndex,
+    view,
+    site: { navigation: siteContent.navigation, footer: siteContent.footer },
+  });
+};
+</script>
+
+<script setup="ts">
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import DocumentationArticle from "@/components/DocumentationArticle.zen";
+</script>
+
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.document.path} searchIndex={data.searchIndex}>
+  <DocumentationArticle view={data.view} />
+</DefaultLayout>
