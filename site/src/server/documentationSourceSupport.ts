@@ -89,6 +89,7 @@ export function formatDocumentationDetailPath(sectionSlug: string, slug: string,
 export function renderDocumentationHtml(markdownRaw: string): string {
   const lines = String(markdownRaw || "").replace(/\r\n/g, "\n").split("\n");
   const html: string[] = [];
+  const headingCounts = new Map<string, number>();
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] || "";
@@ -110,7 +111,11 @@ export function renderDocumentationHtml(markdownRaw: string): string {
     const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length;
-      html.push(`<h${level}>${renderInlineMarkdown(heading[2] || "")}</h${level}>`);
+      const baseId = stableHeadingId(heading[2] || "section");
+      const count = headingCounts.get(baseId) || 0;
+      headingCounts.set(baseId, count + 1);
+      const id = count === 0 ? baseId : `${baseId}-${count + 1}`;
+      html.push(`<h${level} id="${id}" class="scroll-mt-28">${renderInlineMarkdown(heading[2] || "")}</h${level}>`);
       continue;
     }
 
@@ -177,7 +182,44 @@ function renderInlineMarkdown(value: string): string {
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) =>
+      safeMarkdownUrl(href) ? `<a href="${href}">${label}</a>` : label,
+    );
+}
+
+export interface MarkdownHeading {
+  id: string;
+  text: string;
+  level: number;
+}
+
+export function extractMarkdownHeadings(markdownRaw: string): MarkdownHeading[] {
+  const counts = new Map<string, number>();
+  return String(markdownRaw || "").split(/\r?\n/).flatMap((line) => {
+    const match = line.trim().match(/^(#{2,3})\s+(.*)$/);
+    if (!match) return [];
+    const text = String(match[2] || "").replace(/[`*_]/g, "").trim();
+    const baseId = stableHeadingId(text || "section");
+    const count = counts.get(baseId) || 0;
+    counts.set(baseId, count + 1);
+    return [{ id: count === 0 ? baseId : `${baseId}-${count + 1}`, text, level: match[1].length }];
+  });
+}
+
+function stableHeadingId(value: string): string {
+  return String(value || "section")
+    .toLowerCase()
+    .replace(/<[^>]+>/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "section";
+}
+
+function safeMarkdownUrl(value: string): boolean {
+  const url = String(value || "").trim();
+  return /^#[-a-z0-9_:.]+$/i.test(url)
+    || (/^\/(?!\/)/.test(url) && !/["'<>]/.test(url))
+    || /^https?:\/\/[^\s"'<>]+$/i.test(url)
+    || /^mailto:[^\s"'<>]+$/i.test(url);
 }
 
 function escapeHtml(value: string): string {
@@ -215,6 +257,8 @@ export function groupDocumentationEntries(entries: DocumentationDetail[]): Docum
       if (left.section.order !== right.section.order) {
         return left.section.order - right.section.order;
       }
+      const titleOrder = left.section.title.localeCompare(right.section.title);
+      if (titleOrder !== 0) return titleOrder;
       return left.section.slug.localeCompare(right.section.slug);
     });
 }
@@ -226,7 +270,9 @@ function toNavEntry(entry: DocumentationDetail): DocumentationNavEntry {
 
   return {
     slug: entry.slug,
+    routeSectionSlug: entry.routeSectionSlug,
     title: entry.title,
+    sidebarLabel: entry.sidebarLabel,
     description: entry.description,
     excerpt: entry.excerpt,
     path: entry.path,
@@ -295,6 +341,11 @@ export function compareDocumentationEntries(left: DocumentationDetail, right: Do
     return left.section.order - right.section.order;
   }
 
+  const sectionTitleOrder = left.section.title.localeCompare(right.section.title);
+  if (sectionTitleOrder !== 0) {
+    return sectionTitleOrder;
+  }
+
   const leftOrder = left.docOrder ?? Number.MAX_SAFE_INTEGER;
   const rightOrder = right.docOrder ?? Number.MAX_SAFE_INTEGER;
   if (leftOrder !== rightOrder) {
@@ -306,6 +357,8 @@ export function compareDocumentationEntries(left: DocumentationDetail, right: Do
     return titleOrder;
   }
 
+  const slugOrder = left.slug.localeCompare(right.slug);
+  if (slugOrder !== 0) return slugOrder;
   return (left.sourcePath || left.slug).localeCompare(right.sourcePath || right.slug);
 }
 
@@ -315,7 +368,9 @@ function compareNavEntries(left: DocumentationNavEntry, right: DocumentationNavE
   if (leftOrder !== rightOrder) {
     return leftOrder - rightOrder;
   }
-  return left.path.localeCompare(right.path);
+  const titleOrder = left.title.localeCompare(right.title);
+  if (titleOrder !== 0) return titleOrder;
+  return left.slug.localeCompare(right.slug) || left.path.localeCompare(right.path);
 }
 export function formatSectionPath(sectionSlug: string): string {
   return formatSectionRoute(sectionSlug, "/docs");
@@ -354,5 +409,5 @@ export function normalizeDocumentationLookup(lookupInput: string | Documentation
 }
 
 export function matchesDocumentationLookup(entry: DocumentationDetail, lookup: { slug: string; sectionSlug: string }) {
-  return entry.slug === lookup.slug && entry.section.slug === lookup.sectionSlug;
+  return entry.slug === lookup.slug && entry.routeSectionSlug === lookup.sectionSlug;
 }

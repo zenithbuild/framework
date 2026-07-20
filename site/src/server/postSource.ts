@@ -1,5 +1,6 @@
 import { blogPostContent } from "../content/index";
 import { createDirectusServerClient, type DirectusServerClient } from "./directusClient";
+import { loadGitBlogPosts } from "./gitBlogSource";
 import {
   cleanText,
   decorateBlogHtml,
@@ -19,8 +20,10 @@ import {
   type BlogImage,
   type BlogTag,
 } from "./postSourceSupport";
+import { normalizeReadableSlug } from "../content/slugContract";
+import { ContentValidationError, assertUniqueSlugs } from "./contentValidation";
 
-type SourceMode = "local" | "directus";
+type SourceMode = "git" | "local" | "directus";
 type AccentTone = "red" | "blue" | "gold" | "magenta";
 
 interface LocalBlogAuthor {
@@ -134,16 +137,21 @@ export interface BlogPost {
     href: string;
     label: string;
   };
+  featured: boolean;
+  seoTitle: string;
+  seoDescription: string;
+  canonicalPath: string;
+  headings: Array<{ id: string; text: string; level: number }>;
 }
 
 export function resolveBlogSourceMode(): SourceMode {
-  const mode = (process.env.ZENITH_BLOG_SOURCE || "directus").trim().toLowerCase();
+  const mode = (process.env.ZENITH_BLOG_SOURCE || "git").trim().toLowerCase();
 
-  if (mode === "local" || mode === "directus") {
+  if (mode === "git" || mode === "local" || mode === "directus") {
     return mode;
   }
 
-  throw new Error(`Unsupported ZENITH_BLOG_SOURCE "${mode}". Use "local" or "directus".`);
+  throw new Error(`Unsupported ZENITH_BLOG_SOURCE "${mode}". Use "git", "local", or "directus".`);
 }
 
 export async function loadBlogIndexSource(): Promise<{
@@ -162,15 +170,20 @@ export async function loadBlogIndexSource(): Promise<{
 export async function loadBlogDetailSource(slug: string): Promise<{
   blogPost: BlogPost | null;
   relatedPosts: BlogPost[];
+  previousPost: BlogPost | null;
+  nextPost: BlogPost | null;
   sourceMode: SourceMode;
 }> {
   const posts = await loadBlogPosts();
   const blogPost = posts.find((entry) => entry.slug === slug) || null;
+  const postIndex = blogPost ? posts.findIndex((entry) => entry.slug === blogPost.slug) : -1;
 
   if (!blogPost) {
     return {
       blogPost: null,
       relatedPosts: [],
+      previousPost: null,
+      nextPost: null,
       sourceMode: resolveBlogSourceMode(),
     };
   }
@@ -178,14 +191,29 @@ export async function loadBlogDetailSource(slug: string): Promise<{
   return {
     blogPost,
     relatedPosts: resolveRelatedPosts(posts, blogPost),
+    previousPost: postIndex > 0 ? posts[postIndex - 1] : null,
+    nextPost: postIndex >= 0 && postIndex < posts.length - 1 ? posts[postIndex + 1] : null,
     sourceMode: resolveBlogSourceMode(),
   };
 }
 
 async function loadBlogPosts(): Promise<BlogPost[]> {
-  return resolveBlogSourceMode() === "directus"
-    ? loadDirectusBlogPosts()
+  const mode = resolveBlogSourceMode();
+  const posts = mode === "git"
+    ? await loadGitBlogPosts()
+    : mode === "directus"
+    ? await loadDirectusBlogPosts()
     : loadLocalBlogPosts();
+  for (const post of posts) {
+    if (!post.slug || normalizeReadableSlug(post.slug) !== post.slug) {
+      throw new ContentValidationError(`Blog slug '${post.slug}' is not a canonical readable slug`);
+    }
+    if (post.path !== `/blog/${post.slug}` || post.canonicalPath !== post.path) {
+      throw new ContentValidationError(`Blog '${post.slug}' must use canonical path /blog/${post.slug}`);
+    }
+  }
+  assertUniqueSlugs(posts, "Blog");
+  return posts;
 }
 
 async function loadDirectusBlogPosts(): Promise<BlogPost[]> {
@@ -285,6 +313,11 @@ function mapDirectusPostRecord(record: DirectusPostRecord, baseUrl: string): Blo
     relatedSlugs: [],
     htmlRendered,
     cta: defaultPostCta(category),
+    featured: false,
+    seoTitle: record.title,
+    seoDescription: description,
+    canonicalPath: `/blog/${record.slug}`,
+    headings: [],
   };
 }
 
@@ -345,6 +378,11 @@ function mapLocalBlogRecord(record: LocalBlogRecord): BlogPost {
       href: record.cta?.href || "/docs",
       label: record.cta?.label || "Open docs",
     },
+    featured: false,
+    seoTitle: record.title,
+    seoDescription: cleanText(record.description || record.excerpt || record.title),
+    canonicalPath: `/blog/${record.slug}`,
+    headings: [],
   };
 }
 

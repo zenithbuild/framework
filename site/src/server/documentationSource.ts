@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { createDirectusServerClient, type DirectusServerClient } from "./directusClient";
+import { discoverLocalDocumentationEntries } from "./localDocumentationSource";
+import { renderDocumentationMarkdown } from "./documentationMarkdown";
 import {
   collectDocumentationTags,
   compareDocumentationEntries,
@@ -7,37 +8,15 @@ import {
   excerptText,
   extractDocumentationDescription,
   formatDocumentationDetailPath,
-  formatSectionPath,
   formatSectionRoute,
   groupDocumentationEntries,
   humanizeDocumentationSlug,
   matchesDocumentationLookup,
   normalizeDocumentationLookup,
-  readLocalDocumentationTagsMap,
-  renderDocumentationHtml,
-  stripDocumentationFrontmatter,
   toInteger,
 } from "./documentationSourceSupport";
 
 type SourceMode = "local" | "directus";
-
-interface DocsNavCategoryRecord {
-  slug: string;
-  title: string;
-  summary?: string;
-  order: number | null;
-  docs: DocsNavDocRecord[];
-}
-
-interface DocsNavDocRecord {
-  slug: string;
-  title: string;
-  label?: string;
-  url?: string;
-  order?: number | null;
-  status?: string;
-  source_path: string;
-}
 
 interface DirectusDocumentationSectionRecord {
   slug?: string | null;
@@ -89,7 +68,9 @@ export interface DocumentationSection {
 
 export interface DocumentationNavEntry {
   slug: string;
+  routeSectionSlug: string;
   title: string;
+  sidebarLabel: string;
   description: string;
   excerpt: string;
   path: string;
@@ -109,7 +90,9 @@ export interface DocumentationSectionGroup {
 
 export interface DocumentationDetail {
   slug: string;
+  routeSectionSlug: string;
   title: string;
+  sidebarLabel: string;
   description: string;
   excerpt: string;
   path: string;
@@ -120,7 +103,10 @@ export interface DocumentationDetail {
   tags: DocumentationTag[];
   markdownRaw: string;
   htmlRendered: string | null;
+  headings: Array<{ id: string; text: string; level: number }>;
   docOrder: number | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
 }
 
 export interface DocumentationIndexSource {
@@ -138,9 +124,6 @@ export interface DocumentationDetailLookup {
   slug: string;
   sectionSlug?: string | null;
 }
-
-const DOCS_NAV_URL = new URL("../../../docs/public/ai/docs.nav.json", import.meta.url);
-const DOCS_ROOT_URL = new URL("../../../docs/", import.meta.url);
 
 const BASE_DOCUMENTATION_FIELDS = ["slug", "title", "description", "markdown_raw", "html_rendered", "source_path", "source_kind", "status", "category", "category_label", "category_order", "doc_order"] as const;
 const RELATIONAL_DOCUMENTATION_FIELDS = ["category_ref.slug", "category_ref.title", "category_ref.description", "category_ref.order", "category_ref.route_base", "section.slug", "section.title", "section.description", "section.order", "tags.tag.slug", "tags.tag.title", "tags.tag.color", "tags.tag.order", "tags.tags_id.slug", "tags.tags_id.title", "tags.tags_id.color", "tags.tags_id.order"] as const;
@@ -213,39 +196,7 @@ async function loadDirectusDocumentationEntries(): Promise<DocumentationDetail[]
 }
 
 async function loadLocalDocumentationEntries(): Promise<DocumentationDetail[]> {
-  const nav = await readLocalDocsNav();
-  const localTagsByDoc = await readLocalDocumentationTagsMap();
-  const entries = [];
-
-  for (const category of nav.categories || []) {
-    const section = mapNavCategoryToSection(category);
-    for (const doc of category.docs || []) {
-      const routeKey = doc.slug;
-      const slug = deriveDocumentationLeafSlug(routeKey);
-      const sourcePath = normalizeLocalSourcePath(doc.source_path);
-      const fileUrl = new URL(sourcePath, DOCS_ROOT_URL);
-      const raw = await readFile(fileUrl, "utf8");
-      const markdownRaw = stripDocumentationFrontmatter(raw).trimStart();
-      const description = extractDocumentationDescription(markdownRaw, doc.title);
-      entries.push({
-        slug,
-        title: doc.title,
-        description,
-        excerpt: excerptText(description, 180),
-        path: doc.url || formatDocumentationDetailPath(section.slug, slug),
-        sourcePath: `docs/${sourcePath}`,
-        sourceKind: "repo_sync",
-        status: doc.status || "published",
-        section,
-        tags: mapLocalTags(localTagsByDoc.get(routeKey) || []),
-        markdownRaw,
-        htmlRendered: renderDocumentationHtml(markdownRaw),
-        docOrder: Number.isInteger(doc.order) ? doc.order : null,
-      });
-    }
-  }
-
-  return entries.sort(compareDocumentationEntries);
+  return (await discoverLocalDocumentationEntries()).sort(compareDocumentationEntries);
 }
 
 async function queryDirectusDocumentationRecords(
@@ -281,10 +232,13 @@ function mapDirectusDocumentationRecord(record: DirectusDocumentationRecord): Do
   const slug = deriveDocumentationLeafSlug(record.slug || record.source_path || "");
   const markdownRaw = String(record.markdown_raw || "");
   const description = extractDocumentationDescription(record.description || markdownRaw, record.title);
+  const rendered = renderDocumentationMarkdown(markdownRaw, record.title);
 
   return {
     slug,
+    routeSectionSlug: section.slug,
     title: record.title,
+    sidebarLabel: record.title,
     description,
     excerpt: excerptText(description, 180),
     path: formatDocumentationDetailPath(section.slug, slug, record.category_ref?.route_base || "/docs"),
@@ -294,23 +248,11 @@ function mapDirectusDocumentationRecord(record: DirectusDocumentationRecord): Do
     section,
     tags: mapRecordTags(record.tags),
     markdownRaw,
-    htmlRendered: record.html_rendered || renderDocumentationHtml(markdownRaw),
+    htmlRendered: rendered.html,
+    headings: rendered.headings,
     docOrder: toInteger(record.doc_order),
-  };
-}
-
-async function readLocalDocsNav(): Promise<{ categories: DocsNavCategoryRecord[] }> {
-  return JSON.parse(await readFile(DOCS_NAV_URL, "utf8"));
-}
-
-function mapNavCategoryToSection(category: DocsNavCategoryRecord): DocumentationSection {
-  const sectionSlug = category.slug || "root";
-  return {
-    slug: sectionSlug,
-    title: sectionSlug === "root" ? "Start Here" : category.title,
-    description: category.summary || null,
-    order: toInteger(category.order) ?? Number.MAX_SAFE_INTEGER,
-    path: formatSectionPath(sectionSlug),
+    seoTitle: null,
+    seoDescription: null,
   };
 }
 
@@ -367,31 +309,6 @@ function mapRecordTags(rawTags: DirectusDocumentationRecord["tags"]): Documentat
       }
       return left.slug.localeCompare(right.slug);
     });
-}
-
-function mapLocalTags(rawTags: string[]): DocumentationTag[] {
-  const seen = new Set<string>();
-
-  return rawTags
-    .map((tag) => String(tag || "").trim())
-    .filter((tag) => {
-      if (!tag || seen.has(tag)) {
-        return false;
-      }
-      seen.add(tag);
-      return true;
-    })
-    .map((tag) => ({
-    slug: tag,
-    title: humanizeDocumentationSlug(tag),
-    color: null,
-    order: null,
-  }))
-    .sort((left, right) => left.title.localeCompare(right.title));
-}
-
-function normalizeLocalSourcePath(sourcePath: string): string {
-  return sourcePath.startsWith("documentation/") ? sourcePath : `documentation/${sourcePath}`;
 }
 
 function deriveSectionSlug(slug: string): string {

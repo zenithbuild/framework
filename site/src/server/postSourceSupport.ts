@@ -166,6 +166,9 @@ export function renderLocalSections(record: { sections?: Array<Record<string, an
 
 export function decorateBlogHtml(html: string) {
   return html
+    .replace(/<h1([^>]*) class="scroll-mt-28">/g, '<h1$1 class="scroll-mt-28 font-display text-[clamp(2.6rem,4vw,4.2rem)] leading-[0.94] tracking-tight text-foreground">')
+    .replace(/<h2([^>]*) class="scroll-mt-28">/g, '<h2$1 class="scroll-mt-28 mt-12 font-display text-[clamp(1.9rem,3vw,3.1rem)] leading-[0.96] tracking-tight text-foreground first:mt-0">')
+    .replace(/<h3([^>]*) class="scroll-mt-28">/g, '<h3$1 class="scroll-mt-28 mt-8 font-display text-[clamp(1.35rem,2.2vw,1.95rem)] leading-tight text-foreground">')
     .replace(/<h1>/g, '<h1 class="font-display text-[clamp(2.6rem,4vw,4.2rem)] leading-[0.94] tracking-tight text-foreground">')
     .replace(/<h2>/g, '<h2 class="mt-12 font-display text-[clamp(1.9rem,3vw,3.1rem)] leading-[0.96] tracking-tight text-foreground first:mt-0">')
     .replace(/<h3>/g, '<h3 class="mt-8 font-display text-[clamp(1.35rem,2.2vw,1.95rem)] leading-tight text-foreground">')
@@ -224,4 +227,11 @@ export function escapeHtml(value: string) {
 
 export function stripHtmlTags(value: string) {
   return String(value || "").replace(/<[^>]+>/g, " ");
+}
+
+export function renderBlogHeadingLinks(headings: Array<{ id: string; text: string }>) {
+  return headings.map((heading) => {
+    const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(heading.id) ? heading.id : "section";
+    return `<a href="#${id}" class="border-l border-border py-2 pl-4 text-sm text-muted-foreground hover:border-foreground/40 hover:text-foreground">${escapeHtml(heading.text)}</a>`;
+  }).join("");
 }
