@@ -1,0 +1,224 @@
+fragment DocsParts on Docs {
+  __typename
+  title
+  description
+  section
+  sectionOrder
+  order
+  sidebarLabel
+  status
+  last_updated
+  version
+  tags
+  seoTitle
+  seoDescription
+  body
+}
+
+fragment BlogParts on Blog {
+  __typename
+  title
+  description
+  published
+  publishedAt
+  updatedAt
+  author {
+    ... on People {
+      __typename
+      name
+      profileUrl
+      avatar {
+        __typename
+        src
+        width
+        height
+        alt
+        focalPosition
+      }
+      member
+      contributor
+      active
+      sortOrder
+    }
+    ... on Document {
+      _sys {
+        filename
+        basename
+        hasReferences
+        breadcrumbs
+        path
+        relativePath
+        extension
+      }
+      id
+    }
+  }
+  category
+  tags
+  featured
+  featuredImage {
+    __typename
+    src
+    width
+    height
+    alt
+    focalPosition
+  }
+  seoTitle
+  seoDescription
+  canonicalPath
+  relatedSlugs
+  body
+}
+
+fragment AboutParts on About {
+  __typename
+  pageTitle
+  description
+  seoTitle
+  seoDescription
+  sections {
+    __typename
+    hero {
+      __typename
+      eyebrow
+      title
+      description
+      actions {
+        __typename
+        label
+        href
+        variant
+      }
+    }
+    why {
+      __typename
+      eyebrow
+      title
+      description
+      items {
+        __typename
+        number
+        title
+        description
+      }
+    }
+    principles {
+      __typename
+      eyebrow
+      title
+      description
+      items {
+        __typename
+        number
+        title
+        description
+      }
+    }
+    built {
+      __typename
+      eyebrow
+      title
+      description
+      parts {
+        __typename
+        name
+        description
+      }
+    }
+    ecosystem {
+      __typename
+      eyebrow
+      title
+      description
+      items {
+        __typename
+        name
+        description
+      }
+    }
+    builder {
+      __typename
+      eyebrow
+      title
+      text
+      signature
+      role
+    }
+    cta {
+      __typename
+      eyebrow
+      title
+      text
+      actions {
+        __typename
+        label
+        href
+        variant
+      }
+    }
+  }
+}
+
+fragment SponsorsParts on Sponsors {
+  __typename
+  kind
+  name
+  url
+  logo {
+    __typename
+    src
+    width
+    height
+    alt
+    focalPosition
+  }
+  title
+  description
+  recognitionText
+  ctaLabel
+  ctaUrl
+  supportingStatements
+  active
+  featured
+  startsAt
+  endsAt
+}
+
+fragment PeopleParts on People {
+  __typename
+  name
+  profileUrl
+  avatar {
+    __typename
+    src
+    width
+    height
+    alt
+    focalPosition
+  }
+  member
+  contributor
+  active
+  sortOrder
+}
+
+fragment SiteSettingsParts on SiteSettings {
+  __typename
+  defaultSeoTitle
+  defaultSeoDescription
+  siteUrl
+  socialImage {
+    __typename
+    src
+    width
+    height
+    alt
+  }
+  socialLinks {
+    __typename
+    label
+    url
+  }
+  contactUrl
+}
