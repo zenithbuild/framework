@@ -7,231 +7,230 @@
   "navigation": {
     "categories": [
       {
-        "slug": "contracts",
-        "title": "Contracts",
-        "summary": "Normative framework contracts and invariants.",
-        "order": 10,
-        "count": 24
-      },
-      {
-        "slug": "syntax",
-        "title": "Language",
-        "summary": "Zenith DSL syntax and expression semantics.",
-        "order": 20,
-        "count": 2
-      },
-      {
-        "slug": "reactivity",
-        "title": "Reactivity",
-        "summary": "State, memoization, and reactive execution model.",
-        "order": 30,
-        "count": 11
-      },
-      {
-        "slug": "components",
-        "title": "Components",
-        "summary": "Structural component composition and usage patterns.",
-        "order": 40,
-        "count": 1
-      },
-      {
-        "slug": "guides",
-        "title": "Guides",
-        "summary": "Task-oriented implementation walkthroughs.",
-        "order": 80,
+        "slug": "getting-started",
+        "title": "Getting Started",
+        "summary": "",
+        "order": 1,
         "count": 6
       },
       {
-        "slug": "contributing",
-        "title": "Contributing",
-        "summary": "Governance, drift gates, and contributor workflows.",
-        "order": 90,
+        "slug": "core-concepts",
+        "title": "Core Concepts",
+        "summary": "",
+        "order": 2,
+        "count": 10
+      },
+      {
+        "slug": "pages-and-routing",
+        "title": "Pages and Routing",
+        "summary": "",
+        "order": 3,
+        "count": 7
+      },
+      {
+        "slug": "server-and-data",
+        "title": "Server and Data",
+        "summary": "",
+        "order": 4,
+        "count": 8
+      },
+      {
+        "slug": "styling-and-ui",
+        "title": "Styling and UI",
+        "summary": "",
+        "order": 5,
+        "count": 9
+      },
+      {
+        "slug": "build-and-tooling",
+        "title": "Build and Tooling",
+        "summary": "",
+        "order": 6,
+        "count": 10
+      },
+      {
+        "slug": "deployment",
+        "title": "Deployment",
+        "summary": "",
+        "order": 7,
         "count": 1
       },
       {
-        "slug": "errors",
-        "title": "Errors",
-        "summary": "Build-time and runtime diagnostics with deterministic fix guidance.",
-        "order": 95,
-        "count": 1
-      },
-      {
-        "slug": "reference",
-        "title": "Reference",
-        "summary": "API and marker references for stable lookup.",
-        "order": 100,
-        "count": 6
-      },
-      {
-        "slug": "root",
-        "title": "Root",
+        "slug": "advanced",
+        "title": "Advanced",
         "summary": "",
-        "order": null,
-        "count": 3
-      },
-      {
-        "slug": "routing",
-        "title": "Routing",
-        "summary": "",
-        "order": null,
-        "count": 3
+        "order": 8,
+        "count": 15
       }
     ]
   },
   "items": [
     {
       "kind": "doc",
-      "slug": "contracts/bundler-contract",
-      "title": "Bundler Contract",
+      "slug": "getting-started",
+      "title": "Getting Started",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "bundler",
-        "determinism"
+        "getting-started",
+        "install",
+        "scaffold"
       ],
-      "source_path": "documentation/contracts/bundler-contract.md",
-      "url": "/docs/contracts/bundler-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
+      "source_path": "documentation/getting-started.md",
+      "url": "/docs/getting-started",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
+      "category_path": [],
+      "category_titles": [],
+      "doc_order": 1,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/compiler-boundary",
-      "title": "Compiler Boundary Contract",
+      "slug": "install-compatibility",
+      "title": "Install and Compatibility",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "compiler",
-        "boundaries"
+        "install",
+        "compatibility",
+        "release"
       ],
-      "source_path": "documentation/contracts/compiler-boundary.md",
-      "url": "/docs/contracts/compiler-boundary",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
+      "source_path": "documentation/install-compatibility.md",
+      "url": "/docs/install-compatibility",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
+      "category_path": [],
+      "category_titles": [],
+      "doc_order": 2,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/component-script-hoisting",
-      "title": "Component Script Hoisting Contract",
+      "slug": "getting-started/project-structure",
+      "title": "Project Structure",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "compiler",
-        "runtime",
-        "components"
+        "getting-started",
+        "project",
+        "routes"
       ],
-      "source_path": "documentation/contracts/component-script-hoisting.md",
-      "url": "/docs/contracts/component-script-hoisting",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
+      "source_path": "documentation/getting-started/project-structure.md",
+      "url": "/docs/getting-started/project-structure",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
       "category_path": [
-        "contracts"
+        "getting-started"
       ],
       "category_titles": [
-        "Contracts"
+        "Start Here"
       ],
-      "doc_order": null,
+      "doc_order": 3,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/config-contract",
-      "title": "Config Contract",
+      "slug": "getting-started/first-page",
+      "title": "Your First Page",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "config",
-        "schema"
+        "getting-started",
+        "pages",
+        "zen"
       ],
-      "source_path": "documentation/contracts/config-contract.md",
-      "url": "/docs/contracts/config-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
+      "source_path": "documentation/getting-started/first-page.md",
+      "url": "/docs/getting-started/first-page",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
       "category_path": [
-        "contracts"
+        "getting-started"
       ],
       "category_titles": [
-        "Contracts"
+        "Start Here"
       ],
-      "doc_order": null,
+      "doc_order": 4,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/core-contract",
-      "title": "Core Contract",
+      "slug": "getting-started/development-workflow",
+      "title": "Development Workflow",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "core",
-        "determinism"
+        "getting-started",
+        "development",
+        "diagnostics"
       ],
-      "source_path": "documentation/contracts/core-contract.md",
-      "url": "/docs/contracts/core-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
+      "source_path": "documentation/getting-started/development-workflow.md",
+      "url": "/docs/getting-started/development-workflow",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
       "category_path": [
-        "contracts"
+        "getting-started"
       ],
       "category_titles": [
-        "Contracts"
+        "Start Here"
       ],
-      "doc_order": null,
+      "doc_order": 5,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/create-contract",
-      "title": "Create Contract",
+      "slug": "getting-started/build-and-preview",
+      "title": "Build and Preview",
+      "status": "canonical",
+      "tags": [
+        "getting-started",
+        "build",
+        "preview"
+      ],
+      "source_path": "documentation/getting-started/build-and-preview.md",
+      "url": "/docs/getting-started/build-and-preview",
+      "category": "getting-started",
+      "category_title": "Getting Started",
+      "category_order": 1,
+      "category_path": [
+        "getting-started"
+      ],
+      "category_titles": [
+        "Start Here"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "zenith-contract",
+      "title": "Zenith Contract",
       "status": "canonical",
       "tags": [
         "contracts",
-        "create-zenith",
-        "scaffolding"
+        "governance",
+        "compiler-first"
       ],
-      "source_path": "documentation/contracts/create-contract.md",
-      "url": "/docs/contracts/create-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
+      "source_path": "documentation/zenith-contract.md",
+      "url": "/docs/zenith-contract",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
+      "category_path": [],
+      "category_titles": [],
+      "doc_order": 1,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -249,515 +248,42 @@
       ],
       "source_path": "documentation/contracts/dsl-syntax.md",
       "url": "/docs/contracts/dsl-syntax",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
       "category_path": [
         "contracts"
       ],
       "category_titles": [
         "Contracts"
       ],
-      "doc_order": null,
+      "doc_order": 2,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "contracts/editor-integration",
-      "title": "Editor Integration Contract",
+      "slug": "components/components-props-and-slots",
+      "title": "Components, Props, and Slots",
       "status": "canonical",
       "tags": [
-        "contracts",
-        "editor",
-        "lsp",
-        "snippets",
-        "diagnostics"
+        "components",
+        "props",
+        "slots"
       ],
-      "source_path": "documentation/contracts/editor-integration.md",
-      "url": "/docs/contracts/editor-integration",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
+      "source_path": "documentation/components/components-props-and-slots.md",
+      "url": "/docs/components/components-props-and-slots",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
       "category_path": [
-        "contracts"
+        "components"
       ],
       "category_titles": [
-        "Contracts"
+        "Components"
       ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/extension-contract",
-      "title": "Extension Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "plugins",
-        "extensions"
-      ],
-      "source_path": "documentation/contracts/extension-contract.md",
-      "url": "/docs/contracts/extension-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/extension-hooks-audit",
-      "title": "Extension Hooks Audit",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "plugins",
-        "extensions",
-        "adapters"
-      ],
-      "source_path": "documentation/contracts/extension-hooks-audit.md",
-      "url": "/docs/contracts/extension-hooks-audit",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/hmr-v1-contract",
-      "title": "HMR V1 Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "hmr",
-        "dev-server",
-        "runtime"
-      ],
-      "source_path": "documentation/contracts/hmr-v1-contract.md",
-      "url": "/docs/contracts/hmr-v1-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/hydration-contract",
-      "title": "Hydration Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "runtime",
-        "hydration"
-      ],
-      "source_path": "documentation/contracts/hydration-contract.md",
-      "url": "/docs/contracts/hydration-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/ir-envelope",
-      "title": "IR Envelope Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "compiler",
-        "ir"
-      ],
-      "source_path": "documentation/contracts/ir-envelope.md",
-      "url": "/docs/contracts/ir-envelope",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/navigation",
-      "title": "Navigation Contract",
-      "status": "canonical",
-      "tags": [
-        "navigation",
-        "routing",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/navigation.md",
-      "url": "/docs/contracts/navigation",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/navigation-lifecycle",
-      "title": "Navigation Lifecycle Contract",
-      "status": "canonical",
-      "tags": [
-        "navigation",
-        "routing",
-        "lifecycle",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/navigation-lifecycle.md",
-      "url": "/docs/contracts/navigation-lifecycle",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/no-magic",
-      "title": "No Magic Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "compiler",
-        "no-magic"
-      ],
-      "source_path": "documentation/contracts/no-magic.md",
-      "url": "/docs/contracts/no-magic",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/props-contract",
-      "title": "Props Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "compiler",
-        "props"
-      ],
-      "source_path": "documentation/contracts/props-contract.md",
-      "url": "/docs/contracts/props-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/router-contract",
-      "title": "Router Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "router",
-        "navigation"
-      ],
-      "source_path": "documentation/contracts/router-contract.md",
-      "url": "/docs/contracts/router-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/routing",
-      "title": "Routing Contract",
-      "status": "canonical",
-      "tags": [
-        "routing",
-        "manifest",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/routing.md",
-      "url": "/docs/contracts/routing",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/runtime-contract",
-      "title": "Runtime Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "runtime"
-      ],
-      "source_path": "documentation/contracts/runtime-contract.md",
-      "url": "/docs/contracts/runtime-contract",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/script-boundary",
-      "title": "Script Boundary Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "bundler",
-        "runtime",
-        "scripts"
-      ],
-      "source_path": "documentation/contracts/script-boundary.md",
-      "url": "/docs/contracts/script-boundary",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/security-drift-gates",
-      "title": "Security and Drift Gates",
-      "status": "canonical",
-      "tags": [
-        "security",
-        "drift-gates",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/security-drift-gates.md",
-      "url": "/docs/contracts/security-drift-gates",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/server-data",
-      "title": "Server Data Contract",
-      "status": "canonical",
-      "tags": [
-        "server",
-        "data",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/server-data.md",
-      "url": "/docs/contracts/server-data",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "contracts/ssr-transport",
-      "title": "SSR Transport Contract",
-      "status": "canonical",
-      "tags": [
-        "ssr",
-        "transport",
-        "contracts"
-      ],
-      "source_path": "documentation/contracts/ssr-transport.md",
-      "url": "/docs/contracts/ssr-transport",
-      "category": "contracts",
-      "category_title": "Contracts",
-      "category_order": 10,
-      "category_path": [
-        "contracts"
-      ],
-      "category_titles": [
-        "Contracts"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "syntax/events",
-      "title": "Events",
-      "status": "canonical",
-      "tags": [
-        "syntax",
-        "events",
-        "dx"
-      ],
-      "source_path": "documentation/syntax/events.md",
-      "url": "/docs/syntax/events",
-      "category": "syntax",
-      "category_title": "Language",
-      "category_order": 20,
-      "category_path": [
-        "syntax"
-      ],
-      "category_titles": [
-        "Language"
-      ],
-      "doc_order": 10,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "syntax/bindings-expressions",
-      "title": "Bindings and Expressions",
-      "status": "canonical",
-      "tags": [
-        "syntax",
-        "bindings",
-        "expressions"
-      ],
-      "source_path": "documentation/syntax/bindings-expressions.md",
-      "url": "/docs/syntax/bindings-expressions",
-      "category": "syntax",
-      "category_title": "Language",
-      "category_order": 20,
-      "category_path": [
-        "syntax"
-      ],
-      "category_titles": [
-        "Language"
-      ],
-      "doc_order": 20,
+      "doc_order": 3,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -774,43 +300,95 @@
       ],
       "source_path": "documentation/reactivity/reactivity-model.md",
       "url": "/docs/reactivity/reactivity-model",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 10,
+      "doc_order": 4,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "reactivity/effects-vs-mount",
-      "title": "zenEffect vs zenMount",
+      "slug": "reference/primitives-patterns",
+      "title": "Primitives and Patterns",
       "status": "canonical",
       "tags": [
-        "reactivity",
-        "effects",
-        "mount",
-        "lifecycle"
+        "reference",
+        "primitives",
+        "patterns",
+        "animations"
       ],
-      "source_path": "documentation/reactivity/effects-vs-mount.md",
-      "url": "/docs/reactivity/effects-vs-mount",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "source_path": "documentation/reference/primitives-patterns.md",
+      "url": "/docs/reference/primitives-patterns",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
       "category_path": [
-        "reactivity"
+        "reference"
       ],
       "category_titles": [
-        "Reactivity"
+        "Reference"
       ],
-      "doc_order": 11,
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "syntax/bindings-expressions",
+      "title": "Bindings and Expressions",
+      "status": "canonical",
+      "tags": [
+        "syntax",
+        "bindings",
+        "expressions"
+      ],
+      "source_path": "documentation/syntax/bindings-expressions.md",
+      "url": "/docs/syntax/bindings-expressions",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
+      "category_path": [
+        "syntax"
+      ],
+      "category_titles": [
+        "Language"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "syntax/events",
+      "title": "Events",
+      "status": "canonical",
+      "tags": [
+        "syntax",
+        "events",
+        "dx"
+      ],
+      "source_path": "documentation/syntax/events.md",
+      "url": "/docs/syntax/events",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
+      "category_path": [
+        "syntax"
+      ],
+      "category_titles": [
+        "Language"
+      ],
+      "doc_order": 7,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -828,16 +406,515 @@
       ],
       "source_path": "documentation/reactivity/dom-and-environment.md",
       "url": "/docs/reactivity/dom-and-environment",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 12,
+      "doc_order": 8,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/effects-vs-mount",
+      "title": "zenEffect vs zenMount",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "effects",
+        "mount",
+        "lifecycle"
+      ],
+      "source_path": "documentation/reactivity/effects-vs-mount.md",
+      "url": "/docs/reactivity/effects-vs-mount",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 9,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reference/reactive-binding-model",
+      "title": "Reactive Binding Model",
+      "status": "canonical",
+      "tags": [
+        "reference",
+        "runtime",
+        "reactivity"
+      ],
+      "source_path": "documentation/reference/reactive-binding-model.md",
+      "url": "/docs/reference/reactive-binding-model",
+      "category": "core-concepts",
+      "category_title": "Core Concepts",
+      "category_order": 2,
+      "category_path": [
+        "reference"
+      ],
+      "category_titles": [
+        "Reference"
+      ],
+      "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/pages-layouts-and-dynamic-routes",
+      "title": "Pages, Layouts, and Dynamic Routes",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "pages",
+        "layouts"
+      ],
+      "source_path": "documentation/routing/pages-layouts-and-dynamic-routes.md",
+      "url": "/docs/routing/pages-layouts-and-dynamic-routes",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 1,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/routing",
+      "title": "Routing Contract",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "manifest",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/routing.md",
+      "url": "/docs/contracts/routing",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 2,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/navigation",
+      "title": "Navigation Contract",
+      "status": "canonical",
+      "tags": [
+        "navigation",
+        "routing",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/navigation.md",
+      "url": "/docs/contracts/navigation",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 3,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/router-contract",
+      "title": "Router Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "router",
+        "navigation"
+      ],
+      "source_path": "documentation/contracts/router-contract.md",
+      "url": "/docs/contracts/router-contract",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 4,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/navigation-lifecycle",
+      "title": "Navigation Lifecycle Contract",
+      "status": "canonical",
+      "tags": [
+        "navigation",
+        "routing",
+        "lifecycle",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/navigation-lifecycle.md",
+      "url": "/docs/contracts/navigation-lifecycle",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reference/zenlink",
+      "title": "ZenLink Reference",
+      "status": "canonical",
+      "tags": [
+        "reference",
+        "navigation",
+        "zenlink"
+      ],
+      "source_path": "documentation/reference/zenlink.md",
+      "url": "/docs/reference/zenlink",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "reference"
+      ],
+      "category_titles": [
+        "Reference"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/navigation-shell",
+      "title": "Navigation Shell",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "navigation",
+        "shell",
+        "transitions"
+      ],
+      "source_path": "documentation/routing/navigation-shell.md",
+      "url": "/docs/routing/navigation-shell",
+      "category": "pages-and-routing",
+      "category_title": "Pages and Routing",
+      "category_order": 3,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 7,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reference/script-server",
+      "title": "Script Server Reference",
+      "status": "canonical",
+      "tags": [
+        "reference",
+        "server",
+        "script-server"
+      ],
+      "source_path": "documentation/reference/script-server.md",
+      "url": "/docs/reference/script-server",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "reference"
+      ],
+      "category_titles": [
+        "Reference"
+      ],
+      "doc_order": 1,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reference/server-data-api",
+      "title": "Server Data API",
+      "status": "canonical",
+      "tags": [
+        "reference",
+        "server",
+        "data"
+      ],
+      "source_path": "documentation/reference/server-data-api.md",
+      "url": "/docs/reference/server-data-api",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "reference"
+      ],
+      "category_titles": [
+        "Reference"
+      ],
+      "doc_order": 2,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/route-protection",
+      "title": "Route Protection (guard/load)",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "security",
+        "guard",
+        "load"
+      ],
+      "source_path": "documentation/routing/route-protection.md",
+      "url": "/docs/routing/route-protection",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 3,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "components/component-server-values",
+      "title": "Component Server Values",
+      "status": "canonical",
+      "tags": [
+        "components",
+        "server",
+        "data",
+        "hydration"
+      ],
+      "source_path": "documentation/components/component-server-values.md",
+      "url": "/docs/components/component-server-values",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "components"
+      ],
+      "category_titles": [
+        "Components"
+      ],
+      "doc_order": 4,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "routing/global-middleware",
+      "title": "Global Middleware",
+      "status": "canonical",
+      "tags": [
+        "routing",
+        "middleware",
+        "server"
+      ],
+      "source_path": "documentation/routing/global-middleware.md",
+      "url": "/docs/routing/global-middleware",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "routing"
+      ],
+      "category_titles": [
+        "Routing"
+      ],
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/server-data",
+      "title": "Server Data Contract",
+      "status": "canonical",
+      "tags": [
+        "server",
+        "data",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/server-data.md",
+      "url": "/docs/contracts/server-data",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/ssr-transport",
+      "title": "SSR Transport Contract",
+      "status": "canonical",
+      "tags": [
+        "ssr",
+        "transport",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/ssr-transport.md",
+      "url": "/docs/contracts/ssr-transport",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 7,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/hydration-contract",
+      "title": "Hydration Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "runtime",
+        "hydration"
+      ],
+      "source_path": "documentation/contracts/hydration-contract.md",
+      "url": "/docs/contracts/hydration-contract",
+      "category": "server-and-data",
+      "category_title": "Server and Data",
+      "category_order": 4,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 8,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/styling-and-public-assets",
+      "title": "Styling and Public Assets",
+      "status": "canonical",
+      "tags": [
+        "styling",
+        "tailwind",
+        "assets"
+      ],
+      "source_path": "documentation/guides/styling-and-public-assets.md",
+      "url": "/docs/guides/styling-and-public-assets",
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 1,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/interactive-demos",
+      "title": "Interactive Demos",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "demos",
+        "interactive"
+      ],
+      "source_path": "documentation/guides/interactive-demos.md",
+      "url": "/docs/guides/interactive-demos",
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 2,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -855,16 +932,16 @@
       ],
       "source_path": "documentation/reactivity/presence.md",
       "url": "/docs/reactivity/presence",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 13,
+      "doc_order": 3,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -883,45 +960,16 @@
       ],
       "source_path": "documentation/reactivity/overlay-sheet-pattern.md",
       "url": "/docs/reactivity/overlay-sheet-pattern",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 14,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reactivity/overlay-sheet-focus-dismissal",
-      "title": "Overlay Sheet: Focus and Dismissal",
-      "status": "canonical",
-      "tags": [
-        "reactivity",
-        "overlay",
-        "sheet",
-        "modal",
-        "focus",
-        "dismissal"
-      ],
-      "source_path": "documentation/reactivity/overlay-sheet-focus-dismissal.md",
-      "url": "/docs/reactivity/overlay-sheet-focus-dismissal",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
-      "category_path": [
-        "reactivity"
-      ],
-      "category_titles": [
-        "Reactivity"
-      ],
-      "doc_order": 15,
+      "doc_order": 4,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -941,16 +989,45 @@
       ],
       "source_path": "documentation/reactivity/overlay-sheet-accessibility.md",
       "url": "/docs/reactivity/overlay-sheet-accessibility",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 16,
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reactivity/overlay-sheet-focus-dismissal",
+      "title": "Overlay Sheet: Focus and Dismissal",
+      "status": "canonical",
+      "tags": [
+        "reactivity",
+        "overlay",
+        "sheet",
+        "modal",
+        "focus",
+        "dismissal"
+      ],
+      "source_path": "documentation/reactivity/overlay-sheet-focus-dismissal.md",
+      "url": "/docs/reactivity/overlay-sheet-focus-dismissal",
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
+      "category_path": [
+        "reactivity"
+      ],
+      "category_titles": [
+        "Reactivity"
+      ],
+      "doc_order": 6,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -970,16 +1047,16 @@
       ],
       "source_path": "documentation/reactivity/overlay-sheet-actions.md",
       "url": "/docs/reactivity/overlay-sheet-actions",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 17,
+      "doc_order": 7,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -999,16 +1076,16 @@
       ],
       "source_path": "documentation/reactivity/overlay-sheet-settings.md",
       "url": "/docs/reactivity/overlay-sheet-settings",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 18,
+      "doc_order": 8,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -1028,16 +1105,300 @@
       ],
       "source_path": "documentation/reactivity/overlay-sheet-styling-cleanup.md",
       "url": "/docs/reactivity/overlay-sheet-styling-cleanup",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "styling-and-ui",
+      "category_title": "Styling and UI",
+      "category_order": 5,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 19,
+      "doc_order": 9,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "cli-contract",
+      "title": "CLI Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "cli",
+        "commands"
+      ],
+      "source_path": "documentation/cli-contract.md",
+      "url": "/docs/cli-contract",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [],
+      "category_titles": [],
+      "doc_order": 1,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/create-contract",
+      "title": "Create Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "create-zenith",
+        "scaffolding"
+      ],
+      "source_path": "documentation/contracts/create-contract.md",
+      "url": "/docs/contracts/create-contract",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 2,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/config-contract",
+      "title": "Config Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "config",
+        "schema"
+      ],
+      "source_path": "documentation/contracts/config-contract.md",
+      "url": "/docs/contracts/config-contract",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 3,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/bundler-contract",
+      "title": "Bundler Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "bundler",
+        "determinism"
+      ],
+      "source_path": "documentation/contracts/bundler-contract.md",
+      "url": "/docs/contracts/bundler-contract",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 4,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/hmr-v1-contract",
+      "title": "HMR V1 Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "hmr",
+        "dev-server",
+        "runtime"
+      ],
+      "source_path": "documentation/contracts/hmr-v1-contract.md",
+      "url": "/docs/contracts/hmr-v1-contract",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/editor-integration",
+      "title": "Editor Integration Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "editor",
+        "lsp",
+        "snippets",
+        "diagnostics"
+      ],
+      "source_path": "documentation/contracts/editor-integration.md",
+      "url": "/docs/contracts/editor-integration",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "errors/index",
+      "title": "Error Reference Index",
+      "status": "canonical",
+      "tags": [
+        "errors",
+        "diagnostics"
+      ],
+      "source_path": "documentation/errors/index.md",
+      "url": "/docs/errors/index",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "errors"
+      ],
+      "category_titles": [
+        "Errors"
+      ],
+      "doc_order": 7,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/common-mistakes",
+      "title": "Common Mistakes",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "troubleshooting",
+        "contracts"
+      ],
+      "source_path": "documentation/guides/common-mistakes.md",
+      "url": "/docs/guides/common-mistakes",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 8,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/troubleshooting",
+      "title": "Troubleshooting Guide",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "troubleshooting",
+        "hydration"
+      ],
+      "source_path": "documentation/guides/troubleshooting.md",
+      "url": "/docs/guides/troubleshooting",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 9,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "reference/markers",
+      "title": "Marker Reference",
+      "status": "canonical",
+      "tags": [
+        "reference",
+        "markers",
+        "runtime"
+      ],
+      "source_path": "documentation/reference/markers.md",
+      "url": "/docs/reference/markers",
+      "category": "build-and-tooling",
+      "category_title": "Build and Tooling",
+      "category_order": 6,
+      "category_path": [
+        "reference"
+      ],
+      "category_titles": [
+        "Reference"
+      ],
+      "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "guides/deployment-targets",
+      "title": "Deployment Targets Guide",
+      "status": "canonical",
+      "tags": [
+        "guides",
+        "deployment",
+        "build"
+      ],
+      "source_path": "documentation/guides/deployment-targets.md",
+      "url": "/docs/guides/deployment-targets",
+      "category": "deployment",
+      "category_title": "Deployment",
+      "category_order": 7,
+      "category_path": [
+        "guides"
+      ],
+      "category_titles": [
+        "Guides"
+      ],
+      "doc_order": 1,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -1054,43 +1415,304 @@
       ],
       "source_path": "documentation/reactivity/controlled-uncontrolled-components.md",
       "url": "/docs/reactivity/controlled-uncontrolled-components",
-      "category": "reactivity",
-      "category_title": "Reactivity",
-      "category_order": 30,
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
       "category_path": [
         "reactivity"
       ],
       "category_titles": [
         "Reactivity"
       ],
-      "doc_order": 20,
+      "doc_order": 1,
       "level": null,
       "hidden": false,
       "prerequisites": []
     },
     {
       "kind": "doc",
-      "slug": "components/component-server-values",
-      "title": "Component Server Values",
+      "slug": "contracts/props-contract",
+      "title": "Props Contract",
       "status": "canonical",
       "tags": [
-        "components",
-        "server",
-        "data",
-        "hydration"
+        "contracts",
+        "compiler",
+        "props"
       ],
-      "source_path": "documentation/components/component-server-values.md",
-      "url": "/docs/components/component-server-values",
-      "category": "components",
-      "category_title": "Components",
-      "category_order": 40,
+      "source_path": "documentation/contracts/props-contract.md",
+      "url": "/docs/contracts/props-contract",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
       "category_path": [
-        "components"
+        "contracts"
       ],
       "category_titles": [
-        "Components"
+        "Contracts"
       ],
-      "doc_order": 20,
+      "doc_order": 2,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/compiler-boundary",
+      "title": "Compiler Boundary Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "compiler",
+        "boundaries"
+      ],
+      "source_path": "documentation/contracts/compiler-boundary.md",
+      "url": "/docs/contracts/compiler-boundary",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 3,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/component-script-hoisting",
+      "title": "Component Script Hoisting Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "compiler",
+        "runtime",
+        "components"
+      ],
+      "source_path": "documentation/contracts/component-script-hoisting.md",
+      "url": "/docs/contracts/component-script-hoisting",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 4,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/core-contract",
+      "title": "Core Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "core",
+        "determinism"
+      ],
+      "source_path": "documentation/contracts/core-contract.md",
+      "url": "/docs/contracts/core-contract",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 5,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/runtime-contract",
+      "title": "Runtime Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "runtime"
+      ],
+      "source_path": "documentation/contracts/runtime-contract.md",
+      "url": "/docs/contracts/runtime-contract",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 6,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/script-boundary",
+      "title": "Script Boundary Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "bundler",
+        "runtime",
+        "scripts"
+      ],
+      "source_path": "documentation/contracts/script-boundary.md",
+      "url": "/docs/contracts/script-boundary",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 7,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/ir-envelope",
+      "title": "IR Envelope Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "compiler",
+        "ir"
+      ],
+      "source_path": "documentation/contracts/ir-envelope.md",
+      "url": "/docs/contracts/ir-envelope",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 8,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/no-magic",
+      "title": "No Magic Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "compiler",
+        "no-magic"
+      ],
+      "source_path": "documentation/contracts/no-magic.md",
+      "url": "/docs/contracts/no-magic",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 9,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/security-drift-gates",
+      "title": "Security and Drift Gates",
+      "status": "canonical",
+      "tags": [
+        "security",
+        "drift-gates",
+        "contracts"
+      ],
+      "source_path": "documentation/contracts/security-drift-gates.md",
+      "url": "/docs/contracts/security-drift-gates",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 10,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/extension-contract",
+      "title": "Extension Contract",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "plugins",
+        "extensions"
+      ],
+      "source_path": "documentation/contracts/extension-contract.md",
+      "url": "/docs/contracts/extension-contract",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 11,
+      "level": null,
+      "hidden": false,
+      "prerequisites": []
+    },
+    {
+      "kind": "doc",
+      "slug": "contracts/extension-hooks-audit",
+      "title": "Extension Hooks Audit",
+      "status": "canonical",
+      "tags": [
+        "contracts",
+        "plugins",
+        "extensions",
+        "adapters"
+      ],
+      "source_path": "documentation/contracts/extension-hooks-audit.md",
+      "url": "/docs/contracts/extension-hooks-audit",
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
+      "category_path": [
+        "contracts"
+      ],
+      "category_titles": [
+        "Contracts"
+      ],
+      "doc_order": 12,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -1108,42 +1730,16 @@
       ],
       "source_path": "documentation/guides/using-ai-with-zenith.md",
       "url": "/docs/guides/using-ai-with-zenith",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
       "category_path": [
         "guides"
       ],
       "category_titles": [
         "Guides"
       ],
-      "doc_order": 30,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "guides/common-mistakes",
-      "title": "Common Mistakes",
-      "status": "canonical",
-      "tags": [
-        "guides",
-        "troubleshooting",
-        "contracts"
-      ],
-      "source_path": "documentation/guides/common-mistakes.md",
-      "url": "/docs/guides/common-mistakes",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
-      "category_path": [
-        "guides"
-      ],
-      "category_titles": [
-        "Guides"
-      ],
-      "doc_order": 40,
+      "doc_order": 13,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -1160,94 +1756,16 @@
       ],
       "source_path": "documentation/guides/cms-unified-site.md",
       "url": "/docs/guides/cms-unified-site",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
       "category_path": [
         "guides"
       ],
       "category_titles": [
         "Guides"
       ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "guides/deployment-targets",
-      "title": "Deployment Targets Guide",
-      "status": "canonical",
-      "tags": [
-        "guides",
-        "deployment",
-        "build"
-      ],
-      "source_path": "documentation/guides/deployment-targets.md",
-      "url": "/docs/guides/deployment-targets",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
-      "category_path": [
-        "guides"
-      ],
-      "category_titles": [
-        "Guides"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "guides/interactive-demos",
-      "title": "Interactive Demos",
-      "status": "canonical",
-      "tags": [
-        "guides",
-        "demos",
-        "interactive"
-      ],
-      "source_path": "documentation/guides/interactive-demos.md",
-      "url": "/docs/guides/interactive-demos",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
-      "category_path": [
-        "guides"
-      ],
-      "category_titles": [
-        "Guides"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "guides/troubleshooting",
-      "title": "Troubleshooting Guide",
-      "status": "canonical",
-      "tags": [
-        "guides",
-        "troubleshooting",
-        "hydration"
-      ],
-      "source_path": "documentation/guides/troubleshooting.md",
-      "url": "/docs/guides/troubleshooting",
-      "category": "guides",
-      "category_title": "Guides",
-      "category_order": 80,
-      "category_path": [
-        "guides"
-      ],
-      "category_titles": [
-        "Guides"
-      ],
-      "doc_order": null,
+      "doc_order": 14,
       "level": null,
       "hidden": false,
       "prerequisites": []
@@ -1264,344 +1782,16 @@
       ],
       "source_path": "documentation/contributing/drift-gates.md",
       "url": "/docs/contributing/drift-gates",
-      "category": "contributing",
-      "category_title": "Contributing",
-      "category_order": 90,
+      "category": "advanced",
+      "category_title": "Advanced",
+      "category_order": 8,
       "category_path": [
         "contributing"
       ],
       "category_titles": [
         "Contributing"
       ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "errors/index",
-      "title": "Error Reference Index",
-      "status": "canonical",
-      "tags": [
-        "errors",
-        "diagnostics"
-      ],
-      "source_path": "documentation/errors/index.md",
-      "url": "/docs/errors/index",
-      "category": "errors",
-      "category_title": "Errors",
-      "category_order": 95,
-      "category_path": [
-        "errors"
-      ],
-      "category_titles": [
-        "Errors"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/markers",
-      "title": "Marker Reference",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "markers",
-        "runtime"
-      ],
-      "source_path": "documentation/reference/markers.md",
-      "url": "/docs/reference/markers",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/primitives-patterns",
-      "title": "Primitives and Patterns",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "primitives",
-        "patterns",
-        "animations"
-      ],
-      "source_path": "documentation/reference/primitives-patterns.md",
-      "url": "/docs/reference/primitives-patterns",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/reactive-binding-model",
-      "title": "Reactive Binding Model",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "runtime",
-        "reactivity"
-      ],
-      "source_path": "documentation/reference/reactive-binding-model.md",
-      "url": "/docs/reference/reactive-binding-model",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/script-server",
-      "title": "Script Server Reference",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "server",
-        "script-server"
-      ],
-      "source_path": "documentation/reference/script-server.md",
-      "url": "/docs/reference/script-server",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/server-data-api",
-      "title": "Server Data API",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "server",
-        "data"
-      ],
-      "source_path": "documentation/reference/server-data-api.md",
-      "url": "/docs/reference/server-data-api",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "reference/zenlink",
-      "title": "ZenLink Reference",
-      "status": "canonical",
-      "tags": [
-        "reference",
-        "navigation",
-        "zenlink"
-      ],
-      "source_path": "documentation/reference/zenlink.md",
-      "url": "/docs/reference/zenlink",
-      "category": "reference",
-      "category_title": "Reference",
-      "category_order": 100,
-      "category_path": [
-        "reference"
-      ],
-      "category_titles": [
-        "Reference"
-      ],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "zenith-contract",
-      "title": "Zenith Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "governance",
-        "compiler-first"
-      ],
-      "source_path": "documentation/zenith-contract.md",
-      "url": "/docs/zenith-contract",
-      "category": "root",
-      "category_title": "Root",
-      "category_order": null,
-      "category_path": [],
-      "category_titles": [],
-      "doc_order": 5,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "cli-contract",
-      "title": "CLI Contract",
-      "status": "canonical",
-      "tags": [
-        "contracts",
-        "cli",
-        "commands"
-      ],
-      "source_path": "documentation/cli-contract.md",
-      "url": "/docs/cli-contract",
-      "category": "root",
-      "category_title": "Root",
-      "category_order": null,
-      "category_path": [],
-      "category_titles": [],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "install-compatibility",
-      "title": "Install and Compatibility",
-      "status": "canonical",
-      "tags": [
-        "install",
-        "compatibility",
-        "release"
-      ],
-      "source_path": "documentation/install-compatibility.md",
-      "url": "/docs/install-compatibility",
-      "category": "root",
-      "category_title": "Root",
-      "category_order": null,
-      "category_path": [],
-      "category_titles": [],
-      "doc_order": null,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "routing/navigation-shell",
-      "title": "Navigation Shell",
-      "status": "canonical",
-      "tags": [
-        "routing",
-        "navigation",
-        "shell",
-        "transitions"
-      ],
-      "source_path": "documentation/routing/navigation-shell.md",
-      "url": "/docs/routing/navigation-shell",
-      "category": "routing",
-      "category_title": "Routing",
-      "category_order": null,
-      "category_path": [
-        "routing"
-      ],
-      "category_titles": [
-        "Routing"
-      ],
-      "doc_order": 42,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "routing/global-middleware",
-      "title": "Global Middleware",
-      "status": "canonical",
-      "tags": [
-        "routing",
-        "middleware",
-        "server"
-      ],
-      "source_path": "documentation/routing/global-middleware.md",
-      "url": "/docs/routing/global-middleware",
-      "category": "routing",
-      "category_title": "Routing",
-      "category_order": null,
-      "category_path": [
-        "routing"
-      ],
-      "category_titles": [
-        "Routing"
-      ],
-      "doc_order": 45,
-      "level": null,
-      "hidden": false,
-      "prerequisites": []
-    },
-    {
-      "kind": "doc",
-      "slug": "routing/route-protection",
-      "title": "Route Protection (guard/load)",
-      "status": "canonical",
-      "tags": [
-        "routing",
-        "security",
-        "guard",
-        "load"
-      ],
-      "source_path": "documentation/routing/route-protection.md",
-      "url": "/docs/routing/route-protection",
-      "category": "routing",
-      "category_title": "Routing",
-      "category_order": null,
-      "category_path": [
-        "routing"
-      ],
-      "category_titles": [
-        "Routing"
-      ],
-      "doc_order": 50,
+      "doc_order": 15,
       "level": null,
       "hidden": false,
       "prerequisites": []

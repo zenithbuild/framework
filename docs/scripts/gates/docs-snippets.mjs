@@ -11,12 +11,12 @@ import {
   parseFrontmatter,
   listMarkdown,
   toRelative,
-  isPublicDocStatus,
   extractCodeFences,
   findForbiddenMatches,
   parseDemoShortcodeIds,
   readDemoRegistry,
 } from "./shared.mjs";
+import { isPublicDocumentationPath } from "../../public-documentation-policy.mjs";
 
 const EXAMPLES_ROOT = path.join(DOCS_ROOT, "examples");
 
@@ -218,17 +218,14 @@ async function main() {
   try {
     for (const fullPath of docsFiles) {
       const rel = toRelative(fullPath);
+      const relToDocs = rel.replace(/^documentation\//, "");
+      if (!isPublicDocumentationPath(relToDocs)) continue;
       const raw = await fs.readFile(fullPath, "utf8");
 
       let parsed;
       try {
         parsed = parseFrontmatter(raw, rel);
       } catch {
-        continue;
-      }
-
-      const status = typeof parsed.meta.status === "string" ? parsed.meta.status.trim() : "";
-      if (!isPublicDocStatus(status)) {
         continue;
       }
 

@@ -3,74 +3,80 @@ Project: Zenith (compiler-first UI)
 Docs: /docs
 
 Start here (ordered):
-- Contracts:
-  - /docs/contracts/bundler-contract
-  - /docs/contracts/compiler-boundary
-  - /docs/contracts/component-script-hoisting
-  - /docs/contracts/config-contract
-  - /docs/contracts/core-contract
-  - /docs/contracts/create-contract
+- Getting Started:
+  - /docs/getting-started
+  - /docs/install-compatibility
+  - /docs/getting-started/project-structure
+  - /docs/getting-started/first-page
+  - /docs/getting-started/development-workflow
+  - /docs/getting-started/build-and-preview
+- Core Concepts:
+  - /docs/zenith-contract
   - /docs/contracts/dsl-syntax
-  - /docs/contracts/editor-integration
-  - /docs/contracts/extension-contract
-  - /docs/contracts/extension-hooks-audit
-  - /docs/contracts/hmr-v1-contract
-  - /docs/contracts/hydration-contract
-  - /docs/contracts/ir-envelope
-  - /docs/contracts/navigation
-  - /docs/contracts/navigation-lifecycle
-  - /docs/contracts/no-magic
-  - /docs/contracts/props-contract
-  - /docs/contracts/router-contract
+  - /docs/components/components-props-and-slots
+  - /docs/reactivity/reactivity-model
+  - /docs/reference/primitives-patterns
+  - /docs/syntax/bindings-expressions
+  - /docs/syntax/events
+  - /docs/reactivity/dom-and-environment
+  - /docs/reactivity/effects-vs-mount
+  - /docs/reference/reactive-binding-model
+- Pages and Routing:
+  - /docs/routing/pages-layouts-and-dynamic-routes
   - /docs/contracts/routing
-  - /docs/contracts/runtime-contract
-  - /docs/contracts/script-boundary
-  - /docs/contracts/security-drift-gates
+  - /docs/contracts/navigation
+  - /docs/contracts/router-contract
+  - /docs/contracts/navigation-lifecycle
+  - /docs/reference/zenlink
+  - /docs/routing/navigation-shell
+- Server and Data:
+  - /docs/reference/script-server
+  - /docs/reference/server-data-api
+  - /docs/routing/route-protection
+  - /docs/components/component-server-values
+  - /docs/routing/global-middleware
   - /docs/contracts/server-data
   - /docs/contracts/ssr-transport
-- Language:
-  - /docs/syntax/events
-  - /docs/syntax/bindings-expressions
-- Reactivity:
-  - /docs/reactivity/reactivity-model
-  - /docs/reactivity/effects-vs-mount
-  - /docs/reactivity/dom-and-environment
+  - /docs/contracts/hydration-contract
+- Styling and UI:
+  - /docs/guides/styling-and-public-assets
+  - /docs/guides/interactive-demos
   - /docs/reactivity/presence
   - /docs/reactivity/overlay-sheet-pattern
-  - /docs/reactivity/overlay-sheet-focus-dismissal
   - /docs/reactivity/overlay-sheet-accessibility
+  - /docs/reactivity/overlay-sheet-focus-dismissal
   - /docs/reactivity/overlay-sheet-actions
   - /docs/reactivity/overlay-sheet-settings
   - /docs/reactivity/overlay-sheet-styling-cleanup
-  - /docs/reactivity/controlled-uncontrolled-components
-- Components:
-  - /docs/components/component-server-values
-- Guides:
-  - /docs/guides/using-ai-with-zenith
-  - /docs/guides/common-mistakes
-  - /docs/guides/cms-unified-site
-  - /docs/guides/deployment-targets
-  - /docs/guides/interactive-demos
-  - /docs/guides/troubleshooting
-- Contributing:
-  - /docs/contributing/drift-gates
-- Errors:
-  - /docs/errors/index
-- Reference:
-  - /docs/reference/markers
-  - /docs/reference/primitives-patterns
-  - /docs/reference/reactive-binding-model
-  - /docs/reference/script-server
-  - /docs/reference/server-data-api
-  - /docs/reference/zenlink
-- Root:
-  - /docs/zenith-contract
+- Build and Tooling:
   - /docs/cli-contract
-  - /docs/install-compatibility
-- Routing:
-  - /docs/routing/navigation-shell
-  - /docs/routing/global-middleware
-  - /docs/routing/route-protection
+  - /docs/contracts/create-contract
+  - /docs/contracts/config-contract
+  - /docs/contracts/bundler-contract
+  - /docs/contracts/hmr-v1-contract
+  - /docs/contracts/editor-integration
+  - /docs/errors/index
+  - /docs/guides/common-mistakes
+  - /docs/guides/troubleshooting
+  - /docs/reference/markers
+- Deployment:
+  - /docs/guides/deployment-targets
+- Advanced:
+  - /docs/reactivity/controlled-uncontrolled-components
+  - /docs/contracts/props-contract
+  - /docs/contracts/compiler-boundary
+  - /docs/contracts/component-script-hoisting
+  - /docs/contracts/core-contract
+  - /docs/contracts/runtime-contract
+  - /docs/contracts/script-boundary
+  - /docs/contracts/ir-envelope
+  - /docs/contracts/no-magic
+  - /docs/contracts/security-drift-gates
+  - /docs/contracts/extension-contract
+  - /docs/contracts/extension-hooks-audit
+  - /docs/guides/using-ai-with-zenith
+  - /docs/guides/cms-unified-site
+  - /docs/contributing/drift-gates
 
 Machine-readable:
 - /ai/docs.manifest.json

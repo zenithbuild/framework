@@ -23,6 +23,11 @@ import {
 } from "./ai-endpoints/content.mjs";
 import { anchorize, buildRss, llmsTxt, sectionChunks, stableJson } from "./ai-endpoints/format.mjs";
 import { parseFrontmatter, parseStructuredBlock } from "./ai-endpoints/frontmatter.mjs";
+import {
+  documentationSectionByTitle,
+  isPublicDocumentationPath,
+  PUBLIC_DOCUMENTATION_STATUS,
+} from "../public-documentation-policy.mjs";
 
 const GENERATED_AT = process.env.GENERATED_AT || "2026-02-22";
 const ROOT = process.cwd();
@@ -104,13 +109,21 @@ function enrichDocRecord(record, categoryMap) {
     topCategorySummary = topCategory.summary;
   }
 
+  const configuredSection = documentationSectionByTitle(asString(record.meta.section));
+  if (configuredSection) {
+    topCategoryOrder = asNumber(record.meta.sectionOrder) ?? configuredSection.order;
+    topCategorySlug = configuredSection.slug;
+    topCategoryTitle = configuredSection.title;
+    topCategorySummary = "";
+  }
+
   const nav = record.meta.nav && typeof record.meta.nav === "object" ? record.meta.nav : {};
   const label = asString(nav.label) || asString(record.meta.nav_label) || asString(record.meta.title);
 
   return {
     ...record,
     doc_stem: strippedDoc.name,
-    doc_order: resolveDocOrder(record.meta, docFile),
+    doc_order: asNumber(record.meta.order) ?? resolveDocOrder(record.meta, docFile),
     hidden: resolveHidden(record.meta),
     level: resolveLevel(record.meta),
     prerequisites: asArray(record.meta.prerequisites),
@@ -148,7 +161,7 @@ function sortPosts(posts) {
 }
 
 function buildDocsNav(sortedDocs) {
-  const canonicalVisibleDocs = sortedDocs.filter((doc) => doc.meta.status === "canonical" && !doc.hidden);
+  const canonicalVisibleDocs = sortedDocs.filter((doc) => doc.meta.status === PUBLIC_DOCUMENTATION_STATUS && !doc.hidden);
   const categoryMap = new Map();
 
   for (const doc of canonicalVisibleDocs) {
@@ -202,6 +215,10 @@ async function buildDocsRecords(categoryMap) {
   for (const fullPath of files) {
     const raw = await fs.readFile(fullPath, "utf8");
     const rel = path.relative(ROOT, fullPath).replace(/\\/g, "/");
+    const docsRelativePath = path.relative(DOCS_ROOT, fullPath).replace(/\\/g, "/");
+    if (!isPublicDocumentationPath(docsRelativePath)) {
+      continue;
+    }
     const slug = slugFromPath(fullPath, DOCS_ROOT);
     let parsed;
     try {
@@ -280,7 +297,7 @@ async function computeOutputs() {
   const jsonlChunks = [];
 
   for (const entry of all) {
-    if (entry.kind === "doc" && entry.meta.status !== "canonical") {
+    if (entry.kind === "doc" && entry.meta.status !== PUBLIC_DOCUMENTATION_STATUS) {
       continue;
     }
     if (entry.kind === "post" && entry.meta.status !== "published") {
