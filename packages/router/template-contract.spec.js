@@ -63,11 +63,39 @@ assert.equal(
 assert.ok(sourceA.includes(`from '${runtimeImport}'`), 'router template must import runtime via provided specifier');
 assert.ok(sourceA.includes(`from '${coreImport}'`), 'router template must import core via provided specifier');
 assert.ok(sourceA.includes('const __ZENITH_MANIFEST__ ='), 'router template must inject __ZENITH_MANIFEST__ constant');
+assert.ok(sourceA.includes('const __ZENITH_ROUTE_MODULES__ ='), 'router template must emit a route importer table');
 assert.ok(sourceA.includes('const __ZENITH_ROUTE_CHECK_ENABLED__ = true;'), 'router template must inline route-check capability');
 assert.ok(sourceA.includes(manifestJson), 'router template must inline provided manifestJson string');
 assert.ok(
-    sourceA.includes('import(__ZENITH_MANIFEST__.chunks[route])'),
-    'router template must use manifest-driven dynamic import shape'
+    sourceA.includes('"/": () => import("/assets/index.aaaaaaa1.js")') &&
+    sourceA.includes('"/about": () => import("/assets/about.bbbbbbb2.js")'),
+    'router template must emit literal dynamic imports for every manifest route'
+);
+assert.equal(
+    sourceA.includes('import(routeModuleSpecifier('),
+    false,
+    'router template must not emit computed route-module imports'
+);
+assert.equal(
+    sourceA.includes('zenith_navigation='),
+    false,
+    'router template must not use query-string cache busting for route modules'
+);
+assert.ok(
+    sourceA.includes('const superseded = !!context.abortReason || !ensureCurrentNavigation(context);'),
+    'router must treat platform-specific aborted fetch errors as superseded navigation'
+);
+assert.ok(
+    sourceA.includes('token below is the authority and discards every stale result'),
+    'router must use its navigation token instead of aborting a reusable in-flight connection'
+);
+assert.ok(
+    sourceA.includes('if (activeDocumentRequest)') && sourceA.includes('activeDocumentRequest === documentRequest'),
+    'router must serialize document requests and let the newest navigation token win'
+);
+assert.ok(
+    sourceA.includes('for (let attempt = 0; attempt < 2; attempt += 1)'),
+    'router must retry one transient current-navigation document fetch failure'
 );
 assert.equal(
     sourceA.includes('import { _dispatchRouteEvent as __zenithDispatchRouteEvent'),

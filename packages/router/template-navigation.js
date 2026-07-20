@@ -254,12 +254,29 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
     }
 
     context.stage = "fetch";
-    const response = await fetch(targetUrl.href, {
-      credentials: "include",
-      headers: { Accept: "text/html,application/xhtml+xml" },
-      redirect: "manual",
-      signal: context.signal
-    });
+    if (activeDocumentRequest) {
+      try { await activeDocumentRequest; } catch {}
+      if (!ensureCurrentNavigation(context)) return false;
+    }
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const documentRequest = fetch(targetUrl.href, {
+          credentials: "include",
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          redirect: "manual",
+          signal: context.signal
+        });
+      activeDocumentRequest = documentRequest;
+      try {
+        response = await documentRequest;
+        break;
+      } catch (error) {
+        if (!ensureCurrentNavigation(context) || attempt === 1) throw error;
+        await nextFrame();
+      } finally {
+        if (activeDocumentRequest === documentRequest) activeDocumentRequest = null;
+      }
+    }
     if (!ensureCurrentNavigation(context)) return false;
 
     if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
@@ -315,7 +332,8 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
 
     return true;
   } catch (error) {
-    if (!isAbortError(error)) {
+    const superseded = !!context.abortReason || !ensureCurrentNavigation(context);
+    if (!superseded && !isAbortError(error)) {
       emitNavigationError(context, {
         reason: "runtime-failure",
         error,

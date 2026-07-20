@@ -27,9 +27,12 @@ const source = renderRouterModule({
 assert.equal(source.includes('.zen'), false, 'router output must not contain .zen');
 assert.equal(source.includes('zenith:'), false, 'router output must not contain zenith:');
 assert.ok(
-  source.includes('import(__ZENITH_MANIFEST__.chunks[route])'),
-  'router output must use manifest-driven dynamic imports'
+  source.includes('"/": () => import("/assets/index.aaaaaaa1.js")') &&
+    source.includes('"/about": () => import("/assets/about.bbbbbbb2.js")'),
+  'router output must use statically analyzable manifest importers'
 );
+assert.equal(source.includes('import(__ZENITH_MANIFEST__.chunks[route])'), false, 'router output must not import a computed chunk lookup');
+assert.equal(source.includes('import(routeModuleSpecifier('), false, 'router output must not import a computed helper result');
 assert.equal(source.includes('\r'), false, 'router output must use \\n newlines');
 
 console.log('contract-scan.mjs passed');

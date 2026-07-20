@@ -16,14 +16,16 @@ const __ZENITH_MANIFEST__ = {
     "/about": "/assets/about.bbbbbbb2.js"
   }
 };
+const __ZENITH_ROUTE_MODULES__ = {
+  "/": () => import("/assets/index.aaaaaaa1.js"),
+  "/about": () => import("/assets/about.bbbbbbb2.js")
+};
 const __ZENITH_ROUTE_CHECK_ENABLED__ = true;
 const __ZENITH_BASE_PATH__ = normalizeBasePath(
   typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
 );
 const __ZENITH_ROUTE_EVENT_KEY = "__zenith_route_event_listeners";
 const __ZENITH_ROUTE_EVENT_NAMES = [
-  "guard:start",
-  "guard:end",
   "route-check:start",
   "route-check:end",
   "route-check:error",
@@ -48,6 +50,7 @@ let activeCleanup = null;
 let navigationToken = 0;
 let activeNavigationController = null;
 let activeNavigationContext = null;
+let activeDocumentRequest = null;
 let currentUrl = null;
 let currentHistoryKey = "";
 let scrollSnapshotQueued = false;
@@ -347,7 +350,11 @@ async function mountRoute(route, params, token, payload) {
   }
 
   try {
-    const pageModule = await import(__ZENITH_MANIFEST__.chunks[route]);
+    const loadRouteModule = __ZENITH_ROUTE_MODULES__[route];
+    if (typeof loadRouteModule !== "function") {
+      throw new Error("Missing route module importer for " + route);
+    }
+    const pageModule = await loadRouteModule();
     if (token !== navigationToken) return false;
     const mountFn = pageModule.__zenith_mount || pageModule.default;
     if (typeof mountFn === "function") {
@@ -370,9 +377,9 @@ function beginNavigation(targetUrl, resolved, navigationType) {
       abortedStage: activeNavigationContext.stage
     };
   }
-  if (activeNavigationController && typeof activeNavigationController.abort === "function") {
-    activeNavigationController.abort();
-  }
+  // Do not abort the previous HTTP request: some browsers tear down its reusable
+  // connection and fail the newest request as well. The monotonic navigation
+  // token below is the authority and discards every stale result at each stage.
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const context = {
     token: navigationToken,
@@ -925,12 +932,29 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
     }
 
     context.stage = "fetch";
-    const response = await fetch(targetUrl.href, {
-      credentials: "include",
-      headers: { Accept: "text/html,application/xhtml+xml" },
-      redirect: "manual",
-      signal: context.signal
-    });
+    if (activeDocumentRequest) {
+      try { await activeDocumentRequest; } catch {}
+      if (!ensureCurrentNavigation(context)) return false;
+    }
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const documentRequest = fetch(targetUrl.href, {
+          credentials: "include",
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          redirect: "manual",
+          signal: context.signal
+        });
+      activeDocumentRequest = documentRequest;
+      try {
+        response = await documentRequest;
+        break;
+      } catch (error) {
+        if (!ensureCurrentNavigation(context) || attempt === 1) throw error;
+        await nextFrame();
+      } finally {
+        if (activeDocumentRequest === documentRequest) activeDocumentRequest = null;
+      }
+    }
     if (!ensureCurrentNavigation(context)) return false;
 
     if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
@@ -986,7 +1010,8 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
 
     return true;
   } catch (error) {
-    if (!isAbortError(error)) {
+    const superseded = !!context.abortReason || !ensureCurrentNavigation(context);
+    if (!superseded && !isAbortError(error)) {
       emitNavigationError(context, {
         reason: "runtime-failure",
         error,

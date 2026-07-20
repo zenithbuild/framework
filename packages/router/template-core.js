@@ -1,4 +1,4 @@
-export function renderRouterCoreSource({ manifest, runtimeSpec, coreSpec, routeCheck = false }) {
+export function renderRouterCoreSource({ manifest, routeModuleImporters, runtimeSpec, coreSpec, routeCheck = false }) {
     return `import { hydrate as __zenithHydrate } from '${runtimeSpec}';
 import { zenOnMount as __zenithOnMount } from '${coreSpec}';
 
@@ -6,6 +6,7 @@ void __zenithHydrate;
 void __zenithOnMount;
 
 const __ZENITH_MANIFEST__ = ${manifest};
+const __ZENITH_ROUTE_MODULES__ = ${routeModuleImporters};
 const __ZENITH_ROUTE_CHECK_ENABLED__ = ${routeCheck ? 'true' : 'false'};
 const __ZENITH_BASE_PATH__ = normalizeBasePath(
   typeof __ZENITH_MANIFEST__.base_path === "string" ? __ZENITH_MANIFEST__.base_path : "/"
@@ -36,6 +37,7 @@ let activeCleanup = null;
 let navigationToken = 0;
 let activeNavigationController = null;
 let activeNavigationContext = null;
+let activeDocumentRequest = null;
 let currentUrl = null;
 let currentHistoryKey = "";
 let scrollSnapshotQueued = false;
@@ -335,7 +337,11 @@ async function mountRoute(route, params, token, payload) {
   }
 
   try {
-    const pageModule = await import(__ZENITH_MANIFEST__.chunks[route]);
+    const loadRouteModule = __ZENITH_ROUTE_MODULES__[route];
+    if (typeof loadRouteModule !== "function") {
+      throw new Error("Missing route module importer for " + route);
+    }
+    const pageModule = await loadRouteModule();
     if (token !== navigationToken) return false;
     const mountFn = pageModule.__zenith_mount || pageModule.default;
     if (typeof mountFn === "function") {
@@ -358,9 +364,9 @@ function beginNavigation(targetUrl, resolved, navigationType) {
       abortedStage: activeNavigationContext.stage
     };
   }
-  if (activeNavigationController && typeof activeNavigationController.abort === "function") {
-    activeNavigationController.abort();
-  }
+  // Do not abort the previous HTTP request: some browsers tear down its reusable
+  // connection and fail the newest request as well. The monotonic navigation
+  // token below is the authority and discards every stale result at each stage.
   const controller = typeof AbortController === "function" ? new AbortController() : null;
   const context = {
     token: navigationToken,

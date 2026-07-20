@@ -125,6 +125,7 @@ async function createTemplateHarness({ includeForm = false } = {}) {
     let count = 1;
     let viewer = 'guest';
     let routeCheckMode = 'allow';
+    let transientGetFailures = 0;
     const fetchCalls = [];
 
     global.fetch = jest.fn(async (input, init = {}) => {
@@ -184,6 +185,10 @@ async function createTemplateHarness({ includeForm = false } = {}) {
         }
 
         if (requestUrl.pathname === '/' && method === 'GET') {
+            if (transientGetFailures > 0) {
+                transientGetFailures -= 1;
+                throw new TypeError('Failed to fetch');
+            }
             return createMockResponse(createHtml({ count, viewer, includeForm }), {
                 status: 200,
                 headers: { 'content-type': 'text/html; charset=utf-8' }
@@ -213,6 +218,9 @@ async function createTemplateHarness({ includeForm = false } = {}) {
         },
         setRouteCheckMode: (value) => {
             routeCheckMode = value;
+        },
+        setTransientGetFailures: (value) => {
+            transientGetFailures = value;
         }
     };
 }
@@ -302,6 +310,18 @@ describe('refreshCurrentRoute runtime bridge', () => {
 
         expect(harness.fetchCalls).toEqual(['GET /__zenith/route-check?path=%2F']);
         expect(harness.getMainText()).toBe('guest:1');
+    });
+
+    test('retries one transient current document fetch without a browser fallback', async () => {
+        harness = await createTemplateHarness();
+
+        harness.setTransientGetFailures(1);
+        await refreshCurrentRoute();
+        await flushRouter();
+
+        expect(harness.getMainText()).toBe('guest:1');
+        expect(console.error).not.toHaveBeenCalled();
+        expect(harness.fetchCalls.filter((call) => call === 'GET /')).toHaveLength(2);
     });
 
     test('preserves deny fallback behavior during refresh', async () => {
