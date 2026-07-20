@@ -1,6 +1,6 @@
 <script lang="ts">
 import Links from "../../ui/Links.zen";
-import ZenithLogo from "../../ui/ZenithLogo.zen";
+import ZenithLogoMark from "@/components/ZenithLogoMark.zen";
 
 interface Props {
   content: any;
@@ -9,74 +9,41 @@ interface Props {
 const footerNavContent = (props as Props).content;
 </script>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 w-full">
-  
-  <div data-footer-nav-group class="flex flex-col gap-6 lg:justify-start">
-    <Links href="/" class="flex items-center gap-2 drop-shadow-sm transition-transform hover:scale-105" ariaLabel="Home">
-      <div class="h-8 w-8 text-foreground">
-        <ZenithLogo />
+<div class="grid w-full grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-5 lg:gap-8">
+  <div class="flex flex-col gap-6 lg:col-span-2">
+    <Links href="/" class="flex w-max items-center gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring" ariaLabel="Zenith home">
+      <div class="h-9 w-9">
+        <ZenithLogoMark />
       </div>
-      <span class="font-[var(--zen-font-heading)] font-semibold text-xl tracking-tight text-foreground">{footerNavContent.nav.brand.label}</span>
+      <span class="font-heading text-xl font-semibold text-foreground">{footerNavContent.nav.brand.label}</span>
     </Links>
-    <p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-      {footerNavContent.nav.brand.description}
-    </p>
+    <p class="max-w-sm text-sm leading-7 text-muted-foreground">{footerNavContent.nav.brand.description}</p>
   </div>
 
-  <div data-footer-nav-group class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[0].title}</h3>
-    <Links href={footerNavContent.nav.groups[0].links[0].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+  <div class="flex flex-col gap-4">
+    <h3 class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{footerNavContent.nav.groups[0].title}</h3>
+    <Links href={footerNavContent.nav.groups[0].links[0].href} class="w-max text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
       {footerNavContent.nav.groups[0].links[0].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
     </Links>
-    <Links href={footerNavContent.nav.groups[0].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+    <Links href={footerNavContent.nav.groups[0].links[1].href} class="w-max text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
       {footerNavContent.nav.groups[0].links[1].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[0].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[0].links[2].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[0].links[3].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[0].links[3].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
     </Links>
   </div>
 
-  <div data-footer-nav-group class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[1].title}</h3>
-    <Links href={footerNavContent.nav.groups[1].links[0].href} target="_blank" rel="noopener noreferrer" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+  <div class="flex flex-col gap-4">
+    <h3 class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{footerNavContent.nav.groups[1].title}</h3>
+    <Links href={footerNavContent.nav.groups[1].links[0].href} class="w-max text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
       {footerNavContent.nav.groups[1].links[0].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
     </Links>
-    <Links href={footerNavContent.nav.groups[1].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+    <Links href={footerNavContent.nav.groups[1].links[1].href} class="w-max text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
       {footerNavContent.nav.groups[1].links[1].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[1].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[1].links[2].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[1].links[3].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[1].links[3].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
     </Links>
   </div>
 
-  <div data-footer-nav-group class="flex flex-col gap-4">
-    <h3 class="text-[10px] font-mono font-semibold text-foreground uppercase tracking-[0.2em] mb-2 opacity-60">{footerNavContent.nav.groups[2].title}</h3>
-    <Links href={footerNavContent.nav.groups[2].links[0].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
+  <div class="flex flex-col gap-4">
+    <h3 class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{footerNavContent.nav.groups[2].title}</h3>
+    <Links href={footerNavContent.nav.groups[2].links[0].href} target="_blank" rel="noopener noreferrer" class="w-max text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
       {footerNavContent.nav.groups[2].links[0].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[2].links[1].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[2].links[1].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
-    </Links>
-    <Links href={footerNavContent.nav.groups[2].links[2].href} class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-block w-max relative group">
-      {footerNavContent.nav.groups[2].links[2].label}
-      <span class="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full"></span>
     </Links>
   </div>
-
 </div>
