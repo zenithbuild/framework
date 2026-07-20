@@ -77,7 +77,7 @@ pub(crate) fn collect_fast_path_vendor_map(
     output_mode: OutputMode,
     base_path: &str,
 ) -> BTreeMap<String, String> {
-    let replacement = crate::bundler_paths::public_asset_path(base_path, &output_mode.vendor_rel(""));
+    let replacement = fast_path_vendor_public_path(output_mode, base_path);
     let mut out = BTreeMap::new();
 
     for input in inputs {
@@ -126,6 +126,13 @@ pub(crate) fn collect_fast_path_vendor_map(
     out
 }
 
+fn fast_path_vendor_public_path(output_mode: OutputMode, base_path: &str) -> String {
+    crate::bundler_paths::public_asset_path(
+        base_path,
+        &format!("assets/{}", output_mode.vendor_rel("")),
+    )
+}
+
 pub(crate) fn derive_fast_path_component_assets(
     inputs: &[BundlerInput],
     changed_routes: &BTreeSet<String>,
@@ -144,4 +151,21 @@ pub(crate) fn derive_fast_path_component_assets(
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fast_path_vendor_stays_under_the_assets_root() {
+        assert_eq!(
+            fast_path_vendor_public_path(OutputMode::DevStable, "/"),
+            "/assets/vendor.dev.js"
+        );
+        assert_eq!(
+            fast_path_vendor_public_path(OutputMode::DevStable, "/docs"),
+            "/docs/assets/vendor.dev.js"
+        );
+    }
 }
