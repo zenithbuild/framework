@@ -1,24 +1,177 @@
 <script server lang="ts">
 import { pageContent, siteContent } from "../../content/index";
+import { createPageMetadata } from "../../content/site/metadata";
+import { loadAboutContent } from "../../server/editorialContentSource";
+import { loadSearchIndex } from "../../server/searchIndexLoader";
 
-export const load = async (_ctx) => {
-    return {
-        pageTitle: pageContent.about.pageTitle,
-        pageDescription: pageContent.about.description,
-        pageContent: pageContent.about,
-        site: {
-            navigation: siteContent.navigation,
-            footer: siteContent.footer,
-        }
-    };
+export const load = async (ctx) => {
+  const page = await loadAboutContent(pageContent.about);
+  const searchIndex = await loadSearchIndex();
+  return ctx.data({
+    page,
+    metadata: createPageMetadata("/about"),
+    searchIndex,
+    site: {
+      navigation: siteContent.navigation,
+      footer: siteContent.footer,
+    },
+  });
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import AboutSurface from "@/components/surfaces/AboutSurface.zen";
+import PageHeader from "@/components/layout/PageHeader.zen";
+import NumberedItem from "@/components/layout/NumberedItem.zen";
+import CodePanel from "@/components/CodePanel.zen";
+import Callout from "@/components/Callout.zen";
+import Links from "@/components/ui/Links.zen";
+import MotionController from "@/components/motion/MotionController.zen";
+
+const aboutPageRootRef = ref<HTMLElement>();
+const aboutWhyRef = ref<HTMLElement>();
+const aboutPrinciplesRef = ref<HTMLElement>();
+const aboutBuiltRef = ref<HTMLElement>();
+const aboutEcosystemRef = ref<HTMLElement>();
+const aboutBuilderRef = ref<HTMLElement>();
+
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <AboutSurface content={data.pageContent} />
+<DefaultLayout title={data.page.pageTitle} description={data.page.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/about" searchIndex={data.searchIndex}>
+  <div ref={aboutPageRootRef} data-page-shell="about" class="bg-background text-foreground">
+    <PageHeader
+      eyebrow={data.page.sections.hero.eyebrow}
+      title={data.page.sections.hero.title}
+      description={data.page.sections.hero.description}
+      asideLabel="Independent and open"
+      asideText="Zenith is a focused open-source framework project, still being built and sharpened in public."
+    />
+
+    <section ref={aboutWhyRef} data-motion-section="about-why" aria-labelledby="why-zenith" class="border-b border-border bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto w-full max-w-7xl">
+        <div class="grid grid-cols-4 gap-x-6 gap-y-10 md:grid-cols-12 lg:gap-x-12">
+          <p class="col-span-4 font-mono text-[10px] uppercase tracking-[0.2em] text-primary md:col-span-3">{data.page.sections.why.eyebrow}</p>
+          <div class="col-span-4 md:col-span-8 md:col-start-4">
+            <h2 id="why-zenith" class="font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl lg:text-7xl">{data.page.sections.why.title}</h2>
+            <p class="mt-7 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{data.page.sections.why.description}</p>
+          </div>
+        </div>
+
+        <div class="mt-16 grid gap-x-8 gap-y-14 border-t border-border pt-12 md:grid-cols-2 lg:gap-x-14">
+          <NumberedItem number={data.page.sections.why.items[0].number} title={data.page.sections.why.items[0].title} description={data.page.sections.why.items[0].description} />
+          <NumberedItem number={data.page.sections.why.items[1].number} title={data.page.sections.why.items[1].title} description={data.page.sections.why.items[1].description} />
+          <NumberedItem number={data.page.sections.why.items[2].number} title={data.page.sections.why.items[2].title} description={data.page.sections.why.items[2].description} />
+          <NumberedItem number={data.page.sections.why.items[3].number} title={data.page.sections.why.items[3].title} description={data.page.sections.why.items[3].description} />
+        </div>
+      </div>
+    </section>
+
+    <section ref={aboutPrinciplesRef} data-motion-section="about-principles" aria-labelledby="principles" class="border-b border-border bg-muted px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-4">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{data.page.sections.principles.eyebrow}</p>
+          <h2 id="principles" class="mt-5 font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl">{data.page.sections.principles.title}</h2>
+          <p class="mt-6 text-base leading-8 text-muted-foreground">{data.page.sections.principles.description}</p>
+        </div>
+
+        <div class="col-span-4 border-t border-border md:col-span-7 md:col-start-6">
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">01</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[0].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[0].description}</p></div>
+          </div>
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">02</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[1].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[1].description}</p></div>
+          </div>
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">03</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[2].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[2].description}</p></div>
+          </div>
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">04</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[3].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[3].description}</p></div>
+          </div>
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">05</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[4].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[4].description}</p></div>
+          </div>
+          <div class="grid gap-5 border-b border-border py-6 sm:grid-cols-[3rem,1fr]">
+            <span class="font-mono text-[10px] text-muted-foreground">06</span>
+            <div><h3 class="font-heading text-2xl font-semibold text-foreground">{data.page.sections.principles.items[5].title}</h3><p class="mt-3 text-sm leading-7 text-muted-foreground">{data.page.sections.principles.items[5].description}</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section ref={aboutBuiltRef} data-motion-section="about-technical" aria-labelledby="built-independently" class="border-b border-border bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto w-full max-w-7xl">
+        <div class="grid grid-cols-4 gap-x-6 gap-y-10 md:grid-cols-12 lg:gap-x-12">
+          <p class="col-span-4 font-mono text-[10px] uppercase tracking-[0.2em] text-primary md:col-span-3">{data.page.sections.built.eyebrow}</p>
+          <div class="col-span-4 md:col-span-8 md:col-start-4">
+            <h2 id="built-independently" class="font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl lg:text-7xl">{data.page.sections.built.title}</h2>
+            <p class="mt-7 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg">{data.page.sections.built.description}</p>
+          </div>
+        </div>
+
+        <div class="mt-14 grid gap-8 lg:grid-cols-[1fr,1.35fr]">
+          <div class="grid border-t border-border">
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[0].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[0].description}</p></div>
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[1].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[1].description}</p></div>
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[2].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[2].description}</p></div>
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[3].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[3].description}</p></div>
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[4].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[4].description}</p></div>
+            <div class="grid gap-4 border-b border-border py-5 sm:grid-cols-[8rem,1fr]"><h3 class="font-heading text-xl font-semibold text-foreground">{data.page.sections.built.parts[5].name}</h3><p class="text-sm leading-7 text-muted-foreground">{data.page.sections.built.parts[5].description}</p></div>
+          </div>
+
+          <CodePanel filename="packages/framework" label="One contract family">
+compiler/
+  parse - validate - emit
+runtime/
+  hydrate - bind - update
+router/
+  match - guard - load
+tooling/
+  diagnose - explain - package
+          </CodePanel>
+        </div>
+      </div>
+    </section>
+
+    <section ref={aboutEcosystemRef} data-motion-section="about-ecosystem" aria-labelledby="ecosystem" class="border-b border-border bg-card px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-4">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{data.page.sections.ecosystem.eyebrow}</p>
+          <h2 id="ecosystem" class="mt-5 font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl">{data.page.sections.ecosystem.title}</h2>
+          <p class="mt-6 text-base leading-8 text-muted-foreground">{data.page.sections.ecosystem.description}</p>
+        </div>
+
+        <div class="col-span-4 grid gap-5 sm:grid-cols-2 md:col-span-7 md:col-start-6">
+          <div class="rounded-lg border border-border bg-background p-6"><p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Core</p><h3 class="mt-5 font-heading text-3xl font-semibold text-foreground">{data.page.sections.ecosystem.items[0].name}</h3><p class="mt-4 text-sm leading-7 text-muted-foreground">{data.page.sections.ecosystem.items[0].description}</p></div>
+          <div class="rounded-lg border border-border bg-background p-6"><p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-blue">Build</p><h3 class="mt-5 font-heading text-3xl font-semibold text-foreground">{data.page.sections.ecosystem.items[1].name}</h3><p class="mt-4 text-sm leading-7 text-muted-foreground">{data.page.sections.ecosystem.items[1].description}</p></div>
+          <div class="rounded-lg border border-border bg-background p-6"><p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-gold">Server</p><h3 class="mt-5 font-heading text-3xl font-semibold text-foreground">{data.page.sections.ecosystem.items[2].name}</h3><p class="mt-4 text-sm leading-7 text-muted-foreground">{data.page.sections.ecosystem.items[2].description}</p></div>
+          <div class="rounded-lg border border-border bg-background p-6"><p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-magenta">Editor</p><h3 class="mt-5 font-heading text-3xl font-semibold text-foreground">{data.page.sections.ecosystem.items[3].name}</h3><p class="mt-4 text-sm leading-7 text-muted-foreground">{data.page.sections.ecosystem.items[3].description}</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section ref={aboutBuilderRef} data-motion-section="about-creator" aria-labelledby="builder-note" class="bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
+      <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">
+        <div class="col-span-4 md:col-span-3">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{data.page.sections.builder.eyebrow}</p>
+          <p class="mt-5 font-heading text-2xl font-semibold text-foreground">{data.page.sections.builder.signature}</p>
+          <p class="mt-1 text-sm text-muted-foreground">{data.page.sections.builder.role}</p>
+        </div>
+        <div class="col-span-4 md:col-span-8 md:col-start-4">
+          <h2 id="builder-note" class="font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl lg:text-7xl">{data.page.sections.builder.title}</h2>
+          <p class="mt-8 max-w-4xl text-xl leading-9 text-muted-foreground sm:text-2xl sm:leading-10">{data.page.sections.builder.text}</p>
+          <div class="mt-10 flex flex-wrap gap-3">
+            <Links href="/docs/getting-started" surface="button" variant="primary" size="lg">Start with the docs</Links>
+            <Links href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" surface="button" variant="outline" size="lg">View the project</Links>
+          </div>
+          <Callout label="Project status" title="Zenith is still being built." description="The framework is developed in public, and the current site describes shipped contracts without presenting unfinished direction as established capability." tone="gold" />
+        </div>
+      </div>
+    </section>
+    <MotionController rootRef={aboutPageRootRef} targetARef={aboutWhyRef} targetBRef={aboutPrinciplesRef} targetCRef={aboutBuiltRef} targetDRef={aboutEcosystemRef} targetERef={aboutBuilderRef} />
+  </div>
 </DefaultLayout>
