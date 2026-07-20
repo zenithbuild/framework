@@ -97,7 +97,14 @@ fn emitted_router_and_runtime_follow_template_contract() {
                 "graph_nodes": [{ "id": "src/pages/index.zen", "hoist_id": "mod_home" }],
                 "html": "<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><main>Home</main></body></html>",
                 "expressions": [],
-                "hoisted": { "imports": [], "declarations": [], "functions": [], "signals": [], "state": [], "code": [] },
+                "hoisted": {
+                    "imports": [],
+                    "declarations": [],
+                    "functions": [],
+                    "signals": [],
+                    "state": [],
+                    "code": ["const __fixture_marker = 1;\nexport {};__zenith_component_bootstraps.push(() => {});"]
+                },
                 "components_scripts": {},
                 "component_instances": [],
                 "imports": [],
@@ -152,13 +159,22 @@ fn emitted_router_and_runtime_follow_template_contract() {
 
     let router_path = from_manifest_path(&out_dir, router_rel);
     let runtime_path = from_manifest_path(&out_dir, runtime_rel);
+    let home_path = from_manifest_path(
+        &out_dir,
+        manifest["chunks"]["/"]
+            .as_str()
+            .expect("manifest home chunk missing"),
+    );
 
     assert!(router_path.exists(), "router asset missing");
     assert!(runtime_path.exists(), "runtime asset missing");
+    assert!(home_path.exists(), "home page asset missing");
 
     let router_source = fs::read_to_string(&router_path).expect("read router asset");
     let runtime_source = fs::read_to_string(&runtime_path).expect("read runtime asset");
+    let home_source = fs::read_to_string(&home_path).expect("read home page asset");
     let router_compact = router_source.split_whitespace().collect::<String>();
+    let home_compact = home_source.split_whitespace().collect::<String>();
 
     let click_start = router_compact
         .find("document.addEventListener(\"click\",")
@@ -232,9 +248,31 @@ fn emitted_router_and_runtime_follow_template_contract() {
         fetch_document != usize::MAX,
         "router must fetch the target document inside the emitted runtime"
     );
+    for route in ["/", "/about"] {
+        let chunk = manifest["chunks"][route]
+            .as_str()
+            .unwrap_or_else(|| panic!("manifest chunk missing for {route}"));
+        let double_quoted = format!("import(\"{chunk}\")");
+        let single_quoted = format!("import('{chunk}')");
+        assert!(
+            router_compact.contains(&double_quoted) || router_compact.contains(&single_quoted),
+            "router must emit a literal dynamic import for {route}: {chunk}"
+        );
+    }
     assert!(
-        router_compact.contains("import(__ZENITH_MANIFEST__.chunks[route])"),
-        "router must use manifest-driven dynamic import shape"
+        !router_compact.contains("import(routeModuleSpecifier(")
+            && !router_compact.contains("import(__ZENITH_MANIFEST__.chunks[route])")
+            && !router_compact.contains("zenith_navigation="),
+        "router route modules must not use computed imports or cache-busting query strings"
+    );
+    assert!(
+        home_compact.contains("function__zenith_create_page_instance()")
+            && home_compact.contains("return__zenith_create_page_instance().mount(root,params)"),
+        "cached route modules must create fresh page bindings for every mount"
+    );
+    assert!(
+        !home_source.contains("export {};"),
+        "TypeScript module markers must not survive inside the page instance factory"
     );
     assert!(
         before_leave < before_swap
