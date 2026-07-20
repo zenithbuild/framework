@@ -1,34 +1,55 @@
 <script server lang="ts">
 import { pageContent, siteContent } from "../../content/index";
+import { createPageMetadata } from "../../content/site/metadata";
+import { createBlogLandingBrowseModel } from "../../server/blogLandingViewModel";
 import { loadBlogIndexSource } from "../../server/postSource";
+import { loadSearchIndex } from "../../server/searchIndexLoader";
 
-export const load = async (_ctx) => {
+export const load = async (ctx) => {
     const blogPageContent = pageContent.blog;
     const blogSource = await loadBlogIndexSource();
+    const blogBrowse = createBlogLandingBrowseModel(blogSource.featuredPost, blogSource.archivePosts);
+    const searchIndex = await loadSearchIndex();
 
-    return {
+    return ctx.data({
         pageTitle: blogPageContent.pageTitle,
         pageDescription: blogPageContent.description,
+        metadata: createPageMetadata("/blog"),
         pageContent: blogPageContent,
         blogSource,
+        blogBrowse,
+        searchIndex,
         site: {
             navigation: siteContent.navigation,
             footer: siteContent.footer,
         }
-    };
+    });
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import BlogLandingSurface from "@/components/surfaces/BlogLandingSurface.zen";
+import BlogLanding from "@/components/BlogLanding.zen";
+import MotionController from "@/components/motion/MotionController.zen";
+import SearchTrigger from "@/components/search/SearchTrigger.zen";
+const blogRootRef = ref<HTMLElement>();
+const blogLandingRef = ref<HTMLElement>();
+
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <BlogLandingSurface
-        content={data.pageContent}
-        featuredPost={data.blogSource.featuredPost}
-        archivePosts={data.blogSource.archivePosts}
-        sourceMode={data.blogSource.sourceMode}
-    />
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/blog" searchIndex={data.searchIndex}>
+    <div ref={blogRootRef} data-motion-section="blog-index">
+      <div ref={blogLandingRef} data-motion-target="true">
+        <BlogLanding
+            content={data.pageContent}
+            featuredPost={data.blogSource.featuredPost}
+            archivePosts={data.blogSource.archivePosts}
+            browseModel={data.blogBrowse}
+        />
+      </div>
+      <MotionController rootRef={blogRootRef} targetARef={blogLandingRef} mode="scroll" />
+    </div>
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <SearchTrigger scope="blog" label="Search blog" variant="inline" />
+    </div>
 </DefaultLayout>

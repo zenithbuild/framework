@@ -1,0 +1,29 @@
+<script lang="ts">
+export interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+  postCount: number;
+}
+
+const incoming = props as Props;
+const blogHeaderEyebrow = incoming.eyebrow || "Zenith Blog";
+const blogHeaderTitle = incoming.title || "Notes from the framework.";
+const blogHeaderDescription = incoming.description || "";
+const blogHeaderPostCount = Number.isFinite(incoming.postCount) ? incoming.postCount : 0;
+const blogHeaderPostCountLabel = `${blogHeaderPostCount} ${blogHeaderPostCount === 1 ? "article" : "articles"}`;
+</script>
+
+<header data-blog-header="true" class="border-b border-border bg-background px-4 pb-12 pt-32 text-foreground sm:px-6 sm:pb-14 lg:px-8 lg:pb-16 lg:pt-40">
+  <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-8 md:grid-cols-12 lg:gap-x-12">
+    <div class="col-span-4 md:col-span-3">
+      <p class="font-mono text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{blogHeaderEyebrow}</p>
+      <p class="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{blogHeaderPostCountLabel}</p>
+    </div>
+
+    <div class="col-span-4 md:col-span-8 md:col-start-4">
+      <h1 data-route-title="true" class="max-w-4xl text-balance font-heading text-5xl font-semibold leading-[0.92] tracking-normal text-foreground sm:text-6xl lg:text-7xl">{blogHeaderTitle}</h1>
+      <p class="mt-6 max-w-2xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{blogHeaderDescription}</p>
+    </div>
+  </div>
+</header>

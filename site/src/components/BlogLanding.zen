@@ -1,0 +1,51 @@
+<script lang="ts">
+import type { BlogPost } from "@/server/postSource";
+import BlogHeader from "@/components/blog/BlogHeader.zen";
+import BlogArchiveBrowser from "@/components/blog/BlogArchiveBrowser.zen";
+import BlogFeaturedArticle from "@/components/blog/BlogFeaturedArticle.zen";
+
+export interface Props {
+  content: any;
+  featuredPost: BlogPost | null;
+  archivePosts: BlogPost[];
+  browseModel?: {
+    articles: BlogPost[];
+    categories: string[];
+    tags: string[];
+  };
+}
+
+const incoming = props as Props;
+const blogContent = incoming.content || {};
+const blogIntro = blogContent.intro || {};
+const blogArchive = blogContent.archive || {};
+const labels = blogContent.labels || {};
+const featuredPost = incoming.featuredPost || null;
+const archivePosts = Array.isArray(incoming.archivePosts) ? incoming.archivePosts : [];
+const browseModel = incoming.browseModel || {
+  articles: featuredPost ? [featuredPost, ...archivePosts] : archivePosts,
+  categories: [],
+  tags: [],
+};
+
+function safeString(value: any): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value.title || value.name || value.label || "";
+  return String(value);
+}
+
+const pageEyebrow = safeString(blogIntro.eyebrow) || "Zenith Blog";
+const pageTitle = safeString(blogIntro.title) || "Notes from the framework.";
+const pageDescription = safeString(blogIntro.description);
+const archiveDescription = safeString(blogArchive.description);
+const featuredLabel = safeString(labels.featuredEyebrow) || "Featured article";
+const featuredActionLabel = safeString(labels.featuredActionLabel) || "Read featured article";
+const articleActionLabel = safeString(labels.postActionLabel) || "Read article";
+</script>
+
+<div data-page-shell="blog" class="bg-background text-foreground">
+  <BlogHeader eyebrow={pageEyebrow} title={pageTitle} description={pageDescription} postCount={browseModel.articles.length} />
+  <BlogArchiveBrowser posts={browseModel.articles} categories={browseModel.categories} tags={browseModel.tags} description={archiveDescription} actionLabel={articleActionLabel} />
+  <BlogFeaturedArticle post={featuredPost} label={featuredLabel} actionLabel={featuredActionLabel} />
+</div>

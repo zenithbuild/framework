@@ -1,14 +1,14 @@
 <script server lang="ts">
-import { siteContent } from "../../content/index";
-import { createContentMetadata } from "../../content/site/metadata";
-import { loadBlogDetailSource } from "../../server/postSource";
-import { loadSearchIndex } from "../../server/searchIndexLoader";
+import { siteContent } from "../../../content/index";
+import { createContentMetadata } from "../../../content/site/metadata";
+import { loadBlogDetailSource } from "../../../server/postSource";
+import { loadSearchIndex } from "../../../server/searchIndexLoader";
 
 export const load = async (ctx) => {
-  const slug = String(ctx.params?.slug || "");
-  const source = await loadBlogDetailSource(slug);
+  const source = await loadBlogDetailSource("building-zenith-0-8");
   if (!source.blogPost) return ctx.deny(404);
   const post = source.blogPost;
+  const searchIndex = await loadSearchIndex();
   const metadata = createContentMetadata({
     path: post.canonicalPath,
     title: post.seoTitle,
@@ -19,7 +19,6 @@ export const load = async (ctx) => {
     updated: post.updatedAt || undefined,
     author: post.author.name,
   });
-  const searchIndex = await loadSearchIndex();
 
   return ctx.data({
     pageTitle: post.title,
@@ -41,8 +40,17 @@ export const load = async (ctx) => {
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
 import BlogArticle from "@/components/BlogArticle.zen";
+import MotionController from "@/components/motion/MotionController.zen";
+const blogRootRef = ref<HTMLElement>();
+const blogArticleRef = ref<HTMLElement>();
+
 </script>
 
 <DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.post.path} searchIndex={data.searchIndex}>
-  <BlogArticle post={data.post} relatedPosts={data.relatedPosts} previousPost={data.previousPost} nextPost={data.nextPost} />
+  <div ref={blogRootRef} data-motion-section="blog-article">
+    <div ref={blogArticleRef} data-motion-target="true">
+      <BlogArticle post={data.post} relatedPosts={data.relatedPosts} previousPost={data.previousPost} nextPost={data.nextPost} />
+    </div>
+    <MotionController rootRef={blogRootRef} targetARef={blogArticleRef} mode="scroll" />
+  </div>
 </DefaultLayout>
