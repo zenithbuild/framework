@@ -609,22 +609,76 @@ function filterFrameworkNoise(items, typedPrefix) {
 }
 
 // src/diagnostics.ts
-import { fileURLToPath } from "node:url";
-import { compile } from "@zenithbuild/compiler";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   DiagnosticSeverity,
   DiagnosticTag
 } from "vscode-languageserver/node.js";
-async function collectDiagnosticsFromSource(source, filePath, strictDomLints) {
-  try {
-    const result = compile({ source, filePath });
-    if (result.schemaVersion !== 1) {
-      return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
+var compilerModulePromises = /* @__PURE__ */ new Map();
+function createDiagnosticsCollector(options = {}) {
+  const loadCompilerModule = options.loadCompiler ?? loadCompiler;
+  let compilerUnavailableReported = false;
+  return async function collectDiagnostics(source, filePath, strictDomLints) {
+    let compile;
+    try {
+      ({ compile } = await loadCompilerModule(filePath));
+      compilerUnavailableReported = false;
+    } catch {
+      if (compilerUnavailableReported) {
+        return [];
+      }
+      compilerUnavailableReported = true;
+      return [compilerUnavailableDiagnostic()];
     }
-    return mapCompilerEnvelopeToDiagnostics(result, strictDomLints);
-  } catch (error) {
-    return [compilerContractDiagnostic(String(error))];
+    try {
+      const result = compile({ source, filePath });
+      if (result.schemaVersion !== 1) {
+        return [compilerContractDiagnostic(`Unsupported compiler schemaVersion: ${String(result.schemaVersion)}`)];
+      }
+      return mapCompilerEnvelopeToDiagnostics(result, strictDomLints);
+    } catch (error) {
+      return [compilerContractDiagnostic(String(error))];
+    }
+  };
+}
+var collectDiagnosticsFromSource = createDiagnosticsCollector();
+async function loadCompiler(filePath) {
+  const workspaceEntry = resolveWorkspaceCompilerEntry(filePath);
+  if (workspaceEntry) {
+    return importCachedCompiler(workspaceEntry, () => importWorkspaceCompiler(workspaceEntry));
   }
+  return importCachedCompiler("package:@zenithbuild/compiler", importBundledCompiler);
+}
+function resolveWorkspaceCompilerEntry(filePath) {
+  const requireFromDocument = createRequire(pathToFileURL(filePath).href);
+  try {
+    return requireFromDocument.resolve("@zenithbuild/compiler");
+  } catch {
+    return void 0;
+  }
+}
+function importCachedCompiler(cacheKey, importer) {
+  const existing = compilerModulePromises.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+  const next = importer().catch((error) => {
+    compilerModulePromises.delete(cacheKey);
+    throw error;
+  });
+  compilerModulePromises.set(cacheKey, next);
+  return next;
+}
+async function importWorkspaceCompiler(compilerEntry) {
+  return import(pathToFileURL(compilerEntry).href).catch(() => importBundledCompiler());
+}
+async function importBundledCompiler() {
+  return import("@zenithbuild/compiler").catch(() => import(pathToFileURL(resolveCompilerFallbackPath()).href));
+}
+function resolveCompilerFallbackPath() {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "compiler", "dist", "index.js");
 }
 function mapCompilerEnvelopeToDiagnostics(result, strictDomLints) {
   const diagnostics = Array.isArray(result.diagnostics) ? result.diagnostics : [];
@@ -715,6 +769,22 @@ function compilerContractDiagnostic(message) {
     }
   };
 }
+function compilerUnavailableDiagnostic() {
+  return {
+    source: "zenith",
+    code: "ZENITH-COMPILER-UNAVAILABLE",
+    message: [
+      "Zenith compiler package is unavailable to the language server.",
+      "Run your package manager install from the workspace root, ensure @zenithbuild/compiler is installed, and restart the editor.",
+      "Build commands are unchanged; this only disables editor diagnostics until the compiler package resolves."
+    ].join(" "),
+    severity: DiagnosticSeverity.Warning,
+    range: {
+      start: { line: 0, character: 0 },
+      end: { line: 0, character: 1 }
+    }
+  };
+}
 
 // src/hover.ts
 import { MarkupKind as MarkupKind2 } from "vscode-languageserver/node.js";
@@ -756,6 +826,8 @@ var SettingsStore = class {
     this.connection = connection;
     this.supportsWorkspaceConfiguration = supportsWorkspaceConfiguration;
   }
+  connection;
+  supportsWorkspaceConfiguration;
   #cache = /* @__PURE__ */ new Map();
   clear(uri) {
     if (uri) {
