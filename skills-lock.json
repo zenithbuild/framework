@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "zenithbuild": {
+      "source": "zenithbuild/framework",
+      "sourceType": "github",
+      "skillPath": "skills/zenithbuild/SKILL.md",
+      "computedHash": "1b155da178e623f1c73c190b270bb9e8dbce1efc67f18ec7d59c67c63fce4184"
+    }
+  }
+}
