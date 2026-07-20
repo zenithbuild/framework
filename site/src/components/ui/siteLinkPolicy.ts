@@ -1,4 +1,11 @@
-export const PROVEN_SOFT_NAV_ROUTE_ENTRIES = ["/", "/about", "/blog", "/changelog", "/docs"] as const;
+export const PROVEN_SOFT_NAV_ROUTE_ENTRIES = [
+  "/",
+  "/about",
+  "/blog",
+  "/blog/building-zenith-0-8",
+  "/docs",
+  "/docs/getting-started",
+] as const;
 
 export type SiteLinkClass =
   | "invalid"

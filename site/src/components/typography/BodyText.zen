@@ -1,0 +1,31 @@
+<script lang="ts">
+interface Props {
+  size?: "lead" | "body" | "small" | "feature";
+  tone?: "primary" | "muted" | "soft";
+  class?: string;
+}
+
+const p = props as Props;
+const size = p.size || "body";
+const tone = p.tone || "muted";
+const className = typeof p.class === "string" ? p.class : "";
+
+const sizeClasses: Record<string, string> = {
+  lead: "text-lg leading-8 md:text-xl md:leading-9",
+  body: "text-base leading-8 md:text-lg",
+  small: "text-sm leading-7",
+  feature: "text-xl leading-9 sm:text-2xl sm:leading-10",
+};
+
+const toneClasses: Record<string, string> = {
+  primary: "text-foreground",
+  muted: "text-muted-foreground",
+  soft: "text-foreground/80",
+};
+
+const textClass = ((sizeClasses[size] || sizeClasses.body) + " " + (toneClasses[tone] || toneClasses.muted) + " " + className).trim();
+</script>
+
+<p class={textClass}>
+  <slot />
+</p>

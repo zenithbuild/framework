@@ -1,0 +1,47 @@
+<script lang="ts">
+import EyebrowLabel from "@/components/typography/EyebrowLabel.zen";
+import BodyText from "@/components/typography/BodyText.zen";
+import MotionGroup from "@/components/motion/MotionGroup.zen";
+
+export interface Props {
+  eyebrow: string;
+  title: string;
+  description: string;
+  asideLabel?: string;
+  asideText?: string;
+}
+
+const incoming = props as Props;
+const pageHeaderEyebrow = incoming.eyebrow || "Zenith";
+const pageHeaderTitle = incoming.title || "Zenith";
+const pageHeaderDescription = incoming.description || "";
+const pageHeaderAsideLabel = incoming.asideLabel || "";
+const pageHeaderAsideText = incoming.asideText || "";
+const pageHeaderRootRef = ref<HTMLElement>();
+const pageHeaderEyebrowRef = ref<HTMLElement>();
+const pageHeaderTitleRef = ref<HTMLElement>();
+const pageHeaderDescriptionRef = ref<HTMLElement>();
+const pageHeaderAsideRef = ref<HTMLElement>();
+</script>
+
+<section ref={pageHeaderRootRef} data-page-header="true" data-motion-page-header="true" class="border-b border-border bg-background px-4 pb-16 pt-32 text-foreground sm:px-6 sm:pb-20 lg:px-8 lg:pb-24 lg:pt-40">
+  <div class="mx-auto grid min-h-[34rem] w-full max-w-7xl grid-cols-4 content-between gap-x-6 gap-y-16 md:grid-cols-12 lg:gap-x-12">
+    <div ref={pageHeaderEyebrowRef} class="col-span-4 md:col-span-3">
+      <EyebrowLabel tone="muted" class="font-medium tracking-[0.18em] text-xs">{pageHeaderEyebrow}</EyebrowLabel>
+    </div>
+
+    <h1 ref={pageHeaderTitleRef} data-route-title="true" class="col-span-4 max-w-5xl text-balance font-heading text-6xl font-semibold leading-[0.88] tracking-normal text-foreground sm:text-7xl md:col-span-9 md:col-start-4 lg:text-8xl xl:text-9xl">
+      {pageHeaderTitle}
+    </h1>
+
+    <div ref={pageHeaderDescriptionRef} class="col-span-4 max-w-2xl md:col-span-6 md:col-start-4">
+      <BodyText size="lead" tone="muted">{pageHeaderDescription}</BodyText>
+    </div>
+
+    <div ref={pageHeaderAsideRef} class="col-span-4 border-l border-border pl-5 md:col-span-3" style={pageHeaderAsideText ? undefined : "display: none;"}>
+      <EyebrowLabel tone="muted">{pageHeaderAsideLabel}</EyebrowLabel>
+      <BodyText size="small" tone="soft" class="mt-3">{pageHeaderAsideText}</BodyText>
+    </div>
+  </div>
+  <MotionGroup rootRef={pageHeaderRootRef} targetARef={pageHeaderEyebrowRef} targetBRef={pageHeaderTitleRef} targetCRef={pageHeaderDescriptionRef} targetDRef={pageHeaderAsideRef} mode="page" />
+</section>

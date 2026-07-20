@@ -1,0 +1,225 @@
+<script setup="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+
+interface Props {
+  rootRef?: any;
+  targetARef?: any;
+  targetBRef?: any;
+  targetCRef?: any;
+  targetDRef?: any;
+  targetERef?: any;
+  targetFRef?: any;
+  mode?: "page" | "scroll";
+  variant?: "default" | "home-precision" | "home-surface" | "home-sponsor" | "home-contributors";
+  distance?: number;
+  duration?: number;
+  stagger?: number;
+  start?: string;
+  onReveal?: () => void;
+}
+
+const incoming = props as Props;
+const fallbackARef = ref<HTMLElement>();
+const fallbackBRef = ref<HTMLElement>();
+const fallbackCRef = ref<HTMLElement>();
+const fallbackDRef = ref<HTMLElement>();
+const fallbackERef = ref<HTMLElement>();
+const fallbackFRef = ref<HTMLElement>();
+const motionTargetARef = incoming.targetARef || fallbackARef;
+const motionTargetBRef = incoming.targetBRef || fallbackBRef;
+const motionTargetCRef = incoming.targetCRef || fallbackCRef;
+const motionTargetDRef = incoming.targetDRef || fallbackDRef;
+const motionTargetERef = incoming.targetERef || fallbackERef;
+const motionTargetFRef = incoming.targetFRef || fallbackFRef;
+const motionMode = incoming.mode === "page" ? "page" : "scroll";
+const motionVariant = incoming.variant || "default";
+const motionDistance = typeof incoming.distance === "number" ? incoming.distance : motionMode === "page" ? 18 : 24;
+const motionDuration = typeof incoming.duration === "number" ? incoming.duration : motionMode === "page" ? 0.68 : 0.72;
+const motionStagger = typeof incoming.stagger === "number" ? incoming.stagger : 0.08;
+const motionStart = typeof incoming.start === "string" ? incoming.start : "top 88%";
+const motionRevealHandler = typeof incoming.onReveal === "function" ? incoming.onReveal : undefined;
+
+const sectionMotion = {
+  title: { duration: 0.78, stagger: 0.024, ease: "power4.out" },
+  copy: { duration: 0.58, stagger: 0.075, ease: "power3.out" },
+  media: { duration: 0.72, stagger: 0.1, ease: "power3.inOut" },
+} as const;
+
+function disposeSplit(split: SplitText | null) {
+  if (!split) return;
+  split.revert();
+  split.kill();
+}
+
+function setMotionState(root: HTMLElement, state: "prepared" | "waiting" | "playing" | "complete" | "fallback") {
+  root.setAttribute("data-motion-ready", state === "fallback" ? "fallback" : "true");
+  root.setAttribute("data-motion-state", state);
+}
+
+function clearMotionStyles(targets: HTMLElement[]) {
+  targets.forEach((target) => {
+    target.style.removeProperty("opacity");
+    target.style.removeProperty("visibility");
+    target.style.removeProperty("transform");
+    target.style.removeProperty("clip-path");
+    target.style.removeProperty("will-change");
+  });
+}
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const doc = zenDocument();
+  const root = incoming.rootRef?.current as HTMLElement | null;
+  const targets = collectRefs(motionTargetARef, motionTargetBRef, motionTargetCRef, motionTargetDRef, motionTargetERef, motionTargetFRef) as HTMLElement[];
+  if (!win || !root || !targets.length) return;
+
+  let titleSplit: SplitText | null = null;
+  let copySplit: SplitText | null = null;
+  let timeline: gsap.core.Timeline | null = null;
+  let context: gsap.Context | null = null;
+  let disposed = false;
+
+  const recover = (error: unknown) => {
+    timeline?.kill();
+    disposeSplit(titleSplit);
+    disposeSplit(copySplit);
+    if (context) context.revert();
+    clearMotionStyles(targets);
+    setMotionState(root, "fallback");
+    win.console?.error("[zenith motion] Section preparation failed; content was revealed.", error);
+  };
+
+  if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    clearMotionStyles(targets);
+    setMotionState(root, "complete");
+    ctx.cleanup(() => clearMotionStyles(targets));
+    return;
+  }
+
+  try {
+    gsap.registerPlugin(ScrollTrigger, SplitText);
+    context = gsap.context(() => {
+      if (motionVariant === "home-precision") {
+        const label = targets[0];
+        const rail = targets[1];
+        if (!label || !rail) throw new Error("PrecisionRail motion targets are missing.");
+        gsap.set(label, { autoAlpha: 0, y: 12, willChange: "transform,opacity" });
+        gsap.set(rail, { autoAlpha: 0, xPercent: 4, clipPath: "inset(0 14% 0 14%)", willChange: "transform,opacity,clip-path" });
+        setMotionState(root, "prepared");
+        timeline = gsap.timeline({
+          scrollTrigger: { trigger: root, start: "top 84%", once: true, invalidateOnRefresh: true },
+          onStart: () => setMotionState(root, "playing"),
+          onComplete: () => { setMotionState(root, "complete"); motionRevealHandler?.(); },
+        })
+          .to(label, { autoAlpha: 1, y: 0, duration: sectionMotion.copy.duration, ease: sectionMotion.copy.ease, clearProps: "willChange" })
+          .to(rail, { autoAlpha: 1, xPercent: 0, clipPath: "inset(0 0% 0 0%)", duration: sectionMotion.media.duration, ease: sectionMotion.media.ease, clearProps: "willChange" }, "<0.1");
+        setMotionState(root, "waiting");
+        return;
+      }
+
+      if (motionVariant === "home-surface") {
+        const title = targets[0];
+        const labels = targets[1];
+        const detail = targets[2];
+        if (!title || !labels || !detail) throw new Error("Framework Surface motion targets are missing.");
+        titleSplit = SplitText.create(title, { type: "words,chars", mask: "chars", aria: "auto", charsClass: "zenith-home-section-char" });
+        gsap.set(titleSplit.chars, { autoAlpha: 0, yPercent: 112, rotationX: -16, willChange: "transform,opacity" });
+        gsap.set(labels, { autoAlpha: 0, y: 12, willChange: "transform,opacity" });
+        gsap.set(detail, { autoAlpha: 0, x: 14, clipPath: "inset(0 0 0 8%)", willChange: "transform,opacity,clip-path" });
+        setMotionState(root, "prepared");
+        timeline = gsap.timeline({
+          scrollTrigger: { trigger: root, start: "top 84%", once: true, invalidateOnRefresh: true },
+          onStart: () => setMotionState(root, "playing"),
+          onComplete: () => setMotionState(root, "complete"),
+        })
+          .to(titleSplit.chars, { autoAlpha: 1, yPercent: 0, rotationX: 0, duration: sectionMotion.title.duration, stagger: sectionMotion.title.stagger, ease: sectionMotion.title.ease, clearProps: "willChange" })
+          .to(labels, { autoAlpha: 1, y: 0, duration: sectionMotion.copy.duration, ease: sectionMotion.copy.ease, clearProps: "willChange" }, "<0.16")
+          .to(detail, { autoAlpha: 1, x: 0, clipPath: "inset(0 0 0 0%)", duration: sectionMotion.media.duration, ease: sectionMotion.media.ease, clearProps: "willChange" }, "<0.1");
+        setMotionState(root, "waiting");
+        return;
+      }
+
+      if (motionVariant !== "default") {
+        const title = targets[0];
+        const copy = targets[1];
+        const first = targets[2];
+        const second = targets[3];
+        const third = targets[4];
+        const fourth = targets[5];
+        if (!title || !copy) throw new Error("Section title or copy target is missing.");
+        titleSplit = SplitText.create(title, { type: "words,chars", mask: "chars", aria: "auto", charsClass: "zenith-home-section-char" });
+        copySplit = SplitText.create(copy, { type: "lines", mask: "lines", aria: "auto", autoSplit: true, linesClass: "zenith-home-section-line" });
+        gsap.set(titleSplit.chars, { autoAlpha: 0, yPercent: 112, rotationX: -16, willChange: "transform,opacity" });
+        gsap.set(copySplit.lines, { autoAlpha: 0, yPercent: 108, willChange: "transform,opacity" });
+        if (motionVariant === "home-sponsor") {
+          if (fourth) gsap.set(fourth, { autoAlpha: 0, y: 10, willChange: "transform,opacity" });
+          if (first) gsap.set(first, { autoAlpha: 0, x: 20, clipPath: "inset(0 100% 0 0)", willChange: "transform,opacity,clip-path" });
+          if (second) gsap.set(second, { autoAlpha: 0, y: 18, willChange: "transform,opacity" });
+          if (third) gsap.set(third, { autoAlpha: 0, y: 14, willChange: "transform,opacity" });
+        }
+        if (motionVariant === "home-contributors") {
+          if (first) gsap.set(first, { autoAlpha: 0, scale: 1.08, clipPath: "inset(0 100% 0 0)", willChange: "transform,opacity,clip-path" });
+          if (second) gsap.set(second, { autoAlpha: 0, y: 12, willChange: "transform,opacity" });
+        }
+        setMotionState(root, "prepared");
+        timeline = gsap.timeline({
+          scrollTrigger: { trigger: root, start: "top 84%", once: true, invalidateOnRefresh: true },
+          onStart: () => setMotionState(root, "playing"),
+          onComplete: () => { setMotionState(root, "complete"); motionRevealHandler?.(); },
+        })
+          .to(titleSplit.chars, { autoAlpha: 1, yPercent: 0, rotationX: 0, duration: sectionMotion.title.duration, stagger: sectionMotion.title.stagger, ease: sectionMotion.title.ease, clearProps: "willChange" })
+          .to(copySplit.lines, { autoAlpha: 1, yPercent: 0, duration: sectionMotion.copy.duration, stagger: sectionMotion.copy.stagger, ease: sectionMotion.copy.ease, clearProps: "willChange" }, "<0.18");
+
+        if (motionVariant === "home-sponsor") {
+          if (fourth) timeline.to(fourth, { autoAlpha: 1, y: 0, duration: 0.44, ease: sectionMotion.copy.ease, clearProps: "willChange" }, 0);
+          if (first) timeline.to(first, { autoAlpha: 1, x: 0, clipPath: "inset(0 0% 0 0)", duration: sectionMotion.media.duration, ease: sectionMotion.media.ease, clearProps: "willChange" }, "<0.12");
+          if (second) timeline.to(second, { autoAlpha: 1, y: 0, duration: sectionMotion.media.duration, ease: sectionMotion.media.ease, clearProps: "willChange" }, "<0.12");
+          if (third) timeline.to(third, { autoAlpha: 1, y: 0, duration: sectionMotion.copy.duration, ease: sectionMotion.copy.ease, clearProps: "willChange" }, "<0.12");
+        }
+        if (motionVariant === "home-contributors") {
+          if (first) timeline.to(first, { autoAlpha: 1, scale: 1, clipPath: "inset(0 0% 0 0)", duration: sectionMotion.media.duration, ease: sectionMotion.media.ease, clearProps: "clipPath,transform,opacity,visibility,willChange" }, "<0.12");
+          if (second) timeline.to(second, { autoAlpha: 1, y: 0, duration: sectionMotion.copy.duration, ease: sectionMotion.copy.ease, clearProps: "willChange" }, "<0.1");
+        }
+        setMotionState(root, "waiting");
+        return;
+      }
+
+      if (motionMode === "page") {
+        targets.forEach((target) => target.setAttribute("data-route-entrance", "true"));
+        gsap.set(targets, { autoAlpha: 0, y: motionDistance, willChange: "transform,opacity" });
+        setMotionState(root, "prepared");
+        timeline = gsap.timeline({ onComplete: () => setMotionState(root, "complete") }).to(targets, { autoAlpha: 1, y: 0, duration: motionDuration, stagger: motionStagger, ease: "power3.out", clearProps: "willChange" });
+        setMotionState(root, "playing");
+        return;
+      }
+
+      gsap.set(targets, { autoAlpha: 0, y: motionDistance, willChange: "transform,opacity" });
+      setMotionState(root, "prepared");
+      timeline = gsap.timeline({
+        scrollTrigger: { trigger: root, start: motionStart, once: true, invalidateOnRefresh: true },
+        onStart: () => setMotionState(root, "playing"),
+        onComplete: () => setMotionState(root, "complete"),
+      }).to(targets, { autoAlpha: 1, y: 0, duration: motionDuration, stagger: motionStagger, ease: "power3.out", clearProps: "willChange" });
+      setMotionState(root, "waiting");
+    }, root);
+  } catch (error) {
+    recover(error);
+    return;
+  }
+
+  ScrollTrigger.refresh();
+  doc?.fonts?.ready.then(() => { if (!disposed) ScrollTrigger.refresh(); });
+  ctx.cleanup(() => {
+    disposed = true;
+    timeline?.kill();
+    disposeSplit(titleSplit);
+    disposeSplit(copySplit);
+    if (context) context.revert();
+    clearMotionStyles(targets);
+  });
+});
+</script>
+
+<span data-motion-controller={motionMode} data-motion-variant={motionVariant} class="hidden" aria-hidden="true"></span>

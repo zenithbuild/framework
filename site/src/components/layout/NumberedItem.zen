@@ -1,0 +1,24 @@
+<script lang="ts">
+export interface Props {
+  number: string;
+  title: string;
+  description: string;
+  class?: string;
+}
+
+const incoming = props as Props;
+const itemNumber = typeof incoming.number === "string" ? incoming.number : "";
+const itemTitle = typeof incoming.title === "string" ? incoming.title : "";
+const itemDescription = typeof incoming.description === "string" ? incoming.description : "";
+const itemClassName = typeof incoming.class === "string" ? incoming.class : "";
+const itemClass = ("flex flex-col gap-8 " + itemClassName).trim();
+</script>
+
+<div class={itemClass}>
+  <h3 class="text-4xl lg:text-5xl font-heading font-semibold uppercase tracking-tighter text-foreground leading-none">
+    {itemNumber}.<br />{itemTitle}
+  </h3>
+  <p class="text-base lg:text-lg text-muted-foreground leading-relaxed">
+    {itemDescription}
+  </p>
+</div>

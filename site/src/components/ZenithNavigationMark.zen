@@ -1,0 +1,9 @@
+<script setup="ts">
+import ZenithLogoMark from "./ZenithLogoMark.zen";
+</script>
+
+<span data-shared-nav-mark="true" class="grid h-full w-full place-items-center rounded-full border border-border bg-card text-foreground shadow-sm shadow-primary/10 transition-colors group-hover:bg-muted">
+  <span class="block h-[70%] w-[70%]">
+    <ZenithLogoMark />
+  </span>
+</span>

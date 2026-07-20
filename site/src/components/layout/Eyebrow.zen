@@ -1,0 +1,16 @@
+<script lang="ts">
+export interface Props {
+  class?: string;
+}
+
+const incoming = props as Props;
+const eyebrowClassName = typeof incoming.class === "string" ? incoming.class : "";
+const eyebrowClass = (
+  "text-sm font-mono tracking-widest uppercase text-muted-foreground " +
+  eyebrowClassName
+).trim();
+</script>
+
+<span class={eyebrowClass}>
+  <slot />
+</span>

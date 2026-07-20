@@ -1,6 +1,4 @@
 <script lang="ts">
-import IconButton from "./IconButton.zen";
-
 const themeToggleRef = ref<HTMLButtonElement>();
 state currentTheme = "light";
 
@@ -57,15 +55,20 @@ zenMount(() => {
 });
 </script>
 
-<IconButton
-  elementRef={themeToggleRef}
+<button
+  ref={themeToggleRef}
   type="button"
-  ariaLabel={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-  ariaPressed={currentTheme === "dark" ? "true" : "false"}
-  class="border border-border bg-muted text-foreground hover:border-ring hover:bg-secondary"
-  onClick={handleToggleClick}
+  data-zen-theme-toggle="true"
+  aria-label={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+  aria-pressed={currentTheme === "dark" ? "true" : "false"}
+  class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-foreground transition-colors duration-200 hover:border-ring hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+  on:click={handleToggleClick}
 >
-  <span class="theme-icon pointer-events-none text-sm transition-transform duration-200" data-zen-theme-icon="true">
-    {currentTheme === "dark" ? "🌙" : "☀️"}
-  </span>
-</IconButton>
+  <svg style={currentTheme === "dark" ? "display: none;" : undefined} class="pointer-events-none h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+  </svg>
+  <svg style={currentTheme === "dark" ? undefined : "display: none;"} class="pointer-events-none h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+  </svg>
+</button>

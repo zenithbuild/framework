@@ -14,6 +14,10 @@ export interface Props {
   ariaControls?: string;
   ariaExpanded?: string;
   ariaPressed?: string;
+  ariaSelected?: string;
+  role?: string;
+  tabIndex?: number;
+  id?: string;
   dataActive?: string;
   onPress?: (event: MouseEvent) => void;
   onClick?: (event: MouseEvent) => void;
@@ -21,6 +25,7 @@ export interface Props {
   onHoverOut?: (event: PointerEvent) => void;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: FocusEvent) => void;
+  onKeyDown?: (event: KeyboardEvent) => void;
   elementRef?: any;
   class?: string;
   contentClass?: string;
@@ -47,6 +52,10 @@ const buttonAriaLabelValue = typeof incoming.ariaLabel === "string" ? incoming.a
 const buttonAriaControlsValue = typeof incoming.ariaControls === "string" ? incoming.ariaControls : undefined;
 const buttonAriaExpandedValue = typeof incoming.ariaExpanded === "string" ? incoming.ariaExpanded : undefined;
 const buttonAriaPressedValue = typeof incoming.ariaPressed === "string" ? incoming.ariaPressed : undefined;
+const buttonAriaSelectedValue = typeof incoming.ariaSelected === "string" ? incoming.ariaSelected : undefined;
+const buttonRoleProp = typeof incoming.role === "string" ? incoming.role : undefined;
+const buttonTabIndexValue = typeof incoming.tabIndex === "number" ? incoming.tabIndex : undefined;
+const buttonIdValue = typeof incoming.id === "string" ? incoming.id : undefined;
 const buttonDataActiveValue = typeof incoming.dataActive === "string" ? incoming.dataActive : undefined;
 const buttonHasHref = buttonHrefValue.length > 0;
 const buttonAriaDisabled = buttonDisabledValue ? "true" : undefined;
@@ -91,7 +100,8 @@ const buttonHoverInHandler = typeof incoming.onHoverIn === "function" ? incoming
 const buttonHoverOutHandler = typeof incoming.onHoverOut === "function" ? incoming.onHoverOut : undefined;
 const buttonFocusHandler = typeof incoming.onFocus === "function" ? incoming.onFocus : undefined;
 const buttonBlurHandler = typeof incoming.onBlur === "function" ? incoming.onBlur : undefined;
-const buttonRoleValue = buttonHasHref ? "link" : undefined;
+const buttonKeyDownHandler = typeof incoming.onKeyDown === "function" ? incoming.onKeyDown : undefined;
+const buttonRoleValue = buttonRoleProp || (buttonHasHref ? "link" : undefined);
 
 function getRootElement() {
   if (forwardedElementRef && forwardedElementRef.current) {
@@ -185,6 +195,10 @@ function handleBlur(event: FocusEvent) {
   }
 }
 
+function handleKeyDown(event: KeyboardEvent) {
+  if (typeof buttonKeyDownHandler === "function") buttonKeyDownHandler(event);
+}
+
 function navigateToHref(event: MouseEvent) {
   if (!buttonHasHref || event.defaultPrevented) return;
   const win = zenWindow();
@@ -225,20 +239,24 @@ zenMount((ctx) => {
   ref={rootRef}
   data-zen-btn
   data-active={buttonDataActiveValue}
+  id={buttonIdValue}
   type={buttonControlType}
   role={buttonRoleValue}
+  tabindex={buttonTabIndexValue}
   disabled={buttonDisabledValue ? true : undefined}
   class={buttonResolvedClass}
   aria-label={buttonAriaLabelValue}
   aria-controls={buttonAriaControlsValue}
   aria-expanded={buttonAriaExpandedValue}
   aria-pressed={buttonAriaPressedValue}
+  aria-selected={buttonAriaSelectedValue}
   aria-disabled={buttonAriaDisabled}
   on:click={handleClick}
   on:hoverin={handleHoverIn}
   on:hoverout={handleHoverOut}
   on:focus={handleFocus}
   on:blur={handleBlur}
+  on:keydown={handleKeyDown}
 >
   <span
     ref={buttonOverlayRef}

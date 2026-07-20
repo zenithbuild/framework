@@ -1,0 +1,16 @@
+<script lang="ts">
+export interface Props {
+  class?: string;
+}
+
+const incoming = props as Props;
+const sectionGridClassName = typeof incoming.class === "string" ? incoming.class : "";
+const sectionGridClass = (
+  "col-span-4 lg:col-span-12 grid grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 " +
+  sectionGridClassName
+).trim();
+</script>
+
+<div class={sectionGridClass}>
+  <slot />
+</div>

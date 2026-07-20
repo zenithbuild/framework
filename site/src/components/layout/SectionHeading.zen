@@ -1,0 +1,16 @@
+<script lang="ts">
+export interface Props {
+  class?: string;
+}
+
+const incoming = props as Props;
+const sectionHeadingClassName = typeof incoming.class === "string" ? incoming.class : "";
+const sectionHeadingClass = (
+  "text-5xl lg:text-8xl font-heading font-semibold uppercase tracking-tighter leading-none text-foreground " +
+  sectionHeadingClassName
+).trim();
+</script>
+
+<h2 class={sectionHeadingClass}>
+  <slot />
+</h2>

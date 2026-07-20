@@ -1,0 +1,24 @@
+<script lang="ts">
+interface Props {
+  tone?: "primary" | "blue" | "gold" | "magenta" | "muted";
+  class?: string;
+}
+
+const p = props as Props;
+const tone = p.tone || "muted";
+const className = typeof p.class === "string" ? p.class : "";
+
+const toneClasses: Record<string, string> = {
+  primary: "text-primary",
+  blue: "text-brand-blue",
+  gold: "text-brand-gold",
+  magenta: "text-brand-magenta",
+  muted: "text-muted-foreground",
+};
+
+const eyebrowClass = ("font-mono text-[10px] uppercase tracking-[0.2em] " + (toneClasses[tone] || toneClasses.muted) + " " + className).trim();
+</script>
+
+<p class={eyebrowClass}>
+  <slot />
+</p>

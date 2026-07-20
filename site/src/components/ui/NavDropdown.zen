@@ -1,0 +1,133 @@
+<script lang="ts">
+import Links from "./Links.zen";
+
+interface Item {
+    label: string;
+    href: string;
+    target?: string;
+    rel?: string;
+    description?: string;
+}
+
+interface Props {
+    label: string;
+    items: readonly Item[];
+    active?: boolean;
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+}
+
+const dropdownProps = props as Props;
+const dropdownActive = dropdownProps.active === true;
+const navDropdownIsControlled = typeof dropdownProps.open === "boolean";
+const navDropdownOpenChange = typeof dropdownProps.onOpenChange === "function" ? dropdownProps.onOpenChange : undefined;
+const ICON_CLASS = "h-3 w-3";
+const ICON_OPEN_CLASS = "h-3 w-3 rotate-180";
+const PANEL_CLASS = "invisible pointer-events-none absolute left-0 top-full z-40 mt-2 w-72 -translate-y-1 rounded-lg border border-border bg-popover p-2 text-popover-foreground opacity-0 shadow-xl transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]";
+const PANEL_OPEN_CLASS = "visible pointer-events-auto absolute left-0 top-full z-40 mt-2 w-72 translate-y-0 rounded-lg border border-border bg-popover p-2 text-popover-foreground opacity-100 shadow-xl transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]";
+const ITEM_CLASS = "block rounded-md px-3 py-2.5 transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const menuId = `nav-dropdown-${dropdownProps.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+const navDropdownRootRef = ref<HTMLElement>();
+const navDropdownTriggerRef = ref<HTMLButtonElement>();
+state navDropdownOpen = navDropdownIsControlled ? dropdownProps.open === true : dropdownProps.defaultOpen === true;
+
+function navDropdownSetOpen(nextOpen: boolean) {
+    if (!navDropdownIsControlled) navDropdownOpen = nextOpen;
+    if (navDropdownIsControlled) navDropdownOpen = dropdownProps.open === true;
+    navDropdownOpenChange?.(nextOpen);
+}
+
+function navDropdownClose() {
+    navDropdownSetOpen(false);
+}
+
+function navDropdownToggle() {
+    navDropdownSetOpen(!navDropdownOpen);
+}
+
+function navDropdownHandleKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !navDropdownOpen) return;
+    event.preventDefault();
+    event.stopPropagation();
+    navDropdownClose();
+    navDropdownTriggerRef.current?.focus();
+}
+
+zenMount((ctx) => {
+    const doc = zenDocument();
+    if (!doc) return;
+    const offPointerDown = zenOn(doc, "pointerdown", (event: PointerEvent) => {
+        const target = event.target as Node | null;
+        if (!target || navDropdownRootRef.current?.contains(target)) return;
+        navDropdownClose();
+    });
+    ctx.cleanup(offPointerDown);
+});
+</script>
+
+<div ref={navDropdownRootRef} data-nav-dropdown-root="true" class="relative" on:keydown={navDropdownHandleKeydown}>
+    <button
+        ref={navDropdownTriggerRef}
+        type="button"
+        data-nav-dropdown-trigger="true"
+        class={dropdownActive ? "flex items-center gap-1 border-b border-primary py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring" : "flex items-center gap-1 border-b border-transparent py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:border-border hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"}
+        aria-expanded={navDropdownOpen ? "true" : "false"}
+        aria-haspopup="menu"
+        aria-controls={menuId}
+        on:click={navDropdownToggle}
+    >
+        {dropdownProps.label}
+        <svg
+            class={navDropdownOpen ? ICON_OPEN_CLASS : ICON_CLASS}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+        >
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+        </svg>
+    </button>
+
+    <div
+        id={menuId}
+        data-nav-dropdown-panel="true"
+        class={navDropdownOpen ? PANEL_OPEN_CLASS : PANEL_CLASS}
+        role="menu"
+        aria-label={dropdownProps.label}
+        inert={navDropdownOpen ? undefined : true}
+    >
+        <Links
+            role="menuitem"
+            href={dropdownProps.items[0].href}
+            target={dropdownProps.items[0].target}
+            rel={dropdownProps.items[0].rel}
+            class={ITEM_CLASS}
+            onClick={navDropdownClose}
+        >
+            <span class="block text-sm font-medium text-foreground">{dropdownProps.items[0].label}</span>
+            <span class="mt-1 block text-xs leading-5 text-muted-foreground">{dropdownProps.items[0].description}</span>
+        </Links>
+        <Links
+            role="menuitem"
+            href={dropdownProps.items[1].href}
+            target={dropdownProps.items[1].target}
+            rel={dropdownProps.items[1].rel}
+            class={ITEM_CLASS}
+            onClick={navDropdownClose}
+        >
+            <span class="block text-sm font-medium text-foreground">{dropdownProps.items[1].label}</span>
+            <span class="mt-1 block text-xs leading-5 text-muted-foreground">{dropdownProps.items[1].description}</span>
+        </Links>
+        <Links
+            role="menuitem"
+            href={dropdownProps.items[2].href}
+            target={dropdownProps.items[2].target}
+            rel={dropdownProps.items[2].rel}
+            class={ITEM_CLASS}
+            onClick={navDropdownClose}
+        >
+            <span class="block text-sm font-medium text-foreground">{dropdownProps.items[2].label}</span>
+            <span class="mt-1 block text-xs leading-5 text-muted-foreground">{dropdownProps.items[2].description}</span>
+        </Links>
+    </div>
+</div>
