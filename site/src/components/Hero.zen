@@ -1,0 +1,26 @@
+<script setup="ts">
+import Links from "@/components/ui/Links.zen";
+import CodeWorkbench from "@/components/home/CodeWorkbench.zen";
+
+interface Props { sectionRef?: any; eyebrowRef?: any; titleRef?: any; descriptionRef?: any; actionsRef?: any; supportRef?: any; }
+const heroProps = props as Props;
+const localSectionRef = ref<HTMLElement>(); const localEyebrowRef = ref<HTMLElement>(); const localTitleRef = ref<HTMLElement>(); const localDescriptionRef = ref<HTMLElement>(); const localActionsRef = ref<HTMLElement>(); const localSupportRef = ref<HTMLElement>();
+const heroSectionRef = heroProps.sectionRef || localSectionRef;
+const heroEyebrowRef = heroProps.eyebrowRef || localEyebrowRef;
+const heroTitleRef = heroProps.titleRef || localTitleRef;
+const heroDescriptionRef = heroProps.descriptionRef || localDescriptionRef;
+const heroActionsRef = heroProps.actionsRef || localActionsRef;
+const heroSupportRef = heroProps.supportRef || localSupportRef;
+</script>
+
+<section ref={heroSectionRef} data-home-hero="true" class="relative overflow-hidden bg-background px-4 pb-10 pt-32 text-foreground sm:px-6 lg:px-8 lg:pt-36">
+  <div class="mx-auto flex min-h-screen w-full max-w-7xl flex-col items-center">
+    <div class="flex flex-col items-center text-center">
+      <p ref={heroEyebrowRef} data-hero-eyebrow="true" class="font-mono text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Build closer to the platform.</p>
+      <h1 ref={heroTitleRef} data-hero-split-title="true" data-route-title="true" class="mt-8 max-w-6xl text-balance font-heading text-[clamp(4rem,11vw,9.5rem)] font-semibold leading-[0.84] tracking-normal text-foreground">Ship Interfaces The Compiler Can Trust.</h1>
+      <p ref={heroDescriptionRef} data-hero-description="true" class="mt-9 max-w-3xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">Zenith keeps routes, state, and UI contracts explicit so teams can ship serious web applications without hiding critical behavior in the browser.</p>
+      <div ref={heroActionsRef} data-hero-actions="true" class="mt-10 flex w-full flex-col items-stretch justify-center gap-4 sm:w-auto sm:flex-row sm:items-center"><Links href="/about" surface="button" size="lg" variant="primary" class="w-full sm:w-auto">Explore Zenith</Links><Links href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" surface="button" size="lg" variant="outline" class="w-full sm:w-auto">View Source</Links></div>
+    </div>
+    <CodeWorkbench sectionRef={heroSupportRef} />
+  </div>
+</section>

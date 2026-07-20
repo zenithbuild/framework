@@ -1,0 +1,67 @@
+<script setup="ts">
+import EyebrowLabel from "@/components/typography/EyebrowLabel.zen";
+import Links from "@/components/ui/Links.zen";
+import MotionGroup from "@/components/motion/MotionGroup.zen";
+import type { SponsorshipContent } from "@/content/models";
+
+const incoming = props as { sponsorship?: SponsorshipContent };
+const sponsorship = incoming.sponsorship || {
+  mode: "invitation",
+  title: "Become Zenith’s first sponsor.",
+  description: "Zenith is built publicly and independently. Sponsorship gives sustained time to the compiler, runtime, documentation, tooling, and the ecosystem work that connects them.",
+  recognitionText: "A prominent place on the Zenith front page, paired with sustained work on the framework’s public foundation.",
+  ctaLabel: "Sponsor Zenith",
+  ctaUrl: "https://github.com/sponsors/zenithbuild",
+  supportingStatements: [],
+};
+const activeSponsor = sponsorship.mode === "sponsor" ? sponsorship.sponsor : null;
+const recognitionName = activeSponsor ? activeSponsor.name : "Your name here";
+const recognitionBadge = activeSponsor ? "Featured sponsor" : "First sponsor";
+const recognitionStatus = activeSponsor ? "Active / 01" : "Reserved / 01";
+const supportStatements = sponsorship.supportingStatements || [];
+
+const sponsorRootRef = ref<HTMLElement>();
+const sponsorEyebrowRef = ref<HTMLElement>();
+const sponsorTitleRef = ref<HTMLElement>();
+const sponsorCopyRef = ref<HTMLElement>();
+const sponsorFrameRef = ref<HTMLElement>();
+const sponsorCategoriesRef = ref<HTMLElement>();
+const sponsorActionsRef = ref<HTMLElement>();
+</script>
+
+<section ref={sponsorRootRef} data-motion-section="home-sponsorship" data-sponsorship-section="true" data-motion-ready="false" data-motion-state="unprepared" class="relative overflow-hidden bg-background px-6 py-24 text-foreground sm:px-10 lg:px-14 lg:py-32">
+  <div class="mx-auto grid w-full max-w-7xl gap-y-12 lg:grid-cols-12 lg:gap-x-12">
+    <div class="lg:col-span-5 lg:pt-8">
+      <div ref={sponsorEyebrowRef} data-motion-target="true"><EyebrowLabel tone="primary">Support Zenith</EyebrowLabel></div>
+      <h2 ref={sponsorTitleRef} data-motion-target="true" class="mt-6 max-w-xl font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl">{sponsorship.title}</h2>
+      <p ref={sponsorCopyRef} data-motion-target="true" class="mt-8 max-w-md text-base leading-7 text-muted-foreground sm:text-lg">{sponsorship.description}</p>
+      <div ref={sponsorActionsRef} data-motion-target="true" class="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <Links href={sponsorship.ctaUrl} target="_blank" rel="noopener noreferrer" surface="button" variant="primary" size="lg">{sponsorship.ctaLabel}</Links>
+        <Links href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" surface="button" variant="outline" size="lg">View the project</Links>
+      </div>
+    </div>
+
+    <div ref={sponsorFrameRef} data-motion-target="true" data-sponsor-recognition="true" class="relative overflow-hidden border border-primary/55 bg-card text-card-foreground lg:col-span-7">
+      <span aria-hidden="true" class="absolute left-3 top-3 h-4 w-4 border-l border-t border-primary"></span>
+      <span aria-hidden="true" class="absolute bottom-3 right-3 h-4 w-4 border-b border-r border-primary"></span>
+      <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-5 sm:px-8">
+        <span class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Front-page recognition</span>
+        <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{recognitionStatus}</span>
+      </div>
+      <div class="grid min-h-[21rem] gap-8 px-6 py-10 sm:px-8 sm:py-12 md:grid-cols-[8rem,minmax(0,1fr)] md:items-end">
+        <div class="self-start border border-border bg-background px-4 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{recognitionBadge}</div>
+        <div>
+          <p class="font-heading text-4xl font-semibold leading-[0.88] text-foreground sm:text-6xl">{recognitionName}</p>
+          <p class="mt-6 max-w-md text-sm leading-6 text-muted-foreground">{sponsorship.recognitionText}</p>
+        </div>
+      </div>
+      <div ref={sponsorCategoriesRef} data-motion-target="true" class="grid border-t border-border sm:grid-cols-2">
+        <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-4 sm:border-r sm:px-8"><span class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">01 / Compiler</span><span class="text-xs text-muted-foreground">{supportStatements[0] || "authored contracts"}</span></div>
+        <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-4 sm:px-8"><span class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">02 / Runtime</span><span class="text-xs text-muted-foreground">{supportStatements[1] || "browser execution"}</span></div>
+        <div class="flex items-center justify-between gap-4 border-b border-border px-6 py-4 sm:border-b-0 sm:border-r sm:px-8"><span class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">03 / Docs</span><span class="text-xs text-muted-foreground">{supportStatements[2] || "clear adoption"}</span></div>
+        <div class="flex items-center justify-between gap-4 px-6 py-4 sm:px-8"><span class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">04 / Tooling</span><span class="text-xs text-muted-foreground">{supportStatements[3] || "developer flow"}</span></div>
+      </div>
+    </div>
+  </div>
+  <MotionGroup rootRef={sponsorRootRef} targetARef={sponsorTitleRef} targetBRef={sponsorCopyRef} targetCRef={sponsorFrameRef} targetDRef={sponsorCategoriesRef} targetERef={sponsorActionsRef} targetFRef={sponsorEyebrowRef} variant="home-sponsor" />
+</section>

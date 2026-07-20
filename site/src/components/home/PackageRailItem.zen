@@ -1,0 +1,18 @@
+<script lang="ts">
+interface Props {
+  name: string;
+  category: string;
+  detail: string;
+}
+
+const item = props as Props;
+</script>
+
+<li class="flex w-[18rem] shrink-0 flex-col gap-4 border-x border-border/70 px-6 py-5 sm:w-[22rem] sm:px-8">
+  <div class="flex items-center justify-between gap-4">
+    <span class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{item.category}</span>
+    <span class="h-1.5 w-1.5 rounded-full bg-foreground/35"></span>
+  </div>
+  <p class="font-mono text-sm font-semibold tracking-[-0.04em] text-foreground sm:text-base">{item.name}</p>
+  <p class="text-sm leading-6 text-muted-foreground">{item.detail}</p>
+</li>

@@ -1,48 +1,54 @@
 <script server lang="ts">
 import { pageContent, siteContent } from "../content/index";
-import { getContributors, type Contributor } from "../server/github";
+import { createPageMetadata } from "../content/site/metadata";
+import { loadEditorialContentSnapshot } from "../server/editorialContentSource";
+import { loadSearchIndex } from "../server/searchIndexLoader";
 
-interface PageProps {
-    page: typeof pageContent.index;
-    site: {
-        navigation: typeof siteContent.navigation;
-        footer: typeof siteContent.footer;
-    };
-    contributors: Contributor[];
-}
-
-export const load = async (_ctx) => {
-    const contributors = await getContributors();
-    
-    return {
+export const load = async (ctx) => {
+    const searchIndex = await loadSearchIndex();
+    return ctx.data({
         page: pageContent.index,
+        metadata: createPageMetadata("/"),
+        editorial: loadEditorialContentSnapshot(),
+        searchIndex,
         site: {
             navigation: siteContent.navigation,
             footer: siteContent.footer,
-        },
-        contributors,
-    };
+        }
+    });
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import HomeHero from "@/components/sections/home/HomeHero.zen";
-import HomeIdentity from "@/components/sections/home/HomeIdentity.zen";
-import HomePrinciples from "@/components/sections/home/HomePrinciples.zen";
-import HomeProof from "@/components/sections/home/HomeProof.zen";
-import HomeContributors from "@/components/sections/home/HomeContributors.zen";
-import HomeSponsors from "@/components/sections/home/HomeSponsors.zen";
+import Hero from "@/components/Hero.zen";
+import AboutSection from "@/components/AboutSection.zen";
+import PrecisionRail from "@/components/PrecisionRail.zen";
+import FeatureShowcase from "@/components/FeatureShowcase.zen";
+import ContributorsSection from "@/components/ContributorsSection.zen";
+
+const heroEyebrowRef = ref<HTMLElement>();
+const heroTitleRef = ref<HTMLElement>();
+const heroDescriptionRef = ref<HTMLElement>();
+const heroActionsRef = ref<HTMLElement>();
+const heroSupportRef = ref<HTMLElement>();
 </script>
 
-<DefaultLayout title={data.page.title} description={data.page.description} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <!-- Content Grid -->
-    <div class="relative z-10 grid w-full grid-cols-4 lg:grid-cols-12 gap-x-6 lg:gap-x-12 px-6 lg:px-12 py-12 lg:py-24">
-        <HomeHero />
-        <HomeIdentity />
-        <HomePrinciples />
-        <HomeProof />
-        <HomeContributors contributors={data.contributors} />
-        <HomeSponsors />
+<DefaultLayout title={data.page.title} description={data.page.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/" introEnabled={true} searchIndex={data.searchIndex} heroEyebrowRef={heroEyebrowRef} heroTitleRef={heroTitleRef} heroDescriptionRef={heroDescriptionRef} heroActionsRef={heroActionsRef} heroSupportRef={heroSupportRef}>
+    <style>
+        html[data-zenith-intro-state="pending"] [data-nav-shell],
+        html[data-zenith-intro-state="pending"] main,
+        html[data-zenith-intro-state="pending"] footer {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+    </style>
+    <div data-home-content-shell="true" class="relative z-10 bg-background text-foreground">
+        <Hero eyebrowRef={heroEyebrowRef} titleRef={heroTitleRef} descriptionRef={heroDescriptionRef} actionsRef={heroActionsRef} supportRef={heroSupportRef} />
+        <AboutSection />
+        <PrecisionRail />
+        <FeatureShowcase sponsorship={data.editorial.sponsorship} />
+        <ContributorsSection people={data.editorial.people} />
     </div>
 </DefaultLayout>
