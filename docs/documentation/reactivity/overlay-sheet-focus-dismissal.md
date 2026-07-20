@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "overlay", "sheet", "modal", "focus", "dismissal"]
 nav:
   order: 15
+section: "Styling and UI"
+sectionOrder: 5
+order: 6
 ---
 
 # Overlay Sheet: Focus and Dismissal

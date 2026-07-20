@@ -5,6 +5,9 @@ version: "0.5"
 status: "canonical"
 last_updated: "2026-03-12"
 tags: ["contracts", "router", "navigation"]
+section: "Pages and Routing"
+sectionOrder: 3
+order: 4
 ---
 
 # Router Contract

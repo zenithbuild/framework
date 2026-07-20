@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "overlay", "sheet", "modal", "accessibility", "aria"]
 nav:
   order: 16
+section: "Styling and UI"
+sectionOrder: 5
+order: 5
 ---
 
 # Overlay Sheet: Accessibility

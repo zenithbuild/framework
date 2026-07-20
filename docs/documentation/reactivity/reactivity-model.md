@@ -7,6 +7,9 @@ last_updated: "2026-02-27"
 tags: ["reactivity", "state", "scope"]
 nav:
   order: 10
+section: "Core Concepts"
+sectionOrder: 2
+order: 4
 ---
 
 # Reactivity Model

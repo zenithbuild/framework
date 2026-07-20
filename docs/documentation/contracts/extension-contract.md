@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-06-07"
 tags: ["contracts", "plugins", "extensions"]
+section: "Advanced"
+sectionOrder: 8
+order: 11
 ---
 
 # Extension Contract

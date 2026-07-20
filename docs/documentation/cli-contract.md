@@ -5,6 +5,9 @@ version: "0.5"
 status: "canonical"
 last_updated: "2026-06-07"
 tags: ["contracts", "cli", "commands"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 1
 ---
 
 # CLI Contract

@@ -7,6 +7,9 @@ last_updated: "2026-05-25"
 tags: ["routing", "security", "guard", "load"]
 nav:
   order: 50
+section: "Server and Data"
+sectionOrder: 4
+order: 3
 ---
 
 # Route Protection

@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-03-02"
 tags: ["contracts", "create-zenith", "scaffolding"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 2
 ---
 
 # Create Contract

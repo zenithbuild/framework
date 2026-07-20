@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "overlay", "sheet", "modal", "actions", "confirmation"]
 nav:
   order: 17
+section: "Styling and UI"
+sectionOrder: 5
+order: 7
 ---
 
 # Overlay Sheet: Actions

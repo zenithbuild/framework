@@ -5,6 +5,9 @@ version: "0.1"
 status: "canonical"
 last_updated: "2026-06-07"
 tags: ["contracts", "plugins", "extensions", "adapters"]
+section: "Advanced"
+sectionOrder: 8
+order: 12
 ---
 
 # Extension Hooks Audit

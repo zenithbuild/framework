@@ -5,6 +5,9 @@ version: "0.5"
 status: "canonical"
 last_updated: "2026-07-03"
 tags: ["install", "compatibility", "release"]
+section: "Getting Started"
+sectionOrder: 1
+order: 2
 ---
 
 # Install and Compatibility

@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["security", "drift-gates", "contracts"]
+section: "Advanced"
+sectionOrder: 8
+order: 10
 ---
 
 # Security and Drift Gates

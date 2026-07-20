@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["dsl", "syntax", "events", "contracts"]
+section: "Core Concepts"
+sectionOrder: 2
+order: 2
 ---
 
 # DSL Syntax Contract

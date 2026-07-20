@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["guides", "demos", "interactive"]
+section: "Styling and UI"
+sectionOrder: 5
+order: 2
 ---
 
 # Interactive Demos

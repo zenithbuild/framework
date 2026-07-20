@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "presence", "transitions", "runtime"]
 nav:
   order: 13
+section: "Styling and UI"
+sectionOrder: 5
+order: 3
 ---
 
 # Presence

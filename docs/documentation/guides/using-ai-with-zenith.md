@@ -7,6 +7,9 @@ last_updated: "2026-05-25"
 tags: ["guides", "ai", "workflow", "contracts"]
 nav:
   order: 30
+section: "Advanced"
+sectionOrder: 8
+order: 13
 ---
 
 # Using AI with Zenith

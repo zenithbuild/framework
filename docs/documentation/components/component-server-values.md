@@ -7,6 +7,9 @@ last_updated: "2026-06-01"
 tags: ["components", "server", "data", "hydration"]
 nav:
   order: 20
+section: "Server and Data"
+sectionOrder: 4
+order: 4
 ---
 
 # Component Server Values

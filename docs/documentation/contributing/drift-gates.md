@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["contributing", "ci", "drift-gates"]
+section: "Advanced"
+sectionOrder: 8
+order: 15
 ---
 
 # Drift Gates

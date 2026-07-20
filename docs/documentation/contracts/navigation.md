@@ -5,6 +5,9 @@ version: "0.6"
 status: "canonical"
 last_updated: "2026-03-30"
 tags: ["navigation", "routing", "contracts"]
+section: "Pages and Routing"
+sectionOrder: 3
+order: 3
 ---
 
 # Navigation Contract

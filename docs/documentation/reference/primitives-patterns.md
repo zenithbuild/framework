@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-03-29"
 tags: ["reference", "primitives", "patterns", "animations"]
+section: "Core Concepts"
+sectionOrder: 2
+order: 5
 ---
 
 # Primitives and Patterns

@@ -5,6 +5,9 @@ version: "0.5"
 status: "canonical"
 last_updated: "2026-05-25"
 tags: ["reference", "server", "data"]
+section: "Server and Data"
+sectionOrder: 4
+order: 2
 ---
 
 # Server Data API

@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "compiler", "props"]
+section: "Advanced"
+sectionOrder: 8
+order: 2
 ---
 
 # Props Contract

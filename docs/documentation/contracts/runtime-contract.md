@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-03-29"
 tags: ["contracts", "runtime"]
+section: "Advanced"
+sectionOrder: 8
+order: 6
 ---
 
 # Runtime Contract

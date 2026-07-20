@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-03-12"
 tags: ["reference", "navigation", "zenlink"]
+section: "Pages and Routing"
+sectionOrder: 3
+order: 6
 ---
 
 # ZenLink Reference

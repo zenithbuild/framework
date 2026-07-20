@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["ssr", "transport", "contracts"]
+section: "Server and Data"
+sectionOrder: 4
+order: 7
 ---
 
 # SSR Transport Contract

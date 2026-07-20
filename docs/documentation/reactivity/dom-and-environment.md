@@ -7,6 +7,9 @@ last_updated: "2026-02-28"
 tags: ["reactivity", "dom", "environment", "refs"]
 nav:
   order: 12
+section: "Core Concepts"
+sectionOrder: 2
+order: 8
 ---
 
 # DOM and Environment

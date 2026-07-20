@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["reference", "runtime", "reactivity"]
+section: "Core Concepts"
+sectionOrder: 2
+order: 10
 ---
 
 # Reactive Binding Model

@@ -7,6 +7,9 @@ last_updated: "2026-05-08"
 tags: ["syntax", "events", "dx"]
 nav:
   order: 10
+section: "Core Concepts"
+sectionOrder: 2
+order: 7
 ---
 
 # Events

@@ -5,6 +5,9 @@ version: "0.1"
 status: "canonical"
 last_updated: "2026-03-10"
 tags: ["contracts", "editor", "lsp", "snippets", "diagnostics"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 6
 ---
 
 # Editor Integration Contract

@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "overlay", "sheet", "modal", "settings", "forms"]
 nav:
   order: 18
+section: "Styling and UI"
+sectionOrder: 5
+order: 8
 ---
 
 # Overlay Sheet: Settings

@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "runtime", "hydration"]
+section: "Server and Data"
+sectionOrder: 4
+order: 8
 ---
 
 # Hydration Contract

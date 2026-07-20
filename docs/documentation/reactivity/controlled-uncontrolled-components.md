@@ -7,6 +7,9 @@ last_updated: "2026-02-27"
 tags: ["reactivity", "components", "api-design"]
 nav:
   order: 20
+section: "Advanced"
+sectionOrder: 8
+order: 1
 ---
 
 # Controlled vs Uncontrolled Components

@@ -5,6 +5,9 @@ version: "0.5"
 status: "canonical"
 last_updated: "2026-02-28"
 tags: ["contracts", "hmr", "dev-server", "runtime"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 5
 ---
 
 # HMR V1 Contract

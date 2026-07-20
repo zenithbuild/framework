@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["routing", "navigation", "shell", "transitions"]
 nav:
   order: 42
+section: "Pages and Routing"
+sectionOrder: 3
+order: 7
 ---
 
 # Navigation Shell

@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-05-08"
 tags: ["errors", "diagnostics"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 7
 ---
 
 # Error Reference Index

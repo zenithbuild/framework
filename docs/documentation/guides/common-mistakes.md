@@ -7,6 +7,9 @@ last_updated: "2026-02-27"
 tags: ["guides", "troubleshooting", "contracts"]
 nav:
   order: 40
+section: "Build and Tooling"
+sectionOrder: 6
+order: 8
 ---
 
 # Common Mistakes

@@ -7,6 +7,9 @@ last_updated: "2026-03-29"
 tags: ["reactivity", "effects", "mount", "lifecycle"]
 nav:
   order: 11
+section: "Core Concepts"
+sectionOrder: 2
+order: 9
 ---
 
 # zenEffect vs zenMount

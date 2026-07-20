@@ -7,6 +7,9 @@ last_updated: "2026-02-27"
 tags: ["contracts", "governance", "compiler-first"]
 nav:
   order: 5
+section: "Core Concepts"
+sectionOrder: 2
+order: 1
 ---
 
 # Zenith Contract

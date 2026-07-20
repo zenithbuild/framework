@@ -5,6 +5,9 @@ version: "0.2"
 status: "canonical"
 last_updated: "2026-05-25"
 tags: ["guides", "deployment", "build"]
+section: "Deployment"
+sectionOrder: 7
+order: 1
 ---
 
 # Deployment Targets Guide

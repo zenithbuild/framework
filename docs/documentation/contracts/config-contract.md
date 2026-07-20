@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-05-25"
 tags: ["contracts", "config", "schema"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 3
 ---
 
 # Config Contract

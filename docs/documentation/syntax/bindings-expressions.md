@@ -7,6 +7,9 @@ last_updated: "2026-05-08"
 tags: ["syntax", "bindings", "expressions"]
 nav:
   order: 20
+section: "Core Concepts"
+sectionOrder: 2
+order: 6
 ---
 
 # Bindings and Expressions

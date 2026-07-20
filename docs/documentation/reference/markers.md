@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["reference", "markers", "runtime"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 10
 ---
 
 # Marker Reference
