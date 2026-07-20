@@ -1,0 +1,14 @@
+{
+  "name": "Jonathan Streetman",
+  "profileUrl": "https://github.com/Jstreetman",
+  "avatar": {
+    "src": "https://avatars.githubusercontent.com/u/137229312?v=4",
+    "width": 112,
+    "height": 112,
+    "alt": "Jonathan Streetman"
+  },
+  "member": true,
+  "contributor": true,
+  "active": true,
+  "sortOrder": 20
+}

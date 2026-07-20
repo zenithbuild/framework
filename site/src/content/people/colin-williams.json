@@ -1,0 +1,14 @@
+{
+  "name": "Colin Williams",
+  "profileUrl": "https://github.com/colinwilliams91",
+  "avatar": {
+    "src": "https://avatars.githubusercontent.com/u/92059005?v=4",
+    "width": 112,
+    "height": 112,
+    "alt": "Colin Williams"
+  },
+  "member": true,
+  "contributor": true,
+  "active": true,
+  "sortOrder": 30
+}

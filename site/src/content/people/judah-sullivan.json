@@ -1,0 +1,14 @@
+{
+  "name": "Judah Sullivan",
+  "profileUrl": "https://github.com/judahbsullivan",
+  "avatar": {
+    "src": "https://avatars.githubusercontent.com/u/159483985?v=4",
+    "width": 112,
+    "height": 112,
+    "alt": "Judah Sullivan"
+  },
+  "member": true,
+  "contributor": true,
+  "active": true,
+  "sortOrder": 10
+}
