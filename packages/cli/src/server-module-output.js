@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const RELATIVE_SPECIFIER_RE = /((?:import|export)\s+(?:[^'"]*?\s+from\s+)?|import\s*\()\s*(['"])([^'"]+)\2/g;
+const IMPORT_META_ASSET_RE = /new\s+URL\s*\(\s*(['"])(\.\.?\/[^'"]+)\1\s*,\s*import\.meta\.url\s*\)/g;
 const SPECIAL_SERVER_SPECIFIERS = new Map([
     ['zenith:server-contract', 'server-contract.js'],
     ['zenith:route-auth', 'auth/route-auth.js']
@@ -106,6 +107,39 @@ function gatherSpecifiers(source) {
         results.push(specifier);
     }
     return results;
+}
+
+function gatherImportMetaAssets(source) {
+    return [...new Set([...String(source || '').matchAll(IMPORT_META_ASSET_RE)]
+        .map((match) => String(match[2] || ''))
+        .filter(Boolean))];
+}
+
+function assertServerAssetDestination(serverDir, destinationPath, specifier, sourceFile) {
+    const relativeDestination = relative(serverDir, destinationPath);
+    if (
+        relativeDestination === '..' ||
+        relativeDestination.startsWith('../') ||
+        relativeDestination.startsWith('..\\') ||
+        isAbsolute(relativeDestination)
+    ) {
+        throw new Error(
+            `[Zenith:Build] Server asset "${specifier}" from "${sourceFile}" escapes the server output root.`
+        );
+    }
+}
+
+async function copyImportMetaAssets({ source, sourcePath, outputPath, serverDir }) {
+    for (const specifier of gatherImportMetaAssets(source)) {
+        const sourceAssetPath = resolve(dirname(sourcePath), specifier);
+        if (!existsSync(sourceAssetPath)) {
+            continue;
+        }
+        const outputAssetPath = resolve(dirname(outputPath), specifier);
+        assertServerAssetDestination(serverDir, outputAssetPath, specifier, sourcePath);
+        await mkdir(dirname(outputAssetPath), { recursive: true });
+        await cp(sourceAssetPath, outputAssetPath, { force: true, recursive: true });
+    }
 }
 
 function transpileSource(ts, source, filePath) {
@@ -215,6 +249,12 @@ async function compileImportedModule({
     }
 
     const source = await readFile(sourcePath, 'utf8');
+    await copyImportMetaAssets({
+        source,
+        sourcePath,
+        outputPath: outPath,
+        serverDir
+    });
     if (validateMiddlewareImports) {
         assertLiteralMiddlewareDynamicImports(ts, source, sourcePath);
     }
@@ -278,6 +318,12 @@ export async function writeServerModulePackage({
         assertLiteralMiddlewareDynamicImports(ts, entrySource, entrySourcePath);
     }
     let entryOutput = transpileSource(ts, entrySource || '', entrySourcePath || 'route-entry.ts');
+    await copyImportMetaAssets({
+        source: entrySource,
+        sourcePath: entrySourcePath || projectRoot,
+        outputPath: entryOutputPath,
+        serverDir
+    });
 
     for (const specifier of gatherSpecifiers(entryOutput)) {
         const specialSpecifierPath = SPECIAL_SERVER_SPECIFIERS.get(specifier);
