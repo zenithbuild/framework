@@ -12,8 +12,6 @@ Input evidence:
 - `docs/documentation/routing/route-protection.md`
 - `docs/documentation/guides/deployment-targets.md`
 
-Branch note: #207 had not landed when this decision was finalized, so this branch is stacked on the #207 head commit. This document depends on the #193 report and the corrected public hosted-download docs from #207, but it does not duplicate or rewrite the #193 report.
-
 ## Decision
 
 Implement advisory route-check parity for hosted `vercel` and `netlify` as the next hosted adapter milestone.
