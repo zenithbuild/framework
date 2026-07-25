@@ -13,3 +13,4 @@ test-results/
 
 # Graphify local repo-context output
 graphify-out/
+.env*

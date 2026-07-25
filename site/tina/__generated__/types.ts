@@ -1991,3 +1991,5 @@ export const queries = (
   const requester = generateRequester(client)
   return getSdk(requester)
 }
+
+  
