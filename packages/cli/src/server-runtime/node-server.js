@@ -4,7 +4,6 @@ import { access, readFile } from 'node:fs/promises';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from '../base-path.js';
-import { handleImageRequest } from '../images/service.js';
 import { createTrustedOriginResolver } from '../request-origin.js';
 import { defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
 import { executeRouteRequest, renderResourceRouteRequest, renderRouteRequest } from './route-render.js';
@@ -342,6 +341,7 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
     }
 
     if (url.pathname === imageEndpointPath(context.basePath)) {
+        const { handleImageRequest } = await import('../images/service.js');
         await handleImageRequest(req, res, {
             requestUrl: url,
             projectRoot: context.distDir,

@@ -1,9 +1,14 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const PACKAGE_REQUIRE = createRequire(import.meta.url);
+const CLI_PACKAGE = PACKAGE_REQUIRE('../../package.json');
+const SHARP_VERSION_RANGE = CLI_PACKAGE?.dependencies?.sharp;
+
+if (typeof SHARP_VERSION_RANGE !== 'string' || SHARP_VERSION_RANGE.length === 0) {
+    throw new Error('[Zenith:NodeAdapter] CLI package manifest must declare a Sharp dependency.');
+}
 
 const NODE_RUNTIME_FILES = [
     {
@@ -72,21 +77,21 @@ function createNodePackageJson() {
     return {
         private: true,
         type: 'module',
-        main: './index.js'
+        main: './index.js',
+        dependencies: {
+            sharp: SHARP_VERSION_RANGE
+        }
     };
 }
 
 function createSharpRuntimeSource() {
-    const sharpPath = PACKAGE_REQUIRE.resolve('sharp');
-    const fallbackUrl = pathToFileURL(sharpPath).href;
     return [
         'async function loadSharp() {',
         '  try {',
         "    const mod = await import('sharp');",
         '    return mod.default || mod;',
-        '  } catch {',
-        `    const mod = await import(${JSON.stringify(fallbackUrl)});`,
-        '    return mod.default || mod;',
+        '  } catch (error) {',
+        "    throw new Error('[Zenith:NodeAdapter] Missing generated Sharp runtime dependency. Run npm install, bun install, or pnpm install in the generated artifact directory before starting it.', { cause: error });",
         '  }',
         '}',
         '',

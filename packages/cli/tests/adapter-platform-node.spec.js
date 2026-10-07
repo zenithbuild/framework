@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import http from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -21,6 +22,12 @@ async function createProject(files) {
         await writeFile(absolutePath, contents, 'utf8');
     }
     return root;
+}
+
+async function buildNodeArtifact(root) {
+    await cli(['build'], root);
+    const result = spawnSync('bun', ['install'], { cwd: join(root, 'dist'), encoding: 'utf8' });
+    expect(result.status).toBe(0);
 }
 
 function extractSsrPayload(html) {
@@ -110,7 +117,7 @@ describe('node adapter', () => {
             'zenith.config.js': 'module.exports = { target: "node", basePath: "/docs", router: true };\n'
         });
 
-        await cli(['build'], projectRoot);
+        await buildNodeArtifact(projectRoot);
 
         expect(existsSync(join(projectRoot, 'dist', 'index.js'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'manifest.json'))).toBe(true);
@@ -246,7 +253,7 @@ describe('node adapter', () => {
                 'zenith.config.js': 'module.exports = { target: "node" };\n'
             });
 
-            await cli(['build'], projectRoot);
+            await buildNodeArtifact(projectRoot);
             const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
             preview = await mod.createNodeServer({
                 distDir: join(projectRoot, 'dist'),
@@ -351,7 +358,7 @@ describe('node adapter', () => {
             'zenith.config.js': 'module.exports = { target: "node" };\n'
         });
 
-        await cli(['build'], projectRoot);
+        await buildNodeArtifact(projectRoot);
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
         await expect(mod.createRequestHandler()).rejects.toThrow('publicOrigin');
@@ -387,7 +394,7 @@ describe('node adapter', () => {
             'zenith.config.js': 'module.exports = { target: "node" };\n'
         });
 
-        await cli(['build'], projectRoot);
+        await buildNodeArtifact(projectRoot);
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
         preview = await mod.createNodeServer({
@@ -437,7 +444,7 @@ describe('node adapter', () => {
             'zenith.config.js': 'module.exports = { target: "node" };\n'
         });
 
-        await cli(['build'], projectRoot);
+        await buildNodeArtifact(projectRoot);
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
         preview = await mod.createNodeServer({
