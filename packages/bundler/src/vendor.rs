@@ -296,10 +296,18 @@ fn compute_vendor_content_hash(
 fn read_lockfile_hash(base_dir: &Path) -> Option<String> {
     let mut current = base_dir;
     loop {
+        let lock_bun = current.join("bun.lock");
+        let lock_bun_binary = current.join("bun.lockb");
         let lock_npm = current.join("package-lock.json");
         let lock_pnpm = current.join("pnpm-lock.yaml");
         let lock_yarn = current.join("yarn.lock");
 
+        if lock_bun.exists() {
+            return std::fs::read(&lock_bun).ok().map(|b| sha256_hex(&b));
+        }
+        if lock_bun_binary.exists() {
+            return std::fs::read(&lock_bun_binary).ok().map(|b| sha256_hex(&b));
+        }
         if lock_npm.exists() {
             return std::fs::read(&lock_npm).ok().map(|b| sha256_hex(&b));
         }
