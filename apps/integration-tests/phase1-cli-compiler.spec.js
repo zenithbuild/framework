@@ -7,7 +7,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 import { createTempProject } from './helpers/project.js';
-import { bundlerBin, cliBuildModule, compilerBin, toFileHref } from './helpers/paths.js';
+import { bundlerBin, cliBuildModule, compilerBin, repoRoot, toFileHref } from './helpers/paths.js';
 import { validateCompilerIR } from './helpers/ir-schema.js';
 import { runCompilerBinary } from './helpers/pipeline.js';
 
@@ -39,6 +39,9 @@ afterAll(async () => {
 
 describe('Phase 1: CLI -> compiler process seam', () => {
   test('CLI bridge spawns compiler binary and forwards IR unchanged', async () => {
+    const cliManifest = JSON.parse(
+      await fs.readFile(path.join(repoRoot, 'packages', 'cli', 'package.json'), 'utf8')
+    );
     const fakeIR = {
       ir_version: 1,
       schemaVersion: 1,
@@ -66,11 +69,20 @@ describe('Phase 1: CLI -> compiler process seam', () => {
       }
     };
 
-    const spawnSyncMock = jest.fn(() => ({
-      status: 0,
-      stdout: JSON.stringify(fakeIR),
-      stderr: ''
-    }));
+    const spawnSyncMock = jest.fn((spawnPath, spawnArgs) => {
+      if (spawnArgs?.length === 1 && spawnArgs[0] === '--version') {
+        return {
+          status: 0,
+          stdout: `${path.basename(spawnPath)} ${cliManifest.version}\n`,
+          stderr: ''
+        };
+      }
+      return {
+        status: 0,
+        stdout: JSON.stringify(fakeIR),
+        stderr: ''
+      };
+    });
 
     const spawnMock = jest.fn(() => {
       const child = new EventEmitter();
@@ -108,7 +120,14 @@ describe('Phase 1: CLI -> compiler process seam', () => {
     expect(spawnSyncMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(spawnMock).toHaveBeenCalledTimes(1);
 
-    const compilerCalls = spawnSyncMock.mock.calls.filter(([spawnPath]) => spawnPath === compilerBin);
+    const versionProbeCalls = spawnSyncMock.mock.calls.filter(([, spawnArgs]) => (
+      spawnArgs?.length === 1 && spawnArgs[0] === '--version'
+    ));
+    expect(versionProbeCalls).toHaveLength(2);
+
+    const compilerCalls = spawnSyncMock.mock.calls.filter(([spawnPath, spawnArgs]) => (
+      spawnPath === compilerBin && spawnArgs?.[0] === '--stdin'
+    ));
     expect(compilerCalls).toHaveLength(1);
 
     const [spawnPath, spawnArgs, spawnOpts] = compilerCalls[0];
@@ -120,7 +139,9 @@ describe('Phase 1: CLI -> compiler process seam', () => {
     expect(spawnOpts).toEqual(expect.objectContaining({ encoding: 'utf8' }));
 
     const compilerResult = spawnSyncMock.mock.results[
-      spawnSyncMock.mock.calls.findIndex(([spawnPath]) => spawnPath === compilerBin)
+      spawnSyncMock.mock.calls.findIndex(([spawnPath, spawnArgs]) => (
+        spawnPath === compilerBin && spawnArgs?.[0] === '--stdin'
+      ))
     ]?.value;
     const parsed = JSON.parse(compilerResult.stdout);
     expect(validateCompilerIR(parsed)).toEqual([]);

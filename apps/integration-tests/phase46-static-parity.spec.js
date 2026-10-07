@@ -335,7 +335,8 @@ describe('Phase 4.6: static serve parity & substrate certification', () => {
         }
       }
 
-      expect(snapshot1.routerSource.includes('import(__ZENITH_MANIFEST__.chunks[route])')).toBe(true);
+      expect(snapshot1.routerSource.includes('import(__ZENITH_MANIFEST__.chunks[route])')).toBe(false);
+      expect(snapshot1.routerSource.includes('const __ZENITH_ROUTE_MODULES__')).toBe(true);
       expect(snapshot1.routerSource.includes('fetch(')).toBe(true);
       expect(snapshot1.routerSource.includes('router-manifest.json')).toBe(false);
 

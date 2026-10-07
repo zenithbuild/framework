@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,6 +12,7 @@ const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, '..');
 const CLI_ENTRY = resolve(ROOT, 'packages/cli/dist/index.js');
 const CLI_TOOLCHAIN_PATHS = resolve(ROOT, 'packages/cli/dist/toolchain-paths.js');
+const RELEASE_TRAIN = JSON.parse(readFileSync(resolve(ROOT, 'packages/cli/package.json'), 'utf8')).version;
 
 const PLATFORM_BINARIES = {
     compiler: {
@@ -94,14 +95,14 @@ function copyCompilerPackages(projectRoot) {
     mkdirSync(compilerRoot, { recursive: true });
     writeJson(join(compilerRoot, 'package.json'), {
         name: '@zenithbuild/compiler',
-        version: '0.0.0-smoke',
+        version: RELEASE_TRAIN,
         type: 'module'
     });
 
     mkdirSync(join(platformRoot, 'bin'), { recursive: true });
     writeJson(join(platformRoot, 'package.json'), {
         name: platformBinary.packageName,
-        version: '0.0.0-smoke',
+        version: RELEASE_TRAIN,
         type: 'module'
     });
     copyFileSync(sourceBinary, join(platformRoot, 'bin', platformBinary.binaryName));
@@ -120,14 +121,14 @@ function copyBundlerPackages(projectRoot) {
     mkdirSync(bundlerRoot, { recursive: true });
     writeJson(join(bundlerRoot, 'package.json'), {
         name: '@zenithbuild/bundler',
-        version: '0.0.0-smoke',
+        version: RELEASE_TRAIN,
         type: 'module'
     });
 
     mkdirSync(join(platformRoot, 'bin'), { recursive: true });
     writeJson(join(platformRoot, 'package.json'), {
         name: platformBinary.packageName,
-        version: '0.0.0-smoke',
+        version: RELEASE_TRAIN,
         type: 'module'
     });
     copyFileSync(sourceBinary, join(platformRoot, 'bin', platformBinary.binaryName));
