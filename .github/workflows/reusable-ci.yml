@@ -178,8 +178,9 @@ jobs:
           if ZENITH_CI_RETRY_ATTEMPT=1 bash ./scripts/ci-integration.sh; then
             log_retry 1 end 0
             exit 0
+          else
+            retry_exit=$?
           fi
-          retry_exit=$?
           log_retry 1 end "$retry_exit"
 
           echo "Integration shard failed on first attempt; retrying once..."
@@ -187,9 +188,9 @@ jobs:
           if ZENITH_CI_RETRY_ATTEMPT=2 bash ./scripts/ci-integration.sh; then
             log_retry 2 end 0
             exit 0
+          else
+            retry_exit=$?
           fi
-
-          retry_exit=$?
           log_retry 2 end "$retry_exit"
           exit "$retry_exit"
 
