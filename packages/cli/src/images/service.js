@@ -70,7 +70,7 @@ async function walkPublicImages(rootDir) {
     return files;
 }
 
-async function writeIfStale(sourcePath, targetPath, buffer) {
+async function writeIfStale(sourcePath, targetPath, createBuffer) {
     const sourceInfo = await stat(sourcePath);
     if (existsSync(targetPath)) {
         const targetInfo = await stat(targetPath);
@@ -78,6 +78,7 @@ async function writeIfStale(sourcePath, targetPath, buffer) {
             return;
         }
     }
+    const buffer = await createBuffer();
     await mkdir(dirname(targetPath), { recursive: true });
     await writeFile(targetPath, buffer);
 }
@@ -154,9 +155,9 @@ export async function buildImageArtifacts(options) {
             const sourceBuffer = await readFile(filePath);
             for (const width of widths) {
                 for (const format of formats) {
-                    const buffer = await transformImageBuffer(sourceBuffer, width, quality, format);
                     const outputPath = join(outDir, variantRelativePath(publicPath, width, quality, format));
-                    await writeIfStale(filePath, outputPath, buffer);
+                    await writeIfStale(filePath, outputPath,
+                        () => transformImageBuffer(sourceBuffer, width, quality, format));
                 }
             }
         }
