@@ -106,6 +106,13 @@ function _ensureCommentPlaceholderEnd(anchor) {
         return null;
     }
 
+    // Adopt the server-rendered range so hydration replaces its content.
+    for (let sibling = anchor.nextSibling; sibling; sibling = sibling.nextSibling) {
+        if (sibling.nodeType === 8 && sibling.data === `/ ${anchor.data}`) {
+            anchor.__z_range_end = sibling;
+            return sibling;
+        }
+    }
     end = (anchor.ownerDocument || document).createComment(`/ ${anchor.data}`);
     parent.insertBefore(end, anchor.nextSibling);
     anchor.__z_range_end = end;

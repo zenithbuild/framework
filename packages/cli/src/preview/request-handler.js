@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
+import { materializeSsrBindings } from '../server-runtime/ssr-bindings.js';
 import { materializeImageMarkup } from '../images/materialize.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
 import { handleImageRequest } from '../images/service.js';
@@ -395,6 +396,12 @@ export function createPreviewRequestHandler(options) {
         });
       }
       if (ssrPayload) {
+        try {
+          html = await materializeSsrBindings({ html, payload: ssrPayload, params: resolved.params, routePath: resolved.route.path, planPath: join(distDir, '_zenith', 'ssr-bindings.json') });
+        } catch (error) {
+          respondWithMiddlewareSourceError(res, error);
+          return;
+        }
         html = injectSsrPayload(html, ssrPayload);
       }
       if (!IMAGE_RUNTIME_TAG_RE.test(html)) {

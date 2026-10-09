@@ -20,6 +20,7 @@ import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } fro
 import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
+import { writeSsrBindingPlans } from './build/ssr-binding-plans.js';
 import { writeServerOutput } from './server-output.js';
 import { resolveGlobalMiddleware } from './global-middleware.js';
 import { resolveBundlerBin } from './toolchain-paths.js';
@@ -168,7 +169,10 @@ export async function build(options) {
         );
         await startupProfile.measureAsync(
             'inject_image_materialization_manifest',
-            () => injectImageMaterializationIntoRouterManifest(staticOutputDir, envelopes),
+            async () => {
+                await injectImageMaterializationIntoRouterManifest(staticOutputDir, envelopes);
+                await writeSsrBindingPlans(staticOutputDir, envelopes);
+            },
             { envelopes: envelopes.length }
         );
     }

@@ -400,6 +400,7 @@ function detectRequiresJs(pageIr, routerEnabled) {
         signals.length > 0 ||
         event_bindings.length > 0 ||
         ref_bindings.length > 0 ||
+        marker_bindings.length > 0 ||
         (Array.isArray(hoisted.signals) && hoisted.signals.length > 0) ||
         (Array.isArray(hoisted.state) && hoisted.state.length > 0) ||
         (Array.isArray(hoisted.code) && hoisted.code.filter(c => String(c).trim().length > 0).length > 0) ||

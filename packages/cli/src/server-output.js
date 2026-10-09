@@ -11,6 +11,7 @@ const GLOBAL_MIDDLEWARE_MODULE = 'global-middleware/entry.js';
 const SCOPED_SERVER_DATA_LOWERING_HELPER_UNAVAILABLE =
     '[Zenith:ScopedServerData] Server-output lowering helper is unavailable. Run the CLI build step before packaging scoped server data modules.';
 const SERVER_RUNTIME_FILES = [
+    { from: new URL('./server-runtime/ssr-bindings.js', import.meta.url), to: 'runtime/ssr-bindings.js' },
     {
         from: new URL('./server-runtime/route-render.js', import.meta.url),
         to: 'runtime/route-render.js'
@@ -283,6 +284,7 @@ export async function writeServerOutput({
 
     await mkdir(serverDir, { recursive: true });
     await copyRuntimeFiles(serverDir);
+    await copyOptionalFile(join(staticDir, '_zenith', 'ssr-bindings.json'), join(serverDir, 'ssr-bindings.json'));
     const serverGlobalMiddlewareMetadata = await writeGlobalMiddlewarePackage({
         projectRoot,
         serverDir,

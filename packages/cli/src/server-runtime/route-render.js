@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { materializeSsrBindings } from './ssr-bindings.js';
 import { attachRouteAuth } from '../auth/route-auth.js';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
 import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
@@ -371,6 +372,10 @@ export async function renderRouteRequest(options) {
         );
 
         let html = await readFile(shellHtmlPath, 'utf8');
+        html = await materializeSsrBindings({
+            html, payload: finalSsrPayload, params, routePath: route.path,
+            planPath: join(dirname(dirname(dirname(dirname(routeModulePath)))), 'ssr-bindings.json')
+        });
         html = await materializeImageMarkup({
             html,
             payload: imagePayload,

@@ -7,6 +7,7 @@ import { buildPageEnvelopes } from '../build/page-loop.js';
 import { createPageLoopCaches } from '../build/page-loop-state.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from '../build/type-declarations.js';
 import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from '../base-path-html.js';
+import { writeSsrBindingPlans } from '../build/ssr-binding-plans.js';
 import { injectImageMaterializationIntoRouterManifest } from '../images/router-manifest.js';
 import { buildImageArtifacts } from '../images/service.js';
 import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
@@ -155,7 +156,10 @@ export function createDevBuildSession(options) {
         );
         await startupProfile.measureAsync(
             'inject_image_materialization_manifest',
-            () => injectImageMaterializationIntoRouterManifest(outDir, orderedEnvelopes),
+            async () => {
+                await injectImageMaterializationIntoRouterManifest(outDir, orderedEnvelopes);
+                await writeSsrBindingPlans(outDir, orderedEnvelopes);
+            },
             { envelopes: orderedEnvelopes.length }
         );
         await startupProfile.measureAsync(
