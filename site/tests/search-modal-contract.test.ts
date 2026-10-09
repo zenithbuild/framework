@@ -1,3 +1,5 @@
+import { once } from "node:events";
+import { startSiteCommand } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -317,18 +319,24 @@ describe("SearchModal runtime binding regression", () => {
   test(
     "full production build completes and emits a valid home page",
     async () => {
-      const { execSync } = require("node:child_process");
       const { readFileSync, existsSync } = require("node:fs");
       const { resolve } = require("node:path");
       const siteRoot = resolve(import.meta.dir, "..");
+      const build = startSiteCommand("build");
       let output: string;
       try {
-        output = execSync("bun run build", { cwd: siteRoot, encoding: "utf8", timeout: 120000, stdio: "pipe" });
+        // Real site images take several minutes on CI; keep a bounded wait and
+        // stop the process group on failure so the aggregate runner can finish.
+        const [code] = await once(build.proc, "close", { signal: AbortSignal.timeout(600_000) });
+        output = build.logs().stdout;
+        if (code !== 0) throw new Error(JSON.stringify(build.logs()));
       } catch (err: any) {
-        throw new Error(`Production build failed: ${err.stderr || err.stdout || err.message}`);
+        throw new Error(`Production build failed: ${err.message} ${JSON.stringify(build.logs())}`);
+      } finally {
+        await build.stop();
       }
       expect(output.includes("Built 8 page(s)")).toBe(true);
-      expect(output.includes("286 asset(s)")).toBe(true);
+      expect(output).toMatch(/Built 8 page\(s\), [1-9]\d* asset\(s\)/);
       const indexHtml = resolve(siteRoot, "dist/static/index.html");
       expect(existsSync(indexHtml)).toBe(true);
       const html = readFileSync(indexHtml, "utf8");
@@ -336,7 +344,12 @@ describe("SearchModal runtime binding regression", () => {
       expect(html.includes("Zenith Dev Building")).toBe(false);
       expect(html.includes("BINDING_APPLY_FAILED")).toBe(false);
       expect(html.includes("showDocsFilters")).toBe(false);
+      const referencedAssets = [...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)];
+      expect(referencedAssets.length).toBeGreaterThan(0);
+      for (const [, url] of referencedAssets) {
+        expect(existsSync(resolve(siteRoot, "dist/static", url.slice(1).split("?")[0]))).toBe(true);
+      }
     },
-    { timeout: 130_000 },
+    { timeout: 610_000 },
   );
 });

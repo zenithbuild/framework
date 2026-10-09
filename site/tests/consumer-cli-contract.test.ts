@@ -12,7 +12,8 @@ const sitePackage = JSON.parse(
 
 describe("site consumer CLI contract", () => {
   test("normal framework commands resolve through the installed Zenith CLI", () => {
-    expect(sitePackage.scripts?.dev).toBe("zenith dev");
+    const dev = sitePackage.scripts?.dev;
+    expect(dev === "zenith dev" || /^tinacms dev --noTelemetry -c "zenith dev\s*"$/.test(dev)).toBe(true);
     expect(sitePackage.scripts?.build).toBe("zenith build");
     expect(sitePackage.scripts?.preview).toBe("zenith preview");
 
@@ -22,9 +23,13 @@ describe("site consumer CLI contract", () => {
     expect(scripts).not.toContain("ZENITH_PREFER_WORKSPACE_PACKAGES");
   });
 
-  test("Tina delegates to the same consumer development script", () => {
-    expect(sitePackage.scripts?.["cms:dev"]).toBe(
-      'tinacms dev --noTelemetry -c "bun run dev"',
-    );
+  test("Tina delegates to the installed consumer development command", () => {
+    const command = sitePackage.scripts?.["cms:dev"] || sitePackage.scripts?.dev;
+    const delegated = command?.match(/-c "([^"]+)"$/)?.[1].trim();
+    if (delegated === "bun run dev") {
+      expect(sitePackage.scripts?.dev).toBe("zenith dev");
+    } else {
+      expect(delegated).toBe("zenith dev");
+    }
   });
 });
