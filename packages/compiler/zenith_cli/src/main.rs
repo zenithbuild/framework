@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
+use zenith_compiler::compiler::MarkerPayload;
 use zenith_compiler::compiler::{
     compile_structured_with_source_options_and_report, CompileDiagnosticSeverity, CompileOptions,
     CompilerOutput,
 };
 use zenith_compiler::deterministic::sha256_hex;
-use zenith_compiler::compiler::MarkerPayload;
-use serde::Deserialize;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

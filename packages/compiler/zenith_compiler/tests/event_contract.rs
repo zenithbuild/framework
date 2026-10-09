@@ -58,10 +58,22 @@ fn rejects_direct_call_event_handlers() {
 #[test]
 fn rejects_direct_call_event_handler_variants() {
     for (label, source) in [
-        ("parenthesized direct call", r#"<button on:click={(doThing())}></button>"#),
-        ("member call", r#"<button on:click={handlers["save"]()}></button>"#),
-        ("optional call", r#"<button on:click={doThing?.()}></button>"#),
-        ("factory call", r#"<button on:click={factory().handler}></button>"#),
+        (
+            "parenthesized direct call",
+            r#"<button on:click={(doThing())}></button>"#,
+        ),
+        (
+            "member call",
+            r#"<button on:click={handlers["save"]()}></button>"#,
+        ),
+        (
+            "optional call",
+            r#"<button on:click={doThing?.()}></button>"#,
+        ),
+        (
+            "factory call",
+            r#"<button on:click={factory().handler}></button>"#,
+        ),
     ] {
         let error = compile_structured(source).unwrap_err();
         assert!(
@@ -99,8 +111,12 @@ fn emits_unknown_event_warning_with_suggestion() {
 
         assert_eq!(warnings.len(), 1, "{event_name} should emit one warning");
         assert_eq!(warnings[0].code, "ZEN-EVT-UNKNOWN");
-        assert!(warnings[0].message.contains(&format!("Unknown DOM event '{event_name}'")));
-        assert!(warnings[0].message.contains(&format!("Did you mean '{suggestion}'")));
+        assert!(warnings[0]
+            .message
+            .contains(&format!("Unknown DOM event '{event_name}'")));
+        assert!(warnings[0]
+            .message
+            .contains(&format!("Did you mean '{suggestion}'")));
         assert!(warnings[0].line >= 1);
         assert!(warnings[0].column >= 1);
     }
