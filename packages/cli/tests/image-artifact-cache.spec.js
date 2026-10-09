@@ -27,6 +27,12 @@ test('fresh image variants skip encoding and source/config changes invalidate th
         expect(await readFile(target)).toEqual(coldBytes);
         expect((await stat(target)).mtimeMs).toBe(coldStat.mtimeMs);
 
+        await rm(outDir, { recursive: true, force: true });
+        encoder.mockClear();
+        await buildImageArtifacts({ projectRoot: root, outDir, config });
+        expect(encoder).not.toHaveBeenCalled();
+        expect(await readFile(target)).toEqual(coldBytes);
+
         await sharp({ create: { width: 4, height: 3, channels: 3, background: 'blue' } }).png().toFile(source);
         const changedTime = new Date(Date.now() + 2_000);
         await utimes(source, changedTime, changedTime);

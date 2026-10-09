@@ -1,5 +1,6 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, stat, writeFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile, readdir, rename } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import sharp from 'sharp';
 import { fetchRemoteImage, isLocalNetworkAddress, resolveRemoteTarget, validateRemoteTarget } from './remote-fetch.js';
@@ -153,11 +154,29 @@ export async function buildImageArtifacts(options) {
             };
 
             const sourceBuffer = await readFile(filePath);
+            const sourceHash = createHash('sha256').update(sourceBuffer).digest('hex');
             for (const width of widths) {
                 for (const format of formats) {
                     const outputPath = join(outDir, variantRelativePath(publicPath, width, quality, format));
-                    await writeIfStale(filePath, outputPath,
-                        () => transformImageBuffer(sourceBuffer, width, quality, format));
+                    await writeIfStale(filePath, outputPath, async () => {
+                        // Bundler output directories are replaced atomically. Keep
+                        // encoded bytes outside them so rebuilds can reuse work.
+                        const cacheKey = createHash('sha256').update(JSON.stringify({
+                            sourceHash, width, quality, format, versions: sharp.versions
+                        })).digest('hex');
+                        const cachePath = join(projectRoot, '.zenith', 'cache', 'images', 'build', cacheKey);
+                        try {
+                            return await readFile(cachePath);
+                        } catch (error) {
+                            if (error.code !== 'ENOENT') throw error;
+                        }
+                        const buffer = await transformImageBuffer(sourceBuffer, width, quality, format);
+                        await mkdir(dirname(cachePath), { recursive: true });
+                        const cacheTemp = `${cachePath}.${randomUUID()}.tmp`;
+                        await writeFile(cacheTemp, buffer);
+                        await rename(cacheTemp, cachePath);
+                        return buffer;
+                    });
                 }
             }
         }
