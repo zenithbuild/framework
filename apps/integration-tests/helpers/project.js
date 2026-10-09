@@ -30,6 +30,7 @@ export async function scaffoldZenithProject(rootDir, options = {}) {
       preview: 'zenith preview'
     },
     dependencies: {
+      '@zenithbuild/core': fileDep(path.join(repoRoot, 'packages', 'core')),
       '@zenithbuild/cli': fileDep(path.join(repoRoot, 'packages', 'cli')),
       '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler'))
     },

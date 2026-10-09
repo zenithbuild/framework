@@ -4,6 +4,7 @@ import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SourceTextModule } from 'node:vm';
+import { execFileSync } from 'node:child_process';
 import { linkWorkspaceNodeModules, walkFiles } from './helpers/build-fixtures.js';
 
 jest.setTimeout(45000);
@@ -111,7 +112,14 @@ describe('helper esm provenance and route matrix', () => {
             'utf8'
         );
 
-        await linkWorkspaceNodeModules(root);
+        await writeFile(join(root, 'package.json'), JSON.stringify({
+            private: true,
+            type: 'module',
+            dependencies: { picocolors: '1.1.1' }
+        }));
+        execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], {
+            cwd: root, stdio: 'pipe', timeout: 20_000
+        });
         const result = await build({ pagesDir, outDir });
 
         expect(result.assets.length).toBeGreaterThan(0);
