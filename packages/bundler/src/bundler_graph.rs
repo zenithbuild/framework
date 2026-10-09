@@ -64,76 +64,20 @@ pub(crate) fn build_module_registry(
     Ok(modules)
 }
 
-fn is_external_runtime_specifier(spec: &str) -> bool {
-    !spec.starts_with('.')
-        && !spec.starts_with('/')
-        && !spec.starts_with("@/")
-        && !spec.starts_with(zenith_bundler::utils::VIRTUAL_PREFIX)
-        && !spec.contains("zenith:")
-}
-
 pub(crate) fn collect_fast_path_vendor_map(
     inputs: &[BundlerInput],
     output_mode: OutputMode,
     base_path: &str,
-) -> BTreeMap<String, String> {
-    let mut out = BTreeMap::new();
-
-    for input in inputs {
-        for import in &input.ir.imports {
-            if is_external_runtime_specifier(&import.spec) {
-                out.insert(
-                    import.spec.clone(),
-                    fast_path_vendor_public_path(output_mode, base_path, &import.spec),
-                );
-            }
-        }
-        for entry in &input.ir.hoisted.imports {
-            let specs = collect_js_import_specifiers(entry);
-            if specs.is_empty() {
-                if is_external_runtime_specifier(entry) {
-                    out.insert(
-                        entry.clone(),
-                        fast_path_vendor_public_path(output_mode, base_path, entry),
-                    );
-                }
-                continue;
-            }
-            for spec in specs {
-                if is_external_runtime_specifier(&spec) {
-                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
-                    out.insert(spec, replacement);
-                }
-            }
-        }
-        for module in &input.ir.modules {
-            for spec in collect_js_import_specifiers(&module.source) {
-                if is_external_runtime_specifier(&spec) {
-                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
-                    out.insert(spec, replacement);
-                }
-            }
-        }
-        for script in input.ir.components_scripts.values() {
-            for spec in collect_js_import_specifiers(&script.code) {
-                if is_external_runtime_specifier(&spec) {
-                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
-                    out.insert(spec, replacement);
-                }
-            }
-            for import_stmt in &script.imports {
-                for spec in collect_js_import_specifiers(import_stmt) {
-                    if is_external_runtime_specifier(&spec) {
-                        let replacement =
-                            fast_path_vendor_public_path(output_mode, base_path, &spec);
-                        out.insert(spec, replacement);
-                    }
-                }
-            }
-        }
-    }
-
-    out
+) -> Result<BTreeMap<String, String>, String> {
+    Ok(
+        crate::dependency_analysis::collect_vendor_specifiers(inputs)?
+            .into_iter()
+            .map(|specifier| {
+                let path = fast_path_vendor_public_path(output_mode, base_path, &specifier);
+                (specifier, path)
+            })
+            .collect(),
+    )
 }
 
 fn fast_path_vendor_public_path(

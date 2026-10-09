@@ -36,6 +36,7 @@ mod bundler_paths;
 mod bundler_runtime_profile;
 mod bundler_server_script;
 mod bundler_types;
+mod dependency_analysis;
 mod image_materialization;
 mod output_mode;
 mod page_runtime;
@@ -225,7 +226,7 @@ fn run() -> Result<(), String> {
             })
             .collect::<BTreeMap<_, _>>()
     } else if fast_path {
-        collect_fast_path_vendor_map(&inputs, output_mode, &base_path)
+        collect_fast_path_vendor_map(&inputs, output_mode, &base_path)?
     } else {
         BTreeMap::new()
     };

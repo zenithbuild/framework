@@ -1,4 +1,3 @@
-use regex::Regex;
 use rolldown::{Bundler, BundlerOptions, InputItem};
 use rolldown_common::{Output, OutputFormat, Platform};
 use serde::{Deserialize, Serialize};
@@ -6,9 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use zenith_compiler::deterministic::sha256_hex;
 
+use crate::dependency_analysis::collect_vendor_specifiers;
 use crate::output_mode::{write_file_for_mode, OutputMode};
 use crate::BundlerInput;
-use zenith_bundler::utils::{EXPECTED_ROLLDOWN_COMMIT, VIRTUAL_PREFIX};
+use zenith_bundler::utils::EXPECTED_ROLLDOWN_COMMIT;
 
 const FRAMEWORK_INTEROP_DENYLIST: &[&str] = &[
     "react",
@@ -35,60 +35,12 @@ pub async fn bundle_vendor(
     out_dir: &Path,
     output_mode: OutputMode,
 ) -> Result<Option<VendorBuildResult>, String> {
-    // 1. Collect and deduplicate external specifiers
-    let mut externals = BTreeSet::new();
-
-    for input in inputs {
-        for import in &input.ir.imports {
-            if is_external(&import.spec) {
-                externals.insert(import.spec.clone());
-            }
-        }
-        // Also check hoisted imports if any (legacy IR compatibility).
-        for entry in &input.ir.hoisted.imports {
-            let specs = collect_js_import_specifiers(entry);
-            if specs.is_empty() {
-                if is_external(entry) {
-                    externals.insert(entry.clone());
-                }
-                continue;
-            }
-            for spec in specs {
-                if is_external(&spec) {
-                    externals.insert(spec);
-                }
-            }
-        }
-        // Extract from module sources and component scripts so vendor detection
-        // matches emitted runtime assets, not just compiler import metadata.
-        for module in &input.ir.modules {
-            for spec in collect_js_import_specifiers(&module.source) {
-                if is_external(&spec) {
-                    externals.insert(spec);
-                }
-            }
-        }
-        for script in input.ir.components_scripts.values() {
-            for spec in collect_js_import_specifiers(&script.code) {
-                if is_external(&spec) {
-                    externals.insert(spec);
-                }
-            }
-            for import_stmt in &script.imports {
-                for spec in collect_js_import_specifiers(import_stmt) {
-                    if is_external(&spec) {
-                        externals.insert(spec);
-                    }
-                }
-            }
-        }
-    }
-
-    if externals.is_empty() {
+    // 1. Collect and deduplicate validated external specifiers.
+    let sorted_externals = collect_vendor_specifiers(inputs)?;
+    if sorted_externals.is_empty() {
         return Ok(None);
     }
 
-    let sorted_externals: Vec<String> = externals.into_iter().collect();
     let blocked_frameworks: BTreeSet<String> = sorted_externals
         .iter()
         .filter_map(|spec| framework_interop_match(spec).map(|_| spec.clone()))
@@ -222,49 +174,6 @@ fn emit_vendor_assets(
     Ok(())
 }
 
-fn is_external(spec: &str) -> bool {
-    !spec.starts_with('.')
-        && !spec.starts_with('/')
-        && !spec.starts_with("@/")
-        && !spec.starts_with(VIRTUAL_PREFIX)
-        && !spec.contains("zenith:")
-}
-
-fn collect_js_import_specifiers(source: &str) -> Vec<String> {
-    let static_import_re =
-        Regex::new(r#"(?m)\bimport\s+(?:[^'"\n;]*?\s+from\s+)?['"]([^'"]+)['"]"#).unwrap();
-    let dynamic_import_re = Regex::new(r#"(?m)\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)"#).unwrap();
-    let export_from_re =
-        Regex::new(r#"(?m)\bexport\s+[^'"\n;]*?\s+from\s+['"]([^'"]+)['"]"#).unwrap();
-
-    let mut out = Vec::new();
-    for captures in static_import_re.captures_iter(source) {
-        if let Some(spec) = captures.get(1) {
-            let value = spec.as_str().to_string();
-            if !out.contains(&value) {
-                out.push(value);
-            }
-        }
-    }
-    for captures in dynamic_import_re.captures_iter(source) {
-        if let Some(spec) = captures.get(1) {
-            let value = spec.as_str().to_string();
-            if !out.contains(&value) {
-                out.push(value);
-            }
-        }
-    }
-    for captures in export_from_re.captures_iter(source) {
-        if let Some(spec) = captures.get(1) {
-            let value = spec.as_str().to_string();
-            if !out.contains(&value) {
-                out.push(value);
-            }
-        }
-    }
-    out
-}
-
 fn framework_interop_match(spec: &str) -> Option<&'static str> {
     let normalized = spec.strip_prefix("npm:").unwrap_or(spec);
     FRAMEWORK_INTEROP_DENYLIST
@@ -339,21 +248,5 @@ mod tests {
         );
         assert_eq!(framework_interop_match("gsap"), None);
         assert_eq!(framework_interop_match("date-fns"), None);
-    }
-    #[test]
-    fn collect_js_import_specifiers_extracts_static_dynamic_and_export_from() {
-        let source = "import { gsap } from 'gsap'; import \"./styles/output.css\"; export { format } from \"date-fns\"; const m = import('three');";
-        let specs = collect_js_import_specifiers(source);
-        assert!(specs.contains(&"gsap".to_string()));
-        assert!(specs.contains(&"./styles/output.css".to_string()));
-        assert!(specs.contains(&"date-fns".to_string()));
-        assert!(specs.contains(&"three".to_string()));
-    }
-
-    #[test]
-    fn is_external_skips_zenith_alias_paths() {
-        assert!(!is_external("@/components/ui/Hero.zen"));
-        assert!(is_external("@scope/pkg"));
-        assert!(is_external("gsap"));
     }
 }

@@ -65,7 +65,7 @@ fn payload() -> serde_json::Value {
             "hoisted": {
                 "code": ["void first; void second; void firstShared; void secondShared;"],
                 "state": [],
-                "imports": ["import first, { shared as firstShared } from 'first-dep';", "import second, { shared as secondShared } from 'second-dep';"]
+                "imports": ["import first, { shared as firstShared } from 'first-dep';", "import second, {\n shared as secondShared\n} from 'second-dep';"]
             },
             "components_scripts": {},
             "component_instances": [],
@@ -77,9 +77,9 @@ fn payload() -> serde_json::Value {
             }],
             "import_records": [
                 { "specifier": "first-dep", "raw_source": "import first, { shared as firstShared } from 'first-dep';" },
-                { "specifier": "second-dep", "raw_source": "import second, { shared as secondShared } from 'second-dep';" }
+                { "specifier": "second-dep", "raw_source": "import second, {\n shared as secondShared\n} from 'second-dep';" }
             ],
-            "modules": []
+            "modules": [{ "id": "local-helper", "source": "// import fake from 'not-a-real-package';\nexport const local = \"import ghost from 'not-a-real-package';\";" }]
         }
     }])
 }
