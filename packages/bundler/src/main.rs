@@ -215,10 +215,14 @@ fn run() -> Result<(), String> {
             meta.filename,
             meta.specifiers.len()
         );
-        let replacement = public_asset_path(&base_path, &format!("assets/{}", meta.filename));
-        meta.specifiers
+        meta.entries
             .iter()
-            .map(|s| (s.clone(), replacement.clone()))
+            .map(|(specifier, filename)| {
+                (
+                    specifier.clone(),
+                    public_asset_path(&base_path, &format!("assets/{filename}")),
+                )
+            })
             .collect::<BTreeMap<_, _>>()
     } else if fast_path {
         collect_fast_path_vendor_map(&inputs, output_mode, &base_path)
@@ -310,7 +314,13 @@ fn run() -> Result<(), String> {
     let mut known_emitted_assets = BTreeSet::<String>::new();
     known_emitted_assets.insert(css_rel.clone());
     if fast_path && !vendor_map.is_empty() {
-        known_emitted_assets.insert(format!("assets/{}", output_mode.vendor_rel("")));
+        for path in vendor_map.values() {
+            known_emitted_assets.insert(
+                crate::bundler_paths::strip_base_path(path, &base_path)
+                    .trim_start_matches('/')
+                    .to_string(),
+            );
+        }
     }
     if let Some(css_content) = &final_css_content {
         expected_asset_contents.insert(css_rel.clone(), css_content.clone());

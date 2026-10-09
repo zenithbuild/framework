@@ -77,46 +77,56 @@ pub(crate) fn collect_fast_path_vendor_map(
     output_mode: OutputMode,
     base_path: &str,
 ) -> BTreeMap<String, String> {
-    let replacement = fast_path_vendor_public_path(output_mode, base_path);
     let mut out = BTreeMap::new();
 
     for input in inputs {
         for import in &input.ir.imports {
             if is_external_runtime_specifier(&import.spec) {
-                out.insert(import.spec.clone(), replacement.clone());
+                out.insert(
+                    import.spec.clone(),
+                    fast_path_vendor_public_path(output_mode, base_path, &import.spec),
+                );
             }
         }
         for entry in &input.ir.hoisted.imports {
             let specs = collect_js_import_specifiers(entry);
             if specs.is_empty() {
                 if is_external_runtime_specifier(entry) {
-                    out.insert(entry.clone(), replacement.clone());
+                    out.insert(
+                        entry.clone(),
+                        fast_path_vendor_public_path(output_mode, base_path, entry),
+                    );
                 }
                 continue;
             }
             for spec in specs {
                 if is_external_runtime_specifier(&spec) {
-                    out.insert(spec, replacement.clone());
+                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
+                    out.insert(spec, replacement);
                 }
             }
         }
         for module in &input.ir.modules {
             for spec in collect_js_import_specifiers(&module.source) {
                 if is_external_runtime_specifier(&spec) {
-                    out.insert(spec, replacement.clone());
+                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
+                    out.insert(spec, replacement);
                 }
             }
         }
         for script in input.ir.components_scripts.values() {
             for spec in collect_js_import_specifiers(&script.code) {
                 if is_external_runtime_specifier(&spec) {
-                    out.insert(spec, replacement.clone());
+                    let replacement = fast_path_vendor_public_path(output_mode, base_path, &spec);
+                    out.insert(spec, replacement);
                 }
             }
             for import_stmt in &script.imports {
                 for spec in collect_js_import_specifiers(import_stmt) {
                     if is_external_runtime_specifier(&spec) {
-                        out.insert(spec, replacement.clone());
+                        let replacement =
+                            fast_path_vendor_public_path(output_mode, base_path, &spec);
+                        out.insert(spec, replacement);
                     }
                 }
             }
@@ -126,11 +136,18 @@ pub(crate) fn collect_fast_path_vendor_map(
     out
 }
 
-fn fast_path_vendor_public_path(output_mode: OutputMode, base_path: &str) -> String {
-    crate::bundler_paths::public_asset_path(
-        base_path,
-        &format!("assets/{}", output_mode.vendor_rel("")),
-    )
+fn fast_path_vendor_public_path(
+    output_mode: OutputMode,
+    base_path: &str,
+    specifier: &str,
+) -> String {
+    let name = crate::vendor::vendor_entry_name(specifier);
+    let filename = if output_mode.is_dev_stable() {
+        format!("{name}.dev.js")
+    } else {
+        name
+    };
+    crate::bundler_paths::public_asset_path(base_path, &format!("assets/{filename}"))
 }
 
 pub(crate) fn derive_fast_path_component_assets(
@@ -161,12 +178,18 @@ mod tests {
     #[test]
     fn fast_path_vendor_stays_under_the_assets_root() {
         assert_eq!(
-            fast_path_vendor_public_path(OutputMode::DevStable, "/"),
-            "/assets/vendor.dev.js"
+            fast_path_vendor_public_path(OutputMode::DevStable, "/", "first"),
+            format!(
+                "/assets/{}.dev.js",
+                crate::vendor::vendor_entry_name("first")
+            )
         );
         assert_eq!(
-            fast_path_vendor_public_path(OutputMode::DevStable, "/docs"),
-            "/docs/assets/vendor.dev.js"
+            fast_path_vendor_public_path(OutputMode::DevStable, "/docs", "first"),
+            format!(
+                "/docs/assets/{}.dev.js",
+                crate::vendor::vendor_entry_name("first")
+            )
         );
     }
 }

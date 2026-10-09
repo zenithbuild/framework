@@ -256,6 +256,9 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
     }
 
     if let Some(meta) = vendor_result {
+        for filename in meta.assets.keys() {
+            known_emitted_assets.insert(format!("assets/{filename}"));
+        }
         let vendor_path = emitted_root.join("assets").join(&meta.filename);
         expected_asset_contents.insert(format!("assets/{}", meta.filename), meta.content.clone());
         if !vendor_path.exists() {
