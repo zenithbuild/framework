@@ -200,12 +200,12 @@ async function assertToolchainResolution(projectRoot) {
     assert.equal(compilerCandidates[0]?.label, 'installed platform package binary');
     assert.equal(bundlerCandidates[0]?.label, 'installed platform package binary');
     assert.equal(
-        compilerCandidates[0]?.path.includes(`/node_modules/@zenithbuild/${compilerPlatform.packageDirName}/bin/`),
+        compilerCandidates[0]?.path.replaceAll('\\', '/').includes(`/node_modules/@zenithbuild/${compilerPlatform.packageDirName}/bin/`),
         true,
         'compiler platform binary did not resolve from fixture'
     );
     assert.equal(
-        bundlerCandidates[0]?.path.includes(`/node_modules/@zenithbuild/${bundlerPlatform.packageDirName}/bin/`),
+        bundlerCandidates[0]?.path.replaceAll('\\', '/').includes(`/node_modules/@zenithbuild/${bundlerPlatform.packageDirName}/bin/`),
         true,
         'bundler platform binary did not resolve from fixture'
     );
@@ -255,4 +255,69 @@ try {
     console.log('cross-os smoke passed');
 } finally {
     rmSync(projectRoot, { recursive: true, force: true });
+}
+
+if (process.argv.includes('--packed')) {
+    const scratch = mkdtempSync(join(tmpdir(), 'zenith-packed-native-smoke-'));
+    try {
+        const npmCli = [
+            resolve(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js'),
+            resolve(dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js')
+        ].find(existsSync);
+        assert.ok(npmCli, 'npm CLI must be installed beside Node');
+        const dependencies = {};
+        const directories = [
+            'cli', 'core', 'compiler', 'bundler', 'runtime', 'router',
+            currentPlatformBinary('compiler').packageDirName,
+            currentPlatformBinary('bundler').packageDirName
+        ];
+        for (const directory of directories) {
+            const packageRoot = resolve(ROOT, 'packages', directory);
+            const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+            assert.equal(manifest.version, RELEASE_TRAIN, `${manifest.name} train mismatch`);
+            const result = spawnSync(process.execPath, [npmCli, 'pack', '--json', '--ignore-scripts', '--pack-destination', scratch], {
+                cwd: packageRoot, encoding: 'utf8'
+            });
+            assert.equal(result.status, 0, `pack ${manifest.name} failed: ${result.stderr || result.error || ''}`);
+            const [packed] = JSON.parse(result.stdout);
+            dependencies[manifest.name] = pathToFileURL(join(scratch, packed.filename)).href;
+        }
+        const consumer = join(scratch, 'consumer');
+        mkdirSync(join(consumer, 'src/pages'), { recursive: true });
+        writeJson(join(consumer, 'package.json'), {
+            name: 'zenith-packed-native-consumer', private: true, type: 'module',
+            dependencies, overrides: dependencies
+        });
+        writeFileSync(join(consumer, 'src/pages/index.zen'), '<main>Independent packed consumer</main>\n');
+        for (const args of [['install'], ['install', '--frozen-lockfile']]) {
+            const installed = spawnSync(process.platform === 'win32' ? 'bun.exe' : 'bun', args, {
+                cwd: consumer, encoding: 'utf8'
+            });
+            assert.equal(installed.status, 0, `packed install failed: ${installed.stderr || installed.error || ''}`);
+        }
+        for (const name of Object.keys(dependencies)) {
+            const manifest = JSON.parse(readFileSync(join(consumer, 'node_modules', name, 'package.json'), 'utf8'));
+            assert.equal(manifest.version, RELEASE_TRAIN, `installed ${name} train mismatch`);
+        }
+        const env = { ...process.env, CI: '1', ZENITH_NO_UI: '1' };
+        for (const key of ['ZENITH_COMPILER_BIN', 'ZENITH_BUNDLER_BIN', 'ZENITH_PREFER_WORKSPACE_PACKAGES', 'ZENITH_SKIP_VERSION_CHECK']) {
+            delete env[key];
+        }
+        for (const tool of ['compiler', 'bundler']) {
+            const platform = currentPlatformBinary(tool);
+            const binary = join(consumer, 'node_modules', platform.packageName, 'bin', platform.binaryName);
+            const result = spawnSync(binary, ['--version'], { encoding: 'utf8', env });
+            assert.equal(result.status, 0, `${tool} native execution failed`);
+            assert.equal(result.stdout.trim().split(/\s+/).at(-1), RELEASE_TRAIN, `${tool} binary train mismatch`);
+        }
+        const built = spawnSync(process.execPath, [join(consumer, 'node_modules/@zenithbuild/cli/dist/index.js'), 'build'], {
+            cwd: consumer, encoding: 'utf8', env
+        });
+        assert.equal(built.status, 0, `packed build failed:\n${built.stdout}\n${built.stderr}`);
+        assert.ok(existsSync(join(consumer, 'dist/index.html')), 'packed consumer did not emit HTML');
+        assert.equal(`${built.stdout}${built.stderr}`.includes('workspace binary'), false, 'packed build used workspace fallback');
+        console.log(`packed native consumer passed (${process.platform}-${process.arch}, ${RELEASE_TRAIN})`);
+    } finally {
+        rmSync(scratch, { recursive: true, force: true });
+    }
 }
