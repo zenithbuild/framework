@@ -1,0 +1,68 @@
+name: Candidate Linux qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Committed candidate ref to qualify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: [site, stress]
+    env:
+      ZENITH_SITE_CLI_ENTRY: ${{ github.workspace }}/packages/cli/dist/index.js
+      ZENITH_COMPILER_BIN: ${{ github.workspace }}/packages/compiler/target/release/zenith-compiler
+      ZENITH_BUNDLER_BIN: ${{ github.workspace }}/packages/bundler/target/release/zenith-bundler
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - run: bun install --frozen-lockfile
+      - name: Build the matching candidate once, serially
+        run: |
+          export ZENITH_TRAIN_VERSION="$(cat TRAIN_VERSION)"
+          bun run --cwd packages/runtime build
+          bun run --cwd packages/router build
+          bun run --cwd packages/extension-registry build
+          bun run --cwd packages/core build
+          bun run --cwd packages/cli build
+          cargo build --locked --release --manifest-path packages/compiler/Cargo.toml
+          bun run --cwd packages/compiler build
+          bun run --cwd packages/bundler build
+      - name: Install the locked Chromium browser and system dependencies
+        run: bun run --cwd apps/integration-tests playwright install --with-deps chromium
+      - name: Install the site lockfile
+        if: matrix.gate == 'site'
+        working-directory: site
+        run: bun install --frozen-lockfile
+      - name: Run the entire site suite, including browser lifecycles
+        if: matrix.gate == 'site'
+        working-directory: site
+        run: bun test 2>&1 | tee ../qualification-site.log
+      - name: Run all 100 deterministic fixtures with browser and package-manager checks
+        if: matrix.gate == 'stress'
+        run: bun run --cwd apps/integration-tests test --runTestsByPath phase15-stress.spec.js 2>&1 | tee qualification-stress.log
+      - name: Preserve qualification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ matrix.gate }}-${{ github.run_id }}
+          path: qualification-*.log
+          if-no-files-found: warn
