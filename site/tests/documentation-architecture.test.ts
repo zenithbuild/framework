@@ -19,7 +19,7 @@ const docsRoot = resolve(siteRoot, "../docs/documentation");
 describe("public documentation inventory", () => {
   test("uses one explicit path boundary for Tina and the repo loader", async () => {
     const diskFiles = readdirSync(docsRoot, { recursive: true })
-      .map(String)
+      .map((file) => String(file).replaceAll("\\", "/"))
       .filter((file) => file.endsWith(".md"));
     const publicFiles = diskFiles.filter(isPublicDocumentationPath).sort();
     const entries = await discoverLocalDocumentationEntries();
