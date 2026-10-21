@@ -108,7 +108,6 @@ describe("Zenith animation contract", () => {
       "src/pages/blog/index.zen",
       "src/pages/blog/building-zenith-0-8/index.zen",
       "src/pages/docs/index.zen",
-      "src/pages/docs/getting-started/index.zen",
       "src/pages/about/index.zen",
     ].map(readSource);
 
@@ -116,6 +115,17 @@ describe("Zenith animation contract", () => {
       expect(source.includes("MotionController")).toBe(true);
       expect(source.includes("data-motion-section")).toBe(true);
     });
+  });
+
+  test("keeps docs articles on one reader template so the router can swap only #app", () => {
+    // SPA navigation replaces only #app (inside DocumentationArticle). Markup
+    // outside #app must match between docs article routes, otherwise the next
+    // route's ref markers are missing and the router falls back to a hard load.
+    const template = (path: string) => readSource(path).split("<script setup")[1]?.replace(/\s+/g, " ").trim();
+    expect(template("src/pages/docs/getting-started/index.zen")).toBe(template("src/pages/docs/[...slug].zen"));
+    const article = readSource("src/components/DocumentationArticle.zen");
+    expect(article.includes("<DocsArticleTransition")).toBe(true);
+    expect(article.includes("ref={documentationArticleRegionRef} data-docs-article-region")).toBe(true);
   });
 });
 

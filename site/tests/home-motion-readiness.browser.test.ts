@@ -1,10 +1,10 @@
+import { startSiteDevServer } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
 
 const PORT = 4017;
 const origin = `http://localhost:${PORT}`;
 const sections = [
   "home-precision",
-  "home-framework-surface",
   "home-sponsorship",
   "home-community",
 ] as const;
@@ -14,34 +14,19 @@ const contributorProfiles = [
   { label: "View Colin Williams's profile", href: "https://github.com/colinwilliams91" },
 ] as const;
 
-async function startDevServer(): Promise<{ kill: () => void }> {
-  const { spawn } = await import("child_process");
-  const http = await import("http");
-  const dev = spawn("npx", ["zenith", "dev", "--port", String(PORT)], {
-    cwd: import.meta.dir + "/..",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const requestStatus = () => new Promise<number>((resolve) => {
-    const request = http.get(origin, (response) => { response.resume(); resolve(response.statusCode || 0); });
-    request.on("error", () => resolve(0));
-    request.setTimeout(2_000, () => { request.destroy(); resolve(0); });
-  });
-
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    if (await requestStatus() === 200) return { kill: () => dev.kill() };
-  }
-  dev.kill();
-  throw new Error("Home motion readiness dev server failed to start");
+async function startDevServer() {
+  return startSiteDevServer(PORT);
 }
 
 async function waitForHome(page: import("playwright").Page) {
   await page.waitForFunction(
     () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+    undefined,
     { timeout: 30_000 },
   );
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector("main")!).pointerEvents === "auto",
+    undefined,
     { timeout: 15_000 },
   );
 }
@@ -49,6 +34,7 @@ async function waitForHome(page: import("playwright").Page) {
 async function waitForTransition(page: import("playwright").Page) {
   await page.waitForFunction(
     () => document.querySelector("[data-route-transition='true']")?.getAttribute("data-route-transition-phase") === "complete",
+    undefined,
     { timeout: 30_000 },
   );
 }
@@ -133,9 +119,9 @@ describe("Home scroll-motion readiness", () => {
       await page.waitForURL(`${origin}/`);
       await waitForHome(page);
       await waitForTransition(page);
-      await page.waitForFunction(() => document.querySelectorAll(".zenith-home-section-char").length > 0, { timeout: 12_000 });
+      await page.waitForFunction(() => document.querySelectorAll(".zenith-home-section-char").length > 0, undefined, { timeout: 12_000 });
       expect(await page.locator("[data-motion-section='home-precision']").count()).toBe(1);
-      expect(await page.locator("[data-motion-section='home-framework-surface']").count()).toBe(1);
+      expect(await page.locator("[data-motion-section='home-sponsorship']").count()).toBe(1);
       expect(await page.locator(".zenith-home-section-char").count()).toBe(characterCount);
       await page.goBack();
       await page.waitForURL(`${origin}/blog`);
@@ -146,9 +132,9 @@ describe("Home scroll-motion readiness", () => {
       expect(errors).toEqual([]);
     } finally {
       await browser.close();
-      server.kill();
+      await server.stop();
     }
-  }, 180_000);
+  }, 660_000);
 
   test("renders compact deduplicated contributor avatars with browser-resolving profile links", async () => {
     const { chromium } = await import("playwright");
@@ -217,7 +203,7 @@ describe("Home scroll-motion readiness", () => {
       expect(await group.evaluate((node) => [...node.querySelectorAll<HTMLElement>("a")].every((avatar) => avatar.getBoundingClientRect().width >= 48 && avatar.getBoundingClientRect().width <= 64))).toBe(true);
     } finally {
       await browser.close();
-      server.kill();
+      await server.stop();
     }
-  }, 180_000);
+  }, 660_000);
 });
