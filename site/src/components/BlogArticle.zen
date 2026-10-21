@@ -83,7 +83,7 @@ function blogArticleRenderRelatedPosts(posts: BlogPost[]): string {
   </div>
 
   <section class="px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
-    <div class="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,48rem),15rem] lg:items-start lg:gap-16">
+    <div class="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,48rem)_15rem] lg:items-start lg:gap-16">
       <aside aria-labelledby="blog-on-this-page" class="border-y border-border py-5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:border-y-0 lg:border-l lg:py-0 lg:pl-5" style={blogArticleHeadings.length > 0 ? undefined : "display: none;"}>
         <ReaderToc
           headings={post.headings}

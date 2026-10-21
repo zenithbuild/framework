@@ -48,7 +48,7 @@ const sponsorActionsRef = ref<HTMLElement>();
         <span class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Front-page recognition</span>
         <span class="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{recognitionStatus}</span>
       </div>
-      <div class="grid min-h-[21rem] gap-8 px-6 py-10 sm:px-8 sm:py-12 md:grid-cols-[8rem,minmax(0,1fr)] md:items-end">
+      <div class="grid min-h-[21rem] gap-8 px-6 py-10 sm:px-8 sm:py-12 md:grid-cols-[8rem_minmax(0,1fr)] md:items-end">
         <div class="self-start border border-border bg-background px-4 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{recognitionBadge}</div>
         <div>
           <p class="font-heading text-4xl font-semibold leading-[0.88] text-foreground sm:text-6xl">{recognitionName}</p>
