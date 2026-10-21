@@ -1,36 +1,22 @@
+import { startSiteDevServer } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
 
 const PORT = 4016;
 const origin = `http://localhost:${PORT}`;
 
-async function startDevServer(): Promise<{ kill: () => void }> {
-  const { spawn } = await import("child_process");
-  const http = await import("http");
-  const dev = spawn("npx", ["zenith", "dev", "--port", String(PORT)], {
-    cwd: import.meta.dir + "/..",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const check = () => new Promise<number>((resolve) => {
-    const request = http.get(origin, (response) => { response.resume(); resolve(response.statusCode || 0); });
-    request.on("error", () => resolve(0));
-    request.setTimeout(2_000, () => { request.destroy(); resolve(0); });
-  });
-
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    if (await check() === 200) return { kill: () => dev.kill() };
-  }
-  dev.kill();
-  throw new Error("Home refinement dev server failed to start");
+async function startDevServer() {
+  return startSiteDevServer(PORT);
 }
 
 async function waitForHome(page: import("playwright").Page) {
   await page.waitForFunction(
     () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+    undefined,
     { timeout: 30_000 },
   );
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector("main")!).pointerEvents === "auto",
+    undefined,
     { timeout: 15_000 },
   );
 }
@@ -38,12 +24,23 @@ async function waitForHome(page: import("playwright").Page) {
 async function waitForTransition(page: import("playwright").Page) {
   await page.waitForFunction(
     () => document.querySelector("[data-route-transition='true']")?.getAttribute("data-route-transition-phase") === "complete",
+    undefined,
     { timeout: 30_000 },
   );
 }
 
+async function sponsorshipTargetsVisible(page: import("playwright").Page) {
+  return page.evaluate(() => {
+    const targets = [...document.querySelectorAll<HTMLElement>("[data-sponsorship-section='true'] [data-motion-target='true']")];
+    return targets.length > 0 && targets.every((node) => {
+      const style = getComputedStyle(node);
+      return Number(style.opacity) > 0.98 && style.visibility === "visible";
+    });
+  });
+}
+
 describe("Home section refinement playback", () => {
-  test("keeps the restored package rail, Framework Surface, sponsorship, contributors, and scroll motion stable through SPA return", async () => {
+  test("keeps the restored package rail, sponsorship, contributors, and scroll motion stable through SPA return", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
     const browser = await chromium.launch({ headless: true });
@@ -69,7 +66,7 @@ describe("Home section refinement playback", () => {
       await page.waitForFunction(() => {
         const transform = getComputedStyle(document.querySelector("[data-precision-package-track='true']")!).transform;
         return transform !== "none" && transform !== "matrix(1, 0, 0, 1, 0, 0)";
-      }, { timeout: 10_000 });
+      }, undefined, { timeout: 10_000 });
       await rail.hover();
       await page.waitForFunction(() => document.querySelector("[data-precision-package-rail='true']")?.getAttribute("data-precision-rail-state") === "paused");
       await page.waitForTimeout(300);
@@ -80,68 +77,8 @@ describe("Home section refinement playback", () => {
       await rail.focus();
       await page.waitForTimeout(150);
 
-      const framework = page.locator("[data-framework-surface='true']");
-      await framework.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(1_200);
-      const initialLayout = await page.evaluate(() => {
-        const stage = document.querySelector("[data-framework-detail='true']")!.getBoundingClientRect();
-        const framework = document.querySelector("[data-framework-surface='true']")!.getBoundingClientRect();
-        const sponsor = document.querySelector("[data-sponsorship-section='true']")!.getBoundingClientRect();
-        const labels = [...document.querySelectorAll<HTMLElement>("[data-framework-surface='true'] [role='tab']")].map((label) => {
-          const bounds = label.getBoundingClientRect();
-          return { top: bounds.top + window.scrollY, left: bounds.left, width: bounds.width, height: bounds.height };
-        });
-        return { stageHeight: stage.height, stageWidth: stage.width, frameworkHeight: framework.height, sponsorTop: sponsor.top + window.scrollY, labels };
-      });
-
-      const expectedDetails = [
-        "Structure and binding intent are resolved before the browser takes over.",
-        "Pathname selects the route. The server decides protected outcomes.",
-        "Use the primitive that matches the ownership boundary.",
-        "Security and data stay route-owned.",
-        "Compiler, bundler, runtime, router, and CLI move on one train.",
-      ];
-      const accordionIds = ["compiler", "router", "reactivity", "server", "toolchain"];
-      for (let index = 0; index < accordionIds.length; index += 1) {
-        const control = page.locator(`#feature-tab-${accordionIds[index]}`);
-        await control.click();
-        await page.waitForFunction((id) => document.querySelector(id)?.getAttribute("aria-selected") === "true", `#feature-tab-${accordionIds[index]}`);
-        await page.waitForFunction((detail) => document.querySelector("[data-framework-detail='true']")?.textContent?.includes(detail), expectedDetails[index]);
-      }
-      const routerControl = page.locator("#feature-tab-router");
-      await routerControl.focus();
-      await routerControl.press("Enter");
-      await page.waitForFunction(() => document.querySelector("#feature-tab-router")?.getAttribute("aria-selected") === "true");
-      await page.locator("#feature-tab-compiler").click();
-      await page.locator("#feature-tab-server").click();
-      await page.locator("#feature-tab-toolchain").click();
-      await page.waitForFunction(() => document.querySelector("#feature-tab-toolchain")?.getAttribute("aria-selected") === "true");
-      await page.waitForTimeout(900);
-      const settledLayout = await page.evaluate(() => {
-        const stage = document.querySelector("[data-framework-detail='true']")!.getBoundingClientRect();
-        const framework = document.querySelector("[data-framework-surface='true']")!.getBoundingClientRect();
-        const sponsor = document.querySelector("[data-sponsorship-section='true']")!.getBoundingClientRect();
-        return {
-          stageHeight: stage.height,
-          stageWidth: stage.width,
-          frameworkHeight: framework.height,
-          sponsorTop: sponsor.top + window.scrollY,
-          labels: [...document.querySelectorAll<HTMLElement>("[data-framework-surface='true'] [role='tab']")].map((label) => {
-            const bounds = label.getBoundingClientRect();
-            return { top: bounds.top + window.scrollY, left: bounds.left, width: bounds.width, height: bounds.height };
-          }),
-          visiblePanels: [...document.querySelectorAll<HTMLElement>("[data-framework-panel]")].filter((panel) => getComputedStyle(panel).display !== "none").length,
-          splitLines: document.querySelectorAll(".zenith-framework-detail-line").length,
-        };
-      });
-      expect(Math.abs(settledLayout.stageHeight - initialLayout.stageHeight)).toBeLessThanOrEqual(1);
-      expect(Math.abs(settledLayout.stageWidth - initialLayout.stageWidth)).toBeLessThanOrEqual(1);
-      expect(Math.abs(settledLayout.frameworkHeight - initialLayout.frameworkHeight)).toBeLessThanOrEqual(1);
-      expect(Math.abs(settledLayout.sponsorTop - initialLayout.sponsorTop)).toBeLessThanOrEqual(1);
-      expect(settledLayout.labels).toEqual(initialLayout.labels);
-      expect(settledLayout.visiblePanels).toBe(1);
-      expect(settledLayout.splitLines).toBeGreaterThan(0);
-      expect(settledLayout.splitLines).toBeLessThan(10);
+      // The Framework Surface tab section was retired in favour of the sponsorship invitation;
+      // home-section-refinement.test.ts asserts index.zen no longer renders <FrameworkSurface>.
 
       const sponsor = page.locator("[data-sponsorship-section='true']");
       await sponsor.scrollIntoViewIfNeeded();
@@ -177,10 +114,12 @@ describe("Home section refinement playback", () => {
       await page.locator("[data-nav-shell='true'] a[href='/']").first().click();
       await page.waitForURL(`${origin}/`);
       await waitForTransition(page);
-      expect(await page.locator("[data-framework-surface='true']").count()).toBe(1);
-      await page.locator("[data-framework-surface='true']").scrollIntoViewIfNeeded();
+      // The SPA return must restore exactly one sponsorship section and leave it visible.
+      expect(await page.locator("[data-sponsorship-section='true']").count()).toBe(1);
+      await page.locator("[data-sponsorship-section='true']").scrollIntoViewIfNeeded();
       await page.waitForTimeout(1_300);
-      expect(await page.locator("[data-framework-detail='true']").evaluate((node) => getComputedStyle(node).visibility)).toBe("visible");
+      // Assert on the animated targets; the section root itself is never hidden by the motion.
+      expect(await sponsorshipTargetsVisible(page)).toBe(true);
 
       const themeToggle = page.getByRole("button", { name: /theme/i });
       const beforeTheme = await themeToggle.getAttribute("aria-label");
@@ -197,12 +136,14 @@ describe("Home section refinement playback", () => {
       await reducedPage.goto(`${origin}/`, { waitUntil: "networkidle" });
       await waitForHome(reducedPage);
       expect(await reducedPage.locator("[data-precision-package-track='true']").evaluate((node) => getComputedStyle(node).transform)).toBe("none");
-      expect(await reducedPage.locator("[data-framework-detail='true']").evaluate((node) => getComputedStyle(node).visibility)).toBe("visible");
+      await reducedPage.locator("[data-sponsorship-section='true']").scrollIntoViewIfNeeded();
+      await reducedPage.waitForTimeout(300);
+      expect(await sponsorshipTargetsVisible(reducedPage)).toBe(true);
       await reducedContext.close();
       expect(errors).toEqual([]);
     } finally {
       await browser.close();
-      server.kill();
+      await server.stop();
     }
-  }, 180_000);
+  }, 660_000);
 });

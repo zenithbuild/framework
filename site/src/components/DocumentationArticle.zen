@@ -2,6 +2,7 @@
 import type { DocumentationViewModel } from "@/server/documentationViewModel";
 import ReaderToc from "@/components/reader/ReaderToc.zen";
 import DocumentationSidebarEntries from "@/components/docs/DocumentationSidebarEntries.zen";
+import DocsArticleTransition from "@/components/reader/DocsArticleTransition.zen";
 
 interface Props {
   view: DocumentationViewModel;
@@ -13,6 +14,7 @@ const documentationPrevious = documentationView.previous;
 const documentationNext = documentationView.next;
 const documentationArticleRef = ref<HTMLElement>();
 const documentationArticleEndRef = ref<HTMLElement>();
+const documentationArticleRegionRef = ref<HTMLElement>();
 
 function documentationEscapeHtml(value: unknown): string {
   return String(value || "")
@@ -66,7 +68,7 @@ function documentationRenderSidebar(): string {
     </div>
 
     <div id="app" class="w-full max-w-[44rem] min-w-0 lg:col-start-2 lg:row-start-2 xl:row-start-1">
-      <main data-docs-article-region="true" data-docs-transition-phase="idle" class="min-w-0">
+      <main ref={documentationArticleRegionRef} data-docs-article-region="true" data-docs-transition-phase="idle" class="min-w-0">
         <header data-docs-article-header="true" class="border-b border-border pb-12 lg:pb-16">
           <nav aria-label="Breadcrumb">
             <ol class="flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground" unsafeHTML={documentationRenderBreadcrumbs()}></ol>
@@ -90,6 +92,7 @@ function documentationRenderSidebar(): string {
           </a>
         </nav>
       </main>
+      <DocsArticleTransition articleRegionRef={documentationArticleRegionRef} currentPath={documentationView.path} />
     </div>
   </div>
 </div>

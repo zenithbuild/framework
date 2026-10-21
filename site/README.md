@@ -126,6 +126,68 @@ The public route shape is intentionally category-aware:
 
 The site adapter expects a token-first Directus read path. For local development, use a static token from the API-only `Frontend Bot` user rather than admin credentials.
 
+## Testing against the framework candidate
+
+The site suite (`bun test`, including the Playwright browser tests) runs against the
+framework candidate built from this repository, not the published npm toolchain:
+published `@zenithbuild/*@0.8.0` cannot build this site (vendor bundling fails with
+`Unterminated string`). The browser tests start `zenith dev` through
+`tests/helpers/dev-server.ts`, which uses `ZENITH_SITE_CLI_ENTRY`.
+
+Verified candidate: `f504c98d` (train `0.8.0`) on Judah's local `zenith09-head` branch. That
+branch is not pushed, so the SHA is not on GitHub (GitHub `master` is `c2010a0`). From the
+repository root:
+
+```bash
+bun install --frozen-lockfile
+export ZENITH_TRAIN_VERSION="$(cat TRAIN_VERSION)"
+for p in runtime router extension-registry core cli; do bun run --cwd packages/$p build; done
+cargo build --locked --release --manifest-path packages/compiler/Cargo.toml   # rustc >= 1.88
+bun run --cwd packages/compiler build
+bun run --cwd packages/bundler build
+bun run --cwd apps/integration-tests playwright install chromium
+
+cd site
+bun install --frozen-lockfile
+export ZENITH_SITE_CLI_ENTRY="$PWD/../packages/cli/dist/index.js"
+export ZENITH_COMPILER_BIN="$PWD/../packages/compiler/target/release/zenith-compiler"
+export ZENITH_BUNDLER_BIN="$PWD/../packages/bundler/target/release/zenith-bundler"
+node "$ZENITH_SITE_CLI_ENTRY" build   # production build with the candidate
+bun test                              # full suite, about 15 minutes
+```
+
+This mirrors the `site` gate in `.github/workflows/qualify-candidate.yml`. Result at
+`f504c98d` with the JUD-48 site changes applied: 260 pass, 0 fail (30 files, about 14
+minutes). Plain `f504c98d` without these changes fails 13 tests. At that SHA, nine browser
+tests spawn `npx zenith` directly, so they run published 0.8.0 and ignore
+`ZENITH_SITE_CLI_ENTRY`. JUD-48 routes them through `tests/helpers/dev-server.ts`.
+
+Root causes of the six original candidate failures (JUD-48):
+
+| Test | Cause | Resolution |
+| --- | --- | --- |
+| destination entrance replay | Test drift: it navigated to `/blog`, whose scroll-mode motion has no `[data-route-entrance]` targets. | Navigates to `/about` (page-mode `PageHeader`). |
+| Tina-managed committed content routes | Test drift: stale Blog heading, TOC label (`On this page`), and a repo path the reader no longer renders. | Asserts the committed content (`blog.json`, frontmatter description). |
+| documentation reader path | Site bugs: `DocsArticleTransition` was never mounted, and `docs/getting-started` wrapped the reader in different outer markup from `[...slug]`, so soft navigation between them hit `MARKER_MISSING` and fell back to a full load. | Mounted the transition; both routes render the same `DocumentationArticle` template (contract test added). The framework's unchecked `#app` swap is reported separately. |
+| Home scroll-motion readiness | Test drift: expected the retired Framework Surface section (`home-section-refinement.test.ts` asserts it is gone). | Checks the sponsorship section instead. |
+| Home section refinement playback | Same retired Framework Surface. | Checks sponsorship motion targets after SPA return and under reduced motion. |
+| route-transition lifecycle | Site bug: workbench tabs never updated `aria-selected`/`tabIndex` because props are not reactive (ZEN-RULE-104). Plus test drift in panel ids and strings. | `syncTabSelection()` in `CodeWorkbench.zen` (unit test in `workbench-tab-selection.test.ts`); updated selectors. |
+
+Not in the original six: `route transition playback` was flaky. It sampled the phase at a
+fixed 2.5 seconds, but the router fires `navigation:before-leave` only after the route check
+and HTML fetch finish (about 3 seconds on a cold dev server). It now waits for the phase.
+
+Environment notes:
+
+- Each browser test starts its own dev server on a fixed port between 4010 and 4033. The
+  harness refuses a port that is already in use instead of testing against another server,
+  so stop other dev servers on those ports first.
+- The Home contributor and route-lifecycle tests load GitHub avatars and profile pages, so
+  the suite needs outbound network access. Offline runs fail those two tests with
+  `ERR_INTERNET_DISCONNECTED`.
+- On hosts with a low inotify watch limit the dev server can exit with
+  `ENOSPC: System limit for number of file watchers reached`.
+
 ## Technologies
 
 - **Core**: `@zenithbuild/core`
