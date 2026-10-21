@@ -134,9 +134,8 @@ published `@zenithbuild/*@0.8.0` cannot build this site (vendor bundling fails w
 `Unterminated string`). The browser tests start `zenith dev` through
 `tests/helpers/dev-server.ts`, which uses `ZENITH_SITE_CLI_ENTRY`.
 
-Verified candidate: `f504c98d` (train `0.8.0`) on Judah's local `zenith09-head` branch. That
-branch is not pushed, so the SHA is not on GitHub (GitHub `master` is `c2010a0`). From the
-repository root:
+Verified candidate: `f504c98d` (train `0.8.0`), the head of the GitHub branch `integration/v1`.
+From the repository root:
 
 ```bash
 bun install --frozen-lockfile
