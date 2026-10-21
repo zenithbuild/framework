@@ -134,7 +134,7 @@ published `@zenithbuild/*@0.8.0` cannot build this site (vendor bundling fails w
 `Unterminated string`). The browser tests start `zenith dev` through
 `tests/helpers/dev-server.ts`, which uses `ZENITH_SITE_CLI_ENTRY`.
 
-Verified candidate: `f504c98d` (train `0.8.0`), the head of the GitHub branch `integration/v1`.
+Verified candidate: `f504c98d` (train `0.8.0`), the base commit of this batch on GitHub's `integration/v1`.
 From the repository root:
 
 ```bash
