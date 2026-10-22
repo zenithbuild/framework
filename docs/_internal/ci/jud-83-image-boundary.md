@@ -1,65 +1,58 @@
-# JUD-83 image package boundary: implementation checkpoint
+# JUD-83 image package boundary
 
-This is the first extraction checkpoint, not a completed package split.
-The loader is implemented and tested before changing CLI/adapters together.
-Production callers still use the existing image pipeline until the package,
-config ownership and consumer qualification are ready.
+Judah approved the independent shared config package (option A) before this
+implementation. See [the architecture decision](./jud-83-config-boundary-proposal.md)
+and [migration and packaging details](./jud-83-image-migration.md).
 
 ## Loader contract
 
-`loadImagePackage({ projectRoot, required })` is internal to the CLI.
+`loadImagePackage({ projectRoot, required })` is internal to CLI:
 
-- `required=false`: return null without package resolution, import or Sharp.
-- `required=true`: resolve from the consumer's package tree, validate exact
-  CLI/image release-train identity, then dynamically import the image API.
-- Return `{ api, packageRoot, componentPath, sharpVersionRange }`.
-- Missing package: fail with `npm i -D @zenithbuild/image@<exact CLI version>`.
-- Broken installed package: preserve its original error; do not disguise
-  dependency/import failures as absence of the optional image package.
-- Image must export its package manifest and `components/Image.zen` as well
-  as the existing artifact, request, materialization and payload functions.
-  Adapters read the Sharp range from this manifest, never the CLI manifest.
+- `required=false` returns null without resolution, import or Sharp.
+- `required=true` resolves from the consumer's dependency tree, validates exact
+  CLI/image train identity, and dynamically imports the image API.
+- It returns `{ api, packageRoot, componentPath, sharpVersionRange }`.
+- Missing/skewed packages identify the exact `npm i -D @zenithbuild/image@VERSION` command.
+- Import failures inside an installed package retain their original cause.
 
-The CLI remains responsible for detecting raster files in public/ and Image
-usage across pages, components, layouts and globals before any compiler
-spawn or output mutation. The loader deliberately accepts that decision;
-it does not add a second markup parser or silently infer an incomplete tree.
-Dev must repeat detection after relevant source/public file additions.
-Preview and generated runtimes use output image metadata/endpoint needs.
+CLI detects raster public assets and Image tags in project `.zen` files before
+compilation or output removal. It excludes dependency, Git and standard generated
+directories and does not follow directory symlinks. Dev repeats detection on
+rebuild, including the first image added to a project. An absent image pipeline
+uses identity/no-op helpers and a 404 image endpoint.
 
-## Verified dependency conflict
+The Image component is registered from the package selected by the loader.
+The image package owns the image pipeline and Sharp; it depends on the pure
+shared config package, never on CLI or core. Rust materialization stays native.
 
-The supplied simplification handoff says config consolidation in core must
-precede JUD-83. The Linear issue currently says there are no dependencies.
-At f504c98, CLI config.js imports image normalization from images/shared.js;
-core/config.ts separately implements image normalization. Core's manifest
-already depends on CLI. Merely moving shared.js and importing image from
-CLI config would make image/Sharp mandatory for every project. Making image
-depend on CLI for base-path/config helpers introduces the wrong dependency
-direction. Adding CLI -> core without addressing core -> CLI adds a cycle.
+## Compatibility and deployment
 
-The concrete decision for Judah is the shared config/module home and the
-core/CLI dependency direction. This checkpoint avoids changing either.
-No new package name, Rust change, public API or risk acceptance is implied.
+Core keeps its public root/config APIs, types and sole public `zenith` bin.
+CLI keeps explicit-key and loaded-config metadata, and directory discovery.
+The shared package eliminates duplicate schema/default/loader/plugin code.
 
-Judah requested a concrete proposal after this checkpoint. See
-[the config boundary proposal](./jud-83-config-boundary-proposal.md) for the
-recommended independent lower package, alternatives, compatibility costs
-and verification gates. The architecture implementation remains unapproved.
+Adapters consume image runtime files and the Sharp range emitted from the
+loader-selected package manifest. Config/base-path helpers are copied as pure
+standalone files so relocated output needs no builder workspace. No-image
+artifacts declare no Sharp dependency. Hosted Sharp fallback behavior is retained
+but now resolves from the consumer's image package; JUD-16 owns further path
+qualification.
 
-## Remaining extraction and acceptance work
+The former image router-manifest helper writes server metadata, so it remains
+unconditionally in CLI as `router-server-metadata.js`.
 
-1. Resolve the shared config/base-path boundary and record the decision.
-2. Move images/* and Image.zen into @zenithbuild/image with Sharp ^0.35.5;
-   add the exact lockstep train entry and image-template dependencies.
-3. Wire early usage detection, lazy build/dev/preview/runtime loading and
-   component registration; migrate adapters to the loader contract.
-4. Move/update image tests and the Sharp floor; preserve security checks.
-5. Qualify missing-package errors before work, no-image build/dev/preview,
-   image output and relocated SSR, then full CI. Measure scratch npm 12,
-   pnpm 10 and Bun installs with machine, method and run count.
-6. Publish migration documentation with the final behavior. Until then,
-   neither Sharp removal nor the prior install-size estimate is a result.
+## Qualification
 
-JUD-84 remains dependent on completion of this extraction. JUD-16 retains
-the Sharp security and image-path qualification. This PR stays draft.
+Focused missing-package, no-image build/dev/preview, image transformations,
+security, Node relocation and hosted tests accompany the extraction. Config
+compatibility is checked against the existing core and CLI suites. The Sharp
+floor and image artifact cache tests now belong to the image package.
+
+The install benchmark runs three fresh consumers with and without images for
+npm 12, pnpm 10 and Bun, records actual versions and machine/method, and verifies
+that no-image trees contain zero Sharp packages. Friday's independent Benchmark
+Verifier sign-off is still required.
+
+JUD-84 remains dependent on completion/review of this extraction. Active
+security findings remain enforced under JUD-21. No merge or publication is
+authorized by these implementation results.

@@ -16,10 +16,6 @@ import { findMatchingComponentClose, findNextKnownComponentTag } from './compone
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const FRAMEWORK_COMPONENTS = [
-    ['Image', join(__dirname, 'framework-components', 'Image.zen')]
-];
-
 // ---------------------------------------------------------------------------
 // Registry: Map<PascalCaseName, absolutePath>
 // ---------------------------------------------------------------------------
@@ -33,7 +29,7 @@ const FRAMEWORK_COMPONENTS = [
  * @param {string} srcDir — absolute path to the project's `src/` directory
  * @returns {Map<string, string>}
  */
-export function buildComponentRegistry(srcDir) {
+export function buildComponentRegistry(srcDir, { imageComponentPath = null } = {}) {
     /** @type {Map<string, string>} */
     const registry = new Map();
 
@@ -48,7 +44,7 @@ export function buildComponentRegistry(srcDir) {
         walkDir(dir, registry);
     }
 
-    for (const [componentName, componentPath] of FRAMEWORK_COMPONENTS) {
+    for (const [componentName, componentPath] of (imageComponentPath ? [['Image', imageComponentPath]] : [])) {
         if (!existsSync(componentPath)) {
             continue;
         }

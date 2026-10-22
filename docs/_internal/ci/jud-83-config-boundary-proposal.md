@@ -1,20 +1,22 @@
 # JUD-83 shared configuration boundary proposal
 
-Status: proposed for Judah's architecture approval. No dependency reversal,
-new package or public API described below has been implemented.
+Status: Judah approved option A (shared config package) on October 21, 2026.
+Implementation is in draft PR #235. Validation and independent review remain
+required; approval of this boundary does not approve a merge or release.
 
 ## Recommendation
 
 Use a small, independent configuration package beneath core, CLI and image.
-`@zenithbuild/config` is a working name, subject to approval and registry
-availability. Keep core's existing public config exports and public `zenith`
+The approved name is `@zenithbuild/config`; the public registry lookup returned
+404, which does not establish publish permission. Keep core's public config exports and public `zenith`
 bin as compatibility facades. Keep the image package absent from the CLI's
-dependency manifest; projects install it explicitly when images are needed.
+runtime dependency manifest; CLI uses it as a development fixture only.
+Projects install it explicitly when images are needed.
 
 This changes the handoff's suggested physical home in core. It avoids the
 existing core -> CLI dependency becoming a cycle when CLI needs shared
 configuration. The cost is one additional lockstep package. That packaging
-cost needs Judah's approval; it is not hidden inside the image extraction.
+cost was explicitly approved by Judah before implementation.
 
 ## Evidence and current contracts
 

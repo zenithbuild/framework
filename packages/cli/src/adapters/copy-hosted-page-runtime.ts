@@ -33,8 +33,13 @@ interface ServerManifest {
     };
 }
 
-function createSharpRuntimeSource(): string {
-    const sharpPath = PACKAGE_REQUIRE.resolve('sharp');
+function createSharpRuntimeSource(coreOutput: string): string {
+    const projectRequire = createRequire(join(coreOutput, 'package.json'));
+    const imageManifestPath = projectRequire.resolve('@zenithbuild/image/package.json');
+    const imageRequire = createRequire(imageManifestPath);
+    const imageManifest = imageRequire(imageManifestPath);
+    if (!imageManifest.dependencies?.sharp) throw new Error('[Zenith:Image] Image package must declare Sharp.');
+    const sharpPath = imageRequire.resolve('sharp');
     const fallbackUrl = pathToFileURL(sharpPath).href;
     return [
         'async function loadSharp() {',
@@ -118,13 +123,22 @@ export async function copyHostedPageRuntime(
     }
 
     const imageServicePath = join(targetDir, 'images', 'service.js');
+    let imageManifest;
+    try {
+        imageManifest = JSON.parse(await readFile(join(targetDir, 'images', 'package.json'), 'utf8'));
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+    if (imageManifest?.dependencies?.sharp) {
     const imageServiceSource = await readFile(imageServicePath, 'utf8');
     await writeFile(
         imageServicePath,
         imageServiceSource.replace("import sharp from 'sharp';", "import sharp from './sharp-runtime.js';"),
         'utf8'
     );
-    await writeFile(join(targetDir, 'images', 'sharp-runtime.js'), createSharpRuntimeSource(), 'utf8');
+    await writeFile(join(targetDir, 'images', 'sharp-runtime.js'), createSharpRuntimeSource(coreOutput), 'utf8');
+    await writeFile(join(targetDir, 'package.json'), JSON.stringify({
+        type: 'module', dependencies: { sharp: imageManifest.dependencies.sharp }
+    }, null, 2) + '\n');
+    }
 
     if (options.includeScopedServerData === true) {
         await copyHostedScopedServerDataRuntime(coreOutput, targetDir);

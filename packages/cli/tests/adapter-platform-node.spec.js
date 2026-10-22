@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
 import { cli } from '../dist/index.js';
+import { installImagePackage } from './helpers/image-package.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
@@ -99,7 +100,7 @@ describe('node adapter', () => {
 
     test('node target emits a runnable server artifact with prerender, SSR, image, and route-check support', async () => {
         projectRoot = await createProject({
-            'pages/index.zen': '<main>Home</main>\n',
+            'pages/index.zen': '<main>Home<Image src="/hero.png" alt="Hero" /></main>\n',
             'pages/guides/[slug].zen': '<main>Docs Shell</main>\n',
             'pages/secure/index.zen': '<main>Secure</main>\n',
             'pages/secure/page.guard.ts': [
@@ -117,6 +118,7 @@ describe('node adapter', () => {
             'zenith.config.js': 'module.exports = { target: "node", basePath: "/docs", router: true };\n'
         });
 
+        await installImagePackage(projectRoot);
         await buildNodeArtifact(projectRoot);
 
         expect(existsSync(join(projectRoot, 'dist', 'index.js'))).toBe(true);

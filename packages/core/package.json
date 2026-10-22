@@ -47,7 +47,8 @@
     "@zenithbuild/compiler": "0.8.0",
     "@zenithbuild/runtime": "0.8.0",
     "@zenithbuild/router": "0.8.0",
-    "@zenithbuild/bundler": "0.8.0"
+    "@zenithbuild/bundler": "0.8.0",
+    "@zenithbuild/config": "0.8.0"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",

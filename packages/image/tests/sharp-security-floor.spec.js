@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const FIXED_VERSION = [0, 35, 5];
-const CLI_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+const IMAGE_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 function versionAtLeast(actual, minimum) {
     const parsed = String(actual).split('.').map((part) => Number.parseInt(part, 10));
@@ -19,7 +19,7 @@ function versionAtLeast(actual, minimum) {
 describe('Sharp security floor', () => {
     test('manifest and frozen install require the patched Sharp line', async () => {
         const manifest = JSON.parse(
-            await readFile(join(CLI_ROOT, 'package.json'), 'utf8')
+            await readFile(join(IMAGE_ROOT, 'package.json'), 'utf8')
         );
 
         expect(manifest.dependencies.sharp).toBe('^0.35.5');

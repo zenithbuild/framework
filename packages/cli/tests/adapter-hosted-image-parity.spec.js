@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
-import sharp from 'sharp';
+import { sharp, installImagePackage } from './helpers/image-package.js';
 import { cli } from '../dist/index.js';
 
 process.env.ZENITH_NO_UI = '1';
@@ -51,7 +51,8 @@ async function startRemoteImageServer() {
 async function createProject(target, remotePort) {
     const root = join(tmpdir(), `zenith-hosted-image-${target}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const files = {
-        'pages/index.zen': '<main>Hosted image parity</main>\n',
+        'pages/index.zen': '<main>Hosted image parity<Image src="/hero.png" alt="Hero" /></main>\n',
+        'public/hero.png': await createPng1x1(),
         'zenith.config.js': [
             'module.exports = {',
             `  target: ${JSON.stringify(target)},`,
@@ -69,9 +70,10 @@ async function createProject(target, remotePort) {
     for (const [relativePath, contents] of Object.entries(files)) {
         const absolutePath = join(root, relativePath);
         await mkdir(join(absolutePath, '..'), { recursive: true });
-        await writeFile(absolutePath, contents, 'utf8');
+        await writeFile(absolutePath, contents);
     }
 
+    await installImagePackage(root);
     return root;
 }
 

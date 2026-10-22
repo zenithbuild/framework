@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import {
     buildComponentRegistry,
     expandComponents,
@@ -131,12 +132,15 @@ describe('resolve-components', () => {
         );
     });
 
-    test('registers the built-in Image component without registering unrelated framework components', async () => {
+    test('registers the image package component only when supplied, without unrelated framework components', async () => {
         project = await makeSrc({
             'components/Foo.zen': '<div>Foo</div>',
         });
 
-        const registry = buildComponentRegistry(project.srcDir);
+        expect(buildComponentRegistry(project.srcDir).has('Image')).toBe(false);
+        const registry = buildComponentRegistry(project.srcDir, {
+            imageComponentPath: fileURLToPath(new URL('../../image/components/Image.zen', import.meta.url))
+        });
         expect(registry.has('Image')).toBe(true);
         expect(registry.has('ZenLink')).toBe(false);
     });

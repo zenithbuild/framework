@@ -126,6 +126,18 @@ Typically installed as a dev dependency in your Zenith project:
 bun add -d @zenithbuild/cli
 ```
 
+Projects using `<Image>` or JPG/JPEG/PNG/WebP/AVIF assets in `public/` also
+install `@zenithbuild/image` at the exact same framework train version:
+
+```bash
+npm i -D @zenithbuild/image@0.8.0
+```
+
+The optional package owns the component and Sharp processing. No-image projects
+need neither package nor Sharp. Missing image dependencies fail before compilation
+or output removal. Generated Node image artifacts declare their own Sharp runtime
+dependency; install dependencies in that output before starting it elsewhere.
+
 ## License
 
 MIT
