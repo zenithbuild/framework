@@ -323,7 +323,9 @@ export function createDevBuildSession(options) {
 
     return {
         async build(buildOptions = {}) {
-            imagePackage = await prepareProjectImages(projectRoot, srcDir);
+            const nextImagePackage = await prepareProjectImages(projectRoot, srcDir);
+            if (imagePackage?.componentPath !== nextImagePackage.componentPath) state.hasSuccessfulBuild = false;
+            imagePackage = nextImagePackage;
             const activeLogger = buildOptions.logger || logger;
             const showBundlerInfo = buildOptions.showBundlerInfo !== false;
             const changedFiles = Array.isArray(buildOptions.changedFiles)
