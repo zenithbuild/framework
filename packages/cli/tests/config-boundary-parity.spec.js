@@ -1,5 +1,10 @@
 import { validateConfig as core } from '../../core/dist/config.js';
 import { validateConfig as cli } from '../dist/config.js';
+import { loadConfig as loadCore } from '../../core/dist/config.js';
+import { loadConfig as loadCli } from '../dist/config.js';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const cases = [
     ['defaults', {}],
@@ -28,4 +33,14 @@ function evaluate(validate, input) {
 
 test.each(cases)('shared config boundary preserves current core/CLI behavior: %s', (_, input) => {
     expect(evaluate(cli, input)).toEqual(evaluate(core, input));
+});
+
+test('shared plugin loading retains CLI messages from thrown plain objects', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'zenith-config-hook-message-'));
+    try {
+        await writeFile(join(root, 'zenith.config.js'), "module.exports = { plugins: [{ name: 'diagnostic', config() { throw { message: 'Readable failure' }; } }] };\n");
+        for (const load of [loadCore, loadCli]) {
+            await expect(load(root)).rejects.toThrow('[Zenith plugin diagnostic] config failed: Readable failure');
+        }
+    } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -15,6 +15,8 @@ command. The component is registered from the consumer's installed package;
 local components cannot shadow it. SVG and ordinary `<img>` alone do not
 require the processing package. Static raster files still receive variants,
 matching the previous CLI behavior even when the page uses ordinary `<img>`.
+Built image output carries a small package marker, so preview retains image
+endpoints when original page sources are absent. No-image builds omit it.
 
 The image package owns Sharp `^0.35.5`, Image.zen and the JS/TS processing
 pipeline. The Rust compiler/bundler materialization remains unchanged. CLI has
@@ -27,6 +29,8 @@ plugin configuration hooks, base-path helpers and Node config loader. It has
 no runtime dependencies or bin. Core's existing imports and `zenith` command
 continue to work. CLI retains its non-enumerable explicit-key/loading metadata
 and pages-directory discovery. No core-to-CLI dependency was reversed.
+Shared plugin errors retain CLI's readable message for thrown plain objects;
+core now uses that same message instead of coercing such objects to text.
 
 Generated Node output declares Sharp only for image-enabled builds. Install
 dependencies inside that output before starting a relocated artifact. Adapter
