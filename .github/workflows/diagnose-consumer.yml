@@ -1,0 +1,27 @@
+name: Diagnose isolated core consumer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile
+      - name: Build JavaScript entries without native compilation
+        run: |
+          bun run --cwd packages/runtime build
+          bun run --cwd packages/router build
+          bun run --cwd packages/core build
+          bun run --cwd packages/cli build
+          bun build packages/compiler/meta/index.ts --outdir packages/compiler/dist --target node --format esm
+          node node_modules/typescript/bin/tsc -p packages/bundler/tsconfig.meta.json
+      - run: node scripts/diagnose-core-consumer.mjs
