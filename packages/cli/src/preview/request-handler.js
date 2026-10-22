@@ -82,7 +82,7 @@ export function createPreviewRequestHandler(options) {
     serverOrigin
   } = options;
 
-  const getImageApi = createProjectImageApi(projectRoot);
+  const getImageApi = createProjectImageApi(projectRoot, distDir);
 
   async function loadImageManifest() {
     try {

@@ -1,4 +1,4 @@
-import { prepareProjectImages } from './project-images.js';
+import { prepareProjectImages, writeImagePackageMarker } from './project-images.js';
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
@@ -202,6 +202,7 @@ export async function build(options) {
         'inject_image_runtime_payload',
         () => injectImageRuntimePayloadIntoHtmlFiles(staticOutputDir, imageRuntimePayload)
     );
+    await writeImagePackageMarker(staticOutputDir, imagePackage);
     await startupProfile.measureAsync(
         'copy_public_assets',
         () => copyPublicAssets({

@@ -137,6 +137,8 @@ export function deepFreeze<T>(value: T, seen = new Set<object>()): Readonly<T> {
 }
 
 export function pluginHookError(pluginName: string, hookName: string, error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+    ? error.message
+    : String(error);
   return new Error(`[Zenith plugin ${pluginName}] ${hookName} failed: ${message}`);
 }

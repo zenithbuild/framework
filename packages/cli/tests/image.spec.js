@@ -66,6 +66,18 @@ describe('native image optimization', () => {
     let preview = null;
     let remote = null;
 
+    test('preview retains the image endpoint when original page sources are removed', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main><Image src="/hero.png" alt="Hero" /></main>\n'
+        });
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        await rm(project.pagesDir, { recursive: true, force: true });
+        preview = await createPreviewServer({ projectRoot: project.root, distDir: project.outDir, port: 0 });
+        const result = await fetch(`http://127.0.0.1:${preview.port}/_zenith/image`);
+        expect(result.status).toBe(400);
+        expect(await result.json()).toEqual({ error: 'missing_url' });
+    });
+
     afterEach(async () => {
         if (preview) {
             preview.close();

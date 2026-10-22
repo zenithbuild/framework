@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { discoverPublicAssets } from './public-assets.js';
 import { loadImagePackage } from './image-package-loader.js';
@@ -46,7 +46,24 @@ export async function prepareProjectImages(projectRoot, sourceDir = projectRoot)
     return loaded || { api: NO_IMAGES, componentPath: null, packageRoot: null, sharpVersionRange: null };
 }
 
-export function createProjectImageApi(projectRoot) {
+export async function writeImagePackageMarker(outDir, imagePackage) {
+    if (!imagePackage?.packageRoot) return;
+    const manifest = JSON.parse(await readFile(join(imagePackage.packageRoot, 'package.json'), 'utf8'));
+    const markerDir = join(outDir, '_zenith', 'image');
+    await mkdir(markerDir, { recursive: true });
+    await writeFile(join(markerDir, 'package.json'), JSON.stringify({ name: manifest.name, version: manifest.version }) + '\n');
+}
+
+export function createProjectImageApi(projectRoot, distDir = null) {
     // Re-evaluate usage so adding the first image during dev is handled too.
-    return async () => (await prepareProjectImages(projectRoot)).api;
+    return async () => {
+        if (distDir) {
+            let marker;
+            try {
+                marker = JSON.parse(await readFile(join(distDir, '_zenith', 'image', 'package.json'), 'utf8'));
+            } catch (error) { if (error.code !== 'ENOENT') throw error; }
+            if (marker?.name === '@zenithbuild/image') return (await loadImagePackage({ projectRoot, required: true })).api;
+        }
+        return (await prepareProjectImages(projectRoot)).api;
+    };
 }
