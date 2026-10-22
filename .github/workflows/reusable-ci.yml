@@ -49,10 +49,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -134,10 +135,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -234,10 +236,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

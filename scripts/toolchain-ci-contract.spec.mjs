@@ -46,3 +46,16 @@ test('standard builds validate tools before building and lock native dependencie
     assert.match(build, /cargo build --locked --release/);
     assert.match(JSON.parse(read('packages/bundler/package.json')).scripts.build, /cargo build --locked --release/);
 });
+
+test('Cargo caches never traverse workspace dependency links or restore legacy archives', () => {
+    const source = read('.github/workflows/reusable-ci.yml');
+    const blocks = [...source.matchAll(/- name: Cache Cargo registry and build outputs([\s\S]*?)(?=\n      -)/g)];
+    assert.equal(blocks.length, 3, 'core, integration and smoke must use the safe cache');
+    for (const [, block] of blocks) {
+        assert.doesNotMatch(block, /packages\/\*\*\/target/);
+        assert.match(block, /packages\/compiler\/target/);
+        assert.match(block, /packages\/bundler\/target/);
+        assert.match(block, /key: \$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-/);
+        assert.match(block, /restore-keys: \|\s*\$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-\s*$/);
+    }
+});
