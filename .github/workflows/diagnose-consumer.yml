@@ -22,7 +22,17 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-bun-
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            packages/**/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: bun install --frozen-lockfile
+      - run: ls -ld packages/core/node_modules/@zenithbuild/bundler packages/cli/node_modules/@zenithbuild/bundler && ls -la packages/core/node_modules/@zenithbuild/bundler/
       - name: Build JavaScript entries without native compilation
         run: |
           bun run --cwd packages/runtime build
