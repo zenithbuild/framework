@@ -69,5 +69,6 @@ if (hasMismatch) {
     process.exit(1);
 }
 
-// Proceed to hand off execution to the underlying CLI implementation
-import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
+// Imported CLI modules are inert; the public bin explicitly owns execution.
+const { cli } = await import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
+await cli(args);

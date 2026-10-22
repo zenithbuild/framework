@@ -24,9 +24,17 @@ Validation on the patch:
 
 - Actual Windows `--version`: exit 0, stdout `zenith 0.8.0`.
 - Actual Windows `--help`: exit 0, stdout includes `zenith build`.
-- Linux process tests: 5 passed, including a relocated package with spaces,
+- Linux process tests: 6 passed, including a relocated package with spaces,
   import-only behavior, and an outside-checkout build with nonempty HTML and
   JavaScript assets. Empty CSS placeholders remain valid output.
+- The first combined hosted run exposed an npm/Bun neutrality regression:
+  core's public bin only imported CLI and depended on its old auto-run side
+  effect. The wrapper now explicitly awaits `cli(args)`. Both the CLI entry
+  and core's public bin build real outside-checkout HTML/JavaScript in the
+  process tests. No assertion was relaxed to accept empty output.
+- Full shard 6 after the wrapper fix: 4 suites / 7 tests passed locally,
+  including identical npm/Bun output trees and hashes. This run used fresh
+  JS builds and the already-built matching native tools (`PREPARE=0`).
 - Restoring the baseline entry reproduces the import-only regression:
   stdout is `zenith 0.8.0` rather than `import completed`.
 - The new process tests run in every native-consumer matrix job, alongside

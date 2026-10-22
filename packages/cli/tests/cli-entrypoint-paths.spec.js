@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const cliRoot = fileURLToPath(new URL('..', import.meta.url));
 const entry = join(cliRoot, 'dist', 'index.js');
+const coreEntry = resolve(cliRoot, '..', 'core', 'bin', 'zenith.js');
 const version = JSON.parse(readFileSync(join(cliRoot, 'package.json'), 'utf8')).version;
 let scratch;
 
@@ -56,7 +57,7 @@ test('importing CLI from an application index.js never runs CLI commands', () =>
     expect(result.stderr).toBe('');
 });
 
-test('direct build writes nonempty HTML and referenced assets outside the checkout', () => {
+test.each([entry, coreEntry])('build writes nonempty HTML and assets outside the checkout: %s', (entryPath) => {
     const pages = join(scratch, 'src', 'pages');
     mkdirSync(pages, { recursive: true });
     writeFileSync(join(scratch, 'package.json'), '{"private":true,"type":"module"}');
@@ -67,7 +68,7 @@ test('direct build writes nonempty HTML and referenced assets outside the checko
         '</script>',
         '<main>Windows entry smoke <button on:click={increment}>{count}</button></main>'
     ].join('\n'));
-    const result = run(entry, ['build']);
+    const result = run(entryPath, ['build']);
     expect(result.error).toBeUndefined();
     if (result.status !== 0) throw new Error(`CLI build failed (${result.status}): ${result.stdout}${result.stderr}`);
     const html = readFileSync(join(scratch, 'dist', 'index.html'), 'utf8');
