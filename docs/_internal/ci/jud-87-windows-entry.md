@@ -49,7 +49,22 @@ node --experimental-vm-modules "$(node -p 'require.resolve("jest/bin/jest")')" \
   --config jest.config.js --runInBand tests/cli-entrypoint-paths.spec.js
 ```
 
+The first hosted Windows patch run passes `cross-os smoke passed`, proving
+the original missing-HTML cause is fixed. It then exposes Bun 1.4.0 failing
+to extract the local `file:///C:/...` tarballs (ENOENT). An actual Windows
+Node 24.19.0/Bun 1.4.0 reproduction with a generated dependency-free tarball
+shows the encoded file URL fails while both `file:C:/...` and relative
+`file:../...` install and frozen-install successfully, including spaces in
+the absolute parent path. The harness now uses relative file dependencies
+because the consumer and tarballs share the same scratch directory.
+
+The initial local Bun reproduction was blocked by sandbox EBADF temporary
+handles; rerunning the exact prepared local-only fixture outside the sandbox
+produced the ENOENT baseline and passing path cases above. The Bun archive
+was obtained from oven-sh/bun's bun-v1.4.0 release and checked against its
+SHA256 manifest. No global toolchain configuration was changed.
+
 Windows entry smoke is not full native qualification. Fresh same-source
 packed Windows HTML generation and the remaining native-consumer steps are
-pending hosted execution. JUD-8 owns broader artifact identity qualification;
+pending hosted execution of the updated harness. JUD-8 owns broader artifact identity qualification;
 JUD-17 owns mixed-train rejection.

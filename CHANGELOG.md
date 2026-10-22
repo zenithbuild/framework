@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Probe compiler compatibility before build and dev work, preserve compiler-bridge version probing, and assert both native probes in the compiler-to-bundler process contract (JUD-86).
 - Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application.
 - Correct an invalid PNG test-fixture checksum exposed by the restored core validation lane, retaining real image processing and the Sharp security floor.
+- Use portable relative tarball dependencies in the Windows packed-consumer harness.
 
 ## [0.8.0] - 2026-07-01
 
