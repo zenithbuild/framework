@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds, and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
 - Replace the withdrawn esbuild-specific assertion with current root/site audit evidence, preserve active findings and audit failures, and keep core validation running without treating unresolved security findings as a pass (JUD-85).
 - Probe compiler compatibility before build and dev work, preserve compiler-bridge version probing, and assert both native probes in the compiler-to-bundler process contract (JUD-86).
+- Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application.
 
 ## [0.8.0] - 2026-07-01
 
