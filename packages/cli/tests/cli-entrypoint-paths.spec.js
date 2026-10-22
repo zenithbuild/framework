@@ -1,6 +1,6 @@
 import {
     cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync,
-    readdirSync, rmSync, symlinkSync, writeFileSync
+    readdirSync, rmSync, writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -40,9 +40,12 @@ test('executes a relocated package in a path with spaces', () => {
     mkdirSync(relocated);
     cpSync(join(cliRoot, 'dist'), join(relocated, 'dist'), { recursive: true });
     cpSync(join(cliRoot, 'package.json'), join(relocated, 'package.json'));
-    symlinkSync(join(cliRoot, 'node_modules'), join(relocated, 'node_modules'),
-        process.platform === 'win32' ? 'junction' : 'dir');
+    mkdirSync(join(relocated, 'node_modules'));
+    cpSync(join(cliRoot, 'node_modules', 'picocolors'), join(relocated, 'node_modules', 'picocolors'), {
+        recursive: true, dereference: true
+    });
     const result = run(join(relocated, 'dist', 'index.js'), ['--version']);
+    if (result.status !== 0) throw new Error(`Relocated CLI failed: ${result.stdout}${result.stderr}`);
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe(`zenith ${version}`);
 });

@@ -64,7 +64,14 @@ produced the ENOENT baseline and passing path cases above. The Bun archive
 was obtained from oven-sh/bun's bun-v1.4.0 release and checked against its
 SHA256 manifest. No global toolchain configuration was changed.
 
-Windows entry smoke is not full native qualification. Fresh same-source
-packed Windows HTML generation and the remaining native-consumer steps are
-pending hosted execution of the updated harness. JUD-8 owns broader artifact identity qualification;
+The updated hosted Windows run passes both fresh same-source smoke builds,
+including `packed native consumer passed (win32-x64, 0.8.0)`, relocated Node
+SSR and real image transformations:
+https://github.com/zenithbuild/framework/actions/runs/39715813993/job/119617538376
+The lane then fails only the new relocated CLI test's dependency junction.
+That fixture now copies its static picocolors dependency with dereferencing,
+matching the physical dependency layout used in the actual Windows entry
+reproduction. The relocated command still must return the exact version;
+failures now include child stdout/stderr. The full lane must be rerun before
+claiming a Windows pass. JUD-8 owns broader artifact identity qualification;
 JUD-17 owns mixed-train rejection.
