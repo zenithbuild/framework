@@ -1,6 +1,7 @@
 name: Diagnose isolated core consumer
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:

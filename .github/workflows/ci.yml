@@ -18,6 +18,8 @@ permissions:
   contents: read
 
 jobs:
+  diagnose:
+    uses: ./.github/workflows/diagnose-consumer.yml
   ci:
     uses: ./.github/workflows/reusable-ci.yml
     secrets: inherit
