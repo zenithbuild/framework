@@ -83,13 +83,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve Playwright version
         id: playwright_version
@@ -128,7 +128,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bunx playwright install --with-deps chromium
 
@@ -156,11 +156,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -179,7 +179,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - name: Publish create-zenith
         env:
@@ -195,7 +195,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - name: Verify npm registry propagation
         shell: bash

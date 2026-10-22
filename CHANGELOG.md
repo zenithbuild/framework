@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds, and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
