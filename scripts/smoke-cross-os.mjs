@@ -280,7 +280,9 @@ if (process.argv.includes('--packed')) {
             });
             assert.equal(result.status, 0, `pack ${manifest.name} failed: ${result.stderr || result.error || ''}`);
             const [packed] = JSON.parse(result.stdout);
-            dependencies[manifest.name] = pathToFileURL(join(scratch, packed.filename)).href;
+            // Consumer lives one directory below its tarballs. Bun 1.4 on
+            // Windows cannot extract percent-encoded file:///C:/ tarball URLs.
+            dependencies[manifest.name] = `file:../${packed.filename}`;
         }
         const consumer = join(scratch, 'consumer');
         mkdirSync(join(consumer, 'src/pages'), { recursive: true });
