@@ -36,6 +36,8 @@ jobs:
         run: node --test scripts/security/site-dependency-security.spec.mjs
       - name: Generate schema, client and production admin assets
         run: bun run --cwd site cms:build 2>&1 | tee site-cms-build.log
+      - name: Record generated artifact changes
+        run: git diff --numstat -- site/src/public/admin site/tina/__generated__ > site-cms-generated-diff.txt
       - name: Audit the committed CMS content
         run: bun run --cwd site cms:audit 2>&1 | tee site-cms-content-audit.log
       - name: Verify content loading and documentation contracts
@@ -58,3 +60,6 @@ jobs:
             root-audit.json
             site-audit.json
             site-cms-*.log
+            site-cms-generated-diff.txt
+            site/src/public/admin
+            site/tina/__generated__

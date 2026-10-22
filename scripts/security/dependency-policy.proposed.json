@@ -49,7 +49,7 @@
       "severity": "high",
       "versions": ["3.0.3"],
       "scopes": ["root", "site"],
-      "paths": ["root: Jest -> micromatch -> braces", "site: Tina CLI -> chokidar/anymatch -> micromatch -> braces"],
+      "paths": ["root: Jest -> micromatch -> braces", "site: Tina CLI -> chokidar -> braces"],
       "boundary": "Deeply nested glob AST compilation can exhaust the stack. A controlled small-stack trigger reproduces the defect.",
       "compatibilityBlocker": "The primary advisory and registry list no patched release; upgrading to current 3.0.3 cannot fix it.",
       "controlsProposed": ["Use reviewed repository glob/watch configuration only", "Do not expose CMS/dev tooling as a public service", "Run untrusted PR builds without privileged credentials"],
