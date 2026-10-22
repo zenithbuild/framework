@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application.
 - Correct an invalid PNG test-fixture checksum exposed by the restored core validation lane, retaining real image processing and the Sharp security floor.
 - Use portable relative tarball dependencies in the Windows packed-consumer harness.
+- Restrict Cargo caches to native target directories and retire the cache namespace that restored physical directories over Bun workspace links.
 
 ## [0.8.0] - 2026-07-01
 
