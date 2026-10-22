@@ -38,6 +38,28 @@ afterAll(async () => {
 });
 
 describe('Phase 1: CLI -> compiler process seam', () => {
+  test.each([
+    ['compiler', compilerBin],
+    ['bundler', bundlerBin]
+  ])('%s probe failures stop before compilation or IR forwarding', async (_tool, failingBinary) => {
+    const project = await makePage();
+    const spawnSyncMock = jest.fn((binary, args) => {
+      if (args?.[0] !== '--version') throw new Error('compilation must not start');
+      return binary === failingBinary
+        ? { status: 1, stdout: '', stderr: 'probe deliberately rejected' }
+        : { status: 0, stdout: 'zenith 0.8.0\n', stderr: '' };
+    });
+    const spawnMock = jest.fn();
+    await jest.isolateModulesAsync(async () => {
+      jest.unstable_mockModule('node:child_process', () => ({ spawnSync: spawnSyncMock, spawn: spawnMock }));
+      const { build } = await import(toFileHref(cliBuildModule));
+      await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir }))
+        .rejects.toThrow('probe deliberately rejected');
+    });
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(spawnSyncMock.mock.calls.every(([, args]) => args[0] === '--version')).toBe(true);
+  });
+
   test('CLI bridge spawns compiler binary and forwards IR unchanged', async () => {
     const cliManifest = JSON.parse(
       await fs.readFile(path.join(repoRoot, 'packages', 'cli', 'package.json'), 'utf8')
@@ -124,6 +146,7 @@ describe('Phase 1: CLI -> compiler process seam', () => {
       spawnArgs?.length === 1 && spawnArgs[0] === '--version'
     ));
     expect(versionProbeCalls).toHaveLength(2);
+    expect(versionProbeCalls.map(([binary]) => binary).sort()).toEqual([compilerBin, bundlerBin].sort());
 
     const compilerCalls = spawnSyncMock.mock.calls.filter(([spawnPath, spawnArgs]) => (
       spawnPath === compilerBin && spawnArgs?.[0] === '--stdin'
