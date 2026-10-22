@@ -44,4 +44,4 @@ jobs:
       - name: Install and execute packed 0.8.0 consumers outside the checkout
         run: node scripts/smoke-cross-os.mjs --packed
       - name: Exercise relocated Node SSR and real image transformations
-        run: bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js tests/image-artifact-cache.spec.js
+        run: bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js tests/image-artifact-cache.spec.js tests/cli-entrypoint-paths.spec.js

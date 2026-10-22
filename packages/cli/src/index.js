@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve, join, dirname, relative } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createZenithLogger } from './ui/logger.js';
 import { loadConfig, resolveConfigOutDir, resolveConfigPagesDir } from './config.js';
@@ -207,12 +207,16 @@ export async function cli(args, cwd) {
 }
 
 // Auto-run if called directly
-const isDirectRun = process.argv[1] && (
-    process.argv[1].endsWith('/index.js') ||
-    process.argv[1].endsWith('/zenith')
-);
+function isDirectRun() {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === realpathSync(__filename);
+    } catch {
+        return false;
+    }
+}
 
-if (isDirectRun) {
+if (isDirectRun()) {
     cli(process.argv.slice(2)).catch((error) => {
         const logger = createZenithLogger(process);
         logger.error(error);
