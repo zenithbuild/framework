@@ -42,6 +42,11 @@ The concrete decision for Judah is the shared config/module home and the
 core/CLI dependency direction. This checkpoint avoids changing either.
 No new package name, Rust change, public API or risk acceptance is implied.
 
+Judah requested a concrete proposal after this checkpoint. See
+[the config boundary proposal](./jud-83-config-boundary-proposal.md) for the
+recommended independent lower package, alternatives, compatibility costs
+and verification gates. The architecture implementation remains unapproved.
+
 ## Remaining extraction and acceptance work
 
 1. Resolve the shared config/base-path boundary and record the decision.
