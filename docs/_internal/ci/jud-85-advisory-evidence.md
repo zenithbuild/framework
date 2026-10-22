@@ -27,3 +27,12 @@ unrelated packages, or alter site source.
 Validation: four focused audit-parser regressions pass. Actual audits retain
 exit 1 with the active findings. The full core lane and hosted results are
 recorded in the implementation PR and Linear rather than inferred from this check.
+
+The first full hosted core run after removing the obsolete assertion reached
+the CLI tests: 119 suites passed and config-truth's image test failed in
+libpng. The same focused test fails on baseline f504c98 with the same Sharp
+0.35.5 install. Its embedded PNG has an invalid IDAT CRC (IHDR/IEND CRCs are
+valid). Replace only the fixture bytes with a valid 1x1 RGBA PNG. Keep the
+image transformation assertions, Sharp version floor and corrupt-input
+checks unchanged. All 14 config-truth tests plus the Sharp floor pass after
+this correction. No image runtime or site asset was changed.
