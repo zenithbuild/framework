@@ -2,6 +2,11 @@ name: ci
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnosticsOnly:
+        description: Run only the consumer resolver diagnostic
+        type: boolean
+        default: false
   pull_request:
     branches:
       - train
@@ -21,5 +26,6 @@ jobs:
   diagnose:
     uses: ./.github/workflows/diagnose-consumer.yml
   ci:
+    if: ${{ !inputs.diagnosticsOnly }}
     uses: ./.github/workflows/reusable-ci.yml
     secrets: inherit
