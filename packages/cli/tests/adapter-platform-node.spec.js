@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import http from 'node:http';
+import { requestText } from './helpers/node-http.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -55,32 +55,6 @@ async function fetchBytes(url, options = {}) {
         headers: response.headers,
         body: Buffer.from(await response.arrayBuffer())
     };
-}
-
-async function requestText(port, pathname, headers = {}) {
-    return new Promise((resolve, reject) => {
-        const req = http.request({
-            host: '127.0.0.1',
-            port,
-            path: pathname,
-            method: 'GET',
-            headers
-        }, (res) => {
-            let body = '';
-            res.on('data', (chunk) => {
-                body += chunk;
-            });
-            res.on('end', () => {
-                resolve({
-                    status: res.statusCode,
-                    headers: res.headers,
-                    body
-                });
-            });
-        });
-        req.on('error', reject);
-        req.end();
-    });
 }
 
 describe('node adapter', () => {
