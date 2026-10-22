@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-node ./scripts/security/check-esbuild-ghsa-gv7w-rqvm-qjhr.mjs
+# Keep audit failure status while exercising the rest of core for useful evidence.
+audit_status=0
+node ./scripts/security/check-dependency-advisories.mjs || audit_status=$?
 
 bash ./scripts/build.sh
 node ./scripts/verify-compiler-shipped-surface.mjs
@@ -42,6 +44,7 @@ node --test scripts/bootstrap-platform-package.spec.mjs
 node --test scripts/verify-platform-binary-smoke.spec.mjs
 node --test scripts/workflow-trust-boundary.spec.mjs
 node --test scripts/check-toolchain.spec.mjs scripts/toolchain-ci-contract.spec.mjs
+node --test scripts/security/dependency-audit-report.spec.mjs
 node --test scripts/file-size-audit.spec.mjs
 node --test scripts/live-hosted-adapter-smoke.spec.mjs
 node --test apps/integration-tests/scripts/*.spec.mjs
@@ -56,3 +59,5 @@ bun run --cwd packages/bundler contract:imports
 
 # Compiler node/js bridge tests
 node --test packages/compiler/tests/*.spec.js
+
+exit "$audit_status"
