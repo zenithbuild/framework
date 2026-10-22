@@ -3,14 +3,15 @@ import {
     readdirSync, rmSync, writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const cliRoot = fileURLToPath(new URL('..', import.meta.url));
 const entry = join(cliRoot, 'dist', 'index.js');
 const coreEntry = resolve(cliRoot, '..', 'core', 'bin', 'zenith.js');
-const version = JSON.parse(readFileSync(join(cliRoot, 'package.json'), 'utf8')).version;
+const cliManifest = JSON.parse(readFileSync(join(cliRoot, 'package.json'), 'utf8'));
+const version = cliManifest.version;
 let scratch;
 
 function run(entryPath, args, cwd = scratch) {
@@ -41,9 +42,13 @@ test('executes a relocated package in a path with spaces', () => {
     cpSync(join(cliRoot, 'dist'), join(relocated, 'dist'), { recursive: true });
     cpSync(join(cliRoot, 'package.json'), join(relocated, 'package.json'));
     mkdirSync(join(relocated, 'node_modules'));
-    cpSync(join(cliRoot, 'node_modules', 'picocolors'), join(relocated, 'node_modules', 'picocolors'), {
-        recursive: true, dereference: true
-    });
+    const fixtureDependencies = ['picocolors'];
+    if (cliManifest.dependencies?.['@zenithbuild/config']) fixtureDependencies.push('@zenithbuild/config');
+    for (const name of fixtureDependencies) {
+        const target = join(relocated, 'node_modules', name);
+        mkdirSync(dirname(target), { recursive: true });
+        cpSync(join(cliRoot, 'node_modules', name), target, { recursive: true, dereference: true });
+    }
     const result = run(join(relocated, 'dist', 'index.js'), ['--version']);
     if (result.status !== 0) throw new Error(`Relocated CLI failed: ${result.stdout}${result.stderr}`);
     expect(result.status).toBe(0);
