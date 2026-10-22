@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { buildImageArtifacts } from '../src/images/service.js';
-import { buildLocalVariantAssetPath } from '../src/images/shared.js';
+import { buildImageArtifacts } from '../src/service.js';
+import { buildLocalVariantAssetPath } from '../src/shared.js';
 
 test('fresh image variants skip encoding and source/config changes invalidate them', async () => {
     const root = await mkdtemp(join(tmpdir(), 'zenith-image-cache-'));

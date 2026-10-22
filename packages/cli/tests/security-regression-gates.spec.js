@@ -4,7 +4,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+import { sharp, installImagePackage } from './helpers/image-package.js';
 import { jest } from '@jest/globals';
 import { build } from '../dist/build.js';
 import { createDevServer } from '../dist/dev-server.js';
@@ -29,6 +29,7 @@ async function makeProject(files, options = {}) {
         await writeFile(absolutePath, contents);
     }
 
+    await installImagePackage(root);
     return {
         root,
         pagesDir: join(root, pagesDir),
@@ -302,7 +303,7 @@ describe('Track A security regression gates', () => {
         expect(html).toContain('/docs/_zenith/image/local/');
 
         const buildSource = await readFile(resolve(__dirname, '../src/build.js'), 'utf8');
-        const materializeSource = await readFile(resolve(__dirname, '../src/images/materialize.ts'), 'utf8');
+        const materializeSource = await readFile(resolve(__dirname, '../../image/src/materialize.ts'), 'utf8');
         const previewSource = await readFile(resolve(__dirname, '../src/preview/request-handler.js'), 'utf8');
         const routeRenderSource = await readFile(resolve(__dirname, '../src/server-runtime/route-render.js'), 'utf8');
         const bundlerSource = await readFile(resolve(__dirname, '../../bundler/src/main.rs'), 'utf8');

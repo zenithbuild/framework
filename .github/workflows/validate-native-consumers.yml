@@ -34,7 +34,9 @@ jobs:
           export ZENITH_TRAIN_VERSION="$(cat TRAIN_VERSION)"
           bun run --cwd packages/runtime build
           bun run --cwd packages/router build
+          bun run --cwd packages/config build
           bun run --cwd packages/core build
+          bun run --cwd packages/image build
           bun run --cwd packages/cli build
           cargo build --locked --release --manifest-path packages/compiler/Cargo.toml
           bun run --cwd packages/compiler build
@@ -44,4 +46,6 @@ jobs:
       - name: Install and execute packed 0.8.0 consumers outside the checkout
         run: node scripts/smoke-cross-os.mjs --packed
       - name: Exercise relocated Node SSR and real image transformations
-        run: bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js tests/image-artifact-cache.spec.js
+        run: |
+          bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js
+          bun run --cwd packages/image test

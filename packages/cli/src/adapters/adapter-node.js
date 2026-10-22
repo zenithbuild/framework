@@ -1,14 +1,5 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-
-const PACKAGE_REQUIRE = createRequire(import.meta.url);
-const CLI_PACKAGE = PACKAGE_REQUIRE('../../package.json');
-const SHARP_VERSION_RANGE = CLI_PACKAGE?.dependencies?.sharp;
-
-if (typeof SHARP_VERSION_RANGE !== 'string' || SHARP_VERSION_RANGE.length === 0) {
-    throw new Error('[Zenith:NodeAdapter] CLI package manifest must declare a Sharp dependency.');
-}
 
 const NODE_RUNTIME_FILES = [
     {
@@ -26,10 +17,6 @@ const NODE_RUNTIME_FILES = [
     {
         from: new URL('../server-error.js', import.meta.url),
         to: 'server-error.js'
-    },
-    {
-        from: new URL('../images/service.js', import.meta.url),
-        to: 'images/service.js'
     }
 ];
 
@@ -73,14 +60,12 @@ function createNodeEntrySource() {
     ].join('\n');
 }
 
-function createNodePackageJson() {
+function createNodePackageJson(sharpVersionRange) {
     return {
         private: true,
         type: 'module',
         main: './index.js',
-        dependencies: {
-            sharp: SHARP_VERSION_RANGE
-        }
+        dependencies: sharpVersionRange ? { sharp: sharpVersionRange } : {}
     };
 }
 
@@ -109,6 +94,11 @@ async function copyNodeRuntimeFiles(serverDir) {
     }
 
     const imageServicePath = join(serverDir, 'images', 'service.js');
+    let sharpVersionRange = null;
+    try {
+        sharpVersionRange = JSON.parse(await readFile(join(serverDir, 'images', 'package.json'), 'utf8')).dependencies?.sharp || null;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (!sharpVersionRange) return null;
     const imageServiceSource = await readFile(imageServicePath, 'utf8');
     await writeFile(
         imageServicePath,
@@ -116,6 +106,7 @@ async function copyNodeRuntimeFiles(serverDir) {
         'utf8'
     );
     await writeFile(join(serverDir, 'images', 'sharp-runtime.js'), createSharpRuntimeSource(), 'utf8');
+    return sharpVersionRange;
 }
 
 export const nodeAdapter = {
@@ -132,7 +123,7 @@ export const nodeAdapter = {
         await mkdir(options.outDir, { recursive: true });
         await cp(staticDir, join(options.outDir, 'static'), { recursive: true, force: true });
         await cp(packagedServerDir, targetServerDir, { recursive: true, force: true });
-        await copyNodeRuntimeFiles(targetServerDir);
+        const sharpVersionRange = await copyNodeRuntimeFiles(targetServerDir);
 
         await writeFile(
             join(options.outDir, 'manifest.json'),
@@ -153,7 +144,7 @@ export const nodeAdapter = {
         await writeFile(join(options.outDir, 'index.js'), createNodeEntrySource(), 'utf8');
         await writeFile(
             join(options.outDir, 'package.json'),
-            `${JSON.stringify(createNodePackageJson(), null, 2)}\n`,
+            `${JSON.stringify(createNodePackageJson(sharpVersionRange), null, 2)}\n`,
             'utf8'
         );
     }

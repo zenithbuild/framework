@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import { once } from 'node:events';
-import sharp from 'sharp';
+import { sharp, installImagePackage } from './helpers/image-package.js';
 import { jest } from '@jest/globals';
 
 import { cli } from '../dist/index.js';
@@ -60,12 +60,15 @@ describe('node adapter artifact portability', () => {
             'module.exports = { target: "node", router: false, images: { remotePatterns: [{ protocol: "http", hostname: "127.0.0.1" }], dangerouslyAllowLocalNetwork: true, allowSvg: true } };\n'
         );
 
+        await mkdir(join(fixtureRoot, 'public'), { recursive: true });
+        await sharp({ create: { width: 1, height: 1, channels: 3, background: 'red' } }).png().toFile(join(fixtureRoot, 'public', 'hero.png'));
+        await installImagePackage(fixtureRoot);
         await cli(['build'], fixtureRoot);
         await cp(join(fixtureRoot, 'dist'), relocatedRoot, { recursive: true });
 
         const manifest = JSON.parse(await readFile(join(relocatedRoot, 'package.json'), 'utf8'));
         const cliManifest = JSON.parse(
-            await readFile(new URL('../package.json', import.meta.url), 'utf8')
+            await readFile(new URL('../../image/package.json', import.meta.url), 'utf8')
         );
         expect(manifest.dependencies).toEqual({ sharp: cliManifest.dependencies.sharp });
 

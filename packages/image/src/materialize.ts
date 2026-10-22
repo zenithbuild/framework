@@ -33,8 +33,8 @@ function parseMarkerSelector(selector: string): { attrName: string; attrValue: s
   const match = selector.match(/^\[([^\]=]+)=["']([^"']+)["']\]$/);
   if (!match) return null;
   return {
-    attrName: match[1],
-    attrValue: match[2]
+    attrName: match[1]!,
+    attrValue: match[2]!
   };
 }
 

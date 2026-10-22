@@ -1,3 +1,4 @@
+import { packageImageRuntime } from './package-image-runtime.js';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -36,34 +37,6 @@ const SERVER_RUNTIME_FILES = [
     {
         from: new URL('./auth/route-auth.js', import.meta.url),
         to: 'auth/route-auth.js'
-    },
-    {
-        from: new URL('./base-path.js', import.meta.url),
-        to: 'base-path.js'
-    },
-    {
-        from: new URL('./images/materialize.js', import.meta.url),
-        to: 'images/materialize.js'
-    },
-    {
-        from: new URL('./images/payload.js', import.meta.url),
-        to: 'images/payload.js'
-    },
-    {
-        from: new URL('./images/shared.js', import.meta.url),
-        to: 'images/shared.js'
-    },
-    {
-        from: new URL('./images/remote-fetch.js', import.meta.url),
-        to: 'images/remote-fetch.js'
-    },
-    {
-        from: new URL('./images/runtime.js', import.meta.url),
-        to: 'images/runtime.js'
-    },
-    {
-        from: new URL('./images/service.js', import.meta.url),
-        to: 'images/service.js'
     },
     {
         from: new URL('./server-error.js', import.meta.url),
@@ -115,7 +88,7 @@ async function writeRouteModulePackage({
     });
 }
 
-async function copyRuntimeFiles(serverDir) {
+async function copyRuntimeFiles(serverDir, imagePackage) {
     for (const file of SERVER_RUNTIME_FILES) {
         const targetPath = join(serverDir, file.to);
         await mkdir(dirname(targetPath), { recursive: true });
@@ -237,6 +210,7 @@ async function writeScopedServerDataModules({
 }
 
 export async function writeServerOutput({
+    imagePackage = null,
     coreOutputDir,
     staticDir,
     projectRoot,
@@ -283,7 +257,8 @@ export async function writeServerOutput({
     }
 
     await mkdir(serverDir, { recursive: true });
-    await copyRuntimeFiles(serverDir);
+    await copyRuntimeFiles(serverDir, imagePackage);
+    await packageImageRuntime(serverDir, imagePackage);
     await copyOptionalFile(join(staticDir, '_zenith', 'ssr-bindings.json'), join(serverDir, 'ssr-bindings.json'));
     const serverGlobalMiddlewareMetadata = await writeGlobalMiddlewarePackage({
         projectRoot,

@@ -1,3 +1,4 @@
+import { installImagePackage } from './helpers/image-package.js';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +40,7 @@ async function createProject(files) {
         await mkdir(join(absolutePath, '..'), { recursive: true });
         await writeFile(absolutePath, contents);
     }
+    if (Object.keys(files).some((name) => /\.(png|jpe?g|webp|avif)$/i.test(name))) await installImagePackage(root);
     return {
         root,
         pagesDir: join(root, 'pages'),

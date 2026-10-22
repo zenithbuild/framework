@@ -1,3 +1,4 @@
+import { createProjectImageApi } from '../project-images.js';
 import { readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
@@ -10,9 +11,6 @@ import {
     resolveWithinDist,
     toStaticFilePath
 } from '../preview.js';
-import { materializeImageMarkup } from '../images/materialize.js';
-import { injectImageRuntimePayload } from '../images/payload.js';
-import { handleImageRequest } from '../images/service.js';
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
 import { respondWithDevBuildError } from './build-error-response.js';
 import { handleRouteCheckRequest } from './route-check.js';
@@ -57,6 +55,7 @@ export function createDevRequestHandler(options) {
         LEGACY_DEV_STREAM_PATH,
         IMAGE_RUNTIME_TAG_RE
     } = options;
+    const getImageApi = createProjectImageApi(projectRoot);
 
     return async function handleDevRequest(req, res) {
         const url = new URL(req.url, serverOrigin());
@@ -175,7 +174,7 @@ export function createDevRequestHandler(options) {
             if (isStaticExportTarget) {
                 throw new Error('not found');
             }
-            await handleImageRequest(req, res, {
+            await (await getImageApi()).handleImageRequest(req, res, {
                 requestUrl: url,
                 projectRoot,
                 config: imageConfig
@@ -433,7 +432,7 @@ export function createDevRequestHandler(options) {
 
             let content = await readFileForRequest(filePath, 'utf8');
             if (resolved.matched) {
-                content = await materializeImageMarkup({
+                content = await (await getImageApi()).materializeImageMarkup({
                     html: content,
                     payload: buildSession.getImageRuntimePayload(),
                     imageMaterialization: Array.isArray(resolved.route?.image_materialization)
@@ -445,7 +444,7 @@ export function createDevRequestHandler(options) {
                 content = injectSsrPayload(content, ssrPayload);
             }
             if (!IMAGE_RUNTIME_TAG_RE.test(content)) {
-                content = injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
+                content = (await getImageApi()).injectImageRuntimePayload(content, buildSession.getImageRuntimePayload());
             }
             res.writeHead(Number.isInteger(routeExecution?.status) ? routeExecution.status : 200, appendSetCookieHeaders({
                 'Content-Type': 'text/html'

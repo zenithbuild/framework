@@ -1,10 +1,8 @@
+import { createProjectImageApi } from '../project-images.js';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { materializeSsrBindings } from '../server-runtime/ssr-bindings.js';
-import { materializeImageMarkup } from '../images/materialize.js';
-import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
-import { handleImageRequest } from '../images/service.js';
 import { readRequestBodyBuffer } from '../request-body.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
@@ -83,6 +81,8 @@ export function createPreviewRequestHandler(options) {
     isStaticExportTarget,
     serverOrigin
   } = options;
+
+  const getImageApi = createProjectImageApi(projectRoot);
 
   async function loadImageManifest() {
     try {
@@ -199,7 +199,7 @@ export function createPreviewRequestHandler(options) {
         if (isStaticExportTarget) {
           throw new Error('not found');
         }
-        await handleImageRequest(req, res, {
+        await (await getImageApi()).handleImageRequest(req, res, {
           requestUrl: url,
           projectRoot,
           config: config.images
@@ -387,9 +387,9 @@ export function createPreviewRequestHandler(options) {
 
       let html = await readFile(htmlPath, 'utf8');
       if (resolved.matched) {
-        html = await materializeImageMarkup({
+        html = await (await getImageApi()).materializeImageMarkup({
           html,
-          payload: createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath),
+          payload: (await getImageApi()).createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath),
           imageMaterialization: Array.isArray(resolved.route?.image_materialization)
             ? resolved.route.image_materialization
             : []
@@ -405,9 +405,9 @@ export function createPreviewRequestHandler(options) {
         html = injectSsrPayload(html, ssrPayload);
       }
       if (!IMAGE_RUNTIME_TAG_RE.test(html)) {
-        html = injectImageRuntimePayload(
+        html = (await getImageApi()).injectImageRuntimePayload(
           html,
-          createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
+          (await getImageApi()).createImageRuntimePayload(config.images, await loadImageManifest(), 'endpoint', basePath)
         );
       }
 

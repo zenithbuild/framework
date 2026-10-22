@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createImageRuntimePayload } from '../dist/images/payload.js';
-import { materializeImageMarkup } from '../dist/images/materialize.js';
+import { createImageRuntimePayload } from '../../image/dist/payload.js';
+import { materializeImageMarkup } from '../../image/dist/materialize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,7 +61,7 @@ describe('image materialization trust boundary', () => {
     });
 
     test('image materialization sources contain no dynamic evaluation', () => {
-        const imagesDir = path.resolve(__dirname, '../src/images');
+        const imagesDir = path.resolve(__dirname, '../../image/src');
         const files = fs.readdirSync(imagesDir).filter((name) => /\.(js|ts)$/.test(name));
 
         for (const file of files) {
@@ -73,7 +73,7 @@ describe('image materialization trust boundary', () => {
     });
 
     test('build/static materialization is bundler-owned while runtime materialization stays route-artifact-driven', () => {
-        const materializeSource = fs.readFileSync(path.resolve(__dirname, '../src/images/materialize.ts'), 'utf8');
+        const materializeSource = fs.readFileSync(path.resolve(__dirname, '../../image/src/materialize.ts'), 'utf8');
         const buildSource = fs.readFileSync(path.resolve(__dirname, '../src/build.js'), 'utf8');
         const previewSource = fs.readFileSync(path.resolve(__dirname, '../src/preview/request-handler.js'), 'utf8');
         const devServerSource = fs.readFileSync(path.resolve(__dirname, '../src/dev-server/request-handler.js'), 'utf8');

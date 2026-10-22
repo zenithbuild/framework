@@ -13,6 +13,8 @@ node ./scripts/verify-publish-surface.mjs --selection scaffolder
 
 bun run --cwd packages/runtime typecheck
 bun run --cwd packages/router typecheck
+bun run --cwd packages/config typecheck
+bun run --cwd packages/image typecheck
 bun run --cwd packages/cli typecheck
 bun run --cwd packages/language-server typecheck
 bun run --cwd packages/language typecheck
@@ -27,6 +29,7 @@ ZENITH_BUNDLER_BIN="$ROOT/packages/bundler/target/release/zenith-bundler" \
 ZENITH_COMPILER_BIN="$ROOT/packages/compiler/target/release/zenith-compiler" \
 ZENITH_BUNDLER_BIN="$ROOT/packages/bundler/target/release/zenith-bundler" \
   bun run --cwd packages/cli test
+bun run --cwd packages/image test
 bun run --cwd packages/core test
 bun run --cwd packages/runtime test
 bun run --cwd packages/router test

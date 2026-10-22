@@ -6,7 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- Begin the JUD-83 image extraction with a tested internal consumer loader contract; production image packaging is unchanged at this checkpoint.
+- Extract shared configuration into `@zenithbuild/config`, preserving core's public API and `zenith` command ownership.
+- Move image processing, Sharp and `Image.zen` into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. See [migration notes](docs/_internal/ci/jud-83-image-migration.md).
 
 ## [0.8.0] - 2026-07-01
 

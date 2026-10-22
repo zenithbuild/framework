@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
-import sharp from 'sharp';
+import { sharp, installImagePackage } from './helpers/image-package.js';
 import { build } from '../dist/build.js';
 import { cli } from '../dist/index.js';
 import { createDevServer } from '../dist/dev-server.js';
@@ -35,6 +35,7 @@ async function makeProject(files) {
         await mkdir(join(fullPath, '..'), { recursive: true });
         await writeFile(fullPath, contents);
     }
+    await installImagePackage(root);
     return {
         root,
         pagesDir: join(root, 'src', 'pages'),

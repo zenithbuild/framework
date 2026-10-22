@@ -1,0 +1,40 @@
+{
+  "name": "@zenithbuild/config",
+  "version": "0.8.0",
+  "description": "Shared configuration contracts and loading for Zenith",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./node": "./dist/node.js",
+    "./plugins": "./dist/config-plugins.js",
+    "./base-path": "./dist/base-path.js",
+    "./images": "./dist/image-config.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/config"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "^5.7.3"
+  }
+}
