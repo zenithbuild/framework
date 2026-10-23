@@ -9,6 +9,7 @@
   "method": "Three serial fresh consumer directories per manager and image mode; local tarballs with exact overrides; normal optional dependencies; install scripts enabled; normal warm global manager caches; pnpm isolated fresh store per run. Measured apparent bytes and unique files through physical symlink targets. No release or publish.",
   "source": "68eecf3ca8b316f0bc6e640ea1b6120347d52fe3",
   "dirty": false,
+  "stale": "Measured at 68eecf3c, when the shared config source was the separate @zenithbuild/config package (option A). That package was superseded on October 23, 2026 at 12:16 PM CT by folding the config source into @zenithbuild/core, so the @zenithbuild/config tarball below and the totals that include it describe the old layout. Not re-measured.",
   "tarballs": [
     {
       "name": "@zenithbuild/config",

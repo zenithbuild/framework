@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Keep the image runtime payload script on `unsafeHTML` pages when `@zenithbuild/image` is not installed, matching 0.8.0 output; the payload contract now lives in `@zenithbuild/core/config/images` (JUD-83).
 - Rewrite every `@zenithbuild/core/config` import in packaged server image runtime files, ship the standalone `image-config.js` module with Vercel and Netlify server functions, and fail the build if any package specifier is left unresolved (JUD-83).
 - Record the image package build marker in `.zenith-output/image-package.json` instead of the deployable `_zenith/image/package.json` (JUD-83).
-- Derive the CLI's known deployment targets from the shared config target list (JUD-83).
+- Export `ZENITH_TARGETS` from `@zenithbuild/core/config` and derive the CLI's known deployment targets from it (JUD-83).
 - Name the project files that use `<Image>` in the missing `@zenithbuild/image` error, and let a project-defined `Image.zen` take precedence without requiring the package (JUD-83).
 - List the image package as `@zenithbuild/image` in the extension registry (JUD-83).
 
