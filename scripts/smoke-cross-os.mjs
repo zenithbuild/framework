@@ -267,7 +267,7 @@ if (process.argv.includes('--packed')) {
         assert.ok(npmCli, 'npm CLI must be installed beside Node');
         const dependencies = {};
         const directories = [
-            'config', 'image', 'cli', 'core', 'compiler', 'bundler', 'runtime', 'router',
+            'image', 'cli', 'core', 'compiler', 'bundler', 'runtime', 'router',
             currentPlatformBinary('compiler').packageDirName,
             currentPlatformBinary('bundler').packageDirName
         ];
