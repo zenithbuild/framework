@@ -34,68 +34,6 @@ export const toneByCategory: Record<string, AccentTone> = {
   releases: "gold",
 };
 
-export const fallbackCategory: BlogCategory = {
-  slug: "engineering",
-  title: "Engineering",
-  routeBase: "/blog",
-};
-
-export function normalizeCategory(category: {
-  slug?: string | null;
-  title?: string | null;
-  route_base?: string | null;
-} | null | undefined): BlogCategory | null {
-  if (!category?.slug) {
-    return null;
-  }
-
-  return {
-    slug: String(category.slug),
-    title: cleanText(category.title || humanizeSlug(category.slug)),
-    routeBase: cleanText(category.route_base || "/blog"),
-  };
-}
-
-export function mapTagRecords(
-  records: Array<{ tag?: any; tags_id?: any } | any> | null | undefined,
-): BlogTag[] {
-  const tags = (records || [])
-    .map((record) => ("tag" in Object(record) ? record.tag : "tags_id" in Object(record) ? record.tags_id : record))
-    .filter((tag): tag is { slug?: string | null; title?: string | null; color?: string | null; order?: number | null } => Boolean(tag?.slug || tag?.title))
-    .map((tag) => ({
-      slug: cleanText(tag.slug || slugify(tag.title || "tag")),
-      title: cleanText(tag.title || humanizeSlug(tag.slug || "tag")),
-      color: tag.color || null,
-      order: typeof tag.order === "number" ? tag.order : null,
-    }));
-
-  return [...tags].sort((left, right) => {
-    const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-    return left.slug.localeCompare(right.slug);
-  });
-}
-
-export function normalizeImage(
-  file: { id?: string | null; title?: string | null; width?: number | null; height?: number | null } | string | null | undefined,
-  baseUrl: string,
-  title: string,
-): BlogImage | null {
-  if (!file || typeof file === "string" || !file.id) {
-    return null;
-  }
-
-  return {
-    url: `${baseUrl}/assets/${file.id}`,
-    alt: cleanText(file.title || title),
-    width: typeof file.width === "number" ? file.width : null,
-    height: typeof file.height === "number" ? file.height : null,
-  };
-}
-
 export function defaultPostCta(category: BlogCategory) {
   if (category.slug === "releases") {
     return {
