@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed site grid layouts whose arbitrary `grid-cols-[...]` tracks were comma-separated (Blog article, Feature showcase, About page) by switching to underscore separators, and added a regression test for the syntax (JUD-65).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
