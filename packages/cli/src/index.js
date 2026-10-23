@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve, join, dirname, relative } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createZenithLogger } from './ui/logger.js';
 import { loadConfig, resolveConfigOutDir, resolveConfigPagesDir } from './config.js';
@@ -206,16 +206,33 @@ export async function cli(args, cwd) {
     }
 }
 
-// Auto-run if called directly
-const isDirectRun = process.argv[1] && (
-    process.argv[1].endsWith('/index.js') ||
-    process.argv[1].endsWith('/zenith')
-);
-
-if (isDirectRun) {
-    cli(process.argv.slice(2)).catch((error) => {
-        const logger = createZenithLogger(process);
-        logger.error(error);
+/**
+ * Run the CLI with Zenith's formatted diagnostics and exit code 1 on failure.
+ * Shared by a direct run and the public `@zenithbuild/core` bin.
+ *
+ * @param {string[]} [args] - Process arguments (without node and script paths)
+ * @param {string} [cwd] - Working directory override
+ * @returns {Promise<void>}
+ */
+export async function runCli(args = process.argv.slice(2), cwd) {
+    try {
+        await cli(args, cwd);
+    } catch (error) {
+        createZenithLogger(process).error(error);
         process.exit(1);
-    });
+    }
+}
+
+// Auto-run if called directly
+function isDirectRun() {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === realpathSync(__filename);
+    } catch {
+        return false;
+    }
+}
+
+if (isDirectRun()) {
+    void runCli(process.argv.slice(2));
 }

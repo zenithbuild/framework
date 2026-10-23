@@ -3,7 +3,7 @@ name: Native candidate consumers
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master, train, beta]
+    branches: [master, train, beta, integration/v1]
 
 permissions:
   contents: read
@@ -34,7 +34,6 @@ jobs:
           export ZENITH_TRAIN_VERSION="$(cat TRAIN_VERSION)"
           bun run --cwd packages/runtime build
           bun run --cwd packages/router build
-          bun run --cwd packages/config build
           bun run --cwd packages/core build
           bun run --cwd packages/image build
           bun run --cwd packages/cli build
@@ -47,5 +46,5 @@ jobs:
         run: node scripts/smoke-cross-os.mjs --packed
       - name: Exercise relocated Node SSR and real image transformations
         run: |
-          bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js
+          bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js tests/image-artifact-cache.spec.js tests/cli-entrypoint-paths.spec.js
           bun run --cwd packages/image test

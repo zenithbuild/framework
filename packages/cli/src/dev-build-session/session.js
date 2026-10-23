@@ -59,6 +59,7 @@ export function createDevBuildSession(options) {
     let imagePackage;
     let previousPublicAssetPaths = new Set();
 
+    ensureToolchainCompatibility(compilerBin);
     ensureToolchainCompatibility(bundlerBin);
 
     const state = createDevBuildState(config, basePath);

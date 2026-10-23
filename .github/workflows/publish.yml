@@ -43,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - name: Assert tag matches TRAIN_VERSION and resolve release version
         id: release_version
@@ -187,12 +187,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         if: matrix.package_kind == 'bundler'
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -203,7 +203,7 @@ jobs:
             exit 1
           fi
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Install musl toolchain (linux builds)
         if: contains(matrix.rust_target, 'musl')
@@ -226,12 +226,12 @@ jobs:
           rustup target add "${TARGET_TRIPLE}"
 
           if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
             BUNDLER_PLATFORM_KEY="${PLATFORM_KEY}" \
             BUNDLER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-bundler-platform-package.mjs
           else
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
             COMPILER_PLATFORM_KEY="${PLATFORM_KEY}" \
             COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-compiler-platform-package.mjs
@@ -242,7 +242,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bun install
+          bun install --frozen-lockfile
           bun run --cwd packages/runtime build
           bun run --cwd packages/router build
 
@@ -361,11 +361,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -376,7 +376,7 @@ jobs:
             exit 1
           fi
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Cache Bun install cache
         uses: actions/cache@v4
@@ -392,12 +392,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - name: Build release packages
         shell: bash
@@ -423,7 +424,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - name: Verify npm registry propagation
         shell: bash

@@ -1,17 +1,11 @@
 import { blogPostContent } from "../content/index";
-import { createDirectusServerClient, type DirectusServerClient } from "./directusClient";
 import { loadGitBlogPosts } from "./gitBlogSource";
 import {
   cleanText,
   decorateBlogHtml,
-  defaultPostCta,
   deriveSummaryPoints,
-  fallbackCategory,
   formatEditorialDate,
   formatReadingTime,
-  mapTagRecords,
-  normalizeCategory,
-  normalizeImage,
   renderLocalSections,
   slugify,
   stripHtmlTags,
@@ -23,7 +17,7 @@ import {
 import { normalizeReadableSlug } from "../content/slugContract";
 import { ContentValidationError, assertUniqueSlugs } from "./contentValidation";
 
-type SourceMode = "git" | "local" | "directus";
+type SourceMode = "git" | "local";
 type AccentTone = "red" | "blue" | "gold" | "magenta";
 
 interface LocalBlogAuthor {
@@ -62,43 +56,6 @@ interface LocalBlogRecord {
   sections?: Array<Record<string, any>>;
   relatedSlugs?: string[];
   cta?: LocalBlogCta;
-}
-
-interface DirectusCategoryRecord {
-  slug?: string | null;
-  title?: string | null;
-  route_base?: string | null;
-}
-
-interface DirectusFileRecord {
-  id?: string | null;
-  title?: string | null;
-  filename_download?: string | null;
-  width?: number | null;
-  height?: number | null;
-}
-
-interface DirectusAuthorRecord {
-  first_name?: string | null;
-  last_name?: string | null;
-  email?: string | null;
-}
-
-interface DirectusPostRecord {
-  slug: string;
-  title: string;
-  excerpt?: string | null;
-  description?: string | null;
-  content?: string | null;
-  published_at?: string | null;
-  status?: string | null;
-  author_name?: string | null;
-  author_role?: string | null;
-  author_href?: string | null;
-  image?: DirectusFileRecord | string | null;
-  author?: DirectusAuthorRecord | null;
-  category_ref?: DirectusCategoryRecord | null;
-  tags?: Array<{ tag?: { slug?: string | null; title?: string | null; color?: string | null; order?: number | null } | null; tags_id?: { slug?: string | null; title?: string | null; color?: string | null; order?: number | null } | null } | { slug?: string | null; title?: string | null; color?: string | null; order?: number | null }> | null;
 }
 
 export interface BlogPost {
@@ -147,11 +104,11 @@ export interface BlogPost {
 export function resolveBlogSourceMode(): SourceMode {
   const mode = (process.env.ZENITH_BLOG_SOURCE || "git").trim().toLowerCase();
 
-  if (mode === "git" || mode === "local" || mode === "directus") {
+  if (mode === "git" || mode === "local") {
     return mode;
   }
 
-  throw new Error(`Unsupported ZENITH_BLOG_SOURCE "${mode}". Use "git", "local", or "directus".`);
+  throw new Error(`Unsupported ZENITH_BLOG_SOURCE "${mode}". Use "git" or "local".`);
 }
 
 export async function loadBlogIndexSource(): Promise<{
@@ -199,11 +156,7 @@ export async function loadBlogDetailSource(slug: string): Promise<{
 
 async function loadBlogPosts(): Promise<BlogPost[]> {
   const mode = resolveBlogSourceMode();
-  const posts = mode === "git"
-    ? await loadGitBlogPosts()
-    : mode === "directus"
-    ? await loadDirectusBlogPosts()
-    : loadLocalBlogPosts();
+  const posts = mode === "git" ? await loadGitBlogPosts() : loadLocalBlogPosts();
   for (const post of posts) {
     if (!post.slug || normalizeReadableSlug(post.slug) !== post.slug) {
       throw new ContentValidationError(`Blog slug '${post.slug}' is not a canonical readable slug`);
@@ -214,111 +167,6 @@ async function loadBlogPosts(): Promise<BlogPost[]> {
   }
   assertUniqueSlugs(posts, "Blog");
   return posts;
-}
-
-async function loadDirectusBlogPosts(): Promise<BlogPost[]> {
-  const client = await createDirectusServerClient();
-  const records = await queryDirectusPostRecords(client);
-
-  return records
-    .map((record) => mapDirectusPostRecord(record, client.baseUrl))
-    .filter((post): post is BlogPost => Boolean(post))
-    .sort(compareBlogPosts);
-}
-
-async function queryDirectusPostRecords(client: DirectusServerClient): Promise<DirectusPostRecord[]> {
-  return client.queryItems<DirectusPostRecord>("posts", {
-    limit: -1,
-    fields: [
-      "slug",
-      "title",
-      "excerpt",
-      "description",
-      "content",
-      "published_at",
-      "status",
-      "author_name",
-      "author_role",
-      "author_href",
-      "image.id",
-      "image.title",
-      "image.filename_download",
-      "image.width",
-      "image.height",
-      "author.first_name",
-      "author.last_name",
-      "category_ref.slug",
-      "category_ref.title",
-      "category_ref.route_base",
-      "tags.tag.slug",
-      "tags.tag.title",
-      "tags.tag.color",
-      "tags.tag.order",
-      "tags.tags_id.slug",
-      "tags.tags_id.title",
-      "tags.tags_id.color",
-      "tags.tags_id.order",
-    ],
-    sort: ["-published_at", "title"],
-    query: {
-      "filter[status][_eq]": "published",
-    },
-  });
-}
-
-function mapDirectusPostRecord(record: DirectusPostRecord, baseUrl: string): BlogPost | null {
-  if (isVersionStyleSlug(record.slug)) {
-    return null;
-  }
-  const category = normalizeCategory(record.category_ref) || { ...fallbackCategory };
-
-  const htmlRendered = decorateBlogHtml(String(record.content || `<p>${escapeHtml(record.description || record.title)}</p>`));
-  const excerpt = cleanText(record.excerpt || record.description || record.title);
-  const description = cleanText(record.description || excerpt || record.title);
-  const tagMeta = mapTagRecords(record.tags);
-  const tags = tagMeta.map((tag) => tag.title);
-  const image = normalizeImage(record.image, baseUrl, record.title);
-  const tone = toneByCategory[category.slug] || "blue";
-  const authorName = cleanText(record.author_name || formatDirectusAuthor(record.author) || "Zenith Team");
-  const authorRole = cleanText(record.author_role || category.title) || null;
-  const authorHref = cleanText(record.author_href || "") || null;
-
-  return {
-    slug: record.slug,
-    title: record.title,
-    excerpt,
-    description,
-    publishedAt: record.published_at || null,
-    updatedAt: null,
-    displayPublishedAt: formatEditorialDate(record.published_at),
-    displayUpdatedAt: null,
-    readingTime: formatReadingTime(stripHtmlTags(record.content || description)),
-    path: `/blog/${record.slug}`,
-    tags,
-    tagMeta,
-    category,
-    cover: {
-      eyebrow: category.title,
-      title: record.title,
-      description: excerpt,
-      tone,
-      image,
-    },
-    author: {
-      name: authorName,
-      role: authorRole,
-      href: authorHref,
-    },
-    summaryPoints: deriveSummaryPoints(htmlRendered, excerpt, tags),
-    relatedSlugs: [],
-    htmlRendered,
-    cta: defaultPostCta(category),
-    featured: false,
-    seoTitle: record.title,
-    seoDescription: description,
-    canonicalPath: `/blog/${record.slug}`,
-    headings: [],
-  };
 }
 
 function loadLocalBlogPosts(): BlogPost[] {
@@ -438,13 +286,4 @@ function inferLocalCategory(record: LocalBlogRecord): BlogCategory {
   const slug = record.slug === "release-0-6-18" ? "releases" : "engineering";
   const title = slug === "releases" ? "Releases" : "Engineering";
   return { slug, title, routeBase: "/blog" };
-}
-
-function formatDirectusAuthor(author: DirectusAuthorRecord | null | undefined) {
-  const name = [author?.first_name, author?.last_name].filter(Boolean).join(" ").trim();
-  return name || author?.email || "";
-}
-
-function isVersionStyleSlug(slug: string | null | undefined) {
-  return /^v\d+-\d+-\d+$/.test(cleanText(slug));
 }
