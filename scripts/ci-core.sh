@@ -43,6 +43,7 @@ node --test scripts/assert-tag-on-branch.spec.mjs
 node --test scripts/verify-publish-surface.spec.mjs
 node --test scripts/publish-packages-bootstrap.spec.mjs
 node --test scripts/publish-packages-existing-package.spec.mjs
+node --test scripts/publish-packages-preflight.spec.mjs
 node --test scripts/bootstrap-platform-package.spec.mjs
 node --test scripts/verify-platform-binary-smoke.spec.mjs
 node --test scripts/workflow-trust-boundary.spec.mjs
