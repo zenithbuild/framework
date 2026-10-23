@@ -30,8 +30,8 @@ if (args.includes('--version') || args.includes('-v')) {
 }
 
 if (args.includes('--help') || args.includes('-h')) {
-    const { cli } = await import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
-    await cli(args);
+    const { runCli } = await import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
+    await runCli(args);
     process.exit(0);
 }
 
@@ -70,5 +70,6 @@ if (hasMismatch) {
 }
 
 // Imported CLI modules are inert; the public bin explicitly owns execution.
-const { cli } = await import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
-await cli(args);
+// runCli prints failures through the Zenith logger and exits 1, like a direct run.
+const { runCli } = await import(pathToFileURL(resolveInternal('@zenithbuild/cli')).href);
+await runCli(args);

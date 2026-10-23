@@ -206,6 +206,23 @@ export async function cli(args, cwd) {
     }
 }
 
+/**
+ * Run the CLI with Zenith's formatted diagnostics and exit code 1 on failure.
+ * Shared by a direct run and the public `@zenithbuild/core` bin.
+ *
+ * @param {string[]} [args] - Process arguments (without node and script paths)
+ * @param {string} [cwd] - Working directory override
+ * @returns {Promise<void>}
+ */
+export async function runCli(args = process.argv.slice(2), cwd) {
+    try {
+        await cli(args, cwd);
+    } catch (error) {
+        createZenithLogger(process).error(error);
+        process.exit(1);
+    }
+}
+
 // Auto-run if called directly
 function isDirectRun() {
     if (!process.argv[1]) return false;
@@ -217,9 +234,5 @@ function isDirectRun() {
 }
 
 if (isDirectRun()) {
-    cli(process.argv.slice(2)).catch((error) => {
-        const logger = createZenithLogger(process);
-        logger.error(error);
-        process.exit(1);
-    });
+    void runCli(process.argv.slice(2));
 }

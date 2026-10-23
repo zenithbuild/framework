@@ -42,8 +42,12 @@ test('executes a relocated package in a path with spaces', () => {
     cpSync(join(cliRoot, 'dist'), join(relocated, 'dist'), { recursive: true });
     cpSync(join(cliRoot, 'package.json'), join(relocated, 'package.json'));
     mkdirSync(join(relocated, 'node_modules'));
-    const fixtureDependencies = ['picocolors'];
-    if (cliManifest.dependencies?.['@zenithbuild/config']) fixtureDependencies.push('@zenithbuild/config');
+    // Copy every declared runtime dependency, so the fixture follows the manifest
+    // instead of naming packages from other branches. The toolchain and Sharp are
+    // resolved lazily, so `--version` never loads them.
+    const lazyDependencies = new Set(['@zenithbuild/compiler', '@zenithbuild/bundler', 'sharp']);
+    const fixtureDependencies = Object.keys(cliManifest.dependencies || {})
+        .filter((name) => !lazyDependencies.has(name));
     for (const name of fixtureDependencies) {
         const target = join(relocated, 'node_modules', name);
         mkdirSync(dirname(target), { recursive: true });
@@ -87,4 +91,15 @@ test.each([entry, coreEntry])('build writes nonempty HTML and assets outside the
         const file = resolve(scratch, 'dist', asset.slice(1));
         expect(existsSync(file)).toBe(true);
     }
+}, 120_000);
+
+test.each([entry, coreEntry])('a failing command prints the Zenith error and exits 1: %s', (entryPath) => {
+    writeFileSync(join(scratch, 'package.json'), '{"private":true,"type":"module"}');
+    writeFileSync(join(scratch, 'zenith.config.js'), "throw new Error('entry failure probe');\n");
+    const result = run(entryPath, ['build']);
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('[zenith]');
+    expect(result.stderr).toContain('entry failure probe');
+    expect(result.stderr).not.toMatch(/^\s+at /m);
 }, 120_000);
