@@ -217,11 +217,18 @@ describe('Phase 1: CLI -> compiler process seam', () => {
 
     const bundlerChild = spawnMock.mock.results[0].value;
     const payload = JSON.parse(bundlerChild.__stdinChunks.join(''));
-    // A no-image project uses the native bare-input contract and no image payload.
-    expect(Array.isArray(payload)).toBe(true);
-    expect(payload).toHaveLength(1);
-    expect(payload.image_runtime_payload).toBeUndefined();
-    const envelope = payload[0];
+    // Without @zenithbuild/image the CLI still sends the runtime payload from
+    // the core image config, so the bundler input matches f504c98d.
+    expect(Array.isArray(payload)).toBe(false);
+    expect(Array.isArray(payload.inputs)).toBe(true);
+    expect(payload.inputs).toHaveLength(1);
+    expect(payload.image_runtime_payload).toEqual(expect.objectContaining({
+      basePath: '/',
+      config: expect.any(Object),
+      localImages: expect.any(Object),
+      mode: expect.any(String)
+    }));
+    const envelope = payload.inputs[0];
 
     expect(envelope.ir).toEqual(expect.objectContaining(fakeIR));
     expect(envelope.ir).toEqual(expect.objectContaining({

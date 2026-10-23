@@ -172,7 +172,7 @@ export function normalizeImageConfig(input) {
 
 // Image runtime payload contract. It lives with the image config so the CLI
 // emits the same `zenith-image-runtime` script whether or not the optional
-// @zenithbuild/image package is installed (JUD-83 output parity).
+// image package is installed (JUD-83 output parity).
 const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
 const IMAGE_RUNTIME_MARKER_RE = /data-zx-(data-zenith-image|unsafeHTML)/;
 
