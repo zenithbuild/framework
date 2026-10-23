@@ -7,7 +7,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 import { createTempProject } from './helpers/project.js';
-import { bundlerBin, cliBuildModule, compilerBin, repoRoot, toFileHref } from './helpers/paths.js';
+import { bundlerBin, cliBuildModule, compilerBin, hasExecutable, repoRoot, toFileHref } from './helpers/paths.js';
 import { validateCompilerIR } from './helpers/ir-schema.js';
 import { runCompilerBinary } from './helpers/pipeline.js';
 
@@ -31,6 +31,35 @@ async function makePage(content = '<h1>{count}</h1>') {
   return { root, pagesDir, outDir };
 }
 
+// The mocked-spawn tests below never execute a toolchain binary, so they point
+// the CLI at stub files through the env overrides instead of depending on a
+// native build in packages/*/target/release.
+async function withStubToolchain(run) {
+  const stubDir = await createTempProject('zenith-phase1-stub-bin');
+  tmpDirs.push(stubDir);
+  const stubs = {
+    compiler: path.join(stubDir, 'zenith-compiler'),
+    bundler: path.join(stubDir, 'zenith-bundler')
+  };
+  for (const stub of Object.values(stubs)) {
+    await fs.writeFile(stub, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  }
+  const previous = {
+    compiler: process.env.ZENITH_COMPILER_BIN,
+    bundler: process.env.ZENITH_BUNDLER_BIN
+  };
+  process.env.ZENITH_COMPILER_BIN = stubs.compiler;
+  process.env.ZENITH_BUNDLER_BIN = stubs.bundler;
+  try {
+    return await run(stubs);
+  } finally {
+    for (const [tool, name] of [['compiler', 'ZENITH_COMPILER_BIN'], ['bundler', 'ZENITH_BUNDLER_BIN']]) {
+      if (previous[tool] === undefined) delete process.env[name];
+      else process.env[name] = previous[tool];
+    }
+  }
+}
+
 afterAll(async () => {
   for (const dir of tmpDirs) {
     await fs.rm(dir, { recursive: true, force: true });
@@ -38,29 +67,31 @@ afterAll(async () => {
 });
 
 describe('Phase 1: CLI -> compiler process seam', () => {
-  test.each([
-    ['compiler', compilerBin],
-    ['bundler', bundlerBin]
-  ])('%s probe failures stop before compilation or IR forwarding', async (_tool, failingBinary) => {
+  test.each(['compiler', 'bundler'])('%s probe failures stop before compilation or IR forwarding', async (tool) => {
     const project = await makePage();
-    const spawnSyncMock = jest.fn((binary, args) => {
-      if (args?.[0] !== '--version') throw new Error('compilation must not start');
-      return binary === failingBinary
-        ? { status: 1, stdout: '', stderr: 'probe deliberately rejected' }
-        : { status: 0, stdout: 'zenith 0.8.0\n', stderr: '' };
+    await withStubToolchain(async (stubs) => {
+      const failingBinary = stubs[tool];
+      const spawnSyncMock = jest.fn((binary, args) => {
+        if (args?.[0] !== '--version') throw new Error('compilation must not start');
+        return binary === failingBinary
+          ? { status: 1, stdout: '', stderr: 'probe deliberately rejected' }
+          : { status: 0, stdout: 'zenith 0.8.0\n', stderr: '' };
+      });
+      const spawnMock = jest.fn();
+      await jest.isolateModulesAsync(async () => {
+        jest.unstable_mockModule('node:child_process', () => ({ spawnSync: spawnSyncMock, spawn: spawnMock }));
+        const { build } = await import(toFileHref(cliBuildModule));
+        await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir }))
+          .rejects.toThrow('probe deliberately rejected');
+      });
+      expect(spawnMock).not.toHaveBeenCalled();
+      expect(spawnSyncMock.mock.calls.length).toBeGreaterThan(0);
+      expect(spawnSyncMock.mock.calls.every(([, args]) => args[0] === '--version')).toBe(true);
+      expect(spawnSyncMock.mock.calls.some(([binary]) => binary === failingBinary)).toBe(true);
     });
-    const spawnMock = jest.fn();
-    await jest.isolateModulesAsync(async () => {
-      jest.unstable_mockModule('node:child_process', () => ({ spawnSync: spawnSyncMock, spawn: spawnMock }));
-      const { build } = await import(toFileHref(cliBuildModule));
-      await expect(build({ pagesDir: project.pagesDir, outDir: project.outDir }))
-        .rejects.toThrow('probe deliberately rejected');
-    });
-    expect(spawnMock).not.toHaveBeenCalled();
-    expect(spawnSyncMock.mock.calls.every(([, args]) => args[0] === '--version')).toBe(true);
   });
 
-  test('CLI bridge spawns compiler binary and forwards IR unchanged', async () => {
+  test('CLI bridge spawns compiler binary and forwards IR unchanged', () => withStubToolchain(async ({ compiler: compilerBin, bundler: bundlerBin }) => {
     const cliManifest = JSON.parse(
       await fs.readFile(path.join(repoRoot, 'packages', 'cli', 'package.json'), 'utf8')
     );
@@ -212,9 +243,12 @@ describe('Phase 1: CLI -> compiler process seam', () => {
     expect(envelope.route).toBe('/');
     expect(envelope.file).toMatch(/pages[\\/]index\.zen$/);
     expect(envelope.router).toBe(true);
-  });
+  }));
 
-  test('compiler binary stdout is strict JSON IR with no warnings on stderr', async () => {
+  // This test executes the real compiler, so it needs a native build. Skip it,
+  // rather than fail, when packages/compiler/target/release has no binary.
+  const testWithNativeCompiler = hasExecutable(compilerBin) ? test : test.skip;
+  testWithNativeCompiler('compiler binary stdout is strict JSON IR with no warnings on stderr', async () => {
     const project = await makePage('<script lang="ts">function save() {}</script><div><button on:click={save}>Save</button></div>');
     const entry = path.join(project.pagesDir, 'index.zen');
 
