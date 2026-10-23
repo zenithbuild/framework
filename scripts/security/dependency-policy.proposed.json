@@ -83,6 +83,26 @@
       "approvalUrl": null
     },
     {
+      "advisory": "GHSA-c4qx-w738-7hr3",
+      "url": "https://github.com/advisories/GHSA-c4qx-w738-7hr3",
+      "package": "@graphql-tools/utils",
+      "severity": "high",
+      "versions": ["11.2.0"],
+      "scopes": ["site"],
+      "paths": ["Tina CLI -> @graphql-codegen/plugin-helpers 7.1.0 -> utils 11.2.0"],
+      "boundary": "mergeIncrementalResult accepts non-primitive path segments and can pollute Object.prototype when merging hostile incremental GraphQL results. Affects >=10.10.1 <=12.0.1; 12.1.0 is outside the range and 9.2.1 is below it.",
+      "compatibilityBlocker": "The first patched 12.0.2 is outside plugin-helpers 7.1.0's ^11.2.0 range. A compatible route may exist: plugin-helpers 7.4.2, already in this lock for other codegen packages and inside @tinacms/cli's ^7.1.0 range, depends on utils ^12.0.3. That lock change belongs to the site dependency side of JUD-21 and is not verified here.",
+      "controlsProposed": ["Generate schemas only from reviewed repository configuration and content", "Keep CMS development endpoints local", "Do not accept remote schema/configuration input or public GraphQL tooling requests"],
+      "uncertainty": "Whether Tina code generation ever merges incremental results from untrusted input is not established.",
+      "owner": "Release Captain; Judah owns migration approval",
+      "followUp": "JUD-21 / GitHub #217",
+      "reviewAt": "2026-10-23T14:00:00Z",
+      "expiresAtProposed": "2026-10-25T05:00:00Z",
+      "status": "pending-judah-approval",
+      "approvedAt": null,
+      "approvalUrl": null
+    },
+    {
       "advisory": "GHSA-238p-pmpm-9mq7",
       "url": "https://github.com/advisories/GHSA-238p-pmpm-9mq7",
       "package": "katex",
