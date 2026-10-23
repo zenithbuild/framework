@@ -51,7 +51,7 @@ function measure(directory) {
 
 try {
     const dependencies = {};
-    for (const name of ['config', 'image', 'core', 'cli', 'compiler', 'bundler', 'runtime', 'router', 'compiler-linux-x64', 'bundler-linux-x64']) {
+    for (const name of ['image', 'core', 'cli', 'compiler', 'bundler', 'runtime', 'router', 'compiler-linux-x64', 'bundler-linux-x64']) {
         const packageRoot = join(root, 'packages', name);
         const pkg = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
         const payload = JSON.parse(run(process.execPath, [npmCli, 'pack', '--json', '--ignore-scripts', '--pack-destination', scratch], packageRoot));
