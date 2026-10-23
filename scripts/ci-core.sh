@@ -59,4 +59,13 @@ bun run --cwd packages/bundler contract:imports
 # Compiler node/js bridge tests
 node --test packages/compiler/tests/*.spec.js
 
+# set -e means reaching this point proves every other core check passed.
+if [ "$audit_status" -ne 0 ]; then
+  if [ "$audit_status" -eq 2 ]; then
+    reason="the dependency audit could not run (tool, registry or schema error), not an advisory finding"
+  else
+    reason="active dependency advisories remain (disposition: JUD-21)"
+  fi
+  echo "[ci-core] RED: all other core checks passed; exiting $audit_status only because ${reason}. See the [dependency-audit] lines near the top of this log." >&2
+fi
 exit "$audit_status"
