@@ -10,10 +10,10 @@ test('every workflow uses the same exact toolchain and frozen installs', () => {
     for (const name of workflows) {
         const source = read(`.github/workflows/${name}`);
         for (const match of source.matchAll(/node-version:\s*([^\n]+)/g)) {
-            assert.equal(match[1].replaceAll('"', '').trim(), '24.19.0', name);
+            assert.equal(match[1].replace(/["']/g, '').trim(), '24.19.0', name);
         }
         for (const match of source.matchAll(/bun-version:\s*([^\n]+)/g)) {
-            assert.equal(match[1].replaceAll('"', '').trim(), '1.4.0', name);
+            assert.equal(match[1].replace(/["']/g, '').trim(), '1.4.0', name);
         }
         for (const match of source.matchAll(/dtolnay\/rust-toolchain@([^\s]+)/g)) {
             assert.equal(match[1], '1.97.1', name);
