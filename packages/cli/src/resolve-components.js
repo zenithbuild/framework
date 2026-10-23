@@ -20,6 +20,15 @@ const __dirname = dirname(__filename);
 // Registry: Map<PascalCaseName, absolutePath>
 // ---------------------------------------------------------------------------
 
+// Absolute paths of framework-provided components (the @zenithbuild/image
+// <Image>). Only these get framework Image materialization; a project-defined
+// Image.zen is an ordinary component.
+const FRAMEWORK_COMPONENT_PATHS = new Set();
+
+export function isFrameworkComponentPath(componentPath) {
+    return FRAMEWORK_COMPONENT_PATHS.has(componentPath);
+}
+
 /**
  * Walk `srcDir/components/` recursively. Return Map<PascalName, absPath>.
  * Errors on duplicate component names within the registry.
@@ -48,15 +57,12 @@ export function buildComponentRegistry(srcDir, { imageComponentPath = null } = {
         if (!existsSync(componentPath)) {
             continue;
         }
+        // A project-defined component of the same name wins over the package one.
         if (registry.has(componentName)) {
-            throw new Error(
-                `Duplicate component name "${componentName}":\n` +
-                `  1) ${registry.get(componentName)}\n` +
-                `  2) ${componentPath}\n` +
-                'Rename the local component to avoid shadowing the Zenith framework component.'
-            );
+            continue;
         }
         registry.set(componentName, componentPath);
+        FRAMEWORK_COMPONENT_PATHS.add(componentPath);
     }
 
     return registry;

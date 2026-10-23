@@ -202,7 +202,7 @@ export async function build(options) {
         'inject_image_runtime_payload',
         () => injectImageRuntimePayloadIntoHtmlFiles(staticOutputDir, imageRuntimePayload)
     );
-    await writeImagePackageMarker(staticOutputDir, imagePackage);
+    await writeImagePackageMarker(projectRoot, outDir, imagePackage);
     await startupProfile.measureAsync(
         'copy_public_assets',
         () => copyPublicAssets({

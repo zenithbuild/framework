@@ -1,4 +1,4 @@
-import { prepareProjectImages, writeImagePackageMarker } from '../project-images.js';
+import { prepareProjectImages } from '../project-images.js';
 import { resolve } from 'node:path';
 
 import { buildComponentRegistry } from '../resolve-components.js';
@@ -78,7 +78,6 @@ export function createDevBuildSession(options) {
             })
         );
         state.imageManifest = manifest;
-        await writeImagePackageMarker(outDir, imagePackage);
         state.imageRuntimePayload = createImageRuntimePayload(config.images, manifest, 'passthrough', basePath);
         await startupProfile.measureAsync(
             'materialize_image_markup',

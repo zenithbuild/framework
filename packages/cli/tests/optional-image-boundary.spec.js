@@ -63,7 +63,10 @@ test('preview resolves the image API once from the build marker, not from source
     const getImageApi = createProjectImageApi(root, join(root, 'dist'));
     const api = await getImageApi();
     expect(await getImageApi()).toBe(api);
-    expect(await api.createImageRuntimePayload()).toBeNull();
+    // No marker: the package-free API, whose runtime payload contract matches
+    // the base output (unsafeHTML pages still receive it).
+    expect(await api.createImageRuntimePayload()).toMatchObject({ mode: 'passthrough', basePath: '/', localImages: {} });
+    expect(existsSync(join(root, 'node_modules'))).toBe(false);
 });
 
 test('no-image build, dev, preview and Node output need no image package or Sharp', async () => {

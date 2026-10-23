@@ -22,9 +22,12 @@ const REQUIRED_EXPORTS = [
  * With ifInstalled, an absent package resolves to null instead of throwing;
  * an installed but mismatched or broken package still fails.
  *
- * @param {{projectRoot: string, required: boolean, ifInstalled?: boolean}} options
+ * usedBy lists the project-relative files that use `<Image>`; it is named in
+ * the missing-package error.
+ *
+ * @param {{projectRoot: string, required: boolean, ifInstalled?: boolean, usedBy?: string[]}} options
  */
-export async function loadImagePackage({ projectRoot, required, ifInstalled = false }) {
+export async function loadImagePackage({ projectRoot, required, ifInstalled = false, usedBy = [] }) {
     if (!required && !ifInstalled) return null;
 
     const consumerRequire = createRequire(join(resolve(projectRoot), 'package.json'));
@@ -35,7 +38,8 @@ export async function loadImagePackage({ projectRoot, required, ifInstalled = fa
         if (error.code !== 'MODULE_NOT_FOUND') throw error;
         if (!required) return null;
         throw new Error(
-            `[Zenith:Image] This project requires ${IMAGE_PACKAGE}@${CLI_MANIFEST.version}. ` +
+            `[Zenith:Image] This project requires ${IMAGE_PACKAGE}@${CLI_MANIFEST.version}` +
+            (usedBy.length > 0 ? ` because <Image> is used in ${usedBy.join(', ')}. ` : '. ') +
             `Run ${devInstallCommand(projectRoot, `${IMAGE_PACKAGE}@${CLI_MANIFEST.version}`)} in ${projectRoot}.`,
             { cause: error }
         );
