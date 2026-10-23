@@ -17,7 +17,7 @@ const siteRoot = resolve(import.meta.dir, "..");
 const docsRoot = resolve(siteRoot, "../docs/documentation");
 
 describe("public documentation inventory", () => {
-  test("uses one explicit path boundary for Tina and the repo loader", async () => {
+  test("uses one explicit path boundary for the repo loader", async () => {
     const diskFiles = readdirSync(docsRoot, { recursive: true })
       .map((file) => String(file).replaceAll("\\", "/"))
       .filter((file) => file.endsWith(".md"));

@@ -5,9 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "zenith dev",
-    "cms:dev": "tinacms dev --noTelemetry -c \"bun run dev\"",
-    "cms:build": "tinacms build --local --skip-cloud-checks --noTelemetry",
-    "cms:audit": "tinacms audit --noTelemetry",
     "build": "zenith build",
     "preview": "zenith preview",
     "test": "bun test"

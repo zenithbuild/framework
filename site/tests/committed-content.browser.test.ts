@@ -21,10 +21,10 @@ async function startDevServer(): Promise<{ kill: () => void }> {
     if (await status() === 200) return { kill: () => dev.kill() };
   }
   dev.kill();
-  throw new Error("CMS content dev server failed to start");
+  throw new Error("Committed content dev server failed to start");
 }
 
-describe("Tina-managed committed content routes", () => {
+describe("committed content routes", () => {
   test("renders Blog, Docs, About, sponsorship, and people through direct loads and browser history", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
