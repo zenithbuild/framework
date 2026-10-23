@@ -1,4 +1,4 @@
-import { prependBasePath } from '../base-path.js';
+import { prependBasePath } from '@zenithbuild/core/config/base-path';
 import {
     buildLocalVariantPath,
     buildRemoteVariantPath,

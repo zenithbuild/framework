@@ -217,6 +217,8 @@ describe('Phase 1: CLI -> compiler process seam', () => {
 
     const bundlerChild = spawnMock.mock.results[0].value;
     const payload = JSON.parse(bundlerChild.__stdinChunks.join(''));
+    // Without @zenithbuild/image the CLI still sends the runtime payload from
+    // the core image config, so the bundler input matches f504c98d.
     expect(Array.isArray(payload)).toBe(false);
     expect(Array.isArray(payload.inputs)).toBe(true);
     expect(payload.inputs).toHaveLength(1);

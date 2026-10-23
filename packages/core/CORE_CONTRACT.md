@@ -45,6 +45,7 @@ Core does not:
 | `schema.ts` / `ir/` | Shared IR/schema exports |
 | `core-template.ts` | Deterministic generated core module bridge |
 | `index.ts` | Re-exports |
+| `config/` (`config.ts`, `config-types.ts`, `config-targets.ts`, `config-plugins.ts`, `index.ts`, `node.js`, `base-path.js`, `image-config.js`; top-level `config*.ts` re-export them) | Config source owned by core (JUD-83). Public subpaths: `@zenithbuild/core/config` (including the readonly `ZENITH_TARGETS` list of known deployment targets), `/config/node`, `/config/plugins`, `/config/base-path`, `/config/images`. No `@zenithbuild/*` module references (enforced in src and built dist by `tests/guardrails.spec.js`). |
 
 ---
 

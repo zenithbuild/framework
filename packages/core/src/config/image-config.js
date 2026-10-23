@@ -1,4 +1,4 @@
-import { imageEndpointPath, normalizeBasePath, prependBasePath } from '../base-path.js';
+import { normalizeBasePath } from './base-path.js';
 
 const DEFAULT_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
 const DEFAULT_IMAGE_SIZES = [16, 32, 48, 64, 96, 128, 256, 384];
@@ -8,7 +8,6 @@ const DEFAULT_MAX_REMOTE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_PIXELS = 40_000_000;
 const DEFAULT_MINIMUM_CACHE_TTL = 60;
 const DEFAULT_QUALITY = 75;
-const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
 
 export const DEFAULT_IMAGE_CONFIG = {
     formats: DEFAULT_FORMATS,
@@ -170,164 +169,19 @@ export function normalizeImageConfig(input) {
     return config;
 }
 
-function escapeRegex(value) {
-    return String(value).replace(/[|\\{}()[\]^$+?.*]/g, '\\$&');
-}
 
-function globToRegExp(glob, isHostname = false) {
-    let pattern = escapeRegex(glob);
-    pattern = pattern.replaceAll('\\*\\*', '__DOUBLE_STAR__');
-    pattern = pattern.replaceAll('\\*', isHostname ? '[^.]*' : '[^/]*');
-    pattern = pattern.replaceAll('__DOUBLE_STAR__', '.*');
-    return new RegExp(`^${pattern}$`, 'i');
-}
-
-function hostnameMatches(hostname, pattern) {
-    if (pattern.startsWith('*.')) {
-        const suffix = pattern.slice(1);
-        return hostname.endsWith(suffix) && hostname.length > suffix.length;
-    }
-    return globToRegExp(pattern, true).test(hostname);
-}
-
-export function matchRemotePattern(inputUrl, patterns) {
-    if (!inputUrl || !Array.isArray(patterns) || patterns.length === 0) {
-        return false;
-    }
-    const url = inputUrl instanceof URL ? inputUrl : new URL(String(inputUrl));
-    const protocol = url.protocol.replace(/:$/, '').toLowerCase();
-    const hostname = url.hostname.toLowerCase();
-    const port = url.port || '';
-    const pathname = url.pathname || '/';
-    const search = url.search || '';
-
-    return patterns.some((pattern) => {
-        if (pattern.protocol && pattern.protocol !== protocol) {
-            return false;
-        }
-        if (!hostnameMatches(hostname, pattern.hostname || '')) {
-            return false;
-        }
-        if (pattern.port && pattern.port !== port) {
-            return false;
-        }
-        if (pattern.search && pattern.search !== search) {
-            return false;
-        }
-        return globToRegExp(pattern.pathname || '/**').test(pathname);
-    });
-}
-
-export function isRemoteImageUrl(value) {
-    if (typeof value !== 'string') {
-        return false;
-    }
-    return /^https?:\/\//i.test(value.trim());
-}
-
-export function normalizeImageSource(input) {
-    if (typeof input === 'string') {
-        const trimmed = input.trim();
-        if (!trimmed) {
-            return null;
-        }
-        if (isRemoteImageUrl(trimmed)) {
-            return { kind: 'remote', url: trimmed, width: null, height: null, alt: '' };
-        }
-        if (trimmed.startsWith('/')) {
-            return { kind: 'local', path: trimmed, width: null, height: null, alt: '' };
-        }
-        return null;
-    }
-
-    if (!isPlainObject(input)) {
-        return null;
-    }
-
-    const rawUrl = typeof input.url === 'string'
-        ? input.url
-        : typeof input.src === 'string'
-            ? input.src
-            : typeof input.path === 'string'
-                ? input.path
-                : '';
-    const normalized = normalizeImageSource(rawUrl);
-    if (!normalized) {
-        return null;
-    }
-    const width = Number.isInteger(input.width) && input.width > 0 ? input.width : null;
-    const height = Number.isInteger(input.height) && input.height > 0 ? input.height : null;
-    const alt = typeof input.alt === 'string' ? input.alt : '';
-    return {
-        ...normalized,
-        width,
-        height,
-        alt
-    };
-}
-
-export function normalizeImageFormat(value) {
-    return String(value || '').trim().toLowerCase().replace(/^\./, '');
-}
-
-export function buildLocalImageKey(publicPath) {
-    const input = String(publicPath || '');
-    let hash = 2166136261;
-    for (let index = 0; index < input.length; index += 1) {
-        hash ^= input.charCodeAt(index);
-        hash = Math.imul(hash, 16777619);
-    }
-    return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-export function buildLocalVariantAssetPath(publicPath, width, quality, format) {
-    const key = buildLocalImageKey(publicPath);
-    return `/_zenith/image/local/${key}/w${width}-q${quality}.${normalizeImageFormat(format)}`;
-}
-
-export function buildLocalVariantPath(publicPath, width, quality, format, basePath = '/') {
-    return prependBasePath(basePath, buildLocalVariantAssetPath(publicPath, width, quality, format));
-}
-
-export function buildRemoteVariantPath(remoteUrl, width, quality, format, basePath = '/') {
-    const query = new URLSearchParams();
-    query.set('url', String(remoteUrl || ''));
-    query.set('w', String(width));
-    query.set('q', String(quality));
-    if (format) {
-        query.set('f', normalizeImageFormat(format));
-    }
-    return `${imageEndpointPath(basePath)}?${query.toString()}`;
-}
-
-export function resolveWidthCandidates(width, sizes, config, manifestEntry) {
-    const base = new Set([
-        ...(config?.deviceSizes || DEFAULT_DEVICE_SIZES),
-        ...(config?.imageSizes || DEFAULT_IMAGE_SIZES)
-    ]);
-    if (Number.isInteger(width) && width > 0) {
-        base.add(width);
-        base.add(width * 2);
-    }
-    if (!width && typeof sizes === 'string' && sizes.trim().length > 0) {
-        for (const candidate of config?.deviceSizes || DEFAULT_DEVICE_SIZES) {
-            base.add(candidate);
-        }
-    }
-
-    let widths = [...base].filter((entry) => Number.isInteger(entry) && entry > 0).sort((left, right) => left - right);
-    const available = Array.isArray(manifestEntry?.availableWidths) ? manifestEntry.availableWidths : null;
-    if (available && available.length > 0) {
-        widths = widths.filter((entry) => available.includes(entry));
-        if (widths.length === 0) {
-            widths = [...available];
-        }
-    }
-    return widths;
-}
+// Image runtime payload contract. It lives with the image config so the CLI
+// emits the same `zenith-image-runtime` script whether or not the optional
+// image package is installed (JUD-83 output parity).
+const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
+const IMAGE_RUNTIME_MARKER_RE = /data-zx-(data-zenith-image|unsafeHTML)/;
 
 export function imageRuntimeGlobalName() {
     return IMAGE_RUNTIME_GLOBAL;
+}
+
+export function htmlNeedsImageRuntimePayload(html) {
+    return IMAGE_RUNTIME_MARKER_RE.test(String(html || ''));
 }
 
 export function normalizeImageRuntimePayload(payload) {
@@ -340,4 +194,52 @@ export function normalizeImageRuntimePayload(payload) {
         config: normalizeImageConfig(payload.config || {}),
         localImages: isPlainObject(payload.localImages) ? payload.localImages : {}
     };
+}
+
+export function createImageRuntimePayload(config, localImages, mode = 'passthrough', basePath = '/') {
+    return normalizeImageRuntimePayload({
+        mode,
+        basePath,
+        config: normalizeImageConfig(config),
+        localImages: localImages && typeof localImages === 'object' ? localImages : {}
+    });
+}
+
+function serializeInlineScriptJson(payload) {
+    return JSON.stringify(payload)
+        .replace(/</g, '\\u003C')
+        .replace(/>/g, '\\u003E')
+        .replace(/\//g, '\\u002F')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+}
+
+export function injectImageRuntimePayload(html, payload) {
+    // Only inject if the HTML contains Zenith image markers or unsafeHTML
+    if (!htmlNeedsImageRuntimePayload(html)) {
+        return html;
+    }
+
+    const safePayload = createImageRuntimePayload(
+        payload?.config || {},
+        payload?.localImages || {},
+        payload?.mode || 'passthrough',
+        payload?.basePath || '/'
+    );
+    const globalName = imageRuntimeGlobalName();
+    const serialized = serializeInlineScriptJson(safePayload);
+    const scriptTag = `<script id="zenith-image-runtime">window.${globalName} = ${serialized};</script>`;
+    const existingTagRe = /<script\b[^>]*\bid=(["'])zenith-image-runtime\1[^>]*>[\s\S]*?<\/script>/i;
+
+    if (existingTagRe.test(html)) {
+        return html.replace(existingTagRe, scriptTag);
+    }
+    if (/<\/head>/i.test(html)) {
+        return html.replace(/<\/head>/i, `${scriptTag}</head>`);
+    }
+    const bodyOpen = html.match(/<body\b[^>]*>/i);
+    if (bodyOpen) {
+        return html.replace(bodyOpen[0], `${bodyOpen[0]}${scriptTag}`);
+    }
+    return `${scriptTag}${html}`;
 }

@@ -1,0 +1,47 @@
+{
+  "name": "@zenithbuild/image",
+  "version": "0.8.0",
+  "description": "Optional image processing and Image component for Zenith",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./runtime": "./dist/runtime.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenithbuild/framework",
+    "directory": "packages/image"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build",
+    "test": "bun run build && node --experimental-vm-modules $(node -e \"const path=require('node:path');const pkg=require.resolve('jest/package.json');process.stdout.write(path.join(path.dirname(pkg),'bin/jest.js'))\") --config jest.config.js --forceExit --runInBand"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "^5.7.3",
+    "jest": "^30.2.0",
+    "@jest/globals": "^30.2.0",
+    "@zenithbuild/core": "0.8.0"
+  },
+  "dependencies": {
+    "sharp": "^0.35.5"
+  },
+  "peerDependencies": {
+    "@zenithbuild/core": "0.8.0"
+  }
+}

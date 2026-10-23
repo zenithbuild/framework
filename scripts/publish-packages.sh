@@ -5,15 +5,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DRY_RUN=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-  DRY_RUN=1
+PREFLIGHT_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --preflight-only) PREFLIGHT_ONLY=1 ;;
+    *)
+      echo "Usage: $0 [--dry-run] [--preflight-only]" >&2
+      exit 1
+      ;;
+  esac
   shift
-fi
-
-if [[ $# -ne 0 ]]; then
-  echo "Usage: $0 [--dry-run]" >&2
-  exit 1
-fi
+done
 
 TRAIN_VERSION=""
 if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
@@ -26,6 +29,11 @@ NPM_BIN="${NPM_BIN:-npm}"
 NODE_BIN="${NODE_BIN:-node}"
 PACKAGES=()
 PUBLISH_PACKAGE_FILTER="${PUBLISH_PACKAGE_FILTER:-}"
+# --preflight-only checks the full framework selection (native + release).
+if [[ "$PREFLIGHT_ONLY" -eq 1 && -n "$PUBLISH_PACKAGE_FILTER" ]]; then
+  echo "Ignoring PUBLISH_PACKAGE_FILTER=${PUBLISH_PACKAGE_FILTER} for --preflight-only." >&2
+  PUBLISH_PACKAGE_FILTER=""
+fi
 
 published=()
 skipped=()
@@ -289,11 +297,55 @@ verify_publish_surface() {
   "${args[@]}"
 }
 
+# Exit codes: 0 all names exist, 1 names need bootstrap, 2 registry lookup failed.
+# Mirrors the dependency audit convention (scripts/security): 2 means the check
+# itself could not run, so the result is incomplete and must fail closed.
+preflight_package_names() {
+  local entry package_dir package_name status
+  local missing=()
+  local lookup_failed=()
+
+  echo "Preflight: checking that every selected package name exists on npm"
+  for entry in "${PACKAGES[@]}"; do
+    IFS='|' read -r package_dir package_name <<<"$entry"
+    if npm_view_json "${package_name} package" "${package_name}" version >/dev/null; then
+      status=0
+    else
+      status=$?
+    fi
+    case "$status" in
+      0) echo "  ok: ${package_name}" ;;
+      3)
+        echo "  bootstrap required: package name not yet published on npm (${package_name})"
+        missing+=("$package_name")
+        ;;
+      *) lookup_failed+=("$package_name") ;;
+    esac
+  done
+
+  if [[ "${#lookup_failed[@]}" -gt 0 ]]; then
+    echo "::error::Publish preflight could not query the npm registry for: $(format_inline_list "${lookup_failed[@]}"). This is a network, registry or auth failure, not a missing package. Nothing was published; re-run once ${NPM_REGISTRY_URL} is reachable." >&2
+    if [[ "${#missing[@]}" -gt 0 ]]; then
+      echo "Also not yet published on npm: $(format_inline_list "${missing[@]}")" >&2
+    fi
+    exit 2
+  fi
+
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    echo "::error::Bootstrap required: $(format_inline_list "${missing[@]}"). Nothing was published." >&2
+    echo "Publish once manually or with temporary token, then configure Trusted Publishers." >&2
+    echo "Native platform names can use the manual Bootstrap Platform Packages workflow (.github/workflows/bootstrap-platform-packages.yml)." >&2
+    exit 1
+  fi
+}
+
 echo "Publishing Zenith train in strict order"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "TRAIN_VERSION=${TRAIN_VERSION}"
 fi
-if [[ "$DRY_RUN" -eq 1 ]]; then
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  echo "Mode=preflight-only"
+elif [[ "$DRY_RUN" -eq 1 ]]; then
   echo "Mode=dry-run"
 else
   echo "Mode=publish"
@@ -303,9 +355,17 @@ if [[ -n "$PUBLISH_PACKAGE_FILTER" ]]; then
 fi
 echo
 
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  load_publish_matrix
+  preflight_package_names
+  echo "Preflight passed for ${#PACKAGES[@]} package name(s); nothing was packed or published."
+  exit 0
+fi
+
 echo "Verifying publish surface truth"
 verify_publish_surface
 load_publish_matrix
+preflight_package_names
 echo
 
 for entry in "${PACKAGES[@]}"; do

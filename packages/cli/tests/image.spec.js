@@ -3,11 +3,11 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
-import sharp from 'sharp';
+import { sharp, installImagePackage } from './helpers/image-package.js';
 import { build } from '../dist/build.js';
 import { createPreviewServer } from '../dist/preview.js';
-import { __imageServiceTestHooks } from '../src/images/service.js';
-import { buildLocalVariantPath } from '../src/images/shared.js';
+import { __imageServiceTestHooks } from '../../image/src/service.js';
+import { buildLocalVariantPath } from '../../image/src/shared.js';
 
 jest.setTimeout(45000);
 
@@ -29,6 +29,7 @@ async function makeProject(files) {
         await mkdir(join(fullPath, '..'), { recursive: true });
         await writeFile(fullPath, contents);
     }
+    await installImagePackage(root);
     return {
         root,
         pagesDir: join(root, 'src', 'pages'),
@@ -64,6 +65,18 @@ describe('native image optimization', () => {
     let project = null;
     let preview = null;
     let remote = null;
+
+    test('preview retains the image endpoint when original page sources are removed', async () => {
+        project = await makeProject({
+            'src/pages/index.zen': '<main><Image src="/hero.png" alt="Hero" /></main>\n'
+        });
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        await rm(project.pagesDir, { recursive: true, force: true });
+        preview = await createPreviewServer({ projectRoot: project.root, distDir: project.outDir, port: 0 });
+        const result = await fetch(`http://127.0.0.1:${preview.port}/_zenith/image`);
+        expect(result.status).toBe(400);
+        expect(await result.json()).toEqual({ error: 'missing_url' });
+    });
 
     afterEach(async () => {
         if (preview) {
@@ -234,7 +247,7 @@ describe('native image optimization', () => {
     test('preview blocks loopback remote optimization unless explicitly allowed', async () => {
         remote = await startRemoteImageServer();
         project = await makeProject({
-            'src/pages/index.zen': '<main>Image security test</main>\n',
+            'src/pages/index.zen': '<main>Image security test<Image src="/hero.png" alt="Hero" /></main>\n',
             'zenith.config.js': [
                 'module.exports = {',
                 "  pagesDir: 'src/pages',",
@@ -432,7 +445,7 @@ describe('native image optimization', () => {
     });
 
     test('image materialization source contains no dynamic evaluation path', async () => {
-        const source = await readFile(new URL('../src/images/materialize.ts', import.meta.url), 'utf8');
+        const source = await readFile(new URL('../../image/src/materialize.ts', import.meta.url), 'utf8');
 
         expect(source.includes('new Function')).toBe(false);
         expect(source.includes('replaceImageMarkers')).toBe(true);

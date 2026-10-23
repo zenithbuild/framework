@@ -1,0 +1,289 @@
+{
+  "machine": {
+    "platform": "linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx",
+    "node": "v24.19.0"
+  },
+  "method": "Three serial fresh consumer directories per manager and image mode; local tarballs with exact overrides; normal optional dependencies; install scripts enabled; normal warm global manager caches; pnpm isolated fresh store per run. Measured apparent bytes and unique files through physical symlink targets. No release or publish.",
+  "source": "68eecf3ca8b316f0bc6e640ea1b6120347d52fe3",
+  "dirty": false,
+  "stale": "Measured at 68eecf3c, when the shared config source was the separate @zenithbuild/config package (option A). That package was superseded on October 23, 2026 at 12:16 PM CT by folding the config source into @zenithbuild/core, so the @zenithbuild/config tarball below and the totals that include it describe the old layout. Not re-measured.",
+  "tarballs": [
+    {
+      "name": "@zenithbuild/config",
+      "version": "0.8.0",
+      "integrity": "sha512-FWxXWxiZ4c9QGHS5Xv+gomZ89yKE84QyXnKkQ3g/fBWNnK+sxbnRG15jygphwmRMlx4q8pQ6/zOF2oCUSK1DXg=="
+    },
+    {
+      "name": "@zenithbuild/image",
+      "version": "0.8.0",
+      "integrity": "sha512-rHIIVbXoSRGDmwLHptclMCqQyp1zzDjKPLIcD6IE40VSfBUUQvn3kUaixo4c0svz9+gI4xGsLI3cfwvHhv2Lsg=="
+    },
+    {
+      "name": "@zenithbuild/core",
+      "version": "0.8.0",
+      "integrity": "sha512-0ACTfrbUhzHIIXt20dib5lvgvf7MZ4Sx0vx8SXw1FtTqW7rwgTti/rnyjO5tIrCpAA/OGGU6L9WGQr5oVvm1tA=="
+    },
+    {
+      "name": "@zenithbuild/cli",
+      "version": "0.8.0",
+      "integrity": "sha512-z/oCuDRH0ekv0sZmih8nFpAfbUN8p8a/57J0v6/PlmR+sc5cw8SZowHJDWYBQGXAiTUZDAeMauJnlPbV8LP8Mg=="
+    },
+    {
+      "name": "@zenithbuild/compiler",
+      "version": "0.8.0",
+      "integrity": "sha512-F6JPgKVVMn9N4EcYcMbw5S+7oXj+UxrBaPX1ObgrVlydbFti+06ApqGA8B4bcQry8Dq2hGBcGrYoCMZSAq6oUw=="
+    },
+    {
+      "name": "@zenithbuild/bundler",
+      "version": "0.8.0",
+      "integrity": "sha512-MBvhJOYY/A4xqNnRqQ7p+Hf894sfIYEGOzK1JsF8XeOgtHbrOH7q0c0+TpCNYodYNSy4zfN01CE4/WyB/PCuKQ=="
+    },
+    {
+      "name": "@zenithbuild/runtime",
+      "version": "0.8.0",
+      "integrity": "sha512-pM+mpnosFEOGF67rW7fg+HvLiLWzwz3AsYxwJ7Lxk5pyoM0RyIaUNoEj9l6N2H0Oc1uPHeVtc1Y6KXWoBb/ndA=="
+    },
+    {
+      "name": "@zenithbuild/router",
+      "version": "0.8.0",
+      "integrity": "sha512-q+PM2aL6OlKDPw7o5/+5Ke+aHe8UE1slEjqxCbBQBFXO8MaRaY5AjEeKUe0kkTgYJanPpcL+CGOV6MF/9I8afg=="
+    },
+    {
+      "name": "@zenithbuild/compiler-linux-x64",
+      "version": "0.8.0",
+      "integrity": "sha512-mrEyQq13vcSJMT64N+lHKxgBb5+LQveozTFkDUA4r5Yo02UaIN+h+deqv5Lt3z5fD6SWLRt/Bb5QZXbMpNyCow=="
+    },
+    {
+      "name": "@zenithbuild/bundler-linux-x64",
+      "version": "0.8.0",
+      "integrity": "sha512-/Zod3I54bgCCCXB3AX8zRlSvRU0qNfQlfwtrWP3pxgh/DclB9nUQjXagzaTgQrf24Sd6y1O2vSbYKiOqzM/OBA=="
+    }
+  ],
+  "runs": [
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": false,
+      "run": 1,
+      "elapsedMs": 3249,
+      "bytes": 31489971,
+      "files": 449,
+      "sharp": []
+    },
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": false,
+      "run": 2,
+      "elapsedMs": 2536,
+      "bytes": 31489971,
+      "files": 449,
+      "sharp": []
+    },
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": false,
+      "run": 3,
+      "elapsedMs": 2547,
+      "bytes": 31489971,
+      "files": 449,
+      "sharp": []
+    },
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": true,
+      "run": 1,
+      "elapsedMs": 4125,
+      "bytes": 51863671,
+      "files": 594,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": true,
+      "run": 2,
+      "elapsedMs": 3141,
+      "bytes": 51863671,
+      "files": 594,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "npm",
+      "version": "12.2.0",
+      "images": true,
+      "run": 3,
+      "elapsedMs": 3172,
+      "bytes": 51863671,
+      "files": 594,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": false,
+      "run": 1,
+      "elapsedMs": 1585,
+      "bytes": 31498978,
+      "files": 453,
+      "sharp": []
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": false,
+      "run": 2,
+      "elapsedMs": 1598,
+      "bytes": 31498978,
+      "files": 453,
+      "sharp": []
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": false,
+      "run": 3,
+      "elapsedMs": 1632,
+      "bytes": 31498978,
+      "files": 453,
+      "sharp": []
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": true,
+      "run": 1,
+      "elapsedMs": 2430,
+      "bytes": 51884273,
+      "files": 601,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": true,
+      "run": 2,
+      "elapsedMs": 2534,
+      "bytes": 51884273,
+      "files": 601,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "pnpm",
+      "version": "10.34.7",
+      "images": true,
+      "run": 3,
+      "elapsedMs": 2556,
+      "bytes": 51884273,
+      "files": 601,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": false,
+      "run": 1,
+      "elapsedMs": 245,
+      "bytes": 31485867,
+      "files": 448,
+      "sharp": []
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": false,
+      "run": 2,
+      "elapsedMs": 187,
+      "bytes": 31485867,
+      "files": 448,
+      "sharp": []
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": false,
+      "run": 3,
+      "elapsedMs": 253,
+      "bytes": 31485867,
+      "files": 448,
+      "sharp": []
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": true,
+      "run": 1,
+      "elapsedMs": 398,
+      "bytes": 71091327,
+      "files": 604,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-libvips-linuxmusl-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "@img/sharp-linuxmusl-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": true,
+      "run": 2,
+      "elapsedMs": 286,
+      "bytes": 71091327,
+      "files": 604,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-libvips-linuxmusl-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "@img/sharp-linuxmusl-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    },
+    {
+      "manager": "bun",
+      "version": "1.4.0",
+      "images": true,
+      "run": 3,
+      "elapsedMs": 314,
+      "bytes": 71091327,
+      "files": 604,
+      "sharp": [
+        "@img/sharp-libvips-linux-x64@1.3.4",
+        "@img/sharp-libvips-linuxmusl-x64@1.3.4",
+        "@img/sharp-linux-x64@0.35.5",
+        "@img/sharp-linuxmusl-x64@0.35.5",
+        "sharp@0.35.5"
+      ]
+    }
+  ]
+}

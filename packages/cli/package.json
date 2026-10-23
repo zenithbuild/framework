@@ -37,15 +37,19 @@
   "dependencies": {
     "@zenithbuild/compiler": "0.8.0",
     "@zenithbuild/bundler": "0.8.0",
-    "picocolors": "^1.1.1",
-    "sharp": "^0.35.5"
+    "picocolors": "^1.1.1"
+  },
+  "peerDependencies": {
+    "@zenithbuild/core": "0.8.0"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@jest/globals": "^30.2.0",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "@zenithbuild/image": "0.8.0",
+    "@zenithbuild/core": "0.8.0"
   },
   "private": false
 }

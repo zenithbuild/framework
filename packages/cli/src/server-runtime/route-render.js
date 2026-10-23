@@ -4,8 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { materializeSsrBindings } from './ssr-bindings.js';
 import { attachRouteAuth } from '../auth/route-auth.js';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
-import { createImageRuntimePayload, injectImageRuntimePayload } from '../images/payload.js';
-import { materializeImageMarkup } from '../images/materialize.js';
+import { createImageRuntimePayload, injectImageRuntimePayload } from '../image-config.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException } from '../server-error.js';
 import { allow, data, deny, download, invalid, json, redirect, text } from '../server-contract.js';
@@ -363,27 +362,24 @@ export async function renderRouteRequest(options) {
             finalSsrPayload = scopedRuntime.mergeScopedSsrPayload(ssrPayload, scopedPayload);
         }
 
-        const localImages = await loadImageManifest(imageManifestPath);
-        const imagePayload = createImageRuntimePayload(
-            imageConfig,
-            localImages,
-            'passthrough',
-            route.base_path || '/'
-        );
-
         let html = await readFile(shellHtmlPath, 'utf8');
         html = await materializeSsrBindings({
             html, payload: finalSsrPayload, params, routePath: route.path,
             planPath: join(dirname(dirname(dirname(dirname(routeModulePath)))), 'ssr-bindings.json')
         });
-        html = await materializeImageMarkup({
-            html,
-            payload: imagePayload,
-            imageMaterialization: Array.isArray(route.image_materialization)
-                ? route.image_materialization
-                : []
-        });
         html = injectSsrPayload(html, finalSsrPayload);
+        const imagePayload = createImageRuntimePayload(
+            imageConfig, await loadImageManifest(imageManifestPath), 'passthrough', route.base_path || '/'
+        );
+        // Only image markers need the optional @zenithbuild/image package. The
+        // runtime payload script is emitted for every marker the payload
+        // contract covers (Image markers and unsafeHTML), package or not.
+        if ((route.image_materialization || []).length > 0 || /data-zx-data-zenith-image/.test(html)) {
+            const api = await import('../images/index.js');
+            html = await api.materializeImageMarkup({
+                html, payload: imagePayload, imageMaterialization: route.image_materialization || []
+            });
+        }
         html = injectImageRuntimePayload(html, imagePayload);
 
         const headers = new Headers({

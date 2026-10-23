@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 
 import { cloneComponentIrForInstance } from '../component-instance-ir.js';
 import { renderPropsLiteralFromAttrs } from './scoped-identifier-rewrite.js';
-import { extractTemplate, isDocumentMode } from '../resolve-components.js';
+import { extractTemplate, isDocumentMode, isFrameworkComponentPath } from '../resolve-components.js';
 import {
     buildComponentExpressionRewrite,
     mergeExpressionRewriteMaps,
@@ -422,7 +422,7 @@ export async function runPageComponentLoop({
             pageStats,
             pageOwnerExpressionRewrite
         });
-        if (compName === 'Image') {
+        if (compName === 'Image' && isFrameworkComponentPath(compPath)) {
             imagePropsLiterals.push(
                 renderPropsLiteralFromAttrs(occurrence.attrs || '', {
                     expressionRewrite: attrExpressionRewrite

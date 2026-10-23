@@ -12,6 +12,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/config.js",
+    "./config/node": "./dist/config/node.js",
+    "./config/plugins": "./dist/config/config-plugins.js",
+    "./config/base-path": "./dist/config/base-path.js",
+    "./config/images": "./dist/config/image-config.js",
     "./path": "./dist/path.js",
     "./order": "./dist/order.js",
     "./hash": "./dist/hash.js",

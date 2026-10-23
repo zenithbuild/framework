@@ -1,3 +1,4 @@
+import { prepareProjectImages } from '../project-images.js';
 import { resolve } from 'node:path';
 
 import { buildComponentRegistry } from '../resolve-components.js';
@@ -8,10 +9,7 @@ import { createPageLoopCaches } from '../build/page-loop-state.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from '../build/type-declarations.js';
 import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from '../base-path-html.js';
 import { writeSsrBindingPlans } from '../build/ssr-binding-plans.js';
-import { injectImageMaterializationIntoRouterManifest } from '../images/router-manifest.js';
-import { buildImageArtifacts } from '../images/service.js';
-import { materializeImageMarkupInHtmlFiles } from '../images/materialize.js';
-import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from '../images/payload.js';
+import { injectImageMaterializationIntoRouterManifest } from '../router-server-metadata.js';
 import {
     copyPublicAssets,
     deriveReservedPublicAssetPaths,
@@ -58,6 +56,7 @@ export function createDevBuildSession(options) {
         experimentalEmbeddedMarkup: config.embeddedMarkupExpressions === true,
         strictDomLints: config.strictDomLints === true
     };
+    let imagePackage;
     let previousPublicAssetPaths = new Set();
 
     ensureToolchainCompatibility(compilerBin);
@@ -70,6 +69,7 @@ export function createDevBuildSession(options) {
     }
 
     async function syncImageState(startupProfile) {
+        const { buildImageArtifacts, createImageRuntimePayload, materializeImageMarkupInHtmlFiles, injectImageRuntimePayloadIntoHtmlFiles } = imagePackage.api;
         const { manifest } = await startupProfile.measureAsync(
             'build_image_artifacts',
             () => buildImageArtifacts({
@@ -183,7 +183,7 @@ export function createDevBuildSession(options) {
             bundlerBin
         });
 
-        state.registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
+        state.registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir, { imageComponentPath: imagePackage.componentPath }));
         state.manifest = await startupProfile.measureAsync('generate_manifest', () => generateManifest(resolvedPagesDir));
         const pageManifest = pageManifestEntries();
         await startupProfile.measureAsync('ensure_zenith_type_declarations', () => ensureZenithTypeDeclarations({
@@ -323,7 +323,12 @@ export function createDevBuildSession(options) {
 
     return {
         async build(buildOptions = {}) {
+            const nextImagePackage = await prepareProjectImages(projectRoot, srcDir);
+            if (imagePackage?.componentPath !== nextImagePackage.componentPath) state.hasSuccessfulBuild = false;
+            const imageNotice = nextImagePackage.notice !== imagePackage?.notice ? nextImagePackage.notice : null;
+            imagePackage = nextImagePackage;
             const activeLogger = buildOptions.logger || logger;
+            if (imageNotice) activeLogger?.info?.(imageNotice);
             const showBundlerInfo = buildOptions.showBundlerInfo !== false;
             const changedFiles = Array.isArray(buildOptions.changedFiles)
                 ? [...new Set(buildOptions.changedFiles.map((entry) => resolve(String(entry))))]
@@ -350,6 +355,10 @@ export function createDevBuildSession(options) {
         },
         getImageRuntimePayload() {
             return state.imageRuntimePayload;
+        },
+        /** Image API resolved by the latest build(); no per-request rescan. */
+        async getImageApi() {
+            return (imagePackage || await prepareProjectImages(projectRoot, srcDir)).api;
         },
         getPublicAssetPaths() {
             return previousPublicAssetPaths;

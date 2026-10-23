@@ -100,35 +100,9 @@ jobs:
           TARGET_BRANCH: ${{ steps.release_version.outputs.target_branch }}
         run: node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
 
-      - name: Verify platform package names are bootstrapped
+      - name: Verify every release and native package name exists on npm
         shell: bash
-        run: |
-          set -euo pipefail
-          registry="https://registry.npmjs.org/"
-          packages=(
-            "@zenithbuild/bundler-darwin-arm64"
-            "@zenithbuild/bundler-darwin-x64"
-            "@zenithbuild/bundler-linux-x64"
-            "@zenithbuild/bundler-win32-x64"
-            "@zenithbuild/compiler-darwin-arm64"
-            "@zenithbuild/compiler-darwin-x64"
-            "@zenithbuild/compiler-linux-x64"
-            "@zenithbuild/compiler-win32-x64"
-          )
-
-          missing=()
-          for package in "${packages[@]}"; do
-            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
-              missing+=("${package}")
-            fi
-          done
-
-          if [[ "${#missing[@]}" -gt 0 ]]; then
-            joined="$(IFS=, ; echo "${missing[*]}")"
-            echo "Platform package names are not bootstrapped on npm: ${joined}" >&2
-            echo "Run the manual Bootstrap Platform Packages workflow once for missing names using NPM_BOOTSTRAP_TOKEN, then re-run publish." >&2
-            exit 1
-          fi
+        run: ./scripts/publish-packages.sh --preflight-only
 
   publish_platforms:
     name: Publish Platform Packages
@@ -412,7 +386,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli
+          PUBLISH_PACKAGE_FILTER: packages/runtime,packages/router,packages/compiler,packages/bundler,packages/cli,packages/core,packages/image
         run: ./scripts/publish-packages.sh
 
   verify_registry:

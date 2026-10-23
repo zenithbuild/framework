@@ -1,21 +1,10 @@
-export const KNOWN_TARGETS = [
-    'static',
-    'static-export',
-    'vercel-static',
-    'netlify-static',
-    'vercel',
-    'netlify',
-    'node'
-];
+import { ZENITH_TARGETS } from '@zenithbuild/core/config';
 
-export type ZenithTarget =
-    | 'static'
-    | 'static-export'
-    | 'vercel-static'
-    | 'netlify-static'
-    | 'vercel'
-    | 'netlify'
-    | 'node';
+// Single source of truth: the shared config target list. The runtime list and
+// the ZenithTarget type both derive from it, so they cannot drift.
+export const KNOWN_TARGETS: readonly string[] = ZENITH_TARGETS;
+
+export type ZenithTarget = typeof ZENITH_TARGETS[number];
 
 export type ZenithRenderMode = 'prerender' | 'server';
 

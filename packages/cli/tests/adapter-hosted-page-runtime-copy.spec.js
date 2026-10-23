@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { installImagePackage } from './helpers/image-package.js';
 import {
     copyHostedGlobalMiddlewareRuntime,
     copyHostedPageRuntime
@@ -16,6 +17,8 @@ async function writeFixtureFile(root, relativePath, contents = `${relativePath}\
 async function createCoreOutput() {
     const root = join(tmpdir(), `zenith-hosted-runtime-copy-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const serverRoot = join(root, 'server');
+    await installImagePackage(root);
+    await writeFixtureFile(serverRoot, 'images/package.json', JSON.stringify({ type: 'module', dependencies: { sharp: '^0.35.5' } }));
 
     for (const dir of ['runtime', 'images', 'auth', 'server-contract']) {
         await writeFixtureFile(serverRoot, `${dir}/fixture.js`);
@@ -29,6 +32,7 @@ async function createCoreOutput() {
 
     for (const file of [
         'base-path.js',
+        'image-config.js',
         'server-contract.js',
         'server-middleware.js',
         'server-error.js',

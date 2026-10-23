@@ -42,7 +42,7 @@ const OFFICIAL_REGISTRY: ZenithExtensionRegistry = {
             description: 'Builds Zenith apps for Netlify deployment.'
         },
         {
-            name: '@zenithbuild/plugin-image',
+            name: '@zenithbuild/image',
             type: 'plugin',
             alias: 'image',
             official: true,

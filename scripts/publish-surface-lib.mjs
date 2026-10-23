@@ -23,12 +23,13 @@ export const PUBLISH_SURFACE_MATRIX = [
     entry('packages/compiler-darwin-x64', '@zenithbuild/compiler-darwin-x64', 'platform', ['bin/zenith-compiler']),
     entry('packages/compiler-linux-x64', '@zenithbuild/compiler-linux-x64', 'platform', ['bin/zenith-compiler']),
     entry('packages/compiler-win32-x64', '@zenithbuild/compiler-win32-x64', 'platform', ['bin/zenith-compiler.exe']),
-    entry('packages/bundler', '@zenithbuild/bundler', 'release', ['dist/index.js', 'scripts/render-assets.mjs']),
-    entry('packages/compiler', '@zenithbuild/compiler', 'release', ['dist/index.js']),
     entry('packages/runtime', '@zenithbuild/runtime', 'release', ['dist/index.js', 'dist/template.js']),
     entry('packages/router', '@zenithbuild/router', 'release', ['dist/index.js', 'dist/ZenLink.zen', 'template.js']),
-    entry('packages/core', '@zenithbuild/core', 'release', ['dist/index.js', 'bin/zenith.js']),
-    entry('packages/cli', '@zenithbuild/cli', 'release', ['dist/index.js']),
+    entry('packages/compiler', '@zenithbuild/compiler', 'release', ['dist/index.js']),
+    entry('packages/bundler', '@zenithbuild/bundler', 'release', ['dist/index.js', 'scripts/render-assets.mjs']),
+    entry('packages/cli', '@zenithbuild/cli', 'release', ['dist/index.js', 'dist/framework-components/Image.zen']),
+    entry('packages/core', '@zenithbuild/core', 'release', ['dist/index.js', 'dist/config/node.js', 'bin/zenith.js']),
+    entry('packages/image', '@zenithbuild/image', 'release', ['dist/index.js']),
     entry('packages/zenithbuild', 'zenithbuild', 'manual', ['README.md', 'AGENTS.md', 'SKILL.md', 'rules/zenith-agent-contract.md']),
     entry('packages/create-zenith', 'create-zenith', 'scaffolder', ['dist/cli.js'])
 ];
@@ -288,6 +289,62 @@ export function selectPublishMatrixEntries({ selection = 'all', filter = '', mat
         throw new Error(`No publish surface packages selected for ${selection}`);
     }
     return entries;
+}
+
+// Publish order is the matrix order. A package must come after every in-matrix
+// package it names in dependencies or optionalDependencies (hard edges), and after
+// every in-matrix package it names in peerDependencies, with one exception: a peer
+// edge A -> B may point forward when B has a hard-dependency path back to A. That
+// peer closes a cycle npm resolves at install time (e.g. cli peers on core, and core
+// pins cli), so it is reported as a note. A cycle made only of hard edges always
+// leaves a forward hard edge and is reported as a violation.
+const PUBLISH_ORDER_HARD_FIELDS = ['dependencies', 'optionalDependencies'];
+const PUBLISH_ORDER_PEER_FIELD = 'peerDependencies';
+
+export function analyzePublishOrder({
+    root = REPO_ROOT,
+    matrix = PUBLISH_SURFACE_MATRIX,
+    readManifest = (dir) => readJson(join(root, dir, 'package.json'))
+} = {}) {
+    const positions = new Map(matrix.map((item, index) => [item.name, index]));
+    const manifests = new Map(matrix.map((item) => [item.name, readManifest(item.dir) || {}]));
+    const hardEdges = new Map(matrix.map((item) => [
+        item.name,
+        PUBLISH_ORDER_HARD_FIELDS.flatMap((field) => Object.keys(manifests.get(item.name)[field] || {}))
+            .filter((dependency) => positions.has(dependency))
+    ]));
+    const hasHardPath = (from, to) => {
+        const seen = new Set();
+        const stack = [from];
+        while (stack.length > 0) {
+            const current = stack.pop();
+            if (current === to) return true;
+            if (seen.has(current)) continue;
+            seen.add(current);
+            stack.push(...(hardEdges.get(current) || []));
+        }
+        return false;
+    };
+    const violations = [];
+    const notes = [];
+    matrix.forEach((item, index) => {
+        const manifest = manifests.get(item.name);
+        for (const field of [...PUBLISH_ORDER_HARD_FIELDS, PUBLISH_ORDER_PEER_FIELD]) {
+            for (const dependency of Object.keys(manifest[field] || {})) {
+                if ((positions.get(dependency) ?? -1) <= index) continue;
+                if (field === PUBLISH_ORDER_PEER_FIELD && hasHardPath(dependency, item.name)) {
+                    notes.push(`${item.name} lists ${dependency} in ${field} and publishes before it; allowed because ${dependency} depends on ${item.name}`);
+                } else {
+                    violations.push(`${item.name} lists ${dependency} in ${field} but publishes before it`);
+                }
+            }
+        }
+    });
+    return { violations, notes };
+}
+
+export function findPublishOrderViolations(options = {}) {
+    return analyzePublishOrder(options).violations;
 }
 
 export function listPublishMatrixLines(options = {}) {

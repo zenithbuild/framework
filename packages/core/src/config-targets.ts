@@ -1,11 +1,2 @@
-export const ZENITH_TARGETS = [
-  'static',
-  'static-export',
-  'vercel-static',
-  'netlify-static',
-  'vercel',
-  'netlify',
-  'node'
-] as const;
-
-export type ZenithTarget = typeof ZENITH_TARGETS[number];
+export { ZENITH_TARGETS } from './config/config-targets.js';
+export type { ZenithTarget } from './config/config-targets.js';

@@ -1,3 +1,4 @@
+import { prepareProjectImages, writeImagePackageMarker } from './project-images.js';
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
@@ -14,9 +15,7 @@ import {
 } from './build/compiler-runtime.js';
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
-import { buildImageArtifacts } from './images/service.js';
-import { injectImageMaterializationIntoRouterManifest } from './images/router-manifest.js';
-import { createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } from './images/payload.js';
+import { injectImageMaterializationIntoRouterManifest } from './router-server-metadata.js';
 import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
@@ -63,6 +62,9 @@ export async function build(options) {
     const { pagesDir, outDir, config = {}, logger = null, showBundlerInfo = true } = options;
     const startupProfile = createStartupProfiler('cli-build');
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
+    const imagePackage = await prepareProjectImages(projectRoot, resolve(pagesDir, ".."));
+    if (imagePackage.notice) logger?.info?.(imagePackage.notice);
+    const { buildImageArtifacts, createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } = imagePackage.api;
     const coreOutputDir = join(projectRoot, '.zenith-output');
     const staticOutputDir = join(coreOutputDir, 'static');
     const imageStageDir = join(coreOutputDir, 'image-materialization-stage');
@@ -95,7 +97,7 @@ export async function build(options) {
         }));
     }
 
-    const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir));
+    const registry = startupProfile.measureSync('build_component_registry', () => buildComponentRegistry(srcDir, { imageComponentPath: imagePackage.componentPath }));
     const globalMiddleware = await startupProfile.measureAsync(
         'resolve_global_middleware',
         () => resolveGlobalMiddleware({ projectRoot, pagesDir, target })
@@ -203,6 +205,7 @@ export async function build(options) {
         'inject_image_runtime_payload',
         () => injectImageRuntimePayloadIntoHtmlFiles(staticOutputDir, imageRuntimePayload)
     );
+    await writeImagePackageMarker(projectRoot, outDir, imagePackage);
     await startupProfile.measureAsync(
         'copy_public_assets',
         () => copyPublicAssets({
@@ -228,6 +231,7 @@ export async function build(options) {
         () => writeServerOutput({
             coreOutputDir,
             staticDir: staticOutputDir,
+            imagePackage,
             projectRoot,
             config,
             basePath,

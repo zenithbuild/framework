@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the audit step exits 2 when `bun audit` returns empty or unparseable output instead of passing. The proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils and KaTeX exception requests and binds to the refreshed `site/bun.lock`. braces GHSA-vfj7-8cjw-p6xm was withdrawn upstream, so it is recorded as withdrawn and no exception is requested (JUD-21).
+- Move the shared configuration source into `@zenithbuild/core` (`@zenithbuild/core/config`, `/config/node`, `/config/plugins`, `/config/base-path`, `/config/images`); core imports no other Zenith package, and core's public API and `zenith` command ownership are preserved (JUD-83).
+- Move image processing and Sharp into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. `Image.zen` stays in `@zenithbuild/cli` for 0.9 so `<Image>` output is unchanged. See [migration notes](docs/_internal/ci/jud-83-image-migration.md) (JUD-83).
+- Require `@zenithbuild/image` only for `<Image>` in the source directory; raster files in `public/` alone are copied unoptimized with an install hint, dev and preview stop rescanning the project per request, and install commands follow the project's package manager (JUD-83).
 
 ### Removed
 
@@ -16,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Publish release packages in dependency order (`runtime`, `router`, `compiler`, `bundler`, `cli`, `core`, `image`, after the native packages) and fail `verify-publish-surface` if a package publishes before a package it lists in `dependencies` or `optionalDependencies`, or in `peerDependencies` unless that peer closes a cycle with a hard dependency (cli peers on core while core pins cli; reported as a note); previously core was published before the cli it pins exactly, bundler before runtime and router, and image before the core it peers on (JUD-83).
+- Check every selected package name on npm before `scripts/publish-packages.sh` publishes anything: missing names fail with one `::error::` listing all of them and the bootstrap steps (exit 1), registry or network lookup failures fail closed with exit 2, and `--dry-run` runs the same check (JUD-83).
+- Add `scripts/publish-packages.sh --preflight-only`, which checks every release and native package name without packing or publishing, and run it in the Publish workflow's `preflight` job so a missing name stops the release before any package publishes, and registry errors fail closed instead of being reported as missing (JUD-83).
 - Probe compiler compatibility before build and dev work, preserve compiler-bridge version probing, and assert both native probes in the compiler-to-bundler process contract (JUD-86).
 - Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds (outside CI, newer Node and Rust patch releases on the pinned minor are accepted; Bun stays exact), and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
 - Restrict Cargo caches in CI and publish workflows to native target directories and retire the cache namespace that restored physical directories over Bun workspace links (JUD-15).
@@ -27,6 +33,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application (JUD-87).
 - Use portable relative tarball dependencies in the Windows packed-consumer harness (JUD-87).
 - Route `zenith` command failures through the public `@zenithbuild/core` bin to Zenith's formatted error output with exit code 1, instead of Node's raw stack trace (JUD-87).
+- Keep the image runtime payload script on `unsafeHTML` pages when `@zenithbuild/image` is not installed, matching 0.8.0 output; the payload contract now lives in `@zenithbuild/core/config/images` (JUD-83).
+- Rewrite every `@zenithbuild/core/config` import in packaged server image runtime files, ship the standalone `image-config.js` module with Vercel and Netlify server functions, and fail the build if any package specifier is left unresolved (JUD-83).
+- Record the image package build marker in `.zenith-output/image-package.json` instead of the deployable `_zenith/image/package.json` (JUD-83).
+- Export `ZENITH_TARGETS` from `@zenithbuild/core/config` and derive the CLI's known deployment targets from it (JUD-83).
+- Name the project files that use `<Image>` in the missing `@zenithbuild/image` error, and let a project-defined `Image.zen` take precedence without requiring the package (JUD-83).
+- List the image package as `@zenithbuild/image` in the extension registry (JUD-83).
 
 ## [0.8.0] - 2026-07-01
 

@@ -1,5 +1,4 @@
 import { createPageLoopCaches } from '../build/page-loop-state.js';
-import { createImageRuntimePayload } from '../images/payload.js';
 
 export function createDevBuildState(config, basePath) {
     return {
@@ -13,6 +12,6 @@ export function createDevBuildState(config, basePath) {
         pageLoopCaches: createPageLoopCaches(),
         hasSuccessfulBuild: false,
         imageManifest: {},
-        imageRuntimePayload: createImageRuntimePayload(config.images, {}, 'passthrough', basePath)
+        imageRuntimePayload: null
     };
 }
