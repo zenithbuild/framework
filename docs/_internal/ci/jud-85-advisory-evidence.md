@@ -16,7 +16,7 @@ These are audit findings, not verified exploitability assessments.
 The replacement check excludes only that verified withdrawn identifier.
 All other severities and packages remain visible and produce a failed audit
 status. Missing tools, registry failures, invalid JSON and unsupported schemas
-also fail. Core continues its build/tests to expose additional failures and
+also fail, with a separate exit code (see below). Core continues its build/tests to expose additional failures and
 retains the failed audit status if those checks pass.
 
 No active finding is accepted or suppressed. JUD-21 owns policy and dated
@@ -36,3 +36,17 @@ valid). Replace only the fixture bytes with a valid 1x1 RGBA PNG. Keep the
 image transformation assertions, Sharp version floor and corrupt-input
 checks unchanged. All 14 config-truth tests plus the Sharp floor pass after
 this correction. No image runtime or site asset was changed.
+
+## Exit codes
+
+`scripts/security/check-dependency-advisories.mjs` exits with:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Root and site audited cleanly (withdrawn-only findings count as clean). |
+| 1 | The audit ran and reported active advisory findings. |
+| 2 | The audit could not run in at least one scope: missing `bun`, registry or network failure, timeout, invalid JSON, unsupported schema, or an unexpected crash. Results are incomplete, so 2 wins over findings in another scope. |
+
+Code 2 is an infrastructure or tooling fault, never a clean pass. Both
+nonzero codes keep core red. `scripts/ci-core.sh` ends with a line naming
+which of the two caused the red.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAuditResult } from './dependency-audit-report.mjs';
+import { AUDIT_EXIT, auditExitCode, parseAuditResult } from './dependency-audit-report.mjs';
 
 const withdrawn = { title: 'Misidentified esbuild advisory', severity: 'high', url: 'https://github.com/advisories/GHSA-gv7w-rqvm-qjhr' };
 const active = { title: 'Active esbuild advisory', severity: 'moderate', url: 'https://github.com/advisories/GHSA-67mh-4wv8-2f99' };
@@ -34,4 +34,12 @@ test('command errors, missing findings, malformed JSON and unsupported schemas c
         result([], 0), result({ error: 'registry unavailable' }, 0),
         result({ dependency: [{ ...active, severity: 'unknown' }] })
     ]) assert.throws(() => parseAuditResult(bad, 'root'));
+});
+
+test('audit errors and active findings have distinct exit codes', () => {
+    assert.deepEqual(AUDIT_EXIT, { CLEAN: 0, FINDINGS: 1, AUDIT_ERROR: 2 });
+    assert.equal(auditExitCode({ findings: 0, errors: 0 }), 0);
+    assert.equal(auditExitCode({ findings: 3, errors: 0 }), 1);
+    assert.equal(auditExitCode({ findings: 0, errors: 1 }), 2);
+    assert.equal(auditExitCode({ findings: 3, errors: 1 }), 2, 'incomplete results never look like findings-only');
 });
