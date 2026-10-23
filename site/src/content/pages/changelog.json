@@ -1,6 +1,6 @@
 {
   "pageTitle": "Changelog",
-  "description": "Repo-synced Zenith release notes, version-by-version, through the narrow Directus read path.",
+  "description": "Repo-synced Zenith release notes, version-by-version, from committed markdown in the repo.",
   "intro": {
     "eyebrow": "Changelog",
     "title": "RELEASES. IN ORDER. NO DRIFT.",
@@ -8,13 +8,13 @@
   },
   "chips": [
     "Repo markdown canonical",
-    "Directus read path narrow",
+    "Committed files only",
     "Published releases only"
   ],
   "archive": {
     "eyebrow": "Release archive",
     "title": "Published notes from the train line.",
-    "description": "Release notes stay markdown-first in the repo, sync into Directus, and publish here as the narrow public release surface."
+    "description": "Release notes stay markdown-first in the repo and publish here as the narrow public release surface."
   },
   "labels": {
     "trainPrefix": "Current train",
