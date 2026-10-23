@@ -48,14 +48,22 @@ test('standard builds validate tools before building and lock native dependencie
 });
 
 test('Cargo caches never traverse workspace dependency links or restore legacy archives', () => {
-    const source = read('.github/workflows/reusable-ci.yml');
-    const blocks = [...source.matchAll(/- name: Cache Cargo registry and build outputs([\s\S]*?)(?=\n      -)/g)];
-    assert.equal(blocks.length, 3, 'core, integration and smoke must use the safe cache');
-    for (const [, block] of blocks) {
-        assert.doesNotMatch(block, /packages\/\*\*\/target/);
-        assert.match(block, /packages\/compiler\/target/);
-        assert.match(block, /packages\/bundler\/target/);
-        assert.match(block, /key: \$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-/);
-        assert.match(block, /restore-keys: \|\s*\$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-\s*$/);
+    for (const name of workflows) {
+        const source = read(`.github/workflows/${name}`);
+        assert.doesNotMatch(source, /packages\/\*\*\/target/, name);
+        assert.doesNotMatch(source, /-cargo-(?!1\.97\.1-v2-)/, `${name}: legacy Cargo cache namespace`);
+        const blocks = [...source.matchAll(/- name: Cache Cargo registry and build outputs([\s\S]*?)(?=\n      -)/g)];
+        if (name === 'reusable-ci.yml') {
+            assert.equal(blocks.length, 3, 'core, integration and smoke must use the safe cache');
+        }
+        if (name === 'publish.yml' || name === 'publish-create-zenith.yml') {
+            assert.equal(blocks.length, 1, `${name}: release job must use the safe cache`);
+        }
+        for (const [, block] of blocks) {
+            assert.match(block, /packages\/compiler\/target/, name);
+            assert.match(block, /packages\/bundler\/target/, name);
+            assert.match(block, /key: \$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-/, name);
+            assert.match(block, /restore-keys: \|\s*\$\{\{ runner.os \}\}-cargo-1\.97\.1-v2-\s*$/, name);
+        }
     }
 });
