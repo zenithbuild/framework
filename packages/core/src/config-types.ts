@@ -1,1 +1,1 @@
-export type { BuildManifest, BuildManifestRoute, RouteManifestEntry, ZenithAdapter, ZenithPathKind, ZenithRenderMode, ZenithTarget } from '@zenithbuild/config';
+export type { BuildManifest, BuildManifestRoute, RouteManifestEntry, ZenithAdapter, ZenithPathKind, ZenithRenderMode, ZenithTarget } from './config/config-types.js';

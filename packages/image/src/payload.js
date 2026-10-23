@@ -1,4 +1,4 @@
-import { createImageRuntimePayload, injectImageRuntimePayload } from '@zenithbuild/config/images';
+import { createImageRuntimePayload, injectImageRuntimePayload } from '@zenithbuild/core/config/images';
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 

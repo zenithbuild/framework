@@ -8,7 +8,6 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./components/Image.zen": "./components/Image.zen",
     "./package.json": "./package.json",
     "./runtime": "./dist/runtime.js"
   },
@@ -16,8 +15,7 @@
     "dist",
     "README.md",
     "LICENSE",
-    "package.json",
-    "components"
+    "package.json"
   ],
   "repository": {
     "type": "git",
@@ -37,10 +35,13 @@
     "@types/node": "latest",
     "typescript": "^5.7.3",
     "jest": "^30.2.0",
-    "@jest/globals": "^30.2.0"
+    "@jest/globals": "^30.2.0",
+    "@zenithbuild/core": "0.8.0"
   },
   "dependencies": {
-    "@zenithbuild/config": "0.8.0",
     "sharp": "^0.35.5"
+  },
+  "peerDependencies": {
+    "@zenithbuild/core": "0.8.0"
   }
 }

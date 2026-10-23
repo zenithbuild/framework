@@ -4,7 +4,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "exactOptionalPropertyTypes": true,
     "declaration": true,
     "declarationMap": false,
@@ -19,7 +19,8 @@
     "types": ["node"]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/config/**/*.js"
   ],
   "exclude": [
     "dist",

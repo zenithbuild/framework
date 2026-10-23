@@ -1,4 +1,4 @@
-import { ZENITH_TARGETS } from '@zenithbuild/config';
+import { ZENITH_TARGETS } from '@zenithbuild/core/config';
 
 // Single source of truth: the shared config target list. The runtime list and
 // the ZenithTarget type both derive from it, so they cannot drift.

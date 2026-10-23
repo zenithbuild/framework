@@ -4,11 +4,11 @@ import { dirname, extname, join, relative, sep } from 'node:path';
 
 const require = createRequire(import.meta.url);
 
-// Emitted server files that stand in for @zenithbuild/config subpaths. Server
-// output is self-contained: it never resolves @zenithbuild/config at runtime.
+// Emitted server files that stand in for @zenithbuild/core/config subpaths. Server
+// output is self-contained: it never resolves @zenithbuild/core/config at runtime.
 export const CONFIG_RUNTIME_FILES = {
-    '@zenithbuild/config/base-path': 'base-path.js',
-    '@zenithbuild/config/images': 'image-config.js'
+    '@zenithbuild/core/config/base-path': 'base-path.js',
+    '@zenithbuild/core/config/images': 'image-config.js'
 };
 
 const SPECIFIER_FILE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts']);
@@ -27,7 +27,7 @@ function toImportPath(fromFile, toFile) {
 }
 
 /**
- * Rewrite @zenithbuild/config specifiers in one emitted module.
+ * Rewrite @zenithbuild/core/config specifiers in one emitted module.
  * Throws when a config (or other @zenithbuild) specifier has no emitted
  * replacement, or when any config reference survives the rewrite.
  *
@@ -51,10 +51,10 @@ export function rewriteConfigSpecifiers(source, { filePath, serverDir, specifier
             return `${prefix}${quote}${toImportPath(filePath, join(serverDir, target))}${quote}`;
         });
     }
-    if (next.includes('@zenithbuild/config')) {
+    if (next.includes('@zenithbuild/core/config')) {
         throw new Error(
             `[Zenith:Image] Cannot package ${relative(serverDir, filePath)}: ` +
-            'an unrewritten @zenithbuild/config specifier remains.'
+            'an unrewritten @zenithbuild/core/config specifier remains.'
         );
     }
     return next;

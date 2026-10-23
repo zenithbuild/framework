@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
-import { ZENITH_TARGETS } from '@zenithbuild/config';
+import { ZENITH_TARGETS } from '@zenithbuild/core/config';
 import { build } from '../dist/build.js';
 import { KNOWN_TARGETS } from '../dist/adapters/adapter-types.js';
 import { resolveBuildAdapter } from '../dist/adapters/resolve-adapter.js';
@@ -55,7 +55,7 @@ describe('image runtime payload without @zenithbuild/image', () => {
         expect(existsSync(join(serverDir, 'base-path.js'))).toBe(true);
         for (const file of await listFiles(serverDir)) {
             if (!/\.(m|c)?js$/.test(file)) continue;
-            expect(await readFile(file, 'utf8')).not.toContain('@zenithbuild/config');
+            expect(await readFile(file, 'utf8')).not.toContain('@zenithbuild/core/config');
         }
         const mod = await import(join(serverDir, 'image-config.js'));
         expect(mod.injectImageRuntimePayload('<html><head></head><body data-zx-unsafeHTML="1"></body></html>', {}))
@@ -98,10 +98,10 @@ describe('package-image-runtime specifier rewriting', () => {
 
     test('rewrites static, side-effect, re-export and dynamic forms', () => {
         const source = [
-            "import { a } from '@zenithbuild/config/base-path';",
-            "export { b } from \"@zenithbuild/config/images\";",
-            "import '@zenithbuild/config/images';",
-            "const m = await import('@zenithbuild/config/base-path');",
+            "import { a } from '@zenithbuild/core/config/base-path';",
+            "export { b } from \"@zenithbuild/core/config/images\";",
+            "import '@zenithbuild/core/config/images';",
+            "const m = await import('@zenithbuild/core/config/base-path');",
             "import sharp from 'sharp';"
         ].join('\n');
         const out = rewriteConfigSpecifiers(source, { filePath, serverDir });
@@ -114,22 +114,22 @@ describe('package-image-runtime specifier rewriting', () => {
     });
 
     test('fails loudly on an unmapped @zenithbuild specifier', () => {
-        expect(() => rewriteConfigSpecifiers("import { x } from '@zenithbuild/config/plugins';", { filePath, serverDir }))
-            .toThrow('no server runtime file for import specifier "@zenithbuild/config/plugins"');
+        expect(() => rewriteConfigSpecifiers("import { x } from '@zenithbuild/core/config/plugins';", { filePath, serverDir }))
+            .toThrow('no server runtime file for import specifier "@zenithbuild/core/config/plugins"');
         expect(() => rewriteConfigSpecifiers("export * from '@zenithbuild/core';", { filePath, serverDir }))
             .toThrow('@zenithbuild/core');
     });
 
     test('fails loudly when a config reference survives the rewrite', () => {
-        expect(() => rewriteConfigSpecifiers("const id = require('@zenithbuild/config/images');", { filePath, serverDir }))
-            .toThrow('an unrewritten @zenithbuild/config specifier remains');
+        expect(() => rewriteConfigSpecifiers("const id = require('@zenithbuild/core/config/images');", { filePath, serverDir }))
+            .toThrow('an unrewritten @zenithbuild/core/config specifier remains');
     });
 
     test('rewrites every emitted module, including declarations', async () => {
         const dir = join(root, 'server', 'images');
         await mkdir(join(dir, 'deep'), { recursive: true });
-        await writeFile(join(dir, 'a.js'), "export * from '@zenithbuild/config/images';\n");
-        await writeFile(join(dir, 'deep', 'b.d.ts'), "export { x } from '@zenithbuild/config/base-path';\n");
+        await writeFile(join(dir, 'a.js'), "export * from '@zenithbuild/core/config/images';\n");
+        await writeFile(join(dir, 'deep', 'b.d.ts'), "export { x } from '@zenithbuild/core/config/base-path';\n");
         await rewriteConfigSpecifiersInDir(dir, join(root, 'server'));
         expect(await readFile(join(dir, 'a.js'), 'utf8')).toBe("export * from '../image-config.js';\n");
         expect(await readFile(join(dir, 'deep', 'b.d.ts'), 'utf8')).toBe("export { x } from '../../base-path.js';\n");
@@ -142,7 +142,7 @@ describe('package-image-runtime specifier rewriting', () => {
         await build({ pagesDir: join(root, 'pages'), outDir, config: { target: 'node', images: { remotePatterns: [{ protocol: 'https', hostname: 'example.com' }] } } });
         for (const file of await listFiles(join(outDir, 'server'))) {
             if (!/\.(m|c)?js$|\.d\.ts$/.test(file)) continue;
-            expect([file, (await readFile(file, 'utf8')).includes('@zenithbuild/config')]).toEqual([file, false]);
+            expect([file, (await readFile(file, 'utf8')).includes('@zenithbuild/core/config')]).toEqual([file, false]);
         }
     });
 });

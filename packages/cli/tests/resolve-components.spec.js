@@ -139,7 +139,7 @@ describe('resolve-components', () => {
 
         expect(buildComponentRegistry(project.srcDir).has('Image')).toBe(false);
         const registry = buildComponentRegistry(project.srcDir, {
-            imageComponentPath: fileURLToPath(new URL('../../image/components/Image.zen', import.meta.url))
+            imageComponentPath: fileURLToPath(new URL('../src/framework-components/Image.zen', import.meta.url))
         });
         expect(registry.has('Image')).toBe(true);
         expect(registry.has('ZenLink')).toBe(false);

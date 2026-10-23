@@ -1,1 +1,1 @@
-export * from '@zenithbuild/config/plugins';
+export * from '@zenithbuild/core/config/plugins';

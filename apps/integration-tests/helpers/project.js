@@ -35,7 +35,6 @@ export async function scaffoldZenithProject(rootDir, options = {}) {
       '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler'))
     },
     overrides: {
-      '@zenithbuild/config': fileDep(path.join(repoRoot, 'packages', 'config')),
       '@zenithbuild/image': fileDep(path.join(repoRoot, 'packages', 'image')),
       '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler')),
       '@zenithbuild/bundler': fileDep(path.join(repoRoot, 'packages', 'bundler')),

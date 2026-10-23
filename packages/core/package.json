@@ -12,6 +12,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/config.js",
+    "./config/node": "./dist/config/node.js",
+    "./config/plugins": "./dist/config/config-plugins.js",
+    "./config/base-path": "./dist/config/base-path.js",
+    "./config/images": "./dist/config/image-config.js",
     "./path": "./dist/path.js",
     "./order": "./dist/order.js",
     "./hash": "./dist/hash.js",
@@ -47,8 +51,7 @@
     "@zenithbuild/compiler": "0.8.0",
     "@zenithbuild/runtime": "0.8.0",
     "@zenithbuild/router": "0.8.0",
-    "@zenithbuild/bundler": "0.8.0",
-    "@zenithbuild/config": "0.8.0"
+    "@zenithbuild/bundler": "0.8.0"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",

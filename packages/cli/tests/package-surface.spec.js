@@ -19,7 +19,7 @@ describe('cli package surface', () => {
     test('build emits dist entry JS and declarations', () => {
         expect(existsSync(join(DIST_ROOT, 'index.js'))).toBe(true);
         expect(existsSync(join(DIST_ROOT, 'index.d.ts'))).toBe(true);
-        expect(existsSync(join(DIST_ROOT, 'framework-components', 'Image.zen'))).toBe(false);
+        expect(existsSync(join(DIST_ROOT, 'framework-components', 'Image.zen'))).toBe(true);
         expect(PACKAGE_JSON.dependencies.sharp).toBeUndefined();
         expect(PACKAGE_JSON.dependencies['@zenithbuild/image']).toBeUndefined();
         expect(PACKAGE_JSON.optionalDependencies?.['@zenithbuild/image']).toBeUndefined();

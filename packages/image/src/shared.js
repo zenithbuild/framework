@@ -1,11 +1,11 @@
-import { imageEndpointPath, prependBasePath } from '@zenithbuild/config/base-path';
+import { imageEndpointPath, prependBasePath } from '@zenithbuild/core/config/base-path';
 
 import {
     DEFAULT_IMAGE_CONFIG,
     imageRuntimeGlobalName,
     normalizeImageConfig,
     normalizeImageRuntimePayload
-} from '@zenithbuild/config/images';
+} from '@zenithbuild/core/config/images';
 export { DEFAULT_IMAGE_CONFIG, imageRuntimeGlobalName, normalizeImageConfig, normalizeImageRuntimePayload };
 const DEFAULT_DEVICE_SIZES = DEFAULT_IMAGE_CONFIG.deviceSizes;
 const DEFAULT_IMAGE_SIZES = DEFAULT_IMAGE_CONFIG.imageSizes;

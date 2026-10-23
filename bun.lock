@@ -99,16 +99,19 @@
       "dependencies": {
         "@zenithbuild/bundler": "0.8.0",
         "@zenithbuild/compiler": "0.8.0",
-        "@zenithbuild/config": "0.8.0",
         "picocolors": "^1.1.1",
       },
       "devDependencies": {
         "@jest/globals": "^30.2.0",
         "@types/node": "latest",
+        "@zenithbuild/core": "0.8.0",
         "@zenithbuild/image": "0.8.0",
         "jest": "^30.2.0",
         "jest-environment-jsdom": "^30.2.0",
         "typescript": "^5.7.3",
+      },
+      "peerDependencies": {
+        "@zenithbuild/core": "0.8.0",
       },
     },
     "packages/compiler": {
@@ -141,14 +144,6 @@
       "name": "@zenithbuild/compiler-win32-x64",
       "version": "0.8.0",
     },
-    "packages/config": {
-      "name": "@zenithbuild/config",
-      "version": "0.8.0",
-      "devDependencies": {
-        "@types/node": "latest",
-        "typescript": "^5.7.3",
-      },
-    },
     "packages/core": {
       "name": "@zenithbuild/core",
       "version": "0.8.0",
@@ -159,7 +154,6 @@
         "@zenithbuild/bundler": "0.8.0",
         "@zenithbuild/cli": "0.8.0",
         "@zenithbuild/compiler": "0.8.0",
-        "@zenithbuild/config": "0.8.0",
         "@zenithbuild/router": "0.8.0",
         "@zenithbuild/runtime": "0.8.0",
       },
@@ -198,14 +192,17 @@
       "name": "@zenithbuild/image",
       "version": "0.8.0",
       "dependencies": {
-        "@zenithbuild/config": "0.8.0",
         "sharp": "^0.35.5",
       },
       "devDependencies": {
         "@jest/globals": "^30.2.0",
         "@types/node": "latest",
+        "@zenithbuild/core": "0.8.0",
         "jest": "^30.2.0",
         "typescript": "^5.7.3",
+      },
+      "peerDependencies": {
+        "@zenithbuild/core": "0.8.0",
       },
     },
     "packages/language": {
@@ -646,7 +643,7 @@
 
     "@types/babel__traverse": ["@types/babel__traverse@7.28.0", "", { "dependencies": { "@babel/types": "^7.28.2" } }, "sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q=="],
 
-    "@types/bun": ["@types/bun@1.4.3", "", { "dependencies": { "bun-types": "1.4.3" } }, "sha512-N67Pqy8JXbAY/j0tNraS3V5mubGvc6rrrNDmDCtZLlFzccbUJPDb0tvgUBC5q4m8ybkP93Jcn1QB+RYQ6PvBhw=="],
+    "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 
     "@types/estree": ["@types/estree@1.0.8", "", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
 
@@ -762,8 +759,6 @@
 
     "@zenithbuild/compiler-win32-x64": ["@zenithbuild/compiler-win32-x64@workspace:packages/compiler-win32-x64"],
 
-    "@zenithbuild/config": ["@zenithbuild/config@workspace:packages/config"],
-
     "@zenithbuild/core": ["@zenithbuild/core@workspace:packages/core"],
 
     "@zenithbuild/extension-registry": ["@zenithbuild/extension-registry@workspace:packages/extension-registry"],
@@ -820,7 +815,7 @@
 
     "buffer-from": ["buffer-from@1.1.2", "", {}, "sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ=="],
 
-    "bun-types": ["bun-types@1.4.3", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-tinRJNGOmUN+tEAsn2y2e942n9JHRHR42iUYzDH75NmhJqVBokGSQkkfSFdNWwsANIdrK6ACH9t01M452YyTwg=="],
+    "bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "callsites": ["callsites@3.1.0", "", {}, "sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ=="],
 

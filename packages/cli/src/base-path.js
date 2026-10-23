@@ -1,1 +1,1 @@
-export * from '@zenithbuild/config/base-path';
+export * from '@zenithbuild/core/config/base-path';

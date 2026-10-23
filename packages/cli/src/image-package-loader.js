@@ -1,11 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { devInstallCommand } from './install-command.js';
 
 const CLI_MANIFEST = createRequire(import.meta.url)('../package.json');
 const IMAGE_PACKAGE = '@zenithbuild/image';
+// <Image> stays at its CLI path for 0.9: component IDs derive from the
+// component path, so moving it would change every <Image> page's output.
+const IMAGE_COMPONENT_PATH = fileURLToPath(new URL('./framework-components/Image.zen', import.meta.url));
 const REQUIRED_EXPORTS = [
     'buildImageArtifacts', 'handleImageRequest', 'handleImageFetchRequest',
     'materializeImageMarkup', 'materializeImageMarkupInHtmlFiles',
@@ -57,7 +60,7 @@ export async function loadImagePackage({ projectRoot, required, ifInstalled = fa
         throw new Error(`[Zenith:Image] ${IMAGE_PACKAGE} must declare its Sharp runtime dependency.`);
     }
 
-    const componentPath = consumerRequire.resolve(`${IMAGE_PACKAGE}/components/Image.zen`);
+    const componentPath = IMAGE_COMPONENT_PATH;
     // Import failures inside an installed image package retain their original
     // cause. They must not be mislabeled as a missing optional package.
     const api = await import(pathToFileURL(consumerRequire.resolve(IMAGE_PACKAGE)).href);

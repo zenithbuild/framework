@@ -23,16 +23,22 @@ verbatim and the CLI prints an install hint. Built image output carries a small
 package marker, so preview retains image endpoints when original page sources
 are absent. No-image builds omit it, and preview never rescans sources.
 
-The image package owns Sharp `^0.35.5`, Image.zen and the JS/TS processing
-pipeline. The Rust compiler/bundler materialization remains unchanged. CLI has
+The image package owns Sharp `^0.35.5` and the JS/TS processing pipeline.
+`Image.zen` stays at `packages/cli/src/framework-components/Image.zen` for
+0.9 because component IDs derive from the component path; path-independent
+IDs are follow-up work. The Rust compiler/bundler materialization remains unchanged. CLI has
 no hard or optional dependency on the image package or Sharp. Its development
 dependency supplies workspace integration fixtures and is omitted from packed
 consumer runtime installs.
 
-`@zenithbuild/config` owns the shared schema, defaults, image configuration,
-plugin configuration hooks, base-path helpers and Node config loader. It has
-no runtime dependencies or bin. Core's existing imports and `zenith` command
-continue to work. CLI retains its non-enumerable explicit-key/loading metadata
+`@zenithbuild/core` owns the shared schema, defaults, image configuration,
+plugin configuration hooks, base-path helpers and Node config loader in
+`packages/core/src/config/`, exported as `@zenithbuild/core/config`,
+`/config/node`, `/config/plugins`, `/config/base-path` and `/config/images`.
+Core's source imports no other Zenith package (guardrail-enforced). CLI and
+the image package declare core as a peer dependency, so no runtime
+dependency cycle is added; core keeps its existing CLI dependency for the
+`zenith` command. Core's existing imports continue to work. CLI retains its non-enumerable explicit-key/loading metadata
 and pages-directory discovery. No core-to-CLI dependency was reversed.
 Shared plugin errors retain CLI's readable message for thrown plain objects;
 core now uses that same message instead of coercing such objects to text.

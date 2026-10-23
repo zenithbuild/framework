@@ -1,2 +1,2 @@
-export { ZENITH_TARGETS } from '@zenithbuild/config';
-export type { ZenithTarget } from '@zenithbuild/config';
+export { ZENITH_TARGETS } from './config/config-targets.js';
+export type { ZenithTarget } from './config/config-targets.js';

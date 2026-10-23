@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { getDefaults, validateConfig as validateSharedConfig } from '@zenithbuild/config';
-import { loadConfigWithKeys } from '@zenithbuild/config/node';
+import { getDefaults, validateConfig as validateSharedConfig } from '@zenithbuild/core/config';
+import { loadConfigWithKeys } from '@zenithbuild/core/config/node';
 
 const CONFIG_META = Symbol('zenith.config.meta');
 export const DEFAULT_CONFIG = getDefaults();

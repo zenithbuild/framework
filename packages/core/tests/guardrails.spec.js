@@ -12,7 +12,13 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const srcDir = path.resolve(__dirname, '../src');
-const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith('.ts'));
+// Recursive so the config modules in src/config/ are held to the same rules.
+const allSrcFiles = fs.readdirSync(srcDir, { recursive: true })
+    .map((f) => String(f).split(path.sep).join('/'))
+    .filter((f) => fs.statSync(path.join(srcDir, f)).isFile())
+    .sort();
+const srcFiles = allSrcFiles.filter((f) => f.endsWith('.ts'));
+const ZENITH_SPECIFIER_RE = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]@zenithbuild\//;
 
 describe('Contract Guardrails', () => {
     test('no eval() or new Function in source', () => {
@@ -59,6 +65,15 @@ describe('Contract Guardrails', () => {
             for (const pkg of forbidden) {
                 expect(source.includes(pkg)).toBe(false);
             }
+        }
+    });
+
+    test('no @zenithbuild import specifiers in any source module (.ts or .js)', () => {
+        const modules = allSrcFiles.filter((f) => /\.(?:ts|js)$/.test(f));
+        expect(modules).toEqual(expect.arrayContaining(['config.ts', 'config/node.js', 'config/image-config.js']));
+        for (const file of modules) {
+            const source = fs.readFileSync(path.join(srcDir, file), 'utf8');
+            expect([file, ZENITH_SPECIFIER_RE.test(source)]).toEqual([file, false]);
         }
     });
 

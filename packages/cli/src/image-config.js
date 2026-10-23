@@ -1,1 +1,1 @@
-export * from '@zenithbuild/config/images';
+export * from '@zenithbuild/core/config/images';

@@ -8,14 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Extract shared configuration into `@zenithbuild/config`, preserving core's public API and `zenith` command ownership (JUD-83).
-- Move image processing, Sharp and `Image.zen` into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. See [migration notes](docs/_internal/ci/jud-83-image-migration.md) (JUD-83).
+- Move the shared configuration source into `@zenithbuild/core` (`@zenithbuild/core/config`, `/config/node`, `/config/plugins`, `/config/base-path`, `/config/images`); core imports no other Zenith package, and core's public API and `zenith` command ownership are preserved (JUD-83).
+- Move image processing and Sharp into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. `Image.zen` stays in `@zenithbuild/cli` for 0.9 so `<Image>` output is unchanged. See [migration notes](docs/_internal/ci/jud-83-image-migration.md) (JUD-83).
 - Require `@zenithbuild/image` only for `<Image>` in the source directory; raster files in `public/` alone are copied unoptimized with an install hint, dev and preview stop rescanning the project per request, and install commands follow the project's package manager (JUD-83).
 
 ### Fixed
 
-- Keep the image runtime payload script on `unsafeHTML` pages when `@zenithbuild/image` is not installed, matching 0.8.0 output; the payload contract now lives in `@zenithbuild/config/images` (JUD-83).
-- Rewrite every `@zenithbuild/config` import in packaged server image runtime files, ship the standalone `image-config.js` module with Vercel and Netlify server functions, and fail the build if any package specifier is left unresolved (JUD-83).
+- Keep the image runtime payload script on `unsafeHTML` pages when `@zenithbuild/image` is not installed, matching 0.8.0 output; the payload contract now lives in `@zenithbuild/core/config/images` (JUD-83).
+- Rewrite every `@zenithbuild/core/config` import in packaged server image runtime files, ship the standalone `image-config.js` module with Vercel and Netlify server functions, and fail the build if any package specifier is left unresolved (JUD-83).
 - Record the image package build marker in `.zenith-output/image-package.json` instead of the deployable `_zenith/image/package.json` (JUD-83).
 - Derive the CLI's known deployment targets from the shared config target list (JUD-83).
 - Name the project files that use `<Image>` in the missing `@zenithbuild/image` error, and let a project-defined `Image.zen` take precedence without requiring the package (JUD-83).
