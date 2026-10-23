@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { listPublishMatrixLines } from './publish-surface-lib.mjs';
 
 const ROOT = process.cwd();
 const PACKAGE_DIRS = ['packages/bundler-darwin-arm64', 'packages/bundler-darwin-x64'];
@@ -58,7 +59,7 @@ function createStubNpm(dir) {
   chmodSync(scriptPath, 0o755);
 }
 
-function runPublish({ missing = [], broken = [], dryRun = false } = {}) {
+function runPublish({ missing = [], broken = [], dryRun = false, args: extraArgs = [], filter = PACKAGE_DIRS.join(',') } = {}) {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'zenith-publish-preflight-'));
   const logPath = path.join(tempDir, 'npm.log');
   createStubNpm(tempDir);
@@ -68,13 +69,13 @@ function runPublish({ missing = [], broken = [], dryRun = false } = {}) {
   delete env.npm_config_tag;
 
   try {
-    const args = ['./scripts/publish-packages.sh', ...(dryRun ? ['--dry-run'] : [])];
+    const args = ['./scripts/publish-packages.sh', ...(dryRun ? ['--dry-run'] : []), ...extraArgs];
     const result = spawnSync('bash', args, {
       cwd: ROOT,
       env: {
         ...env,
         PATH: `${tempDir}${path.delimiter}${process.env.PATH}`,
-        PUBLISH_PACKAGE_FILTER: PACKAGE_DIRS.join(','),
+        PUBLISH_PACKAGE_FILTER: filter,
         FAKE_NPM_MISSING: missing.join(','),
         FAKE_NPM_BROKEN: broken.join(','),
         FAKE_NPM_LOG: logPath
@@ -82,7 +83,12 @@ function runPublish({ missing = [], broken = [], dryRun = false } = {}) {
       encoding: 'utf8'
     });
     const calls = existsSync(logPath) ? readFileSync(logPath, 'utf8').trim().split('\n') : [];
-    return { result, calls, publishes: calls.filter((line) => line.startsWith('publish|')) };
+    return {
+      result,
+      calls,
+      publishes: calls.filter((line) => line.startsWith('publish|')),
+      packs: calls.filter((line) => line.startsWith('pack|'))
+    };
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -146,4 +152,76 @@ test('dry-run still runs the preflight and reports missing names', () => {
   assert.ok(calls.includes(`view|${ARM64}|version`));
   assert.deepEqual(publishes, []);
   assert.match(result.stderr, new RegExp(`::error::Bootstrap required: ${ARM64}\\.`));
+});
+
+const FULL_NAMES = listPublishMatrixLines({ selection: 'framework' }).map((line) => line.split('|')[1]);
+const RELEASE_NAME = '@zenithbuild/core';
+const NATIVE_NAME = '@zenithbuild/compiler-linux-x64';
+
+function runPreflightOnly(options = {}) {
+  // A per-job filter is set on purpose: --preflight-only must ignore it.
+  return runPublish({ ...options, args: ['--preflight-only'], filter: 'packages/bundler-darwin-arm64' });
+}
+
+test('--preflight-only checks every release and native name and exits 0 without packing or publishing', () => {
+  const { result, calls, publishes, packs } = runPreflightOnly();
+
+  assert.equal(result.status, 0, describe(result));
+  assert.match(result.stdout, /Mode=preflight-only/);
+  assert.ok(FULL_NAMES.includes(RELEASE_NAME) && FULL_NAMES.includes(NATIVE_NAME));
+  assert.deepEqual(calls, FULL_NAMES.map((name) => `view|${name}|version`));
+  assert.deepEqual(publishes, []);
+  assert.deepEqual(packs, []);
+  assert.match(result.stdout, new RegExp(`Preflight passed for ${FULL_NAMES.length} package name\\(s\\)`));
+});
+
+test('--preflight-only exits 1 when a release name is missing', () => {
+  const { result, publishes, packs } = runPreflightOnly({ missing: [RELEASE_NAME] });
+
+  assert.equal(result.status, 1, describe(result));
+  assert.deepEqual([...publishes, ...packs], []);
+  assert.match(result.stderr, new RegExp(`::error::Bootstrap required: ${RELEASE_NAME}\\.`));
+});
+
+test('--preflight-only exits 1 when a native name is missing', () => {
+  const { result, publishes, packs } = runPreflightOnly({ missing: [NATIVE_NAME] });
+
+  assert.equal(result.status, 1, describe(result));
+  assert.deepEqual([...publishes, ...packs], []);
+  assert.match(result.stderr, new RegExp(`::error::Bootstrap required: ${NATIVE_NAME}\\.`));
+});
+
+test('--preflight-only exits 2 on a registry error, even with missing names', () => {
+  const { result, publishes, packs } = runPreflightOnly({ broken: ['@zenithbuild/runtime'], missing: [NATIVE_NAME] });
+
+  assert.equal(result.status, 2, describe(result));
+  assert.deepEqual([...publishes, ...packs], []);
+  assert.match(result.stderr, /::error::Publish preflight could not query the npm registry for: @zenithbuild\/runtime\./);
+  assert.doesNotMatch(result.stderr, /::error::Bootstrap required/);
+});
+
+function workflowJob(workflow, name) {
+  const lines = workflow.split('\n');
+  const start = lines.indexOf(`  ${name}:`);
+  assert.notEqual(start, -1, `missing job ${name}`);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^ {2}\S/.test(line) || /^\S/.test(line));
+  return rest.slice(0, end === -1 ? rest.length : end).join('\n');
+}
+
+function jobNeeds(job) {
+  const match = job.match(/^ {4}needs:\s*(.+)$/m);
+  return match ? match[1].replace(/[[\]]/g, '').split(',').map((value) => value.trim()) : [];
+}
+
+test('publish.yml preflight job runs --preflight-only and publish jobs depend on it', () => {
+  const workflow = readFileSync(path.join(ROOT, '.github/workflows/publish.yml'), 'utf8');
+  const preflight = workflowJob(workflow, 'preflight');
+
+  assert.match(preflight, /run: \.\/scripts\/publish-packages\.sh --preflight-only$/m);
+  assert.doesNotMatch(preflight, /npm view/);
+  assert.doesNotMatch(preflight, /PUBLISH_PACKAGE_FILTER/);
+  for (const job of ['publish_platforms', 'publish_release']) {
+    assert.ok(jobNeeds(workflowJob(workflow, job)).includes('preflight'), `${job} must need preflight`);
+  }
 });

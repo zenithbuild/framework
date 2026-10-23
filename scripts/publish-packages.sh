@@ -5,15 +5,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DRY_RUN=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-  DRY_RUN=1
+PREFLIGHT_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1 ;;
+    --preflight-only) PREFLIGHT_ONLY=1 ;;
+    *)
+      echo "Usage: $0 [--dry-run] [--preflight-only]" >&2
+      exit 1
+      ;;
+  esac
   shift
-fi
-
-if [[ $# -ne 0 ]]; then
-  echo "Usage: $0 [--dry-run]" >&2
-  exit 1
-fi
+done
 
 TRAIN_VERSION=""
 if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
@@ -26,6 +29,11 @@ NPM_BIN="${NPM_BIN:-npm}"
 NODE_BIN="${NODE_BIN:-node}"
 PACKAGES=()
 PUBLISH_PACKAGE_FILTER="${PUBLISH_PACKAGE_FILTER:-}"
+# --preflight-only checks the full framework selection (native + release).
+if [[ "$PREFLIGHT_ONLY" -eq 1 && -n "$PUBLISH_PACKAGE_FILTER" ]]; then
+  echo "Ignoring PUBLISH_PACKAGE_FILTER=${PUBLISH_PACKAGE_FILTER} for --preflight-only." >&2
+  PUBLISH_PACKAGE_FILTER=""
+fi
 
 published=()
 skipped=()
@@ -335,7 +343,9 @@ echo "Publishing Zenith train in strict order"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "TRAIN_VERSION=${TRAIN_VERSION}"
 fi
-if [[ "$DRY_RUN" -eq 1 ]]; then
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  echo "Mode=preflight-only"
+elif [[ "$DRY_RUN" -eq 1 ]]; then
   echo "Mode=dry-run"
 else
   echo "Mode=publish"
@@ -344,6 +354,13 @@ if [[ -n "$PUBLISH_PACKAGE_FILTER" ]]; then
   echo "Filter=${PUBLISH_PACKAGE_FILTER}"
 fi
 echo
+
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  load_publish_matrix
+  preflight_package_names
+  echo "Preflight passed for ${#PACKAGES[@]} package name(s); nothing was packed or published."
+  exit 0
+fi
 
 echo "Verifying publish surface truth"
 verify_publish_surface
