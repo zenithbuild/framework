@@ -1,3 +1,4 @@
+import { startSiteDevServer } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
 
 /**
@@ -13,29 +14,8 @@ import { describe, expect, test } from "bun:test";
 
 const PORT = 4010;
 
-async function startDevServer(): Promise<{ kill: () => void }> {
-  const { spawn } = await import("child_process");
-  const http = await import("http");
-
-  const dev = spawn("npx", ["zenith", "dev", `--port`, String(PORT)], {
-    cwd: import.meta.dir + "/..",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  const checkUrl = (url: string) => new Promise<number>((resolve) => {
-    const req = http.get(url, (res) => { res.resume(); resolve(res.statusCode || 0); });
-    req.on("error", () => resolve(0));
-    req.setTimeout(3000, () => { req.destroy(); resolve(0); });
-  });
-
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    if (await checkUrl(`http://localhost:${PORT}/`) === 200) {
-      return { kill: () => dev.kill() };
-    }
-  }
-  dev.kill();
-  throw new Error("Dev server failed to start");
+async function startDevServer() {
+  return startSiteDevServer(PORT);
 }
 
 describe("intro animation playback", () => {
@@ -77,6 +57,7 @@ describe("intro animation playback", () => {
       // Verify the intro reaches completion
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+        undefined,
         { timeout: 30000 },
       );
 
@@ -93,9 +74,9 @@ describe("intro animation playback", () => {
 
       await browser.close();
     } finally {
-      server.kill();
+      await server.stop();
     }
-  }, 60000);
+  }, 660_000);
 });
 
 describe("route transition playback", () => {
@@ -113,6 +94,7 @@ describe("route transition playback", () => {
       await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle" });
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+        undefined,
         { timeout: 30000 },
       );
 
@@ -124,13 +106,18 @@ describe("route transition playback", () => {
       const overlay = await page.$('[data-route-transition="true"]');
       expect(overlay).toBeTruthy();
 
-      // Verify the transition progresses past idle
-      await page.waitForTimeout(2000);
-      const phase2s = await page.$eval(
-        '[data-route-transition="true"]',
-        (el) => el.getAttribute("data-route-transition-phase"),
+      // Verify the transition progresses past idle. The router fires
+      // navigation:before-leave only after route-check and the destination HTML
+      // fetch resolve (fetch-before-commit, router-contract.md), which takes ~3s
+      // on a cold dev server, so wait for the phase instead of sampling at 2.5s.
+      await page.waitForFunction(
+        () => {
+          const phase = document.querySelector("[data-route-transition='true']")?.getAttribute("data-route-transition-phase");
+          return Boolean(phase) && phase !== "idle";
+        },
+        undefined,
+        { timeout: 20000 },
       );
-      expect(phase2s).not.toBe("idle");
 
       // Verify the transition reaches completion
       await page.waitForFunction(
@@ -139,6 +126,7 @@ describe("route transition playback", () => {
           if (!el) return false;
           return el.getAttribute("data-route-transition-phase") === "complete";
         },
+        undefined,
         { timeout: 30000 },
       );
 
@@ -158,9 +146,9 @@ describe("route transition playback", () => {
 
       await browser.close();
     } finally {
-      server.kill();
+      await server.stop();
     }
-  }, 120000);
+  }, 660_000);
 });
 
 describe("intro label flash regression", () => {
@@ -178,6 +166,7 @@ describe("intro label flash regression", () => {
       // Wait for markRevealed (phrases start)
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "markRevealed",
+        undefined,
         { timeout: 15000 },
       );
 
@@ -204,6 +193,7 @@ describe("intro label flash regression", () => {
       // Wait for intro completion
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+        undefined,
         { timeout: 30000 },
       );
       sampling = false;
@@ -247,9 +237,9 @@ describe("intro label flash regression", () => {
 
       await browser.close();
     } finally {
-      server.kill();
+      await server.stop();
     }
-  }, 60000);
+  }, 660_000);
 });
 
 describe("destination entrance replay", () => {
@@ -266,11 +256,13 @@ describe("destination entrance replay", () => {
       await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle" });
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
+        undefined,
         { timeout: 30000 },
       );
 
-      // Navigate to /blog
-      await page.click('a[href="/blog"]');
+      // Navigate to /about: its PageHeader tags [data-route-entrance] targets.
+      // /blog uses scroll-mode motion and exposes no entrance targets by design.
+      await page.click('[data-nav-shell="true"] a[href="/about"]');
 
       // Wait for transition to start
       await page.waitForTimeout(500);
@@ -282,6 +274,7 @@ describe("destination entrance replay", () => {
           if (!el) return false;
           return el.getAttribute("data-route-transition-phase") === "complete";
         },
+        undefined,
         { timeout: 30000 },
       );
 
@@ -315,7 +308,7 @@ describe("destination entrance replay", () => {
 
       await browser.close();
     } finally {
-      server.kill();
+      await server.stop();
     }
-  }, 120000);
+  }, 660_000);
 });

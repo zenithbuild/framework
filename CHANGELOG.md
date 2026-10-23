@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Removed every CMS layer from the site (Tina, its `tina/` config and generated `src/public/admin` bundle, the Directus client, and the `cms:dev`/`cms:build`/`cms:audit` scripts); the site now reads its committed markdown and JSON content directly, which drops Tina's dependency tree and its advisories (including @graphql-tools/utils GHSA-c4qx-w738-7hr3) from `site/bun.lock`. The only remaining site override is `sharp` 0.35.5 (JUD-21).
 
+### Fixed
+
+- Stabilized the site browser tests by starting `zenith dev` through `site/tests/helpers/dev-server.ts` with the `ZENITH_SITE_CLI_ENTRY` override, and fixed the DocsArticleTransition mount, the getting-started page markup, and CodeWorkbench tab `aria-selected` and `tabIndex` sync that they exposed (JUD-48).
+- Fixed site grid layouts whose arbitrary `grid-cols-[...]` tracks were comma-separated (Blog article, Feature showcase, About page) by switching to underscore separators, and added a regression test for the syntax (JUD-65).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
