@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Bump `rand` 0.8.5 → 0.8.6 (GHSA-cq8v-f236-94qc) and `xxhash-rust` 0.8.15 → 0.8.16 (GHSA-6g2r-675j-hx59) in `packages/bundler/Cargo.lock`; lockfile-only, bundler output unchanged.
 - Publish release packages in dependency order (`runtime`, `router`, `compiler`, `bundler`, `cli`, `core`, `image`, after the native packages) and fail `verify-publish-surface` if a package publishes before a package it lists in `dependencies` or `optionalDependencies`, or in `peerDependencies` unless that peer closes a cycle with a hard dependency (cli peers on core while core pins cli; reported as a note); previously core was published before the cli it pins exactly, bundler before runtime and router, and image before the core it peers on (JUD-83).
 - Check every selected package name on npm before `scripts/publish-packages.sh` publishes anything: missing names fail with one `::error::` listing all of them and the bootstrap steps (exit 1), registry or network lookup failures fail closed with exit 2, and `--dry-run` runs the same check (JUD-83).
 - Add `scripts/publish-packages.sh --preflight-only`, which checks every release and native package name without packing or publishing, and run it in the Publish workflow's `preflight` job so a missing name stops the release before any package publishes, and registry errors fail closed instead of being reported as missing (JUD-83).
