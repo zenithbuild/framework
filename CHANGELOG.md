@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Publish release packages in dependency order (`runtime`, `router`, `compiler`, `bundler`, `cli`, `core`, `image`, after the native packages) and fail `verify-publish-surface` if a package publishes before a package it lists in `dependencies` or `optionalDependencies`, or in `peerDependencies` unless that peer closes a cycle with a hard dependency (cli peers on core while core pins cli; reported as a note); previously core was published before the cli it pins exactly, bundler before runtime and router, and image before the core it peers on (JUD-83).
 - Probe compiler compatibility before build and dev work, preserve compiler-bridge version probing, and assert both native probes in the compiler-to-bundler process contract (JUD-86).
 - Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds (outside CI, newer Node and Rust patch releases on the pinned minor are accepted; Bun stays exact), and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
 - Restrict Cargo caches in CI and publish workflows to native target directories and retire the cache namespace that restored physical directories over Bun workspace links (JUD-15).

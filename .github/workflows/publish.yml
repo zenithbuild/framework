@@ -412,7 +412,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/image,packages/core,packages/cli
+          PUBLISH_PACKAGE_FILTER: packages/runtime,packages/router,packages/compiler,packages/bundler,packages/cli,packages/core,packages/image
         run: ./scripts/publish-packages.sh
 
   verify_registry:

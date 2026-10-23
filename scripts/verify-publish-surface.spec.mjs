@@ -7,7 +7,9 @@ import path from 'node:path';
 import {
     PUBLISH_SURFACE_MATRIX,
     REPO_ROOT,
+    analyzePublishOrder,
     assertPublishSurfaceMatrixCoverage,
+    findPublishOrderViolations,
     selectPublishMatrixEntries,
     verifyPublishSurface
 } from './publish-surface-lib.mjs';
@@ -84,13 +86,13 @@ test('framework release selection excludes standalone-owned editor packages', ()
     const languageServerPackage = JSON.parse(readFileSync(path.join(REPO_ROOT, 'packages/language-server/package.json'), 'utf8'));
 
     assert.deepEqual(releaseDirs, [
-        'packages/bundler',
-        'packages/compiler',
         'packages/runtime',
         'packages/router',
-        'packages/image',
+        'packages/compiler',
+        'packages/bundler',
+        'packages/cli',
         'packages/core',
-        'packages/cli'
+        'packages/image'
     ]);
     assert.equal(languagePackage.private, true);
     assert.equal(languageServerPackage.private, true);
@@ -361,6 +363,65 @@ test('verifyPublishSurface uses shell mode for npm pack on win32', () => {
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
+});
+
+test('publish matrix lists every package after the packages it depends on', () => {
+    const { violations, notes } = analyzePublishOrder();
+    assert.deepEqual(violations, []);
+    assert.deepEqual(findPublishOrderViolations(), []);
+    assert.deepEqual(notes, [
+        '@zenithbuild/cli lists @zenithbuild/core in peerDependencies and publishes before it; allowed because @zenithbuild/core depends on @zenithbuild/cli'
+    ]);
+});
+
+function orderFixture(names, manifests) {
+    const matrix = names.map((name) => ({ dir: `packages/${name}`, name: `@zenithbuild/${name}` }));
+    return analyzePublishOrder({ matrix, readManifest: (dir) => manifests[dir] });
+}
+
+test('publish order allows a peer edge that closes a cycle with a hard dependency', () => {
+    const manifests = {
+        'packages/core': { dependencies: { '@zenithbuild/cli': '0.0.0' } },
+        'packages/cli': { peerDependencies: { '@zenithbuild/core': '0.0.0' } }
+    };
+    assert.deepEqual(orderFixture(['cli', 'core'], manifests), {
+        violations: [],
+        notes: ['@zenithbuild/cli lists @zenithbuild/core in peerDependencies and publishes before it; allowed because @zenithbuild/core depends on @zenithbuild/cli']
+    });
+    assert.deepEqual(orderFixture(['core', 'cli'], manifests).violations, [
+        '@zenithbuild/core lists @zenithbuild/cli in dependencies but publishes before it'
+    ]);
+});
+
+test('publish order still flags a peer published before its peer without a cycle', () => {
+    const manifests = {
+        'packages/core': { dependencies: { '@zenithbuild/cli': '0.0.0' } },
+        'packages/cli': { peerDependencies: { '@zenithbuild/core': '0.0.0' } },
+        'packages/image': { peerDependencies: { '@zenithbuild/core': '0.0.0' } }
+    };
+    assert.deepEqual(orderFixture(['image', 'cli', 'core'], manifests).violations, [
+        '@zenithbuild/image lists @zenithbuild/core in peerDependencies but publishes before it'
+    ]);
+    assert.deepEqual(orderFixture(['cli', 'core', 'image'], manifests).violations, []);
+});
+
+test('publish order flags a cycle made only of hard dependencies', () => {
+    const manifests = {
+        'packages/core': { dependencies: { '@zenithbuild/cli': '0.0.0' } },
+        'packages/cli': { optionalDependencies: { '@zenithbuild/core': '0.0.0' } }
+    };
+    for (const order of [['cli', 'core'], ['core', 'cli']]) {
+        const { violations, notes } = orderFixture(order, manifests);
+        assert.equal(violations.length, 1);
+        assert.deepEqual(notes, []);
+    }
+});
+
+test('publish workflow release filter lists packages in publish order', () => {
+    const workflow = readFileSync(path.join(REPO_ROOT, '.github/workflows/publish.yml'), 'utf8');
+    const filter = workflow.match(/PUBLISH_PACKAGE_FILTER: (packages\/[^\s]+)/)[1].split(',');
+    const releaseDirs = selectPublishMatrixEntries({ selection: 'release' }).map((entry) => entry.dir);
+    assert.deepEqual(filter, releaseDirs);
 });
 
 test('matrix stays aligned with expected publish targets', () => {
