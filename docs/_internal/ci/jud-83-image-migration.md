@@ -25,8 +25,11 @@ The CLI checks `.zen` files in the source directory (the parent of the pages
 directory, as build uses) and public assets before compilation or output
 deletion. Missing and skewed packages give the exact installation command for
 the project's package manager (lockfile first, then the invoking package
-manager). The component is registered from the consumer's installed package;
-local components cannot shadow it. SVG and ordinary `<img>` alone do not
+manager). The component is registered from the consumer's installed package,
+unless the project defines its own `Image` component (an `Image.zen` in the
+source directory's `components/`, `layouts/` or `globals/`). A project-defined
+`Image.zen` takes precedence, and then `<Image>` does not require the package;
+an installed package still optimizes public rasters. SVG and ordinary `<img>` alone do not
 require the processing package. Static raster files alone, such as a favicon or
 social image, do not require it either: when it is installed they still receive
 variants, matching the previous CLI behavior; when it is absent they are copied
@@ -69,7 +72,9 @@ The basic, CSS and Tailwind scaffolder templates currently contain no raster
 assets or Image tags, so they do not gain an unused dependency. A mechanical
 template check requires an exact train image dependency if this changes.
 
-Both new packages participate in the release matrix and packed consumers.
+The new `@zenithbuild/image` package participates in the release matrix and
+packed consumers. Configuration was folded into `@zenithbuild/core`, so there is
+no separate config package.
 No package was published. Registry naming availability and actual publication
 permissions are separate checks at release time.
 
