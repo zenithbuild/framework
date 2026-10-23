@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Replace the withdrawn esbuild-specific assertion with current root/site audit evidence, preserve active findings and audit failures, and keep core validation running without treating unresolved security findings as a pass (JUD-85).
 - Correct an invalid PNG test-fixture checksum exposed by the restored core validation lane, retaining real image processing and the Sharp security floor (JUD-85).
 - Give dependency audits that cannot run their own exit code (2) apart from active advisory findings (1), and end core with a line stating why it is red (JUD-85).
+- Stabilized the site browser tests by starting `zenith dev` through `site/tests/helpers/dev-server.ts` with the `ZENITH_SITE_CLI_ENTRY` override, and fixed the DocsArticleTransition mount, the getting-started page markup, and CodeWorkbench tab `aria-selected` and `tabIndex` sync that they exposed (JUD-48).
 - Fixed site grid layouts whose arbitrary `grid-cols-[...]` tracks were comma-separated (Blog article, Feature showcase, About page) by switching to underscore separators, and added a regression test for the syntax (JUD-65).
 
 ## [0.8.0] - 2026-07-01
