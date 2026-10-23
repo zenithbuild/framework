@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils exception requests, binds to the refreshed `site/bun.lock`, and traces the site braces path through `@tailwindcss/cli` (JUD-21).
+- Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the audit step exits 2 when `bun audit` returns empty or unparseable output instead of passing. The proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils and KaTeX exception requests, binds to the refreshed `site/bun.lock`, and keeps braces GHSA-vfj7-8cjw-p6xm as its only request, with the site path through `@tailwindcss/cli` (JUD-21).
 
 ### Removed
 
