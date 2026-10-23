@@ -131,8 +131,10 @@ framework train version. It is optional for JPG/JPEG/PNG/WebP/AVIF assets in
 `public/`, which are copied unoptimized without it:
 
 ```bash
-npm i -D @zenithbuild/image@0.8.0
+npm i -D @zenithbuild/image@0.9.0-rc.0
 ```
+
+The 0.9.0 release candidates publish under the npm `train` dist-tag, not `latest`.
 
 The optional package owns the component and Sharp processing. No-image projects
 need neither package nor Sharp. Missing image dependencies fail before compilation

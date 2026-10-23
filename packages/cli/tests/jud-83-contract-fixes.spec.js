@@ -205,7 +205,7 @@ describe('missing package error', () => {
         await writeFile(join(root, 'pages', 'blog', 'post.zen'), '<main><Image src="/b.png" alt="B" /></main>');
         await writeFile(join(root, 'pages', 'about.zen'), '<main>no image</main>');
         await expect(build({ pagesDir: join(root, 'pages'), outDir: join(root, 'dist') })).rejects.toThrow(
-            'requires @zenithbuild/image@0.8.0 because <Image> is used in pages/blog/post.zen, pages/index.zen. Run npm i -D @zenithbuild/image@0.8.0'
+            'requires @zenithbuild/image@0.9.0-rc.0 because <Image> is used in pages/blog/post.zen, pages/index.zen. Run npm i -D @zenithbuild/image@0.9.0-rc.0'
         );
     });
 });

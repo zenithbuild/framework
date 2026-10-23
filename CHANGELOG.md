@@ -6,12 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0-rc.0] - TBD
+
 ### Changed
 
 - Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the audit step exits 2 when `bun audit` returns empty or unparseable output instead of passing. The proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils and KaTeX exception requests and binds to the refreshed `site/bun.lock`. braces GHSA-vfj7-8cjw-p6xm was withdrawn upstream, so it is recorded as withdrawn and no exception is requested (JUD-21).
 - Move the shared configuration source into `@zenithbuild/core` (`@zenithbuild/core/config`, `/config/node`, `/config/plugins`, `/config/base-path`, `/config/images`); core imports no other Zenith package, and core's public API and `zenith` command ownership are preserved (JUD-83).
 - Move image processing and Sharp into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. `Image.zen` stays in `@zenithbuild/cli` for 0.9 so `<Image>` output is unchanged. See [migration notes](docs/_internal/ci/jud-83-image-migration.md) (JUD-83).
 - Require `@zenithbuild/image` only for `<Image>` in the source directory; raster files in `public/` alone are copied unoptimized with an install hint, dev and preview stop rescanning the project per request, and install commands follow the project's package manager (JUD-83).
+- **Migration:** projects that serve remote images through `/_zenith/image` with `images.remotePatterns` set must install `@zenithbuild/image`. Without it, allowed remote URLs return `400` `image_request_failed` ("Remote image optimization requires @zenithbuild/image") instead of being transformed with Sharp as in 0.8. Local `<Image>` builds are unaffected (JUD-83).
 
 ### Removed
 
