@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Run site dependency validation steps with `bash -eo pipefail` so a failed CMS build or content audit piped through `tee` fails the job; the proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and requests an exception for @graphql-tools/utils GHSA-c4qx-w738-7hr3 (JUD-21).
+- Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils exception requests, binds to the refreshed `site/bun.lock`, and traces the site braces path through `@tailwindcss/cli` (JUD-21).
 
 ### Removed
 
