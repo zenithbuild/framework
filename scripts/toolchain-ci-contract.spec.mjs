@@ -44,7 +44,9 @@ test('standard builds validate tools before building and lock native dependencie
     const build = read('scripts/build.sh');
     assert.ok(build.indexOf('node ./scripts/check-toolchain.mjs') < build.indexOf('bun run'));
     assert.match(build, /cargo build --locked --release/);
-    assert.match(JSON.parse(read('packages/bundler/package.json')).scripts.build, /cargo build --locked --release/);
+    const bundlerBuild = JSON.parse(read('packages/bundler/package.json')).scripts.build;
+    assert.match(bundlerBuild, /^node \.\.\/\.\.\/scripts\/check-toolchain\.mjs && /);
+    assert.match(bundlerBuild, /cargo build --locked --release/);
 });
 
 test('Cargo caches never traverse workspace dependency links or restore legacy archives', () => {
