@@ -97,6 +97,32 @@ describe('hosted server functions without @zenithbuild/image', () => {
     });
 });
 
+describe('hosted image endpoints without @zenithbuild/image block local networks like f504c98d', () => {
+    const LOCAL = '{"error":"image_request_failed","message":"[Zenith:Image] Loopback and local network image fetches are blocked"}';
+    const hosts = ['127.0.0.1', 'localhost', '10.1.2.3', '192.168.0.10', '[::1]'];
+    const images = { remotePatterns: hosts.map((hostname) => ({ protocol: 'http', hostname })) };
+    const requests = hosts.map((host) => new Request(`https://example.test/_zenith/image?url=${encodeURIComponent(`http://${host}/a.png`)}&w=16`));
+    async function loadHandler(target) {
+        await writeFile(join(root, 'pages', 'index.zen'), '<main>home</main>');
+        const outDir = join(root, 'dist');
+        await build({ pagesDir: join(root, 'pages'), outDir, config: { target, images } });
+        if (target === 'vercel') {
+            const fn = (await import(join(outDir, 'functions', '__zenith', 'image.func', 'index.js'))).default;
+            return (request) => fn.fetch(request);
+        }
+        return (await import(join(outDir, 'functions', '__zenith_image.mjs'))).default;
+    }
+
+    test.each(['vercel', 'netlify'])('%s', async (target) => {
+        const handler = await loadHandler(target);
+        for (const request of requests) {
+            const response = await handler(request);
+            expect([request.url, response.status, response.headers.get('content-type'), await response.text()])
+                .toEqual([request.url, 400, 'application/json', LOCAL]);
+        }
+    });
+});
+
 describe('package-image-runtime specifier rewriting', () => {
     const serverDir = '/srv/out/server';
     const filePath = '/srv/out/server/images/nested/mod.js';

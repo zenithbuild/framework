@@ -7,8 +7,19 @@ uses `<Image>` in its source directory. Install it to optimize JPG/JPEG/PNG/WebP
 files in `public/`; without it they are copied unoptimized:
 
 ```sh
-npm i -D @zenithbuild/image@0.8.0
+npm i -D @zenithbuild/image@0.9.0
 ```
+
+Projects that set `images.remotePatterns` must also install `@zenithbuild/image`.
+Without it, the `/_zenith/image` endpoint does not fetch or transform remote
+images: a URL allowed by `images.remotePatterns` that passes the checks below
+gets a 400 `image_request_failed` response saying the endpoint requires
+`@zenithbuild/image`. Requests the full image service rejects before fetching
+still get its exact errors: a missing `url`, a missing or invalid `w`, an
+invalid URL, a URL outside `images.remotePatterns`, a non-http(s) protocol,
+loopback and private network hosts (including hostnames that resolve to private
+addresses, unless `images.dangerouslyAllowLocalNetwork` is set), and hostnames
+that fail to resolve.
 
 The CLI checks `.zen` files in the source directory (the parent of the pages
 directory, as build uses) and public assets before compilation or output
