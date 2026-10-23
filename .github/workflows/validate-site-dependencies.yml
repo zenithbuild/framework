@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# Explicit bash runs steps with -eo pipefail, so `| tee` cannot hide a failed command.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   site-dependencies:
     runs-on: ubuntu-latest
