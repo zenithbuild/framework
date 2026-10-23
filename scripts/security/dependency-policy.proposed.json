@@ -10,7 +10,7 @@
     "branch": "codex/jud-21-dependency-advisories",
     "base": "f504c98d05579ce39069d11fb5d0825161add867",
     "rootLockSHA256": "949ed6d625743c6db69355e0510ea1148a46b74449cf96c2edc5e5db1832d02a",
-    "siteLockSHA256": "cefedee70dd89adc8ee197da686f2fbe9c89500060685656b7b8656ae5e4be3d",
+    "siteLockSHA256": "837278169f63e30261c0e68a245d2c2ce200b91b52891e9053f28da4bfdd4f2e",
     "approvalBinding": "An approval must name the exact PR commit SHA and these lockfile hashes."
   },
   "enforcement": {
