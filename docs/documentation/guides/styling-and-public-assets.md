@@ -46,4 +46,24 @@ src/public/logo.svg -> /logo.svg
 
 Use semantic image markup with useful alternative text and reserve dimensions when the asset size is known.
 
+## Optimized Images
+
+The `<Image>` component and image optimization ship in the optional `@zenithbuild/image` package. Projects that use `<Image>` must install it at the exact same version as `@zenithbuild/cli`:
+
+```bash
+npm install -D @zenithbuild/image@0.9.0-rc.0
+```
+
+> The 0.9.0 release candidates of `@zenithbuild/image` publish under the npm `train` dist-tag, not `latest`. Install the version that exactly matches your `@zenithbuild/cli` version.
+
+If a `.zen` file in the source directory uses `<Image>` and the package is missing or on a different version, `zenith dev` and `zenith build` stop before compiling and print the install command for your package manager.
+
+Without `<Image>`, the package is optional. JPG, JPEG, PNG, WebP, and AVIF files in `public/` or `src/public/` are copied unoptimized when it is not installed, and the build prints an install hint. When it is installed, they are optimized. Projects with no images need neither the package nor Sharp.
+
+### Upgrading from 0.8: remote images
+
+In 0.8, the CLI transformed remote images served through `/_zenith/image` with Sharp. From 0.9, projects that set `images.remotePatterns` and serve remote images through `/_zenith/image` must install `@zenithbuild/image`. Without it, every allowed remote URL answers `400` with `image_request_failed` and the message "Remote image optimization requires @zenithbuild/image. Install it and rebuild."
+
+Local images aren't affected by this change.
+
 Next: [Pages, Layouts, and Dynamic Routes](/docs/routing/pages-layouts-and-dynamic-routes).
