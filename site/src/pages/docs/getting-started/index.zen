@@ -38,17 +38,9 @@ export const load = async (ctx) => {
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
 import DocumentationArticle from "@/components/DocumentationArticle.zen";
-import MotionController from "@/components/motion/MotionController.zen";
-const docsRootRef = ref<HTMLElement>();
-const docsArticleRef = ref<HTMLElement>();
 
 </script>
 
 <DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.document.path} searchIndex={data.searchIndex}>
-  <div ref={docsRootRef} data-motion-section="docs-getting-started">
-    <div ref={docsArticleRef} data-motion-target="true">
-      <DocumentationArticle view={data.view} />
-    </div>
-    <MotionController rootRef={docsRootRef} targetARef={docsArticleRef} mode="scroll" />
-  </div>
+  <DocumentationArticle view={data.view} />
 </DefaultLayout>
