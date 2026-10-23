@@ -8,8 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-- Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application.
-- Use portable relative tarball dependencies in the Windows packed-consumer harness.
+- Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application (JUD-87).
+- Use portable relative tarball dependencies in the Windows packed-consumer harness (JUD-87).
 - Route `zenith` command failures through the public `@zenithbuild/core` bin to Zenith's formatted error output with exit code 1, instead of Node's raw stack trace (JUD-87).
 
 ## [0.8.0] - 2026-07-01
