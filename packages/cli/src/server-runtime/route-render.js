@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { materializeSsrBindings } from './ssr-bindings.js';
 import { attachRouteAuth } from '../auth/route-auth.js';
 import { appLocalRedirectLocation, normalizeBasePath, prependBasePath } from '../base-path.js';
+import { createImageRuntimePayload, injectImageRuntimePayload } from '../image-config.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, defaultRouteDenyMessage, logServerException } from '../server-error.js';
 import { allow, data, deny, download, invalid, json, redirect, text } from '../server-contract.js';
@@ -367,16 +368,19 @@ export async function renderRouteRequest(options) {
             planPath: join(dirname(dirname(dirname(dirname(routeModulePath)))), 'ssr-bindings.json')
         });
         html = injectSsrPayload(html, finalSsrPayload);
+        const imagePayload = createImageRuntimePayload(
+            imageConfig, await loadImageManifest(imageManifestPath), 'passthrough', route.base_path || '/'
+        );
+        // Only image markers need the optional @zenithbuild/image package. The
+        // runtime payload script is emitted for every marker the payload
+        // contract covers (Image markers and unsafeHTML), package or not.
         if ((route.image_materialization || []).length > 0 || /data-zx-data-zenith-image/.test(html)) {
             const api = await import('../images/index.js');
-            const imagePayload = api.createImageRuntimePayload(
-                imageConfig, await loadImageManifest(imageManifestPath), 'passthrough', route.base_path || '/'
-            );
             html = await api.materializeImageMarkup({
                 html, payload: imagePayload, imageMaterialization: route.image_materialization || []
             });
-            html = api.injectImageRuntimePayload(html, imagePayload);
         }
+        html = injectImageRuntimePayload(html, imagePayload);
 
         const headers = new Headers({
             'Content-Type': 'text/html; charset=utf-8'

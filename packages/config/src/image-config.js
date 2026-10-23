@@ -1,3 +1,5 @@
+import { normalizeBasePath } from './base-path.js';
+
 const DEFAULT_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
 const DEFAULT_IMAGE_SIZES = [16, 32, 48, 64, 96, 128, 256, 384];
 const DEFAULT_FORMATS = ['webp', 'avif'];
@@ -167,3 +169,77 @@ export function normalizeImageConfig(input) {
     return config;
 }
 
+
+// Image runtime payload contract. It lives with the image config so the CLI
+// emits the same `zenith-image-runtime` script whether or not the optional
+// @zenithbuild/image package is installed (JUD-83 output parity).
+const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
+const IMAGE_RUNTIME_MARKER_RE = /data-zx-(data-zenith-image|unsafeHTML)/;
+
+export function imageRuntimeGlobalName() {
+    return IMAGE_RUNTIME_GLOBAL;
+}
+
+export function htmlNeedsImageRuntimePayload(html) {
+    return IMAGE_RUNTIME_MARKER_RE.test(String(html || ''));
+}
+
+export function normalizeImageRuntimePayload(payload) {
+    if (!isPlainObject(payload)) {
+        return null;
+    }
+    return {
+        mode: payload.mode === 'endpoint' ? 'endpoint' : 'passthrough',
+        basePath: normalizeBasePath(payload.basePath || '/'),
+        config: normalizeImageConfig(payload.config || {}),
+        localImages: isPlainObject(payload.localImages) ? payload.localImages : {}
+    };
+}
+
+export function createImageRuntimePayload(config, localImages, mode = 'passthrough', basePath = '/') {
+    return normalizeImageRuntimePayload({
+        mode,
+        basePath,
+        config: normalizeImageConfig(config),
+        localImages: localImages && typeof localImages === 'object' ? localImages : {}
+    });
+}
+
+function serializeInlineScriptJson(payload) {
+    return JSON.stringify(payload)
+        .replace(/</g, '\\u003C')
+        .replace(/>/g, '\\u003E')
+        .replace(/\//g, '\\u002F')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+}
+
+export function injectImageRuntimePayload(html, payload) {
+    // Only inject if the HTML contains Zenith image markers or unsafeHTML
+    if (!htmlNeedsImageRuntimePayload(html)) {
+        return html;
+    }
+
+    const safePayload = createImageRuntimePayload(
+        payload?.config || {},
+        payload?.localImages || {},
+        payload?.mode || 'passthrough',
+        payload?.basePath || '/'
+    );
+    const globalName = imageRuntimeGlobalName();
+    const serialized = serializeInlineScriptJson(safePayload);
+    const scriptTag = `<script id="zenith-image-runtime">window.${globalName} = ${serialized};</script>`;
+    const existingTagRe = /<script\b[^>]*\bid=(["'])zenith-image-runtime\1[^>]*>[\s\S]*?<\/script>/i;
+
+    if (existingTagRe.test(html)) {
+        return html.replace(existingTagRe, scriptTag);
+    }
+    if (/<\/head>/i.test(html)) {
+        return html.replace(/<\/head>/i, `${scriptTag}</head>`);
+    }
+    const bodyOpen = html.match(/<body\b[^>]*>/i);
+    if (bodyOpen) {
+        return html.replace(bodyOpen[0], `${bodyOpen[0]}${scriptTag}`);
+    }
+    return `${scriptTag}${html}`;
+}

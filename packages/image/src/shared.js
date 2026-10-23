@@ -1,10 +1,14 @@
-import { imageEndpointPath, normalizeBasePath, prependBasePath } from '@zenithbuild/config/base-path';
+import { imageEndpointPath, prependBasePath } from '@zenithbuild/config/base-path';
 
-import { DEFAULT_IMAGE_CONFIG, normalizeImageConfig } from '@zenithbuild/config/images';
-export { DEFAULT_IMAGE_CONFIG, normalizeImageConfig };
+import {
+    DEFAULT_IMAGE_CONFIG,
+    imageRuntimeGlobalName,
+    normalizeImageConfig,
+    normalizeImageRuntimePayload
+} from '@zenithbuild/config/images';
+export { DEFAULT_IMAGE_CONFIG, imageRuntimeGlobalName, normalizeImageConfig, normalizeImageRuntimePayload };
 const DEFAULT_DEVICE_SIZES = DEFAULT_IMAGE_CONFIG.deviceSizes;
 const DEFAULT_IMAGE_SIZES = DEFAULT_IMAGE_CONFIG.imageSizes;
-const IMAGE_RUNTIME_GLOBAL = '__zenith_image_runtime';
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -163,20 +167,4 @@ export function resolveWidthCandidates(width, sizes, config, manifestEntry) {
         }
     }
     return widths;
-}
-
-export function imageRuntimeGlobalName() {
-    return IMAGE_RUNTIME_GLOBAL;
-}
-
-export function normalizeImageRuntimePayload(payload) {
-    if (!isPlainObject(payload)) {
-        return null;
-    }
-    return {
-        mode: payload.mode === 'endpoint' ? 'endpoint' : 'passthrough',
-        basePath: normalizeBasePath(payload.basePath || '/'),
-        config: normalizeImageConfig(payload.config || {}),
-        localImages: isPlainObject(payload.localImages) ? payload.localImages : {}
-    };
 }

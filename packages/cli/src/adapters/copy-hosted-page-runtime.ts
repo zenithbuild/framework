@@ -8,6 +8,7 @@ const PACKAGE_REQUIRE = createRequire(import.meta.url);
 const HOSTED_PAGE_RUNTIME_DIRS = ['runtime', 'images', 'auth', 'server-contract'];
 const HOSTED_PAGE_RUNTIME_FILES = [
     'base-path.js',
+    'image-config.js',
     'server-contract.js',
     'server-middleware.js',
     'server-error.js',
