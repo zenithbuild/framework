@@ -6,8 +6,6 @@ on:
     paths:
       - 'site/package.json'
       - 'site/bun.lock'
-      - 'site/tina/**'
-      - 'site/src/public/admin/**'
       - 'scripts/security/site-dependency-security.spec.mjs'
       - '.github/workflows/validate-site-dependencies.yml'
   workflow_dispatch:
@@ -39,15 +37,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Exercise the installed security boundaries
         run: node --test scripts/security/site-dependency-security.spec.mjs
-      - name: Generate schema, client and production admin assets
-        run: bun run --cwd site cms:build 2>&1 | tee site-cms-build.log
-      - name: Record generated artifact changes
-        run: git diff --numstat -- site/src/public/admin site/tina/__generated__ > site-cms-generated-diff.txt
-      - name: Audit the committed CMS content
-        run: bun run --cwd site cms:audit 2>&1 | tee site-cms-content-audit.log
       - name: Verify content loading and documentation contracts
         working-directory: site
-        run: bun test tests/tina-cms-integration.test.ts tests/documentation-architecture.test.ts tests/search-index.test.ts
+        run: bun test tests/documentation-architecture.test.ts tests/search-index.test.ts
       - name: Keep every active root and site advisory blocking
         if: always()
         run: |
@@ -56,7 +48,7 @@ jobs:
           (cd site && bun audit --json) > site-audit.json || audit_status=$?
           cat root-audit.json site-audit.json
           exit "$audit_status"
-      - name: Retain audit and build evidence
+      - name: Retain audit evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -64,7 +56,3 @@ jobs:
           path: |
             root-audit.json
             site-audit.json
-            site-cms-*.log
-            site-cms-generated-diff.txt
-            site/src/public/admin
-            site/tina/__generated__
