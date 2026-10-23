@@ -14,7 +14,7 @@ const APPROVED_ACTIONS = new Map([
     ['actions/checkout@v4', 'GitHub-maintained checkout action, major tag allowlisted.'],
     ['actions/setup-node@v4', 'GitHub-maintained Node setup action, major tag allowlisted.'],
     ['actions/upload-artifact@v4', 'GitHub-maintained artifact action, major tag allowlisted.'],
-    ['dtolnay/rust-toolchain@stable', 'Rust toolchain setup action, stable selector allowlisted.'],
+    ['dtolnay/rust-toolchain@1.97.1', 'Rust toolchain setup action, exact selected version allowlisted.'],
     ['oven-sh/setup-bun@v2', 'Bun setup action, major tag allowlisted.'],
     ['softprops/action-gh-release@v2', 'GitHub release action, major tag allowlisted.']
 ]);

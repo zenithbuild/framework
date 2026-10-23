@@ -1,55 +1,13 @@
-import { createDirectusServerClient, type DirectusServerClient } from "./directusClient";
 import { discoverLocalDocumentationEntries } from "./localDocumentationSource";
-import { renderDocumentationMarkdown } from "./documentationMarkdown";
 import {
   collectDocumentationTags,
   compareDocumentationEntries,
-  deriveDocumentationLeafSlug,
-  excerptText,
-  extractDocumentationDescription,
-  formatDocumentationDetailPath,
-  formatSectionRoute,
   groupDocumentationEntries,
-  humanizeDocumentationSlug,
   matchesDocumentationLookup,
   normalizeDocumentationLookup,
-  toInteger,
 } from "./documentationSourceSupport";
 
-type SourceMode = "local" | "directus";
-
-interface DirectusDocumentationSectionRecord {
-  slug?: string | null;
-  title?: string | null;
-  description?: string | null;
-  order?: number | null;
-  route_base?: string | null;
-}
-
-interface DirectusDocumentationTagRecord {
-  slug?: string | null;
-  title?: string | null;
-  color?: string | null;
-  order?: number | null;
-}
-
-interface DirectusDocumentationRecord {
-  slug: string;
-  title: string;
-  description?: string | null;
-  markdown_raw?: string | null;
-  html_rendered?: string | null;
-  source_path?: string | null;
-  source_kind?: string | null;
-  status?: string | null;
-  category?: string | null;
-  category_label?: string | null;
-  category_order?: number | null;
-  doc_order?: number | null;
-  category_ref?: DirectusDocumentationSectionRecord | null;
-  section?: DirectusDocumentationSectionRecord | null;
-  tags?: Array<{ tag?: DirectusDocumentationTagRecord | null; tags_id?: DirectusDocumentationTagRecord | null } | DirectusDocumentationTagRecord> | null;
-}
+type SourceMode = "local";
 
 export interface DocumentationTag {
   slug: string;
@@ -125,40 +83,21 @@ export interface DocumentationDetailLookup {
   sectionSlug?: string | null;
 }
 
-const BASE_DOCUMENTATION_FIELDS = ["slug", "title", "description", "markdown_raw", "html_rendered", "source_path", "source_kind", "status", "category", "category_label", "category_order", "doc_order"] as const;
-const RELATIONAL_DOCUMENTATION_FIELDS = ["category_ref.slug", "category_ref.title", "category_ref.description", "category_ref.order", "category_ref.route_base", "section.slug", "section.title", "section.description", "section.order", "tags.tag.slug", "tags.tag.title", "tags.tag.color", "tags.tag.order", "tags.tags_id.slug", "tags.tags_id.title", "tags.tags_id.color", "tags.tags_id.order"] as const;
-
-const DOCUMENTATION_SORT = ["category_order", "doc_order", "title", "source_path"] as const;
-
 export function resolveDocumentationSourceMode(): SourceMode {
   const mode = (process.env.ZENITH_DOCUMENTATION_SOURCE || "local").trim().toLowerCase();
 
-  if (mode === "local" || mode === "directus") {
+  if (mode === "local") {
     return mode;
   }
 
   throw new Error(
-    `Unsupported ZENITH_DOCUMENTATION_SOURCE "${mode}". Use "local" or "directus".`,
+    `Unsupported ZENITH_DOCUMENTATION_SOURCE "${mode}". Use "local".`,
   );
-}
-
-export function getDocumentationDirectusQueryPlan() {
-  return {
-    collection: "documentation",
-    fields: [...BASE_DOCUMENTATION_FIELDS, ...RELATIONAL_DOCUMENTATION_FIELDS],
-    sort: [...DOCUMENTATION_SORT],
-    query: {
-      "filter[status][_eq]": "published",
-      "filter[source_kind][_eq]": "repo_sync",
-    },
-  };
 }
 
 export async function loadDocumentationIndexSource(): Promise<DocumentationIndexSource> {
   const sourceMode = resolveDocumentationSourceMode();
-  const entries = sourceMode === "directus"
-    ? await loadDirectusDocumentationEntries()
-    : await loadLocalDocumentationEntries();
+  const entries = await loadLocalDocumentationEntries();
 
   return {
     sourceMode,
@@ -175,9 +114,7 @@ export async function loadDocumentationDetailFromLookup(
   lookupInput: string | DocumentationDetailLookup,
 ): Promise<DocumentationDetailSource> {
   const sourceMode = resolveDocumentationSourceMode();
-  const entries = sourceMode === "directus"
-    ? await loadDirectusDocumentationEntries()
-    : await loadLocalDocumentationEntries();
+  const entries = await loadLocalDocumentationEntries();
   const lookup = normalizeDocumentationLookup(lookupInput);
 
   return {
@@ -186,143 +123,6 @@ export async function loadDocumentationDetailFromLookup(
   };
 }
 
-async function loadDirectusDocumentationEntries(): Promise<DocumentationDetail[]> {
-  const client = await createDirectusServerClient();
-  const records = await queryDirectusDocumentationRecords(client);
-
-  return [...records]
-    .map((record) => mapDirectusDocumentationRecord(record))
-    .sort(compareDocumentationEntries);
-}
-
 async function loadLocalDocumentationEntries(): Promise<DocumentationDetail[]> {
   return (await discoverLocalDocumentationEntries()).sort(compareDocumentationEntries);
-}
-
-async function queryDirectusDocumentationRecords(
-  client: DirectusServerClient,
-): Promise<DirectusDocumentationRecord[]> {
-  const plan = getDocumentationDirectusQueryPlan();
-  const baseOptions = {
-    sort: [...plan.sort],
-    query: plan.query,
-    limit: -1,
-  };
-
-  try {
-    return await client.queryItems<DirectusDocumentationRecord>(plan.collection, {
-      ...baseOptions,
-      fields: [...plan.fields],
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/(query failed \(400|query failed \(403|field|invalid query|forbidden)/i.test(message)) {
-      throw error;
-    }
-
-    return client.queryItems<DirectusDocumentationRecord>(plan.collection, {
-      ...baseOptions,
-      fields: [...BASE_DOCUMENTATION_FIELDS],
-    });
-  }
-}
-
-function mapDirectusDocumentationRecord(record: DirectusDocumentationRecord): DocumentationDetail {
-  const section = mapRecordSection(record);
-  const slug = deriveDocumentationLeafSlug(record.slug || record.source_path || "");
-  const markdownRaw = String(record.markdown_raw || "");
-  const description = extractDocumentationDescription(record.description || markdownRaw, record.title);
-  const rendered = renderDocumentationMarkdown(markdownRaw, record.title);
-
-  return {
-    slug,
-    routeSectionSlug: section.slug,
-    title: record.title,
-    sidebarLabel: record.title,
-    description,
-    excerpt: excerptText(description, 180),
-    path: formatDocumentationDetailPath(section.slug, slug, record.category_ref?.route_base || "/docs"),
-    sourcePath: record.source_path || null,
-    sourceKind: record.source_kind || "repo_sync",
-    status: record.status || "published",
-    section,
-    tags: mapRecordTags(record.tags),
-    markdownRaw,
-    htmlRendered: rendered.html,
-    headings: rendered.headings,
-    docOrder: toInteger(record.doc_order),
-    seoTitle: null,
-    seoDescription: null,
-  };
-}
-
-function mapRecordSection(record: DirectusDocumentationRecord): DocumentationSection {
-  const relation = record.category_ref || record.section || null;
-  const sectionSlug = relation?.slug || record.category || deriveSectionSlug(record.source_path || record.slug);
-  const sectionTitle = sectionSlug === "root"
-    ? "Start Here"
-    : relation?.title || record.category_label || humanizeDocumentationSlug(sectionSlug);
-  const routeBase = relation?.route_base || "/docs";
-
-  return {
-    slug: sectionSlug,
-    title: sectionTitle,
-    description: relation?.description || null,
-    order: toInteger(relation?.order) ?? toInteger(record.category_order) ?? Number.MAX_SAFE_INTEGER,
-    path: formatSectionRoute(sectionSlug, routeBase),
-  };
-}
-
-function mapRecordTags(rawTags: DirectusDocumentationRecord["tags"]): DocumentationTag[] {
-  if (!Array.isArray(rawTags)) {
-    return [];
-  }
-
-  const seen = new Set<string>();
-
-  return rawTags
-    .map((entry) => {
-      const tag = (entry && typeof entry === "object" && ("tag" in entry || "tags_id" in entry))
-        ? (entry.tag || entry.tags_id)
-        : entry;
-      if (!tag?.slug || !tag?.title) {
-        return null;
-      }
-      const normalizedSlug = String(tag.slug || "").trim();
-      if (!normalizedSlug || seen.has(normalizedSlug)) {
-        return null;
-      }
-      seen.add(normalizedSlug);
-      return {
-        slug: normalizedSlug,
-        title: tag.title,
-        color: tag.color || null,
-        order: toInteger(tag.order),
-      };
-    })
-    .filter(Boolean)
-    .sort((left, right) => {
-      const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
-      const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder;
-      }
-      return left.slug.localeCompare(right.slug);
-    });
-}
-
-function deriveSectionSlug(slug: string): string {
-  const normalized = String(slug || "")
-    .replace(/^docs\/documentation\//, "")
-    .replace(/\.md$/, "");
-  const parts = normalized.split("/").filter(Boolean);
-
-  if (parts[0] === "_legacy") {
-    if (parts.length < 3 || parts[1]?.endsWith(".md")) {
-      return "legacy";
-    }
-    return parts[1] || "legacy";
-  }
-
-  return parts.length > 1 ? (parts[0] || "root") : "root";
 }

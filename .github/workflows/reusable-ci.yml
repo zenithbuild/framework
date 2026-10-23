@@ -17,13 +17,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve Playwright version
         id: playwright_version
@@ -49,10 +49,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -62,7 +63,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - name: File-Size Audit (Stage 1 report-only)
         continue-on-error: true
@@ -102,13 +103,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve Playwright version
         id: playwright_version
@@ -134,10 +135,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -147,7 +149,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bun run --cwd apps/smoke-test playwright install --with-deps chromium
 
@@ -202,13 +204,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve Playwright version
         id: playwright_version
@@ -234,10 +236,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -247,7 +250,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bun run --cwd apps/smoke-test playwright install --with-deps chromium
 

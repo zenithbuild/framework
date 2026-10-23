@@ -3,7 +3,7 @@ name: Native candidate consumers
 on:
   workflow_dispatch:
   pull_request:
-    branches: [master, train, beta]
+    branches: [master, train, beta, integration/v1]
 
 permissions:
   contents: read
