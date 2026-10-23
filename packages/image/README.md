@@ -1,7 +1,8 @@
 # @zenithbuild/image
 
 Optional image processing for Zenith. Install the exact version matching the
-framework train in projects that use `<Image>` or raster files in `public/`:
+framework train in projects that use `<Image>`, or to optimize raster files in
+`public/` (without it they are copied unoptimized):
 
 ```sh
 npm i -D @zenithbuild/image@0.8.0

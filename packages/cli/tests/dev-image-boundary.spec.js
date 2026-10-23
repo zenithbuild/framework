@@ -13,14 +13,17 @@ test('adding/removing the first Image refreshes the dev component registry', asy
         await installImagePackage(root);
         const session = createDevBuildSession({ pagesDir: join(root, 'pages'), outDir: join(root, 'dist') });
         await session.build();
+        const noImageApi = await session.getImageApi();
         await writeFile(page, '<main><Image src="/hero.png" alt="Hero" /></main>');
         const added = await session.build({ changedFiles: [page] });
         expect(added.strategy).toBe('full');
         expect(await readFile(join(root, 'dist', 'index.html'), 'utf8')).not.toContain('<Image');
         expect(session.getImageRuntimePayload()).not.toBeNull();
+        expect(await session.getImageApi()).not.toBe(noImageApi);
         await writeFile(page, '<main>Images removed</main>');
         const removed = await session.build({ changedFiles: [page] });
         expect(removed.strategy).toBe('full');
         expect(session.getImageRuntimePayload()).toBeNull();
+        expect(await session.getImageApi()).toBe(noImageApi);
     } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -325,8 +325,10 @@ export function createDevBuildSession(options) {
         async build(buildOptions = {}) {
             const nextImagePackage = await prepareProjectImages(projectRoot, srcDir);
             if (imagePackage?.componentPath !== nextImagePackage.componentPath) state.hasSuccessfulBuild = false;
+            const imageNotice = nextImagePackage.notice !== imagePackage?.notice ? nextImagePackage.notice : null;
             imagePackage = nextImagePackage;
             const activeLogger = buildOptions.logger || logger;
+            if (imageNotice) activeLogger?.info?.(imageNotice);
             const showBundlerInfo = buildOptions.showBundlerInfo !== false;
             const changedFiles = Array.isArray(buildOptions.changedFiles)
                 ? [...new Set(buildOptions.changedFiles.map((entry) => resolve(String(entry))))]
@@ -353,6 +355,10 @@ export function createDevBuildSession(options) {
         },
         getImageRuntimePayload() {
             return state.imageRuntimePayload;
+        },
+        /** Image API resolved by the latest build(); no per-request rescan. */
+        async getImageApi() {
+            return (imagePackage || await prepareProjectImages(projectRoot, srcDir)).api;
         },
         getPublicAssetPaths() {
             return previousPublicAssetPaths;

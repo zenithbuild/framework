@@ -8,17 +8,21 @@ and [migration and packaging details](./jud-83-image-migration.md).
 
 `loadImagePackage({ projectRoot, required })` is internal to CLI:
 
-- `required=false` returns null without resolution, import or Sharp.
+- `required=false` returns null without resolution, import or Sharp, unless
+  `ifInstalled=true`, which loads an installed package and returns null when absent.
 - `required=true` resolves from the consumer's dependency tree, validates exact
   CLI/image train identity, and dynamically imports the image API.
 - It returns `{ api, packageRoot, componentPath, sharpVersionRange }`.
-- Missing/skewed packages identify the exact `npm i -D @zenithbuild/image@VERSION` command.
+- Missing/skewed packages identify the exact install command for the project's
+  package manager, such as `bun add -d @zenithbuild/image@VERSION`.
 - Import failures inside an installed package retain their original cause.
 
-CLI detects raster public assets and Image tags in project `.zen` files before
+CLI detects Image tags in source-directory `.zen` files (required) and raster
+public assets (optional; copied verbatim when the package is absent) before
 compilation or output removal. It excludes dependency, Git and standard generated
 directories and does not follow directory symlinks. Dev repeats detection on
-rebuild, including the first image added to a project. An absent image pipeline
+rebuild, including the first image added to a project, and its request handler
+reuses that result. Preview resolves once from the build's package marker. An absent image pipeline
 uses identity/no-op helpers and a 404 image endpoint.
 
 The Image component is registered from the package selected by the loader.

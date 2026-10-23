@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
 - Extract shared configuration into `@zenithbuild/config`, preserving core's public API and `zenith` command ownership.
 - Move image processing, Sharp and `Image.zen` into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. See [migration notes](docs/_internal/ci/jud-83-image-migration.md).
+- Require `@zenithbuild/image` only for `<Image>` in the source directory; raster files in `public/` alone are copied unoptimized with an install hint, dev and preview stop rescanning the project per request, and install commands follow the project's package manager (JUD-83).
 
 ## [0.8.0] - 2026-07-01
 

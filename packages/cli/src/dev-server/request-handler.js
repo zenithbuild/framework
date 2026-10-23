@@ -1,4 +1,3 @@
-import { createProjectImageApi } from '../project-images.js';
 import { readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
@@ -55,7 +54,8 @@ export function createDevRequestHandler(options) {
         LEGACY_DEV_STREAM_PATH,
         IMAGE_RUNTIME_TAG_RE
     } = options;
-    const getImageApi = createProjectImageApi(projectRoot);
+    // Reuse the image package the build session resolved for the current build.
+    const getImageApi = async () => buildSession.getImageApi();
 
     return async function handleDevRequest(req, res) {
         const url = new URL(req.url, serverOrigin());

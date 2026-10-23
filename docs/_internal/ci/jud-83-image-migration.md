@@ -3,20 +3,25 @@
 This describes the implementation in PR #235, pending integration and review.
 
 Install `@zenithbuild/image` at the exact version of CLI/core when a project
-uses `<Image>` or has JPG/JPEG/PNG/WebP/AVIF files in `public/`:
+uses `<Image>` in its source directory. Install it to optimize JPG/JPEG/PNG/WebP/AVIF
+files in `public/`; without it they are copied unoptimized:
 
 ```sh
 npm i -D @zenithbuild/image@0.8.0
 ```
 
-The CLI checks source `.zen` files and public assets before compilation or
-output deletion. Missing and skewed packages give the exact installation
-command. The component is registered from the consumer's installed package;
+The CLI checks `.zen` files in the source directory (the parent of the pages
+directory, as build uses) and public assets before compilation or output
+deletion. Missing and skewed packages give the exact installation command for
+the project's package manager (lockfile first, then the invoking package
+manager). The component is registered from the consumer's installed package;
 local components cannot shadow it. SVG and ordinary `<img>` alone do not
-require the processing package. Static raster files still receive variants,
-matching the previous CLI behavior even when the page uses ordinary `<img>`.
-Built image output carries a small package marker, so preview retains image
-endpoints when original page sources are absent. No-image builds omit it.
+require the processing package. Static raster files alone, such as a favicon or
+social image, do not require it either: when it is installed they still receive
+variants, matching the previous CLI behavior; when it is absent they are copied
+verbatim and the CLI prints an install hint. Built image output carries a small
+package marker, so preview retains image endpoints when original page sources
+are absent. No-image builds omit it, and preview never rescans sources.
 
 The image package owns Sharp `^0.35.5`, Image.zen and the JS/TS processing
 pipeline. The Rust compiler/bundler materialization remains unchanged. CLI has

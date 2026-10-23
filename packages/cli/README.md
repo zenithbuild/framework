@@ -126,8 +126,9 @@ Typically installed as a dev dependency in your Zenith project:
 bun add -d @zenithbuild/cli
 ```
 
-Projects using `<Image>` or JPG/JPEG/PNG/WebP/AVIF assets in `public/` also
-install `@zenithbuild/image` at the exact same framework train version:
+Projects using `<Image>` also install `@zenithbuild/image` at the exact same
+framework train version. It is optional for JPG/JPEG/PNG/WebP/AVIF assets in
+`public/`, which are copied unoptimized without it:
 
 ```bash
 npm i -D @zenithbuild/image@0.8.0

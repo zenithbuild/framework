@@ -37,8 +37,27 @@ test('no-image consumers do not resolve a package or touch the project filesyste
 });
 
 test('missing image package gives an exact-train consumer install command', async () => {
+    await writeFile(join(projectRoot, 'package-lock.json'), '{}');
     await expect(loadImagePackage({ projectRoot, required: true }))
         .rejects.toThrow(`npm i -D @zenithbuild/image@${cliVersion}`);
+});
+
+test('the install command follows the project package manager', async () => {
+    await writeFile(join(projectRoot, 'pnpm-lock.yaml'), '');
+    await expect(loadImagePackage({ projectRoot, required: true }))
+        .rejects.toThrow(`pnpm add -D @zenithbuild/image@${cliVersion}`);
+});
+
+test('ifInstalled returns null for an absent package but still validates an installed one', async () => {
+    const absentRoot = await mkdtemp(join(tmpdir(), 'zenith-image-absent-'));
+    try {
+        expect(await loadImagePackage({ projectRoot: absentRoot, required: false, ifInstalled: true })).toBeNull();
+    } finally {
+        await rm(absentRoot, { recursive: true, force: true });
+    }
+    await installFixture({ version: '99.0.0' });
+    await expect(loadImagePackage({ projectRoot, required: false, ifInstalled: true }))
+        .rejects.toThrow('found @zenithbuild/image@99.0.0');
 });
 
 test('consumer resolution returns the package API, component and Sharp range', async () => {

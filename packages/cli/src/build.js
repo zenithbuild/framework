@@ -63,6 +63,7 @@ export async function build(options) {
     const startupProfile = createStartupProfiler('cli-build');
     const projectRoot = deriveProjectRootFromPagesDir(pagesDir);
     const imagePackage = await prepareProjectImages(projectRoot, resolve(pagesDir, ".."));
+    if (imagePackage.notice) logger?.info?.(imagePackage.notice);
     const { buildImageArtifacts, createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } = imagePackage.api;
     const coreOutputDir = join(projectRoot, '.zenith-output');
     const staticOutputDir = join(coreOutputDir, 'static');

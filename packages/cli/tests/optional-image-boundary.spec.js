@@ -6,7 +6,7 @@ import { jest } from '@jest/globals';
 import { build } from '../dist/build.js';
 import { createDevServer } from '../dist/dev-server.js';
 import { createPreviewServer } from '../dist/preview.js';
-import { prepareProjectImages } from '../dist/project-images.js';
+import { createProjectImageApi, prepareProjectImages, projectUsesImages } from '../dist/project-images.js';
 
 jest.setTimeout(45000);
 let root;
@@ -23,19 +23,47 @@ afterEach(async () => {
     await rm(root, { recursive: true, force: true });
 });
 
-test.each(['public raster', 'Image component'])('missing package fails before compilation/output mutation: %s', async (kind) => {
+test('missing package fails before compilation/output mutation when <Image> is used', async () => {
     const outDir = join(root, 'dist');
     await mkdir(outDir);
     await writeFile(join(outDir, 'keep.txt'), 'preserved');
-    if (kind === 'public raster') {
-        await mkdir(join(root, 'public'));
-        await writeFile(join(root, 'public', 'hero.PNG'), 'invalid raster never reaches Sharp');
-    } else {
-        await writeFile(join(root, 'pages', 'index.zen'), '<main><Image src="https://example.com/a.png" alt="A" /></main>');
-    }
+    await writeFile(join(root, 'package-lock.json'), '{}');
+    await writeFile(join(root, 'pages', 'index.zen'), '<main><Image src="https://example.com/a.png" alt="A" /></main>');
     await expect(build({ pagesDir: join(root, 'pages'), outDir })).rejects.toThrow('npm i -D @zenithbuild/image@0.8.0');
     expect(await readFile(join(outDir, 'keep.txt'), 'utf8')).toBe('preserved');
     expect(existsSync(join(root, '.zenith-output'))).toBe(false);
+});
+
+const quietLogger = Object.fromEntries(
+    ['build', 'childLine', 'css', 'dev', 'error', 'heading', 'hmr', 'ok', 'print', 'router', 'summary', 'verbose', 'warn']
+        .map((name) => [name, () => {}])
+);
+
+test('a public raster alone does not require the package and is copied verbatim', async () => {
+    await writeFile(join(root, 'bun.lock'), '');
+    await mkdir(join(root, 'public'));
+    await writeFile(join(root, 'public', 'favicon.PNG'), 'not a real raster; must not reach Sharp');
+    const info = jest.fn();
+    const outDir = join(root, 'dist');
+    await build({ pagesDir: join(root, 'pages'), outDir, logger: { ...quietLogger, info } });
+    expect(await readFile(join(outDir, 'favicon.PNG'), 'utf8')).toBe('not a real raster; must not reach Sharp');
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('bun add -d @zenithbuild/image@0.8.0'));
+    expect(existsSync(join(outDir, '_zenith', 'image', 'package.json'))).toBe(false);
+});
+
+test('only the source directory is scanned for <Image>', async () => {
+    await mkdir(join(root, 'docs'));
+    await writeFile(join(root, 'docs', 'example.zen'), '<Image src="/a.png" alt="A" />');
+    expect(await projectUsesImages(root, join(root, 'pages'))).toBeNull();
+    expect((await prepareProjectImages(root, join(root, 'pages'))).packageRoot).toBeNull();
+});
+
+test('preview resolves the image API once from the build marker, not from sources', async () => {
+    await writeFile(join(root, 'pages', 'index.zen'), '<main><Image src="/a.png" alt="A" /></main>');
+    const getImageApi = createProjectImageApi(root, join(root, 'dist'));
+    const api = await getImageApi();
+    expect(await getImageApi()).toBe(api);
+    expect(await api.createImageRuntimePayload()).toBeNull();
 });
 
 test('no-image build, dev, preview and Node output need no image package or Sharp', async () => {

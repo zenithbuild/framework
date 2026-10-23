@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { devInstallCommand } from './install-command.js';
 
 const CLI_MANIFEST = createRequire(import.meta.url)('../package.json');
 const IMAGE_PACKAGE = '@zenithbuild/image';
@@ -18,10 +19,13 @@ const REQUIRED_EXPORTS = [
  * caller must pass required=false, which never resolves or imports the package.
  * Resolve from the consumer, not from the CLI's own dependency installation.
  *
- * @param {{projectRoot: string, required: boolean}} options
+ * With ifInstalled, an absent package resolves to null instead of throwing;
+ * an installed but mismatched or broken package still fails.
+ *
+ * @param {{projectRoot: string, required: boolean, ifInstalled?: boolean}} options
  */
-export async function loadImagePackage({ projectRoot, required }) {
-    if (!required) return null;
+export async function loadImagePackage({ projectRoot, required, ifInstalled = false }) {
+    if (!required && !ifInstalled) return null;
 
     const consumerRequire = createRequire(join(resolve(projectRoot), 'package.json'));
     let manifestPath;
@@ -29,9 +33,10 @@ export async function loadImagePackage({ projectRoot, required }) {
         manifestPath = consumerRequire.resolve(`${IMAGE_PACKAGE}/package.json`);
     } catch (error) {
         if (error.code !== 'MODULE_NOT_FOUND') throw error;
+        if (!required) return null;
         throw new Error(
             `[Zenith:Image] This project requires ${IMAGE_PACKAGE}@${CLI_MANIFEST.version}. ` +
-            `Run npm i -D ${IMAGE_PACKAGE}@${CLI_MANIFEST.version} in ${projectRoot}.`,
+            `Run ${devInstallCommand(projectRoot, `${IMAGE_PACKAGE}@${CLI_MANIFEST.version}`)} in ${projectRoot}.`,
             { cause: error }
         );
     }
@@ -41,7 +46,7 @@ export async function loadImagePackage({ projectRoot, required }) {
         throw new Error(
             `[Zenith:Image] Expected ${IMAGE_PACKAGE}@${CLI_MANIFEST.version}; ` +
             `found ${manifest.name}@${manifest.version}. ` +
-            `Run npm i -D ${IMAGE_PACKAGE}@${CLI_MANIFEST.version}.`
+            `Run ${devInstallCommand(projectRoot, `${IMAGE_PACKAGE}@${CLI_MANIFEST.version}`)}.`
         );
     }
     if (typeof manifest.dependencies?.sharp !== 'string' || !manifest.dependencies.sharp.trim()) {
