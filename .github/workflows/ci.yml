@@ -1,11 +1,13 @@
 name: ci
 
 on:
+  workflow_dispatch:
   pull_request:
     branches:
       - train
       - master
       - beta
+      - integration/v1
   push:
     branches:
       - beta

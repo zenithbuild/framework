@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+node ./scripts/check-toolchain.mjs
+
 if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
   export ZENITH_TRAIN_VERSION="$(tr -d '[:space:]' < "$ROOT/TRAIN_VERSION")"
 fi
@@ -34,7 +36,7 @@ fi
 cargo clean --release -p zenith_compiler -p zenith_cli --manifest-path packages/compiler/Cargo.toml 2>/dev/null || true
 cargo clean --release -p zenith-bundler --manifest-path packages/bundler/Cargo.toml 2>/dev/null || true
 
-cargo build --release --manifest-path packages/compiler/Cargo.toml
+cargo build --locked --release --manifest-path packages/compiler/Cargo.toml
 bun run --cwd packages/compiler build
 bun run --cwd packages/bundler build
 

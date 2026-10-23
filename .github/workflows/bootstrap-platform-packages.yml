@@ -76,9 +76,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve bootstrap target
         id: target
@@ -133,12 +133,12 @@ jobs:
           rustup target add "${TARGET_TRIPLE}"
 
           if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
             BUNDLER_PLATFORM_KEY="${PLATFORM_KEY}" \
             BUNDLER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-bundler-platform-package.mjs
           else
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
             COMPILER_PLATFORM_KEY="${PLATFORM_KEY}" \
             COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-compiler-platform-package.mjs

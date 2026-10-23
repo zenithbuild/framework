@@ -1,6 +1,7 @@
 {
   "name": "@zenithbuild/framework",
   "private": true,
+  "packageManager": "bun@1.4.0",
   "workspaces": [
     "packages/*",
     "apps/*",
