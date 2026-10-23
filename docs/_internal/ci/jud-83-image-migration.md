@@ -1,13 +1,13 @@
 # JUD-83 optional images and shared configuration
 
-This describes the implementation in PR #235, pending integration and review.
+This describes the implementation from PR #235, merged into `integration/v1` and shipping in the 0.9.0-rc.0 release candidate.
 
 Install `@zenithbuild/image` at the exact version of CLI/core when a project
 uses `<Image>` in its source directory. Install it to optimize JPG/JPEG/PNG/WebP/AVIF
 files in `public/`; without it they are copied unoptimized:
 
 ```sh
-npm i -D @zenithbuild/image@0.9.0
+npm i -D @zenithbuild/image@0.9.0-rc.0
 ```
 
 Projects that set `images.remotePatterns` must also install `@zenithbuild/image`.

@@ -48,21 +48,21 @@ Use semantic image markup with useful alternative text and reserve dimensions wh
 
 ## Optimized Images
 
-The `<Image>` component and image optimization ship in the optional `@zenithbuild/image` package. Projects that use `<Image>` must install it at the exact same version as `@zenithbuild/cli`:
+In 0.9, the `<Image>` component still ships in `@zenithbuild/cli`, and image optimization (Sharp) ships in the optional `@zenithbuild/image` package. Projects that use `<Image>` must install the package at the exact same version as `@zenithbuild/cli`:
 
 ```bash
 npm install -D @zenithbuild/image@0.9.0-rc.0
 ```
 
-> The 0.9.0 release candidates of `@zenithbuild/image` publish under the npm `train` dist-tag, not `latest`. Install the version that exactly matches your `@zenithbuild/cli` version.
+> To install a 0.9.0 release candidate, use its exact version (as above) or the `train` tag (`@zenithbuild/image@train`). Either way, it must exactly match your `@zenithbuild/cli` version.
 
-If a `.zen` file in the source directory uses `<Image>` and the package is missing or on a different version, `zenith dev` and `zenith build` stop before compiling and print the install command for your package manager.
+If a `.zen` file in the source directory uses `<Image>` and the package is missing or on a different version, `zenith dev` and `zenith build` stop before compiling and print the install command for your package manager. A project-defined `Image.zen` takes precedence over the built-in component and doesn't require the package.
 
 Without `<Image>`, the package is optional. JPG, JPEG, PNG, WebP, and AVIF files in `public/` or `src/public/` are copied unoptimized when it is not installed, and the build prints an install hint. When it is installed, they are optimized. Projects with no images need neither the package nor Sharp.
 
 ### Upgrading from 0.8: remote images
 
-In 0.8, the CLI transformed remote images served through `/_zenith/image` with Sharp. From 0.9, projects that set `images.remotePatterns` and serve remote images through `/_zenith/image` must install `@zenithbuild/image`. Without it, every allowed remote URL answers `400` with `image_request_failed` and the message "Remote image optimization requires @zenithbuild/image. Install it and rebuild."
+In 0.8, the CLI transformed remote images served through `/_zenith/image` with Sharp. From 0.9, projects that set `images.remotePatterns` and serve remote images through `/_zenith/image` must install `@zenithbuild/image`. Without it, a remote URL that passes the usual checks answers `400` with `image_request_failed` and the message "Remote image optimization requires @zenithbuild/image. Install it and rebuild." URLs that fail those checks, such as loopback or private-network hosts, still get the same errors as before.
 
 Local images aren't affected by this change.
 
