@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "compiler", "boundaries"]
+section: "Advanced"
+sectionOrder: 8
+order: 3
 ---
 
 # Compiler Boundary Contract
@@ -22,4 +25,4 @@ Definition of Done:
 - Parse -> scope -> safety -> lowering -> emission remains deterministic.
 - Impossible behavior fails at compile time.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/COMPILER_BOUNDARY.md`.
+Canonical source: `packages/compiler/COMPILER_BOUNDARY.md`.

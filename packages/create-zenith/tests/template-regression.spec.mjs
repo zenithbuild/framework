@@ -11,12 +11,14 @@ import {
     writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { assertAgentScaffold } from './agent-scaffold-assertions.mjs';
 
-const CLI_PATH = resolve(process.cwd(), 'dist', 'cli.js');
-const PACKAGE_ROOT = resolve(process.cwd());
-const WORKSPACE_ROOT = resolve(process.cwd(), '..', '..');
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = resolve(TEST_DIR, '..');
+const WORKSPACE_ROOT = resolve(PACKAGE_ROOT, '..', '..');
+const CLI_PATH = resolve(PACKAGE_ROOT, 'dist', 'cli.js');
 const LOCAL_ZENITH_PACKAGES = [
     resolve(WORKSPACE_ROOT, 'packages', 'core'),
     resolve(WORKSPACE_ROOT, 'packages', 'cli'),
@@ -45,6 +47,7 @@ const FORBIDDEN_BUILD_PATTERNS = [
 const TEMPLATE_MATRIX = {
     basic: {
         styleFile: 'src/styles/global.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: false,
         routes: ['/'],
         presentFiles: [
@@ -62,6 +65,7 @@ const TEMPLATE_MATRIX = {
     },
     css: {
         styleFile: 'src/styles/global.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: false,
         routes: ['/', '/about', '/blog', '/docs'],
         presentFiles: [
@@ -76,6 +80,7 @@ const TEMPLATE_MATRIX = {
     },
     tailwind: {
         styleFile: 'src/styles/globals.css',
+        expectedSsrPayloadScripts: 0,
         usesTailwind: true,
         routes: ['/', '/about', '/blog', '/docs'],
         presentFiles: [
@@ -176,11 +181,17 @@ function assertToolingSelection(projectDir, { eslint, prettier }) {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'));
     const devDependencies = pkg.devDependencies || {};
     const scripts = pkg.scripts || {};
+    const eslintConfigPath = join(projectDir, 'eslint.config.js');
 
-    assert.equal(existsSync(join(projectDir, 'eslint.config.js')), eslint, 'eslint config presence mismatch');
+    assert.equal(existsSync(eslintConfigPath), eslint, 'eslint config presence mismatch');
     assert.equal(existsSync(join(projectDir, '.eslintrc.json')), false, 'legacy eslint config should never be scaffolded');
     assert.equal(existsSync(join(projectDir, '.prettierrc')), prettier, 'prettier config presence mismatch');
     assert.equal(existsSync(join(projectDir, '.prettierignore')), prettier, 'prettier ignore presence mismatch');
+
+    if (eslint) {
+        const eslintConfig = readFileSync(eslintConfigPath, 'utf8');
+        assert.match(eslintConfig, /['"]\.zenith-output\/\*\*['"]/, 'eslint config must ignore generated .zenith-output/');
+    }
 
     assert.equal(typeof scripts.lint === 'string', eslint, 'lint script presence mismatch');
     assert.equal(typeof scripts.format === 'string', prettier, 'format script presence mismatch');
@@ -189,6 +200,15 @@ function assertToolingSelection(projectDir, { eslint, prettier }) {
     assert.equal(typeof devDependencies['@typescript-eslint/eslint-plugin'] === 'string', eslint, 'eslint plugin dependency presence mismatch');
     assert.equal(typeof devDependencies['@typescript-eslint/parser'] === 'string', eslint, 'eslint parser dependency presence mismatch');
     assert.equal(typeof devDependencies.prettier === 'string', prettier, 'prettier dependency presence mismatch');
+}
+
+function assertGeneratedGitignore(projectDir) {
+    const gitignorePath = join(projectDir, '.gitignore');
+    assert.equal(existsSync(gitignorePath), true, 'scaffolded .gitignore missing');
+
+    const gitignore = readFileSync(gitignorePath, 'utf8');
+    assert.match(gitignore, /^\.zenith\/$/m, 'scaffolded .gitignore must ignore .zenith/');
+    assert.match(gitignore, /^\.zenith-output\/$/m, 'scaffolded .gitignore must ignore .zenith-output/');
 }
 
 function assertTemplateShape(projectDir, template) {
@@ -206,6 +226,8 @@ function assertTemplateShape(projectDir, template) {
     }
 
     const configSource = readFileSync(join(projectDir, 'zenith.config.js'), 'utf8');
+    assert.match(configSource, /pagesDir:\s*['"]src\/pages['"]/);
+    assert.match(configSource, /target:\s*['"]static['"]/);
     if (template === 'basic') {
         assert.match(configSource, /router:\s*false/);
     } else {
@@ -213,6 +235,7 @@ function assertTemplateShape(projectDir, template) {
     }
 
     assert.equal(pkg.name, basename(projectDir), 'scaffolded package name should match project directory');
+    assertAgentScaffold(projectDir);
 }
 
 function installForBuild(projectDir, template) {
@@ -277,7 +300,11 @@ async function assertPreviewPayload(projectDir, template) {
             const html = await response.text();
 
             assert.equal(response.status, 200, `Preview server did not return 200 for "${route}"`);
-            assert.equal((html.match(/id=\"zenith-ssr-data\"/g) || []).length, 1, `Expected exactly one SSR payload script in "${route}"`);
+            assert.equal(
+                (html.match(/id=\"zenith-ssr-data\"/g) || []).length,
+                TEMPLATE_MATRIX[template].expectedSsrPayloadScripts,
+                `Unexpected SSR payload script count in "${route}"`
+            );
 
             for (const pattern of FORBIDDEN_BUILD_PATTERNS) {
                 assert.equal(pattern.test(html), false, `Forbidden build output pattern (${route}): ${pattern}`);
@@ -331,6 +358,7 @@ test('scaffolder works without examples present', () => {
 
         assert.equal(existsSync(join(projectDir, 'package.json')), true, 'scaffolded package.json missing');
         assert.equal(existsSync(join(projectDir, 'src', 'pages', 'index.zen')), true, 'template source missing');
+        assertAgentScaffold(projectDir);
     } finally {
         rmSync(tempRoot, { recursive: true, force: true });
         rmSync(fixture.fixtureRoot, { recursive: true, force: true });
@@ -347,6 +375,7 @@ for (const template of Object.keys(TEMPLATE_MATRIX)) {
         try {
             assertPackageDependencies(projectDir, template);
             assertSourceContracts(projectDir);
+            assertGeneratedGitignore(projectDir);
             assertTemplateShape(projectDir, template);
             installForBuild(projectDir, template);
             patchRuntimeTemplateExport(projectDir);
@@ -409,3 +438,14 @@ for (const template of Object.keys(TEMPLATE_MATRIX)) {
         }
     });
 }
+
+test('scaffolder advertises only templates that physically exist (no false advertising)', () => {
+    const templatesDir = join(PACKAGE_ROOT, 'templates');
+    const physicalTemplates = readdirSync(templatesDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name !== 'features')
+        .map((entry) => entry.name)
+        .sort();
+        
+    const advertisedTemplates = Object.keys(TEMPLATE_MATRIX).sort();
+    assert.deepEqual(advertisedTemplates, physicalTemplates, 'Advertised templates in test matrix must exactly match physical template folders');
+});

@@ -8,11 +8,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MODULE_EXTENSIONS, scanZenithSpecifiers } from './support/zenith-specifiers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const srcDir = path.resolve(__dirname, '../src');
-const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith('.ts'));
+const distDir = path.resolve(__dirname, '../dist');
+// Recursive so the config modules in src/config/ are held to the same rules.
+const allSrcFiles = fs.readdirSync(srcDir, { recursive: true })
+    .map((f) => String(f).split(path.sep).join('/'))
+    .filter((f) => fs.statSync(path.join(srcDir, f)).isFile())
+    .sort();
+const srcFiles = allSrcFiles.filter((f) => f.endsWith('.ts'));
 
 describe('Contract Guardrails', () => {
     test('no eval() or new Function in source', () => {
@@ -60,6 +67,21 @@ describe('Contract Guardrails', () => {
                 expect(source.includes(pkg)).toBe(false);
             }
         }
+    });
+
+    test('no @zenithbuild module references in any src module (.ts .js .mjs .cjs .mts .cts)', () => {
+        const { files, violations } = scanZenithSpecifiers(srcDir);
+        expect(files).toEqual(expect.arrayContaining(['config.ts', 'config/node.js', 'config/image-config.js']));
+        expect(violations).toEqual([]);
+    });
+
+    test('no @zenithbuild module references in any built dist module (.ts .js .mjs .cjs .mts .cts)', () => {
+        // Built output is what ships; tsc can emit modules the src globs never name.
+        expect(fs.existsSync(path.join(distDir, 'index.js'))).toBe(true);
+        const { files, violations } = scanZenithSpecifiers(distDir);
+        expect(files).toEqual(expect.arrayContaining(['index.js', 'config/node.js', 'config/image-config.js']));
+        expect(files.every((f) => MODULE_EXTENSIONS.some((ext) => f.endsWith(ext)))).toBe(true);
+        expect(violations).toEqual([]);
     });
 
     test('all expected source files exist', () => {

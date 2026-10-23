@@ -1,12 +1,17 @@
 // ---------------------------------------------------------------------------
 // history.js — Zenith Router V0
 // ---------------------------------------------------------------------------
-// Minimal navigation helpers without History API mutation.
+// Minimal source-router path helpers.
 //
-// - push(path)     → hard navigation (assign)
-// - replace(path)  → hard navigation (replace)
+// The template-generated router owns real History API writes.
+// This source helper keeps a narrow in-memory path override for
+// source-level tests and simple router assembly without leaking
+// soft-nav history writes into the shipped runtime contract.
+//
+// - push(path)     → update source-router current path
+// - replace(path)  → update source-router current path
 // - listen(cb)     → popstate listener, returns unlisten
-// - current()      → location.pathname
+// - current()      → source-router path or current location.pathname
 //
 // No hash routing. No scroll restoration. No batching.
 // ---------------------------------------------------------------------------
@@ -17,11 +22,30 @@ const _listeners = new Set();
 /** @type {boolean} */
 let _listening = false;
 
+/** @type {string | null} */
+let _currentPathOverride = null;
+
+/** @type {string | null} */
+let _lastObservedWindowPath = null;
+
+function _readWindowPath() {
+    return window.location.pathname;
+}
+
+function _syncWindowPath() {
+    const windowPath = _readWindowPath();
+    if (_lastObservedWindowPath !== windowPath) {
+        _lastObservedWindowPath = windowPath;
+        _currentPathOverride = null;
+    }
+    return windowPath;
+}
+
 /**
  * Internal popstate handler — fires all registered listeners.
  */
 function _onPopState() {
-    const path = current();
+    const path = _syncWindowPath();
     for (const cb of _listeners) {
         cb(path);
     }
@@ -42,7 +66,8 @@ function _ensureListening() {
  * @param {string} path
  */
 export function push(path) {
-    window.location.assign(path);
+    _lastObservedWindowPath = _readWindowPath();
+    _currentPathOverride = path;
 }
 
 /**
@@ -51,7 +76,8 @@ export function push(path) {
  * @param {string} path
  */
 export function replace(path) {
-    window.location.replace(path);
+    _lastObservedWindowPath = _readWindowPath();
+    _currentPathOverride = path;
 }
 
 /**
@@ -80,5 +106,6 @@ export function listen(callback) {
  * @returns {string}
  */
 export function current() {
-    return window.location.pathname;
+    const windowPath = _syncWindowPath();
+    return _currentPathOverride ?? windowPath;
 }

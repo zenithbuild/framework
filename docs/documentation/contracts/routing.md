@@ -3,8 +3,11 @@ title: "Routing Contract"
 description: "Canonical Phase 0 server-routing contract: manifest truth, deterministic precedence, direct-request execution order, and 404/redirect/error outcomes."
 version: "0.3"
 status: "canonical"
-last_updated: "2026-03-12"
+last_updated: "2026-05-25"
 tags: ["routing", "manifest", "contracts"]
+section: "Pages and Routing"
+sectionOrder: 3
+order: 2
 ---
 
 # Routing Contract
@@ -66,7 +69,7 @@ Invariant: route identity is the matched route metadata plus params:
 - Query string does not participate in route selection.
 - Hash fragments do not reach the server and are not part of route identity.
 
-Query data is still available to `guard(ctx)` and `load(ctx)` through `ctx.url.searchParams`.
+Query data is still available to `guard(ctx)`, `action(ctx)`, and `load(ctx)` through `ctx.url.searchParams`.
 
 ## Contract: Direct Request Execution
 
@@ -75,26 +78,35 @@ Contract: on a matched non-prerender route, the server evaluates route data for 
 Execution order:
 
 1. Resolve the route from the manifest using the request pathname.
-2. If the route has a server module, run `guard(ctx)` first when present.
-3. If `guard(ctx)` returns `allow()`, run `load(ctx)` when present.
-4. If no `load(ctx)` exists, use `data`, then legacy `ssr_data` / `props` / `ssr`, then `{}`.
-5. Inject the resolved payload into HTML and return the matched page.
+2. Create `ctx` for the matched route.
+3. If TypeScript root global middleware exists, run it before route stages.
+4. If the route has a server module, run `guard(ctx)` first when present.
+5. On `POST` requests, if `guard(ctx)` returns `allow()` and the route exports `action(ctx)`, run `action(ctx)`.
+6. If `action(ctx)` returns `data(...)` or `invalid(...)`, expose that result to `load(ctx)` through `ctx.action`.
+7. If global middleware, `guard(ctx)`, or `action(ctx)` returns `redirect(...)` or `deny(...)`, short-circuit rendering immediately.
+8. Run `load(ctx)` when present, otherwise use `data`, then legacy `ssr_data` / `props` / `ssr`, then `{}`.
+9. If the matched page uses Component Server Values, execute the discovered layout/component scoped owners.
+10. Inject the resolved route payload and any scoped owner slices into HTML and return the matched page.
+
+Global middleware V1 is TypeScript-only and is discovered from `middleware.ts` or `middleware/index.ts` at the directory that contains `pagesDir`. It runs for matched server page and resource routes, and it does not run for static assets, image endpoints, prerender/static HTML routes, unmatched 404s, or `/__zenith/route-check`.
 
 ### Server Module Sources
 
 Zenith accepts route server logic from:
 
 - One `<script server lang="ts">` block in the `.zen` page.
-- Adjacent sibling modules named `<route>.guard.ts` / `<route>.load.ts`.
-- For `index.zen` routes, `page.guard.ts` / `page.load.ts` in the same directory are also accepted.
+- Adjacent sibling modules named `<route>.guard.ts` / `<route>.action.ts` / `<route>.load.ts`.
+- For `index.zen` routes, `page.guard.ts` / `page.action.ts` / `page.load.ts` in the same directory are also accepted.
 
-Inline and adjacent `guard` or `load` definitions may not duplicate each other. Inline `data` or legacy payload exports may not be combined with an adjacent `load`.
+Inline and adjacent `guard`, `action`, or `load` definitions may not duplicate each other. Inline `data` or legacy payload exports may not be combined with an adjacent `load`.
 
 ### Data Freshness
 
 - Non-prerender routes evaluate server data on every direct request.
+- `POST` action requests re-run the matched route and return HTML from the same server boundary.
 - Prerendered routes use the build-time server payload snapshot embedded in the output HTML.
-- `guard(ctx)` and `load(ctx)` cannot be combined with `prerender = true`.
+- `guard(ctx)`, `action(ctx)`, and `load(ctx)` cannot be combined with `prerender = true`.
+- Component Server Values execute only through matched non-prerender page renders and do not run for route-check, resource routes, static assets, image endpoints, unmatched 404s, or static HTML.
 
 ## Contract: Redirect, Deny, Error, and 404 Outcomes
 
@@ -102,7 +114,7 @@ Inline and adjacent `guard` or `load` definitions may not duplicate each other. 
 
 If a matched route returns `redirect(location, status?)`:
 
-- `guard(ctx)` or `load(ctx)` short-circuits rendering.
+- `guard(ctx)`, `action(ctx)`, or `load(ctx)` short-circuits rendering.
 - Zenith returns the provided 3xx status.
 - Zenith returns the `Location` header exactly as supplied by the route result.
 - Query and hash are preserved only if the route author includes them in `location`.
@@ -120,6 +132,15 @@ If a matched route returns `deny(status, message?)`:
 
 A matched-route `deny(404, ...)` is not the same as an unmatched 404.
 
+### Expected Action Failure
+
+If a matched `POST` action returns `invalid(payload, status)`:
+
+- Allowed user-authored statuses are `400` and `422`.
+- The route does not redirect.
+- Zenith continues through the same route render path and exposes the normalized result on `ctx.action`.
+- The final HTML response uses the invalid status so browser and enhanced form flows stay aligned.
+
 ### Unmatched 404
 
 Unmatched 404 is chosen only after:
@@ -133,7 +154,7 @@ Catch-all routes participate before unmatched 404. If a catch-all matches, the r
 
 There are two server failure classes today:
 
-- If `guard(ctx)` or `load(ctx)` throws after the route module is executing, Zenith returns `500 text/plain`.
+- If `guard(ctx)`, `action(ctx)`, or `load(ctx)` throws after the route module is executing, Zenith returns `500 text/plain`.
 - If Zenith cannot produce a canonical route result from the extracted server module at all, it injects a `__zenith_error` payload with code `LOAD_FAILED` into the matched HTML response.
 
 This distinction is implementation truth today and is part of the direct-load contract client routing must account for later.

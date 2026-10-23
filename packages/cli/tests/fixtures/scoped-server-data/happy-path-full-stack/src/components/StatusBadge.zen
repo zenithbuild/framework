@@ -1,0 +1,5 @@
+<script server lang="ts">
+const stats = { label: "CSV_CLOSEOUT_SINGLE", count: 1 }
+</script>
+
+<strong data-testid="singleton">{stats.label}</strong>

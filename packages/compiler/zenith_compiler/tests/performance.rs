@@ -14,7 +14,7 @@ fn compile(input: &str) -> String {
 fn generate_template(num_elements: usize) -> String {
     let mut s = String::from("<div>");
     for i in 0..num_elements {
-        s.push_str(&format!(r#"<span id={{e{i}}}>{{{i}}}</span>"#));
+        s.push_str(&format!(r#"<span id={{props.e{i}}}>{{{i}}}</span>"#));
     }
     s.push_str("</div>");
     s
@@ -75,7 +75,9 @@ fn bench_1000_elements() {
 #[test]
 #[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_10() {
-    let templates: Vec<String> = (0..10).map(|i| format!("<div>{{item{i}}}</div>")).collect();
+    let templates: Vec<String> = (0..10)
+        .map(|i| format!("<div>{{props.item{i}}}</div>"))
+        .collect();
 
     let start = Instant::now();
     let outputs: Vec<String> = templates.iter().map(|t| compile(t)).collect();
@@ -93,7 +95,7 @@ fn multi_file_batch_10() {
 #[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_100() {
     let templates: Vec<String> = (0..100)
-        .map(|i| format!("<div>{{item{i}}}</div>"))
+        .map(|i| format!("<div>{{props.item{i}}}</div>"))
         .collect();
 
     let start = Instant::now();
@@ -109,7 +111,7 @@ fn multi_file_batch_100() {
 #[ignore = "Performance gate: machine-dependent. Run with: cargo test -p zenith_compiler --test performance -- --ignored"]
 fn multi_file_batch_1000() {
     let templates: Vec<String> = (0..1000)
-        .map(|i| format!("<div>{{item{i}}}</div>"))
+        .map(|i| format!("<div>{{props.item{i}}}</div>"))
         .collect();
 
     let start = Instant::now();
@@ -124,7 +126,7 @@ fn multi_file_batch_1000() {
 #[test]
 fn no_output_size_explosion() {
     // Output size should scale linearly with input size
-    let small = compile("<div>{a}</div>");
+    let small = compile("<div>{props.a}</div>");
     let medium = generate_template(10);
     let medium_out = compile(&medium);
     let large = generate_template(100);

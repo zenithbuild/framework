@@ -16,7 +16,7 @@
 //   - No async queue
 // ---------------------------------------------------------------------------
 
-import { _nextReactiveId, _trackDependency } from './zeneffect.js';
+import { _nextReactiveId, _trackDependency } from './reactivity-core.js';
 
 export type ZenithSignal<T> = {
     __zenith_id: number;

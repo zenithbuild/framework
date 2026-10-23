@@ -5,6 +5,9 @@ version: "0.4"
 status: "canonical"
 last_updated: "2026-03-12"
 tags: ["reference", "navigation", "zenlink"]
+section: "Pages and Routing"
+sectionOrder: 3
+order: 6
 ---
 
 # ZenLink Reference
@@ -31,7 +34,7 @@ If the router cannot safely mirror server truth, Zenith falls back to browser na
 
 ## Site-Level Normalization
 
-The Zenith site now routes link rendering through a canonical site wrapper at `site/src/components/ui/Links.zen`.
+The external `zenithbuild/site` repo routes link rendering through a canonical site wrapper at `src/components/ui/Links.zen`.
 
 That wrapper does not replace the router contract. It classifies site hrefs and only emits the canonical soft-nav anchor contract for the currently proven route-entry set:
 - `/`

@@ -22,29 +22,37 @@ function componentTagName(id) {
   return `Comp${id}`;
 }
 
-function renderComponentTree(next, depth, maxDepth, maxBreadth, idRef) {
+function renderComponentTree(next, depth, maxDepth, maxBreadth, idRef, componentFiles) {
   const id = idRef.value++;
   const tag = componentTagName(id);
+  const childTags = [];
 
-  let children = '';
   if (depth < maxDepth) {
     const shouldBranch = depth < 2 || nextInt(next, 100) < 65;
     if (shouldBranch) {
       const childCount = 1 + nextInt(next, maxBreadth);
       for (let i = 0; i < childCount; i += 1) {
-        children += renderComponentTree(next, depth + 1, maxDepth, maxBreadth, idRef);
+        childTags.push(renderComponentTree(next, depth + 1, maxDepth, maxBreadth, idRef, componentFiles));
       }
     }
   }
 
-  return `<${tag}>
-  <script>
-    const count = signal(0)
-    function inc() { count.set(count.get() + 1) }
-  </script>
-  <button on:click={inc}>{count}</button>
-  ${children}
-</${tag}>`;
+  const importLines = childTags.map((childTag) => `import ${childTag} from './${childTag}.zen'`);
+  const childMarkup = childTags.map((childTag) => `<${childTag} />`).join('\n');
+
+  componentFiles[`${tag}.zen`] = [
+    '<script lang="ts">',
+    ...importLines,
+    'const count = signal(0)',
+    'function inc() { count.set(count.get() + 1) }',
+    '</script>',
+    '<section>',
+    '  <button on:click={inc}>{count}</button>',
+    childMarkup,
+    '</section>'
+  ].filter((line) => line.length > 0).join('\n');
+
+  return tag;
 }
 
 function generateFixture(seed, options = {}) {
@@ -52,30 +60,45 @@ function generateFixture(seed, options = {}) {
   const maxBreadth = options.maxBreadth ?? 4;
   const next = createPrng(seed);
   const idRef = { value: 0 };
+  const componentFiles = {};
 
-  const indexTree = renderComponentTree(next, 0, maxDepth, maxBreadth, idRef);
-  const aboutTree = renderComponentTree(next, 0, Math.max(2, maxDepth - 2), maxBreadth, idRef);
+  const indexRootTag = renderComponentTree(next, 0, maxDepth, maxBreadth, idRef, componentFiles);
+  const aboutRootTag = renderComponentTree(next, 0, Math.max(2, maxDepth - 2), maxBreadth, idRef, componentFiles);
 
   const usersId = 1 + nextInt(next, 99);
   const router = nextInt(next, 2) === 0;
   const pages = {
-    'index.zen': `<main><h1>Stress ${seed}</h1><a id="about-link" href="/about">About</a><a id="user-link" href="/users/${usersId}">User</a>${indexTree}</main>`,
-    'about.zen': `<main><h1>About ${seed}</h1><a id="home-link" href="/">Home</a>${aboutTree}</main>`,
+    'index.zen': `<script lang="ts">
+import ${indexRootTag} from '../components/${indexRootTag}.zen'
+</script>
+<main><h1>Stress ${seed}</h1><a id="about-link" href="/about">About</a><a id="user-link" href="/users/${usersId}">User</a><${indexRootTag} /></main>`,
+    'about.zen': `<script lang="ts">
+import ${aboutRootTag} from '../components/${aboutRootTag}.zen'
+</script>
+<main><h1>About ${seed}</h1><a id="home-link" href="/">Home</a><${aboutRootTag} /></main>`,
     'users/[id].zen': '<main><h1 id="user-page">User {params.id}</h1></main>'
   };
 
-  return { router, pages, usersId };
+  return { router, pages, componentFiles, usersId };
 }
 
 async function writeFixturePages(root, fixture) {
   const pagesDir = path.join(root, 'pages');
+  const componentsDir = path.join(root, 'components');
   await fs.rm(pagesDir, { recursive: true, force: true });
+  await fs.rm(componentsDir, { recursive: true, force: true });
   await fs.mkdir(path.join(pagesDir, 'users'), { recursive: true });
 
   await fs.writeFile(path.join(root, 'zenith.config.js'), `export default {\n  router: ${fixture.router ? 'true' : 'false'}\n};\n`, 'utf8');
 
   for (const [rel, content] of Object.entries(fixture.pages)) {
     const abs = path.join(pagesDir, rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, content, 'utf8');
+  }
+
+  for (const [rel, content] of Object.entries(fixture.componentFiles)) {
+    const abs = path.join(componentsDir, rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     await fs.writeFile(abs, content, 'utf8');
   }

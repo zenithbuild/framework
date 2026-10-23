@@ -13,78 +13,20 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing v-prefixed release tag to publish or recover."
+        required: true
+        type: string
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Resolve Playwright version
-        id: playwright_version
-        run: |
-          version="$(node -p "const pkg = require('./apps/smoke-test/package.json'); pkg.devDependencies?.playwright ?? pkg.dependencies?.playwright ?? pkg.devDependencies?.['@playwright/test'] ?? pkg.dependencies?.['@playwright/test'] ?? ''")"
-          if [[ -z "$version" ]]; then
-            echo "Unable to determine Playwright version from apps/smoke-test/package.json" >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Bun install cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Cache Cargo registry and build outputs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - run: bun install
-
-      - run: bunx playwright install --with-deps chromium
-
-      - name: Run CI (retry once)
-        shell: bash
-        run: |
-          set -euo pipefail
-          if bun run ci; then
-            exit 0
-          fi
-
-          echo "CI failed on first attempt; retrying once..."
-          bun run ci
+    uses: ./.github/workflows/reusable-ci.yml
+    secrets: inherit
 
   preflight:
     needs: ci
@@ -92,6 +34,7 @@ jobs:
     outputs:
       release_version: ${{ steps.release_version.outputs.release_version }}
       release_tag: ${{ steps.release_version.outputs.release_tag }}
+      release_sha: ${{ steps.release_version.outputs.release_sha }}
       dist_tag: ${{ steps.release_version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
@@ -100,15 +43,23 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - name: Assert tag matches TRAIN_VERSION and resolve release version
         id: release_version
         shell: bash
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG_NAME="${INPUT_RELEASE_TAG}"
+          else
+            TAG_NAME="${REF_NAME}"
+          fi
+
           release_version="$(tr -d '[:space:]' < TRAIN_VERSION)"
           tag_version="${TAG_NAME#v}"
 
@@ -121,6 +72,9 @@ jobs:
             echo "TRAIN_VERSION=${release_version} but tag=${TAG_NAME}; bump TRAIN_VERSION first or retag correctly." >&2
             exit 1
           fi
+
+          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+          release_sha="$(git rev-parse "${TAG_NAME}^{commit}")"
 
           if [[ "${TAG_NAME}" == *-beta.* ]]; then
             dist_tag="beta"
@@ -135,45 +89,20 @@ jobs:
 
           echo "release_version=${release_version}" >> "$GITHUB_OUTPUT"
           echo "release_tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_sha=${release_sha}" >> "$GITHUB_OUTPUT"
           echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
           echo "target_branch=${target_branch}" >> "$GITHUB_OUTPUT"
 
       - name: Assert tag is on correct branch
         env:
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ steps.release_version.outputs.release_sha }}
+          GITHUB_REF_NAME: ${{ steps.release_version.outputs.release_tag }}
           TARGET_BRANCH: ${{ steps.release_version.outputs.target_branch }}
         run: node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
 
-      - name: Verify platform package names are bootstrapped
+      - name: Verify every release and native package name exists on npm
         shell: bash
-        run: |
-          set -euo pipefail
-          registry="https://registry.npmjs.org/"
-          packages=(
-            "@zenithbuild/bundler-darwin-arm64"
-            "@zenithbuild/bundler-darwin-x64"
-            "@zenithbuild/bundler-linux-x64"
-            "@zenithbuild/bundler-win32-x64"
-            "@zenithbuild/compiler-darwin-arm64"
-            "@zenithbuild/compiler-darwin-x64"
-            "@zenithbuild/compiler-linux-x64"
-            "@zenithbuild/compiler-win32-x64"
-          )
-
-          missing=()
-          for package in "${packages[@]}"; do
-            if ! npm view "${package}" version --json --loglevel=error --registry "${registry}" >/dev/null 2>&1; then
-              missing+=("${package}")
-            fi
-          done
-
-          if [[ "${#missing[@]}" -gt 0 ]]; then
-            joined="$(IFS=, ; echo "${missing[*]}")"
-            echo "Platform package names are not bootstrapped on npm: ${joined}" >&2
-            echo "Run the manual Bootstrap Platform Packages workflow once for missing names using NPM_BOOTSTRAP_TOKEN, then re-run publish." >&2
-            exit 1
-          fi
+        run: ./scripts/publish-packages.sh --preflight-only
 
   publish_platforms:
     name: Publish Platform Packages
@@ -192,10 +121,10 @@ jobs:
             package_dir: packages/bundler-darwin-x64
             rust_target: x86_64-apple-darwin
             platform_key: darwin-x64
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             package_kind: bundler
             package_dir: packages/bundler-linux-x64
-            rust_target: x86_64-unknown-linux-gnu
+            rust_target: x86_64-unknown-linux-musl
             platform_key: linux-x64
           - runner: windows-latest
             package_kind: bundler
@@ -212,10 +141,10 @@ jobs:
             package_dir: packages/compiler-darwin-x64
             rust_target: x86_64-apple-darwin
             platform_key: darwin-x64
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             package_kind: compiler
             package_dir: packages/compiler-linux-x64
-            rust_target: x86_64-unknown-linux-gnu
+            rust_target: x86_64-unknown-linux-musl
             platform_key: linux-x64
           - runner: windows-latest
             package_kind: compiler
@@ -224,12 +153,20 @@ jobs:
             platform_key: win32-x64
     runs-on: ${{ matrix.runner }}
     environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
+
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.package_kind == 'bundler'
+        with:
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -240,7 +177,11 @@ jobs:
             exit 1
           fi
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
+
+      - name: Install musl toolchain (linux builds)
+        if: contains(matrix.rust_target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Resolve release version
         shell: bash
@@ -259,16 +200,99 @@ jobs:
           rustup target add "${TARGET_TRIPLE}"
 
           if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/bundler/Cargo.toml
             BUNDLER_PLATFORM_KEY="${PLATFORM_KEY}" \
             BUNDLER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-bundler-platform-package.mjs
           else
-            cargo build --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
+            cargo build --locked --release --target "${TARGET_TRIPLE}" --manifest-path packages/compiler/Cargo.toml -p zenith_cli
             COMPILER_PLATFORM_KEY="${PLATFORM_KEY}" \
             COMPILER_TARGET_TRIPLE="${TARGET_TRIPLE}" \
             node scripts/stage-compiler-platform-package.mjs
           fi
+
+      - name: Build JS template dependencies for bundler smoke
+        if: matrix.package_kind == 'bundler'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run --cwd packages/runtime build
+          bun run --cwd packages/router build
+
+      - name: Verify platform binary exists and works
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+          PLATFORM_KEY: ${{ matrix.platform_key }}
+        run: |
+          set -euo pipefail
+          node scripts/verify-platform-binary-smoke.mjs
+
+      - name: Verify linux binary in glibc container (Debian slim)
+        if: contains(matrix.platform_key, 'linux')
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            binary_name="zenith-bundler"
+            docker_mounts=(
+              -v "$(pwd):/repo:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+              -w /repo/packages/bundler
+            )
+          else
+            binary_name="zenith-compiler"
+            docker_mounts=(
+              -v "$(pwd)/scripts:/repo/scripts:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+            )
+          fi
+
+          echo "--- node:20-slim (Debian Bookworm, glibc ~2.36) ---"
+          docker run --rm \
+            "${docker_mounts[@]}" \
+            -e PACKAGE_KIND="${PACKAGE_KIND}" \
+            -e PLATFORM_BINARY="/test-bin/${binary_name}" \
+            -e PLATFORM_KEY="linux-x64" \
+            node:20-slim \
+            node /repo/scripts/verify-platform-binary-smoke.mjs
+
+      - name: Verify linux binary in musl container (Alpine)
+        if: contains(matrix.platform_key, 'linux')
+        shell: bash
+        env:
+          PACKAGE_KIND: ${{ matrix.package_kind }}
+          PACKAGE_DIR: ${{ matrix.package_dir }}
+        run: |
+          set -euo pipefail
+          if [[ "${PACKAGE_KIND}" == "bundler" ]]; then
+            binary_name="zenith-bundler"
+            docker_mounts=(
+              -v "$(pwd):/repo:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+              -w /repo/packages/bundler
+            )
+          else
+            binary_name="zenith-compiler"
+            docker_mounts=(
+              -v "$(pwd)/scripts:/repo/scripts:ro"
+              -v "$(pwd)/${PACKAGE_DIR}/bin:/test-bin:ro"
+            )
+          fi
+
+          echo "--- node:20-alpine (Alpine, musl libc) ---"
+          docker run --rm \
+            "${docker_mounts[@]}" \
+            -e PACKAGE_KIND="${PACKAGE_KIND}" \
+            -e PLATFORM_BINARY="/test-bin/${binary_name}" \
+            -e PLATFORM_KEY="linux-x64" \
+            node:20-alpine \
+            node /repo/scripts/verify-platform-binary-smoke.mjs
 
       - name: Publish platform package
         shell: bash
@@ -303,16 +327,19 @@ jobs:
     if: needs.platform_stage.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -323,7 +350,7 @@ jobs:
             exit 1
           fi
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Cache Bun install cache
         uses: actions/cache@v4
@@ -339,21 +366,19 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
-      - name: Build compiler and bundler meta packages
+      - name: Build release packages
         shell: bash
         run: |
           set -euo pipefail
-          export ZENITH_TRAIN_VERSION="$(tr -d '[:space:]' < TRAIN_VERSION)"
-          cargo build --release --manifest-path packages/compiler/Cargo.toml
-          bun run --cwd packages/compiler build
-          bun run --cwd packages/bundler build
+          bash ./scripts/build.sh
 
       - name: Publish target packages
         shell: bash
@@ -361,12 +386,38 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           NPM_CONFIG_TAG: ${{ needs.preflight.outputs.dist_tag }}
           PUBLISH_FALLBACK_TAG: ${{ needs.preflight.outputs.dist_tag }}
-          PUBLISH_PACKAGE_FILTER: packages/bundler,packages/compiler,packages/runtime,packages/router,packages/core,packages/cli,packages/language-server,packages/language
+          PUBLISH_PACKAGE_FILTER: packages/runtime,packages/router,packages/compiler,packages/bundler,packages/cli,packages/core,packages/image
         run: ./scripts/publish-packages.sh
 
-  release_metadata:
+  verify_registry:
     needs: [preflight, publish_release]
     if: needs.publish_release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+
+      - name: Verify npm registry propagation
+        shell: bash
+        env:
+          DIST_TAG: ${{ needs.preflight.outputs.dist_tag }}
+          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-npm-registry.mjs release "${RELEASE_VERSION}" "${DIST_TAG}" framework-release-verification.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: framework-release-verification
+          path: framework-release-verification.json
+          if-no-files-found: error
+
+  release_metadata:
+    needs: [preflight, verify_registry]
+    if: needs.verify_registry.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Write release metadata artifact
@@ -374,7 +425,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
           RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
-          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.release_sha }}
         run: |
           set -euo pipefail
           cat > framework-release.json <<JSON

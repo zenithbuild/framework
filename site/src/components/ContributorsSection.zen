@@ -1,0 +1,82 @@
+<script setup="ts">
+import EyebrowLabel from "@/components/typography/EyebrowLabel.zen";
+import Links from "@/components/ui/Links.zen";
+import MotionGroup from "@/components/motion/MotionGroup.zen";
+import type { PersonProfile } from "@/content/models";
+
+const incoming = props as { people?: PersonProfile[] };
+const fallbackPeople = [
+  { name: "Judah Sullivan", profileUrl: "https://github.com/judahbsullivan", avatar: { src: "https://avatars.githubusercontent.com/u/159483985?v=4", width: 112, height: 112, alt: "Judah Sullivan" } },
+  { name: "Jonathan Streetman", profileUrl: "https://github.com/Jstreetman", avatar: { src: "https://avatars.githubusercontent.com/u/137229312?v=4", width: 112, height: 112, alt: "Jonathan Streetman" } },
+  { name: "Colin Williams", profileUrl: "https://github.com/colinwilliams91", avatar: { src: "https://avatars.githubusercontent.com/u/92059005?v=4", width: 112, height: 112, alt: "Colin Williams" } },
+];
+const people = Array.isArray(incoming.people) ? incoming.people : [];
+const judah = people[0] || fallbackPeople[0];
+const jonathan = people[1] || fallbackPeople[1];
+const colin = people[2] || fallbackPeople[2];
+
+const contributorsRootRef = ref<HTMLElement>();
+const contributorsTitleRef = ref<HTMLElement>();
+const contributorsCopyRef = ref<HTMLElement>();
+const contributorsAvatarsRef = ref<HTMLElement>();
+const contributorsActionRef = ref<HTMLElement>();
+
+state judahAvatarFailed = false;
+state jonathanAvatarFailed = false;
+state colinAvatarFailed = false;
+
+function avatarImageClass(failed: boolean) {
+  return failed ? "hidden" : "relative z-10 h-full w-full object-cover";
+}
+
+function avatarFallbackClass() {
+  return "absolute inset-0 grid place-items-center font-mono text-xs uppercase tracking-[0.14em] text-foreground/70";
+}
+
+function initials(name: string) {
+  return String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function profileLabel(name: string) {
+  return `View ${name}'s profile`;
+}
+
+function handleJudahAvatarError() {
+  judahAvatarFailed = true;
+}
+
+function handleJonathanAvatarError() {
+  jonathanAvatarFailed = true;
+}
+
+function handleColinAvatarError() {
+  colinAvatarFailed = true;
+}
+</script>
+
+<section ref={contributorsRootRef} data-motion-section="home-community" data-contributors-section="true" data-motion-ready="false" data-motion-state="unprepared" class="relative overflow-hidden bg-background px-6 py-24 text-foreground sm:px-10 lg:px-14 lg:py-32">
+  <div class="mx-auto grid w-full max-w-7xl gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,0.7fr)] lg:gap-20">
+    <div>
+      <EyebrowLabel tone="primary">Building in public</EyebrowLabel>
+      <h2 ref={contributorsTitleRef} data-motion-target="true" class="mt-6 max-w-4xl font-heading text-[clamp(3rem,7vw,6.5rem)] font-semibold leading-[0.88] tracking-[-0.055em] text-foreground">Built in public, with care.</h2>
+      <p ref={contributorsCopyRef} data-motion-target="true" class="mt-8 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">A compact record of the people publicly connected to the Zenith organization and framework repository.</p>
+    </div>
+
+    <div ref={contributorsAvatarsRef} data-motion-target="true" data-contributor-avatar-group="true" class="flex flex-wrap content-end items-center gap-3 self-end sm:gap-4">
+      <a href={judah.profileUrl} target="_blank" rel="noopener noreferrer" aria-label={profileLabel(judah.name)} class="group relative h-11 w-11 overflow-hidden rounded-full bg-foreground/10 ring-1 ring-foreground/15 transition-transform hover:-translate-y-0.5 hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+        <span class={avatarFallbackClass()} aria-hidden="true">{initials(judah.name)}</span>
+        <img src={judah.avatar?.src || ""} width={judah.avatar?.width || 112} height={judah.avatar?.height || 112} alt={judah.avatar?.alt || judah.name} class={avatarImageClass(judahAvatarFailed)} loading="lazy" decoding="async" on:error={handleJudahAvatarError} />
+      </a>
+      <a href={jonathan.profileUrl} target="_blank" rel="noopener noreferrer" aria-label={profileLabel(jonathan.name)} class="group relative h-11 w-11 overflow-hidden rounded-full bg-foreground/10 ring-1 ring-foreground/15 transition-transform hover:-translate-y-0.5 hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+        <span class={avatarFallbackClass()} aria-hidden="true">{initials(jonathan.name)}</span>
+        <img src={jonathan.avatar?.src || ""} width={jonathan.avatar?.width || 112} height={jonathan.avatar?.height || 112} alt={jonathan.avatar?.alt || jonathan.name} class={avatarImageClass(jonathanAvatarFailed)} loading="lazy" decoding="async" on:error={handleJonathanAvatarError} />
+      </a>
+      <a href={colin.profileUrl} target="_blank" rel="noopener noreferrer" aria-label={profileLabel(colin.name)} class="group relative h-11 w-11 overflow-hidden rounded-full bg-foreground/10 ring-1 ring-foreground/15 transition-transform hover:-translate-y-0.5 hover:scale-[1.03] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:h-12 sm:w-12 lg:h-14 lg:w-14">
+        <span class={avatarFallbackClass()} aria-hidden="true">{initials(colin.name)}</span>
+        <img src={colin.avatar?.src || ""} width={colin.avatar?.width || 112} height={colin.avatar?.height || 112} alt={colin.avatar?.alt || colin.name} class={avatarImageClass(colinAvatarFailed)} loading="lazy" decoding="async" on:error={handleColinAvatarError} />
+      </a>
+    </div>
+  </div>
+  <div ref={contributorsActionRef} data-motion-target="true" class="mx-auto mt-10 w-full max-w-7xl"><Links href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" surface="button" variant="outline" size="lg">View the project history</Links></div>
+  <MotionGroup rootRef={contributorsRootRef} targetARef={contributorsTitleRef} targetBRef={contributorsCopyRef} targetCRef={contributorsAvatarsRef} targetDRef={contributorsActionRef} variant="home-contributors" />
+</section>

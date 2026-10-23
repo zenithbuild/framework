@@ -97,7 +97,14 @@ fn emitted_router_and_runtime_follow_template_contract() {
                 "graph_nodes": [{ "id": "src/pages/index.zen", "hoist_id": "mod_home" }],
                 "html": "<!DOCTYPE html><html><head><!-- ZENITH_STYLES_ANCHOR --></head><body><main>Home</main></body></html>",
                 "expressions": [],
-                "hoisted": { "imports": [], "declarations": [], "functions": [], "signals": [], "state": [], "code": [] },
+                "hoisted": {
+                    "imports": [],
+                    "declarations": [],
+                    "functions": [],
+                    "signals": [],
+                    "state": [],
+                    "code": ["const __fixture_marker = 1;\nexport {};__zenith_component_bootstraps.push(() => {});"]
+                },
                 "components_scripts": {},
                 "component_instances": [],
                 "imports": [],
@@ -152,78 +159,127 @@ fn emitted_router_and_runtime_follow_template_contract() {
 
     let router_path = from_manifest_path(&out_dir, router_rel);
     let runtime_path = from_manifest_path(&out_dir, runtime_rel);
+    let home_path = from_manifest_path(
+        &out_dir,
+        manifest["chunks"]["/"]
+            .as_str()
+            .expect("manifest home chunk missing"),
+    );
 
     assert!(router_path.exists(), "router asset missing");
     assert!(runtime_path.exists(), "runtime asset missing");
+    assert!(home_path.exists(), "home page asset missing");
 
     let router_source = fs::read_to_string(&router_path).expect("read router asset");
     let runtime_source = fs::read_to_string(&runtime_path).expect("read runtime asset");
+    let home_source = fs::read_to_string(&home_path).expect("read home page asset");
+    let router_compact = router_source.split_whitespace().collect::<String>();
+    let home_compact = home_source.split_whitespace().collect::<String>();
 
-    let click_start = router_source
-        .find("document.addEventListener(\"click\"")
+    let click_start = router_compact
+        .find("document.addEventListener(\"click\",")
+        .or_else(|| router_compact.find("document.addEventListener('click',"))
         .expect("router click handler missing");
-    let prevent_default = router_source
-        .find("event.preventDefault();")
+    let prevent_default = router_compact
+        .find("event.preventDefault()")
         .expect("preventDefault missing in click flow");
-    let perform_navigation = router_source
-        .find("performNavigation(targetUrl, \"push\", null)")
+    let perform_navigation = router_compact[prevent_default..]
+        .find("performNavigation(targetUrl,")
+        .map(|index| prevent_default + index)
         .expect("performNavigation missing in click flow");
-    let fetch_document = router_source
+    let fetch_document = router_compact
         .find("fetch(targetUrl.href")
         .expect("fresh document fetch missing in router");
-    let before_leave = router_source
-        .find("await emitNavigationEvent(context, \"navigation:before-leave\"")
-        .expect("navigation:before-leave missing in router");
-    let before_swap = router_source
-        .find("await emitNavigationEvent(context, \"navigation:before-swap\"")
-        .expect("navigation:before-swap missing in router");
-    let before_enter = router_source
-        .find("await emitNavigationEvent(context, \"navigation:before-enter\"")
-        .expect("navigation:before-enter missing in router");
-    let enter_complete = router_source
-        .find("emitNavigationEvent(context, \"navigation:enter-complete\"")
-        .expect("navigation:enter-complete missing in router");
-    let mount_idx = router_source
-        .find("const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);")
+    let find_any = |patterns: &[&str]| {
+        patterns
+            .iter()
+            .find_map(|pattern| router_compact.find(pattern))
+    };
+    let before_leave = find_any(&[
+        "awaitemitNavigationEvent(context,\"navigation:before-leave\",",
+        "awaitemitNavigationEvent(context,'navigation:before-leave',",
+    ])
+    .expect("navigation:before-leave missing in router");
+    let before_swap = find_any(&[
+        "awaitemitNavigationEvent(context,\"navigation:before-swap\",",
+        "awaitemitNavigationEvent(context,'navigation:before-swap',",
+    ])
+    .expect("navigation:before-swap missing in router");
+    let before_enter = find_any(&[
+        "awaitemitNavigationEvent(context,\"navigation:before-enter\",",
+        "awaitemitNavigationEvent(context,'navigation:before-enter',",
+    ])
+    .expect("navigation:before-enter missing in router");
+    let enter_complete = find_any(&[
+        "emitNavigationEvent(context,\"navigation:enter-complete\",",
+        "emitNavigationEvent(context,'navigation:enter-complete',",
+    ])
+    .expect("navigation:enter-complete missing in router");
+    let mount_idx = router_compact
+        .find("constmounted=awaitmountRoute(resolved.route,resolved.params,context.token,payload)")
         .expect("mountRoute missing in router");
-    let scroll_apply = router_source
-        .find("dispatchScrollEvent(\"apply\"")
-        .expect("scroll apply missing in router");
+    let scroll_apply = find_any(&[
+        "dispatchScrollEvent(\"after\",",
+        "dispatchScrollEvent('after',",
+    ])
+    .expect("scroll apply missing in router");
 
     assert!(
         click_start < prevent_default && prevent_default < perform_navigation,
         "router click contract ordering violated"
     );
     assert!(
-        router_source.contains("history.pushState("),
+        router_compact.contains("history.pushState("),
         "router must push history on successful forward navigation"
     );
     assert!(
-        router_source.contains("history.replaceState("),
+        router_compact.contains("history.replaceState("),
         "router must replace history state for initial/popstate bookkeeping"
     );
     assert!(
-        router_source.contains("encodeURIComponent(toNavigationPath(targetUrl))"),
-        "route-check requests must include pathname plus query string"
+        !router_compact.contains("encodeURIComponent(toNavigationPath(targetUrl))"),
+        "route-check disabled router output must omit route-check fetch scaffolding"
     );
     assert!(
-        router_source.contains("const __ZENITH_RUNTIME_ROUTE_HTML_KEY = \"__zenith_route_html\";"),
+        router_compact.contains("__zenith_route_html"),
         "router must expose the runtime route HTML override channel"
     );
     assert!(
         fetch_document != usize::MAX,
         "router must fetch the target document inside the emitted runtime"
     );
+    for route in ["/", "/about"] {
+        let chunk = manifest["chunks"][route]
+            .as_str()
+            .unwrap_or_else(|| panic!("manifest chunk missing for {route}"));
+        let double_quoted = format!("import(\"{chunk}\")");
+        let single_quoted = format!("import('{chunk}')");
+        assert!(
+            router_compact.contains(&double_quoted) || router_compact.contains(&single_quoted),
+            "router must emit a literal dynamic import for {route}: {chunk}"
+        );
+    }
     assert!(
-        router_source.contains("import(__ZENITH_MANIFEST__.chunks[route])"),
-        "router must use manifest-driven dynamic import shape"
+        !router_compact.contains("import(routeModuleSpecifier(")
+            && !router_compact.contains("import(__ZENITH_MANIFEST__.chunks[route])")
+            && !router_compact.contains("zenith_navigation="),
+        "router route modules must not use computed imports or cache-busting query strings"
+    );
+    assert!(
+        home_compact.contains("function__zenith_create_page_instance()")
+            && home_compact.contains("return__zenith_create_page_instance().mount(root,params)"),
+        "cached route modules must create fresh page bindings for every mount"
+    );
+    assert!(
+        !home_source.contains("export {};"),
+        "TypeScript module markers must not survive inside the page instance factory"
     );
     assert!(
         before_leave < before_swap
             && before_swap < mount_idx
-            && mount_idx < scroll_apply
-            && scroll_apply < before_enter
-            && before_enter < enter_complete,
+            && mount_idx < before_enter
+            && before_enter < scroll_apply
+            && scroll_apply < enter_complete,
         "router lifecycle ordering violated"
     );
 

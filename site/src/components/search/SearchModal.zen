@@ -1,0 +1,489 @@
+<script lang="ts">
+import type { SearchIndexPayload, SearchRecord, SearchResult, SearchScopeConfig, SearchFilterOption } from "@/server/searchTypes";
+import {
+  normalizeSearchText,
+  tokenizeSearchQuery,
+  highlightToFragments,
+  searchRecords,
+  applySearchFilters
+} from "./searchEngine";
+
+function normText(value: string): string { return normalizeSearchText(value); }
+function tokenize(query: string): string[] { return tokenizeSearchQuery(query); }
+function highlight(text: string, tokens: string[]) { return highlightToFragments(text, tokens); }
+
+interface Props {
+  searchIndex?: SearchIndexPayload | null;
+  defaultScope?: SearchScopeConfig;
+}
+
+const modalProps = props as Props;
+const modalRecords = (modalProps.searchIndex?.records || []) as SearchRecord[];
+const modalDocsFilters = modalProps.searchIndex?.docsFilters;
+const modalBlogFilters = modalProps.searchIndex?.blogFilters;
+const modalDefaultScope: SearchScopeConfig = modalProps.defaultScope || "global";
+
+state modalOpen = false;
+state modalQuery = "";
+state modalSelectedIndex = 0;
+state modalHoveredIndex = -1;
+state modalScope = modalDefaultScope;
+state modalFilterSection = "All";
+state modalFilterCategory = "All";
+state modalFilterTag = "All";
+state modalFilterAuthor = "All";
+state modalFilterSort = "newest";
+state modalFilterMenu = "";
+
+const modalInputRef = ref<HTMLInputElement>();
+const modalDialogRef = ref<HTMLElement>();
+const modalBackdropRef = ref<HTMLElement>();
+const modalListRef = ref<HTMLElement>();
+const modalFiltersRef = ref<HTMLElement>();
+let modalPreviouslyFocused: HTMLElement | null = null;
+let modalSavedOverflow = "";
+
+function scopeMatch(recScope: string, scope: SearchScopeConfig): boolean {
+  if (scope === "global") return true;
+  if (scope === "docs") return recScope === "docs";
+  if (scope === "blog") return recScope === "blog";
+  return false;
+}
+function modalFilteredRecords(): SearchRecord[] { return applySearchFilters(modalRecords, modalScope, { section: modalFilterSection, category: modalFilterCategory, tag: modalFilterTag, author: modalFilterAuthor, sort: modalFilterSort }); }
+function modalResults(): SearchResult[] { return searchRecords(modalFilteredRecords(), modalQuery, modalScope); }
+function modalCurrentResult(): SearchResult | null {
+  const r = modalResults();
+  const idx = modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex;
+  return r[idx] || null;
+}
+function modalResultCount(): number { return modalResults().length; }
+
+function openModal(scope?: SearchScopeConfig) {
+  modalScope = scope || modalDefaultScope;
+  modalQuery = "";
+  modalSelectedIndex = 0;
+  modalHoveredIndex = -1;
+  modalFilterSection = "All";
+  modalFilterCategory = "All";
+  modalFilterTag = "All";
+  modalFilterAuthor = "All";
+  modalFilterSort = "newest";
+  modalFilterMenu = "";
+  modalOpen = true;
+  const doc = zenDocument();
+  if (doc) { modalPreviouslyFocused = doc.activeElement as HTMLElement | null; modalSavedOverflow = doc.body.style.overflow; doc.body.style.overflow = "hidden"; }
+  queueMicrotask(() => { modalInputRef.current?.focus(); });
+}
+function closeModal() {
+  modalOpen = false;
+  modalFilterMenu = "";
+  const doc = zenDocument();
+  if (doc) doc.body.style.overflow = modalSavedOverflow;
+  if (modalPreviouslyFocused) { modalPreviouslyFocused.focus(); modalPreviouslyFocused = null; }
+}
+function handleQueryInput(event: Event) { modalQuery = (event.target as HTMLInputElement).value; modalSelectedIndex = 0; modalHoveredIndex = -1; }
+function moveDown() { const c = modalResultCount(); if (c === 0) return; modalSelectedIndex = Math.min(modalSelectedIndex + 1, c - 1); modalHoveredIndex = -1; scrollIntoView(); }
+function moveUp() { const c = modalResultCount(); if (c === 0) return; modalSelectedIndex = Math.max(modalSelectedIndex - 1, 0); modalHoveredIndex = -1; scrollIntoView(); }
+function scrollIntoView() {
+  queueMicrotask(() => {
+    const list = modalListRef.current; if (!list) return;
+    // zen-allow:dom-query result list uses a delegated event handler and stable data attribute
+    const items = list.querySelectorAll("[data-search-result-item]");
+    const item = items[modalSelectedIndex]; if (item) item.scrollIntoView({ block: "nearest" });
+  });
+}
+function openSelected() {
+  const r = modalCurrentResult(); if (!r) return;
+  const win = zenWindow(); if (win) { closeModal(); win.location.href = r.record.path; }
+}
+function handleResultsClick(event: Event) {
+  const t = event.target as HTMLElement; const item = t.closest("[data-search-result-item]") as HTMLElement | null; if (!item) return;
+  const index = Number(item.getAttribute("data-index") || "0"); modalSelectedIndex = index; modalHoveredIndex = index; openSelected();
+}
+function handleResultsHover(event: Event) {
+  const t = event.target as HTMLElement; const item = t.closest("[data-search-result-item]") as HTMLElement | null; if (!item) return;
+  modalHoveredIndex = Number(item.getAttribute("data-index") || "0");
+}
+function handleFilterBarClick(event: Event) {
+  const t = event.target as HTMLElement;
+  const trigger = t.closest("[data-filter-trigger]") as HTMLElement | null;
+  if (trigger) {
+    const name = trigger.getAttribute("data-filter-trigger") || "";
+    const opening = modalFilterMenu !== name;
+    modalFilterMenu = modalFilterMenu === name ? "" : name;
+    if (opening) {
+      queueMicrotask(() => {
+        const bar = modalFiltersRef.current;
+        if (!bar) return;
+        // zen-allow:dom-query refocus trigger after conditional fragment patch
+        const next = bar.querySelector(`[data-filter-trigger="${name}"]`) as HTMLElement | null;
+        if (next && typeof next.focus === "function") next.focus();
+      });
+    }
+    return;
+  }
+  const opt = t.closest("[data-filter-option]") as HTMLElement | null;
+  if (opt) {
+    const name = opt.getAttribute("data-filter-name") || "";
+    const value = opt.getAttribute("data-filter-option") || "All";
+    if (name === "section") modalFilterSection = value;
+    if (name === "category") modalFilterCategory = value;
+    if (name === "tag") modalFilterTag = value;
+    if (name === "author") modalFilterAuthor = value;
+    if (name === "sort") modalFilterSort = value;
+    modalFilterMenu = ""; modalSelectedIndex = 0; modalHoveredIndex = -1;
+    return;
+  }
+  const reset = t.closest("[data-filter-reset]") as HTMLElement | null;
+  if (reset) resetFilters();
+}
+function resetFilters() { modalFilterSection = "All"; modalFilterCategory = "All"; modalFilterTag = "All"; modalFilterAuthor = "All"; modalFilterSort = "newest"; modalSelectedIndex = 0; modalHoveredIndex = -1; }
+function focusFilterOption(direction: "next" | "prev") {
+  queueMicrotask(() => {
+    const bar = modalFiltersRef.current;
+    if (!bar || !modalFilterMenu) return;
+    // zen-allow:dom-query dynamic filter options require focus traversal
+    const opts = bar.querySelectorAll(`[data-filter-name="${modalFilterMenu}"][data-filter-option]`);
+    const active = zenDocument()?.activeElement as HTMLElement | null;
+    let idx = -1;
+    if (active && active.getAttribute("data-filter-name") === modalFilterMenu && active.hasAttribute("data-filter-option")) {
+      idx = Array.from(opts).indexOf(active);
+    }
+    if (direction === "next") idx = Math.min(idx + 1, opts.length - 1);
+    else idx = Math.max(idx - 1, 0);
+    const target = opts[idx] as HTMLElement | undefined;
+    if (target) target.focus();
+  });
+}
+function handleBackdrop(event: Event) { if (event.target === modalBackdropRef.current) closeModal(); }
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === "ArrowDown") {
+    if (modalFilterMenu) { event.preventDefault(); focusFilterOption("next"); return; }
+    event.preventDefault(); moveDown();
+  } else if (event.key === "ArrowUp") {
+    if (modalFilterMenu) { event.preventDefault(); focusFilterOption("prev"); return; }
+    event.preventDefault(); moveUp();
+  } else if (event.key === "Enter") {
+    if (modalFilterMenu) return;
+    event.preventDefault(); openSelected();
+  } else if (event.key === "Escape") {
+    if (modalFilterMenu) { event.preventDefault(); modalFilterMenu = ""; return; }
+    event.preventDefault(); closeModal();
+  } else if (event.key === "Tab" && modalFilterMenu) { modalFilterMenu = ""; }
+}
+function currentFilterVal(name: string): string {
+  if (name === "section") return modalFilterSection; if (name === "category") return modalFilterCategory;
+  if (name === "tag") return modalFilterTag; if (name === "author") return modalFilterAuthor; if (name === "sort") return modalFilterSort; return "All";
+}
+function filterOptions(name: string): Array<{ value: string; label: string; count: number }> {
+  let opts: Array<{ value: string; label: string; count: number }> = [];
+  if (name === "section" && modalDocsFilters) opts = modalDocsFilters.sections;
+  if (name === "tag" && modalScope === "docs" && modalDocsFilters) opts = modalDocsFilters.tags;
+  if (name === "tag" && modalScope === "blog" && modalBlogFilters) opts = modalBlogFilters.tags;
+  if (name === "category" && modalBlogFilters) opts = modalBlogFilters.categories;
+  if (name === "author" && modalBlogFilters) opts = modalBlogFilters.authors;
+  if (name === "sort" && modalBlogFilters) opts = modalBlogFilters.sortOrders;
+  return opts;
+}
+function scopeLabel(scope: string): string {
+  return scope === "docs" ? "Docs" : scope === "blog" ? "Blog" : "Page";
+}
+function resultMeta(rec: SearchRecord): string[] {
+  const out: string[] = [];
+  if (rec.section) out.push(rec.section);
+  if (rec.category) out.push(rec.category);
+  if (rec.author) out.push("By " + rec.author);
+  if (rec.publishedAt) out.push(rec.publishedAt.slice(0, 10));
+  return out;
+}
+function resultSnippet(result: SearchResult): { field: string; text: string } | null {
+  const s = result.snippets.find((s) => s.field === "heading") || result.snippets.find((s) => s.field === "description") || result.snippets[0];
+  return s || null;
+}
+function previewMeta(rec: SearchRecord): string[] {
+  const out: string[] = [];
+  if (rec.section) out.push(rec.section);
+  if (rec.category) out.push(rec.category);
+  if (rec.author) out.push("By " + rec.author);
+  if (rec.publishedAt) out.push(rec.publishedAt.slice(0, 10));
+  if (rec.readingTime) out.push(rec.readingTime);
+  return out;
+}
+function previewDescription(record: SearchRecord): string {
+  return record.description || record.bodyText?.slice(0, 200) || "";
+}
+
+zenMount((ctx) => {
+  const doc = zenDocument();
+  if (!doc) return;
+  const off = zenOn(doc, "search:open", (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    openModal(detail?.scope || modalDefaultScope);
+  });
+  ctx.cleanup(off);
+});
+</script>
+
+<div ref={modalBackdropRef} data-search-modal={modalOpen ? "open" : "closed"} role="presentation"
+  class={modalOpen ? "fixed inset-0 z-[100] flex items-start justify-center bg-background/80 backdrop-blur-sm" : "hidden"}
+  on:click={handleBackdrop}>
+  <div ref={modalDialogRef} role="dialog" aria-modal="true" aria-label={modalScope === "docs" ? "Documentation" : modalScope === "blog" ? "Blog" : "Search the site"} data-search-dialog="true"
+    class="relative mt-[8vh] flex h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl"
+    on:keydown={handleKeydown}>
+    <div class="border-b border-border px-6 py-4">
+      <div class="flex items-center gap-4">
+        <span class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{modalScope === "docs" ? "Documentation" : modalScope === "blog" ? "Blog" : "Search the site"}</span>
+        <div class="relative flex-1">
+          <input ref={modalInputRef} type="search" data-search-input="true" aria-label="Search" placeholder="Search…"
+            value={modalQuery} class="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            on:input={handleQueryInput} />
+        </div>
+        <button type="button" class="rounded-lg border border-border px-3 py-1.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" on:click={closeModal}>Esc</button>
+      </div>
+      <div ref={modalFiltersRef} class="relative mt-3 flex flex-wrap items-center gap-2" on:click={handleFilterBarClick}>
+        {modalScope === "docs" && modalDocsFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-section-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "section" ? "true" : "false"}
+              aria-controls="search-filter-section-menu"
+              data-filter-trigger="section"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Section: {currentFilterVal("section")}</button>
+            {modalFilterMenu === "section" ? (
+              <div id="search-filter-section-menu" role="menu" aria-labelledby="search-filter-section-trigger"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+                {filterOptions("section").map((o) => (
+                  <button type="button" role="menuitem" data-filter-name="section" data-filter-option={o.value}
+                    class={modalFilterSection === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                    >
+                    <span>{o.label}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : undefined}
+          </div>
+        ) : undefined}
+        {modalScope === "docs" && modalDocsFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-tag-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "tag" ? "true" : "false"}
+              aria-controls="search-filter-tag-menu"
+              data-filter-trigger="tag"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Tag: {currentFilterVal("tag")}</button>
+            {modalFilterMenu === "tag" ? (
+              <div id="search-filter-tag-menu" role="menu" aria-labelledby="search-filter-tag-trigger"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+                {filterOptions("tag").map((o) => (
+                  <button type="button" role="menuitem" data-filter-name="tag" data-filter-option={o.value}
+                    class={modalFilterTag === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                    >
+                    <span>{o.label}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : undefined}
+          </div>
+        ) : undefined}
+        {modalScope === "blog" && modalBlogFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-category-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "category" ? "true" : "false"}
+              aria-controls="search-filter-category-menu"
+              data-filter-trigger="category"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Category: {currentFilterVal("category")}</button>
+            {modalFilterMenu === "category" ? (
+              <div id="search-filter-category-menu" role="menu" aria-labelledby="search-filter-category-trigger"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+                {filterOptions("category").map((o) => (
+                  <button type="button" role="menuitem" data-filter-name="category" data-filter-option={o.value}
+                    class={modalFilterCategory === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                    >
+                    <span>{o.label}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : undefined}
+          </div>
+        ) : undefined}
+        {modalScope === "blog" && modalBlogFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-tag-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "tag" ? "true" : "false"}
+              aria-controls="search-filter-tag-menu"
+              data-filter-trigger="tag"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Tag: {currentFilterVal("tag")}</button>
+            {modalFilterMenu === "tag" ? (
+            <div id="search-filter-tag-menu" role="menu" aria-labelledby="search-filter-tag-trigger"
+              class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+              {filterOptions("tag").map((o) => (
+                <button type="button" role="menuitem" data-filter-name="tag" data-filter-option={o.value}
+                  class={modalFilterTag === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                  >
+                  <span>{o.label}</span>
+                  <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : undefined}
+          </div>
+        ) : undefined}
+        {modalScope === "blog" && modalBlogFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-author-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "author" ? "true" : "false"}
+              aria-controls="search-filter-author-menu"
+              data-filter-trigger="author"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Author: {currentFilterVal("author")}</button>
+            {modalFilterMenu === "author" ? (
+              <div id="search-filter-author-menu" role="menu" aria-labelledby="search-filter-author-trigger"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+                {filterOptions("author").map((o) => (
+                  <button type="button" role="menuitem" data-filter-name="author" data-filter-option={o.value}
+                    class={modalFilterAuthor === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                    >
+                    <span>{o.label}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : undefined}
+          </div>
+        ) : undefined}
+        {modalScope === "blog" && modalBlogFilters ? (
+          <div class="relative inline-flex">
+            <button type="button" id="search-filter-sort-trigger" aria-haspopup="menu"
+              aria-expanded={modalFilterMenu === "sort" ? "true" : "false"}
+              aria-controls="search-filter-sort-menu"
+              data-filter-trigger="sort"
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >Sort: {currentFilterVal("sort")}</button>
+            {modalFilterMenu === "sort" ? (
+              <div id="search-filter-sort-menu" role="menu" aria-labelledby="search-filter-sort-trigger"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
+                {filterOptions("sort").map((o) => (
+                  <button type="button" role="menuitem" data-filter-name="sort" data-filter-option={o.value}
+                    class={modalFilterSort === o.value ? "flex w-full items-center justify-between rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground" : "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/50"}
+                    >
+                    <span>{o.label}</span>
+                    <span class="font-mono text-[10px] text-muted-foreground/70">{o.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : undefined}
+          </div>
+        ) : undefined}
+        {modalFilterSection !== "All" || modalFilterCategory !== "All" || modalFilterTag !== "All" || modalFilterAuthor !== "All" ? (
+          <button type="button" data-filter-reset="true"
+            class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >Clear</button>
+        ) : undefined}
+      </div>
+    </div>
+    <div class="flex flex-1 overflow-hidden">
+      <div class="flex flex-col border-r border-border" style="width: 55%; min-width: 280px;">
+        <div ref={modalListRef} data-search-results="true" class="flex-1 overflow-y-auto"
+          on:click={handleResultsClick} on:pointerenter={handleResultsHover}>
+          {modalResults().map((result, index) => {
+            const rec = result.record;
+            const tokens = tokenize(modalQuery);
+            const selected = index === (modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex);
+            const snippet = resultSnippet(result);
+            const meta = resultMeta(rec);
+            return (
+              <a href={rec.path} data-search-result-item="true" data-index={index}
+                class={selected ? "block border-b border-border px-4 py-3 transition-colors bg-muted" : "block border-b border-border px-4 py-3 transition-colors hover:bg-muted/50"}
+                >
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-[9px] uppercase tracking-[0.15em] text-primary">{scopeLabel(rec.scope)}</span>
+                  <span class="font-heading text-sm font-semibold text-foreground">
+                  {highlight(rec.title, tokens).map((f) => f.mark ? <mark class="bg-primary/20 text-foreground rounded px-0.5">{f.text}</mark> : <span>{f.text}</span>)}
+                </span>
+                </div>
+                {meta.length > 0 ? (
+                  <p class="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    {meta.map((piece, i) => (
+                      <span>{i > 0 ? <span aria-hidden="true"> · </span> : undefined}{piece}</span>
+                    ))}
+                  </p>
+                ) : undefined}
+                {snippet ? (
+                  <p class="mt-2 text-sm leading-6 text-muted-foreground line-clamp-2">
+                  {highlight(snippet.text, tokens).map((f) => f.mark ? <mark class="bg-primary/20 text-foreground rounded px-0.5">{f.text}</mark> : <span>{f.text}</span>)}
+                </p>
+                ) : undefined}
+              </a>
+            );
+          })}
+        </div>
+        <div class="border-t border-border px-4 py-2.5">
+          <p data-search-result-count="true" aria-live="polite" class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{modalResultCount()} {modalResultCount() === 1 ? "result" : "results"}</p>
+        </div>
+      </div>
+      <div class="hidden flex-1 overflow-y-auto sm:block" data-search-preview="true">
+        {(() => {
+          const result = modalCurrentResult();
+          if (!result) {
+            return (
+              <div class="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">Select a result to preview.</div>
+            );
+          }
+          const rec = result.record;
+          const tokens = tokenize(modalQuery);
+          const meta = previewMeta(rec);
+          const desc = previewDescription(rec);
+          return (
+            <div class="flex h-full flex-col p-6">
+              <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{rec.scope === "docs" ? "Documentation" : rec.scope === "blog" ? "Blog Article" : "Page"}</p>
+              <h3 class="mt-3 font-heading text-2xl font-semibold text-foreground">
+                {highlight(rec.title, tokens).map((f) => f.mark ? <mark class="bg-primary/20 text-foreground rounded px-0.5">{f.text}</mark> : <span>{f.text}</span>)}
+              </h3>
+              {meta.length > 0 ? (
+                <div class="mt-3 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                  {meta.map((piece, i) => (
+                    <span>{i > 0 ? <span aria-hidden="true">·</span> : undefined}{piece}</span>
+                  ))}
+                </div>
+              ) : undefined}
+              {result.matchedHeading ? (
+                <div class="mt-4 border-l-2 border-primary pl-3">
+                  <p class="font-mono text-[10px] uppercase tracking-[0.15em] text-primary">Matched heading</p>
+                  <p class="mt-1 text-sm font-medium text-foreground">
+                    {highlight(result.matchedHeading.text, tokens).map((f) => f.mark ? <mark class="bg-primary/20 text-foreground rounded px-0.5">{f.text}</mark> : <span>{f.text}</span>)}
+                  </p>
+                </div>
+              ) : undefined}
+              {desc ? (
+                <p class="mt-4 text-sm leading-7 text-muted-foreground">
+                  {highlight(desc, tokens).map((f) => f.mark ? <mark class="bg-primary/20 text-foreground rounded px-0.5">{f.text}</mark> : <span>{f.text}</span>)}
+                </p>
+              ) : undefined}
+              {(rec.tags || []).length > 0 ? (
+                <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  {(rec.tags || []).map((t) => (
+                    <li class="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">{t}</li>
+                  ))}
+                </ul>
+              ) : undefined}
+              <div class="mt-auto pt-6">
+                <p class="font-mono text-[10px] text-muted-foreground">{rec.path}</p>
+                <p class="mt-3 text-sm font-semibold text-primary">Open result →</p>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+    {modalResultCount() === 0 && modalQuery ? (
+      <div data-search-empty-state="true" class="border-t border-border p-8 text-center text-sm text-muted-foreground">
+        No results for "{modalQuery}". Try different keywords or clear filters.
+      </div>
+    ) : undefined}
+  </div>
+</div>

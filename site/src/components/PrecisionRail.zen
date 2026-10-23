@@ -1,0 +1,105 @@
+<script setup="ts">
+import { gsap } from "gsap";
+import PackageRailItem from "@/components/home/PackageRailItem.zen";
+import MotionGroup from "@/components/motion/MotionGroup.zen";
+
+const precisionRootRef = ref<HTMLElement>();
+const precisionLabelRef = ref<HTMLElement>();
+const precisionViewportRef = ref<HTMLElement>();
+const precisionRailRef = ref<HTMLElement>();
+
+state railStatus = "waiting";
+let railTimeline: gsap.core.Tween | null = null;
+let railReady = false;
+
+function startRailMotion() {
+  const rail = precisionRailRef.current;
+  if (!rail || !railReady) return;
+  const currentPercent = Number(gsap.getProperty(rail, "xPercent")) || 0;
+  const remainingPercent = currentPercent <= 0 ? 50 + currentPercent : 50;
+  gsap.killTweensOf(rail);
+  railTimeline = gsap.to(rail, {
+    xPercent: -50,
+    duration: Math.max(0.2, (46 * remainingPercent) / 50),
+    ease: "none",
+    onComplete: () => {
+      if (!railReady || railStatus !== "running") return;
+      gsap.set(rail, { xPercent: 0 });
+      startRailMotion();
+    },
+  });
+}
+
+function pauseRail() {
+  railStatus = "paused";
+  railTimeline?.kill();
+  railTimeline = null;
+  const rail = precisionRailRef.current;
+  if (rail) gsap.killTweensOf(rail);
+}
+
+function resumeRail() {
+  if (!railReady) return;
+  railStatus = "running";
+  startRailMotion();
+}
+
+function startRail() {
+  if (railReady) return;
+  railReady = true;
+  railStatus = "running";
+  startRailMotion();
+}
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const rail = precisionRailRef.current;
+  if (!win || !rail || win.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  ctx.cleanup(() => {
+    railReady = false;
+    railStatus = "waiting";
+    railTimeline?.kill();
+    gsap.killTweensOf(rail);
+    railTimeline = null;
+    gsap.set(rail, { clearProps: "transform,willChange" });
+  });
+});
+</script>
+
+<section ref={precisionRootRef} data-motion-section="home-precision" data-motion-ready="false" data-motion-state="unprepared" class="relative overflow-hidden bg-background px-6 py-24 text-foreground sm:px-10 lg:px-14 lg:py-32">
+  <p ref={precisionLabelRef} data-motion-target="true" class="relative z-10 text-left text-sm font-semibold uppercase tracking-[0.08em] text-foreground/62 sm:text-base">
+    Engineered for precision
+  </p>
+
+  <div ref={precisionViewportRef} data-motion-target="true" data-precision-package-rail="true" data-precision-rail-state={railStatus} role="region" tabindex="0" aria-label="Zenith public package rail" class="relative z-10 mt-20 overflow-x-auto overscroll-x-contain outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background" on:pointerenter={pauseRail} on:pointermove={pauseRail} on:pointerleave={resumeRail} on:focus={pauseRail} on:blur={resumeRail}>
+    <div ref={precisionRailRef} data-precision-package-track="true" class="flex w-max min-w-full items-stretch">
+      <ul class="flex shrink-0" aria-label="Zenith public packages">
+        <PackageRailItem name="@zenithbuild/bundler" category="bundler" detail="Build output assembly." />
+        <PackageRailItem name="@zenithbuild/cli" category="CLI" detail="Deterministic project orchestration." />
+        <PackageRailItem name="@zenithbuild/compiler" category="compiler" detail="Compiler-owned component output." />
+        <PackageRailItem name="@zenithbuild/core" category="core" detail="Deterministic utility substrate." />
+        <PackageRailItem name="create-zenith" category="scaffold" detail="New Zenith application setup." />
+        <PackageRailItem name="@zenithbuild/extension-registry" category="registry" detail="Extension metadata and manifests." />
+        <PackageRailItem name="@zenithbuild/language-server" category="language" detail="Language Server Protocol implementation." />
+        <PackageRailItem name="@zenithbuild/language" category="language" detail="Syntax highlighting and editor integration." />
+        <PackageRailItem name="@zenithbuild/router" category="router" detail="File-based SPA route resolution." />
+        <PackageRailItem name="@zenithbuild/runtime" category="runtime" detail="Reactive browser execution." />
+        <PackageRailItem name="zenithbuild" category="agent rules" detail="Canonical skills and framework rules." />
+      </ul>
+      <ul aria-hidden="true" class="flex shrink-0">
+        <PackageRailItem name="@zenithbuild/bundler" category="bundler" detail="Build output assembly." />
+        <PackageRailItem name="@zenithbuild/cli" category="CLI" detail="Deterministic project orchestration." />
+        <PackageRailItem name="@zenithbuild/compiler" category="compiler" detail="Compiler-owned component output." />
+        <PackageRailItem name="@zenithbuild/core" category="core" detail="Deterministic utility substrate." />
+        <PackageRailItem name="create-zenith" category="scaffold" detail="New Zenith application setup." />
+        <PackageRailItem name="@zenithbuild/extension-registry" category="registry" detail="Extension metadata and manifests." />
+        <PackageRailItem name="@zenithbuild/language-server" category="language" detail="Language Server Protocol implementation." />
+        <PackageRailItem name="@zenithbuild/language" category="language" detail="Syntax highlighting and editor integration." />
+        <PackageRailItem name="@zenithbuild/router" category="router" detail="File-based SPA route resolution." />
+        <PackageRailItem name="@zenithbuild/runtime" category="runtime" detail="Reactive browser execution." />
+        <PackageRailItem name="zenithbuild" category="agent rules" detail="Canonical skills and framework rules." />
+      </ul>
+    </div>
+  </div>
+  <MotionGroup rootRef={precisionRootRef} targetARef={precisionLabelRef} targetBRef={precisionViewportRef} variant="home-precision" onReveal={startRail} />
+</section>

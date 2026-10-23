@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const load = async (ctx) => ({ navigation: "bad" })
+</script>
+
+<div>bad load</div>

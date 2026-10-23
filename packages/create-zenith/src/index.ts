@@ -36,6 +36,7 @@ export interface ProjectOptions {
 const GITHUB_REPO = 'zenithbuild/framework'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const AGENT_TEMPLATE_PATH = 'templates/features/agents'
 
 function getCliVersion(): string {
     try {
@@ -313,7 +314,7 @@ async function createProject(options: ProjectOptions): Promise<void> {
     const templateFeaturePaths = selectedTemplateFeaturePaths(options)
 
     // Download template from GitHub
-    await downloadTemplate(targetDir, [templatePath, ...templateFeaturePaths])
+    await downloadTemplate(targetDir, [templatePath, AGENT_TEMPLATE_PATH, ...templateFeaturePaths])
 
     // Update package.json
     const pkgPath = path.join(targetDir, 'package.json')

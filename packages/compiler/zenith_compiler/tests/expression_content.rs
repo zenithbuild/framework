@@ -14,7 +14,7 @@ fn compile_err(input: &str) -> String {
 
 #[test]
 fn expression_with_less_than_comparison() {
-    let input = r#"<p>{x < 10 ? "small" : "big"}</p>"#;
+    let input = r#"<p>{props.x < 10 ? "small" : "big"}</p>"#;
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains("<")),
@@ -24,7 +24,7 @@ fn expression_with_less_than_comparison() {
 
 #[test]
 fn expression_with_greater_than_comparison() {
-    let input = r#"<p>{x > 10 ? "big" : "small"}</p>"#;
+    let input = r#"<p>{props.x > 10 ? "big" : "small"}</p>"#;
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains(">")),
@@ -37,7 +37,7 @@ fn expression_with_greater_than_comparison() {
 #[test]
 fn expression_with_single_letter_generic() {
     // Single letter generics like <T> must NOT be treated as markup tags.
-    let input = r#"<p>{fn_call<T>(x)}</p>"#;
+    let input = r#"<p>{props.fn_call<T>(props.x)}</p>"#;
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains("<T>")),
@@ -49,7 +49,7 @@ fn expression_with_single_letter_generic() {
 
 #[test]
 fn expression_with_nested_braces() {
-    let input = r#"<p>{items.map(x => { return x; })}</p>"#;
+    let input = r#"<p>{props.items.map(x => { return x; })}</p>"#;
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains("return x")),
@@ -81,7 +81,7 @@ fn expression_with_string_containing_braces() {
 
 #[test]
 fn expression_with_template_literal() {
-    let input = "<p>{`hello ${name}`}</p>";
+    let input = "<p>{`hello ${props.name}`}</p>";
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains("hello")),
@@ -93,7 +93,7 @@ fn expression_with_template_literal() {
 
 #[test]
 fn attribute_expression_with_ternary() {
-    let input = r#"<div class={x === 0 ? "active" : "inactive"}></div>"#;
+    let input = r#"<div class={props.x === 0 ? "active" : "inactive"}></div>"#;
     let output = compile_ok(input);
     // The expression should be in the output — either in html or expressions list.
     assert!(
@@ -104,7 +104,7 @@ fn attribute_expression_with_ternary() {
 
 #[test]
 fn attribute_expression_with_complex_value() {
-    let input = r#"<div style={base + " " + extra}></div>"#;
+    let input = r#"<div style={props.base + " " + props.extra}></div>"#;
     let output = compile_ok(input);
     assert!(
         output.html.contains("data-zx"),
@@ -142,7 +142,7 @@ fn embedded_markup_allowed_when_flag_enabled() {
 
 #[test]
 fn event_handler_with_arrow_function() {
-    let input = r#"<button on:click={() => count.set(count.get() + 1)}>+</button>"#;
+    let input = r#"<button on:click={() => props.count.set(props.count.get() + 1)}>+</button>"#;
     let output = compile_ok(input);
     assert!(
         output.html.contains("data-zx-on-click"),
@@ -154,18 +154,15 @@ fn event_handler_with_arrow_function() {
 
 #[test]
 fn empty_expression() {
-    // Empty expressions should still parse (treated as empty string).
+    // Empty expressions are invalid JavaScript and should fail before codegen.
     let input = r#"<p>{}</p>"#;
-    let output = compile_ok(input);
-    assert!(
-        output.expressions.iter().any(|e| e.is_empty()),
-        "empty expression should be captured"
-    );
+    let err = compile_err(input);
+    assert!(err.contains("Invalid markup expression syntax"));
 }
 
 #[test]
 fn expression_with_comment() {
-    let input = "<p>{/* comment */ value}</p>";
+    let input = "<p>{/* comment */ props.value}</p>";
     let output = compile_ok(input);
     assert!(
         output.expressions.iter().any(|e| e.contains("value")),

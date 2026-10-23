@@ -1,53 +1,9 @@
-export function renderRouterNavigationSource() {
-    return `function extractSsrData(parsed) {
-  if (!parsed || typeof parsed.getElementById !== "function") return {};
-  const ssrScript = parsed.getElementById("zenith-ssr-data");
-  if (!ssrScript) return {};
-  const source = typeof ssrScript.textContent === "string" ? ssrScript.textContent : "";
-  const marker = "window.__zenith_ssr_data =";
-  const markerIndex = source.indexOf(marker);
-  if (markerIndex === -1) return {};
-  const jsonText = source.slice(markerIndex + marker.length).trim().replace(/;$/, "");
-  try {
-    return JSON.parse(jsonText);
-  } catch {
-    return {};
+export function renderRouterNavigationSource({ routeCheck = false, formsEnabled = true } = {}) {
+    const routeCheckSource = routeCheck
+        ? `async function requestRouteCheck(context, resolved, targetUrl, signal) {
+  if (!__ZENITH_ROUTE_CHECK_ENABLED__) {
+    return { kind: "allow" };
   }
-}
-
-function parseDocumentPayload(html) {
-  if (typeof DOMParser === "undefined") return null;
-  const parsed = new DOMParser().parseFromString(html, "text/html");
-  return {
-    html,
-    title: parsed.title || "",
-    ssrData: extractSsrData(parsed)
-  };
-}
-
-function isHtmlResponse(response) {
-  const contentType = String(response.headers.get("content-type") || "");
-  return /text\\/html|application\\/xhtml\\+xml/i.test(contentType);
-}
-
-function createDocumentDetail(payload, response) {
-  return {
-    title: payload && typeof payload.title === "string" ? payload.title : "",
-    hasSsrData: !!(payload && payload.ssrData && typeof payload.ssrData === "object"),
-    status: response && typeof response.status === "number" ? response.status : 200
-  };
-}
-
-function createScrollDetail(targetUrl, scrollTarget) {
-  return {
-    mode: scrollTarget.mode,
-    x: scrollTarget.x,
-    y: scrollTarget.y,
-    hash: targetUrl.hash || ""
-  };
-}
-
-async function requestRouteCheck(context, resolved, targetUrl, signal) {
   if (!requiresServerReload(resolved.route)) {
     return { kind: "allow" };
   }
@@ -63,7 +19,7 @@ async function requestRouteCheck(context, resolved, targetUrl, signal) {
   });
 
   try {
-    const response = await fetch("/__zenith/route-check?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
+    const response = await fetch(routeCheckPath() + "?path=" + encodeURIComponent(toNavigationPath(targetUrl)), {
       headers: { "x-zenith-route-check": "1" },
       credentials: "include",
       signal
@@ -124,7 +80,12 @@ async function requestRouteCheck(context, resolved, targetUrl, signal) {
     });
     return { kind: "allow" };
   }
-}
+}`
+        : `async function requestRouteCheck() {
+  return { kind: "allow" };
+}`;
+
+    return `${routeCheckSource}
 
 function resolveRedirectUrl(location, fallbackUrl) {
   try {
@@ -143,8 +104,115 @@ function navigateViaBrowser(targetUrl, replace) {
   window.location.assign(targetUrl.href);
 }
 
+function shouldReplaceBrowserNavigation(historyMode) {
+  return historyMode === "pop";
+}
+
 function dispatchNavigationFallback(context, detail) {
   emitNavigationAbort(context, detail);
+}
+
+async function commitNavigationDocument(context, resolved, targetUrl, historyMode, popstateState, payload, response) {
+  const documentDetail = createDocumentDetail(payload, response);
+  let historyCommitted = false;
+
+  context.stage = "data-ready";
+  emitNavigationEvent(context, "navigation:data-ready", {
+    document: documentDetail
+  }, false);
+
+  dispatchScrollEvent("before", {
+    navigationType: historyMode,
+    to: targetUrl.href,
+    from: context.fromUrl ? context.fromUrl.href : window.location.href
+  }, false);
+
+  context.stage = "before-leave";
+  await emitNavigationEvent(context, "navigation:before-leave", {
+    document: documentDetail
+  }, true);
+  if (!ensureCurrentNavigation(context)) return { committed: false, documentDetail, historyCommitted };
+
+  context.stage = "leave-complete";
+  emitNavigationEvent(context, "navigation:leave-complete", {
+    document: documentDetail
+  }, false);
+
+  context.stage = "before-swap";
+  await emitNavigationEvent(context, "navigation:before-swap", {
+    document: documentDetail
+  }, true);
+  if (!ensureCurrentNavigation(context)) return { committed: false, documentDetail, historyCommitted };
+
+  if (historyMode === "push") {
+    rememberScrollForKey(currentHistoryKey);
+    pushHistoryEntry(targetUrl);
+    historyCommitted = true;
+  } else if (historyMode === "pop") {
+    syncHistoryEntry(popstateState);
+    historyCommitted = true;
+  }
+  currentUrl = new URL(targetUrl.href);
+
+  if (payload.title) {
+    document.title = payload.title;
+  }
+
+  const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);
+  if (!mounted || !ensureCurrentNavigation(context)) {
+    return { committed: false, documentDetail, historyCommitted };
+  }
+
+  context.stage = "content-swapped";
+  emitNavigationEvent(context, "navigation:content-swapped", {
+    document: documentDetail,
+    historyCommitted
+  }, false);
+
+  await nextFrame();
+  if (!ensureCurrentNavigation(context)) return { committed: false, documentDetail, historyCommitted };
+
+  const scrollTarget = resolveScrollTarget(targetUrl, historyMode, popstateState);
+  const scrollDetail = createScrollDetail(targetUrl, scrollTarget);
+  const defaultScrollAllowed = dispatchScrollEvent("apply", {
+    navigationType: historyMode,
+    mode: scrollDetail.mode,
+    x: scrollDetail.x,
+    y: scrollDetail.y,
+    hash: scrollDetail.hash
+  }, true);
+  if (defaultScrollAllowed) {
+    applyNativeScroll(scrollTarget);
+  }
+
+  focusAfterNavigation(scrollTarget);
+  rememberScrollForKey(currentHistoryKey, { x: scrollTarget.x, y: scrollTarget.y });
+
+  context.stage = "before-enter";
+  await emitNavigationEvent(context, "navigation:before-enter", {
+    document: documentDetail,
+    scroll: scrollDetail
+  }, true);
+  if (!ensureCurrentNavigation(context)) return { committed: false, documentDetail, historyCommitted };
+
+  dispatchScrollEvent("after", {
+    navigationType: historyMode,
+    mode: scrollDetail.mode,
+    x: scrollDetail.x,
+    y: scrollDetail.y,
+    hash: scrollDetail.hash
+  }, false);
+
+  await nextFrame();
+  if (!ensureCurrentNavigation(context)) return { committed: false, documentDetail, historyCommitted };
+
+  context.stage = "enter-complete";
+  emitNavigationEvent(context, "navigation:enter-complete", {
+    document: documentDetail,
+    scroll: scrollDetail
+  }, false);
+
+  return { committed: true, documentDetail, historyCommitted };
 }
 
 async function performNavigation(targetUrl, historyMode, popstateState) {
@@ -173,7 +241,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: checkResult.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (checkResult.kind === "deny") {
@@ -181,17 +249,34 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "server-deny",
         status: checkResult.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
     context.stage = "fetch";
-    const response = await fetch(targetUrl.href, {
-      credentials: "include",
-      headers: { Accept: "text/html,application/xhtml+xml" },
-      redirect: "manual",
-      signal: context.signal
-    });
+    if (activeDocumentRequest) {
+      try { await activeDocumentRequest; } catch {}
+      if (!ensureCurrentNavigation(context)) return false;
+    }
+    let response;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const documentRequest = fetch(targetUrl.href, {
+          credentials: "include",
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          redirect: "manual",
+          signal: context.signal
+        });
+      activeDocumentRequest = documentRequest;
+      try {
+        response = await documentRequest;
+        break;
+      } catch (error) {
+        if (!ensureCurrentNavigation(context) || attempt === 1) throw error;
+        await nextFrame();
+      } finally {
+        if (activeDocumentRequest === documentRequest) activeDocumentRequest = null;
+      }
+    }
     if (!ensureCurrentNavigation(context)) return false;
 
     if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
@@ -201,7 +286,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         location: redirectUrl.href,
         status: response.status
       });
-      navigateViaBrowser(redirectUrl, historyMode === "pop");
+      navigateViaBrowser(redirectUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -212,7 +297,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "http-status",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
     if (!isHtmlResponse(response)) {
@@ -220,7 +305,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "non-html",
         status: response.status
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
 
@@ -229,109 +314,26 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
       dispatchNavigationFallback(context, {
         reason: "document-parse"
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop");
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode));
       return true;
     }
-
-    documentDetail = createDocumentDetail(payload, response);
-
-    context.stage = "data-ready";
-    emitNavigationEvent(context, "navigation:data-ready", {
-      document: documentDetail
-    }, false);
-
-    dispatchScrollEvent("before", {
-      navigationType: historyMode,
-      to: targetUrl.href,
-      from: context.fromUrl ? context.fromUrl.href : window.location.href
-    }, false);
-
-    context.stage = "before-leave";
-    await emitNavigationEvent(context, "navigation:before-leave", {
-      document: documentDetail
-    }, true);
-    if (!ensureCurrentNavigation(context)) return false;
-
-    context.stage = "leave-complete";
-    emitNavigationEvent(context, "navigation:leave-complete", {
-      document: documentDetail
-    }, false);
-
-    context.stage = "before-swap";
-    await emitNavigationEvent(context, "navigation:before-swap", {
-      document: documentDetail
-    }, true);
-    if (!ensureCurrentNavigation(context)) return false;
-
-    if (historyMode === "push") {
-      rememberScrollForKey(currentHistoryKey);
-      pushHistoryEntry(targetUrl);
-      historyCommitted = true;
-    } else if (historyMode === "pop") {
-      syncHistoryEntry(popstateState);
-      historyCommitted = true;
-    }
-    currentUrl = new URL(targetUrl.href);
-
-    if (payload.title) {
-      document.title = payload.title;
-    }
-
-    const mounted = await mountRoute(resolved.route, resolved.params, context.token, payload);
-    if (!mounted || !ensureCurrentNavigation(context)) return false;
-
-    context.stage = "content-swapped";
-    emitNavigationEvent(context, "navigation:content-swapped", {
-      document: documentDetail,
-      historyCommitted
-    }, false);
-
-    await nextFrame();
-    if (!ensureCurrentNavigation(context)) return false;
-
-    const scrollTarget = resolveScrollTarget(targetUrl, historyMode, popstateState);
-    const scrollDetail = createScrollDetail(targetUrl, scrollTarget);
-    const defaultScrollAllowed = dispatchScrollEvent("apply", {
-      navigationType: historyMode,
-      mode: scrollDetail.mode,
-      x: scrollDetail.x,
-      y: scrollDetail.y,
-      hash: scrollDetail.hash
-    }, true);
-    if (defaultScrollAllowed) {
-      applyNativeScroll(scrollTarget);
-    }
-
-    focusAfterNavigation(scrollTarget);
-    rememberScrollForKey(currentHistoryKey, { x: scrollTarget.x, y: scrollTarget.y });
-
-    context.stage = "before-enter";
-    await emitNavigationEvent(context, "navigation:before-enter", {
-      document: documentDetail,
-      scroll: scrollDetail
-    }, true);
-    if (!ensureCurrentNavigation(context)) return false;
-
-    dispatchScrollEvent("after", {
-      navigationType: historyMode,
-      mode: scrollDetail.mode,
-      x: scrollDetail.x,
-      y: scrollDetail.y,
-      hash: scrollDetail.hash
-    }, false);
-
-    await nextFrame();
-    if (!ensureCurrentNavigation(context)) return false;
-
-    context.stage = "enter-complete";
-    emitNavigationEvent(context, "navigation:enter-complete", {
-      document: documentDetail,
-      scroll: scrollDetail
-    }, false);
+    const committed = await commitNavigationDocument(
+      context,
+      resolved,
+      targetUrl,
+      historyMode,
+      popstateState,
+      payload,
+      response
+    );
+    documentDetail = committed.documentDetail;
+    historyCommitted = committed.historyCommitted;
+    if (!committed.committed) return false;
 
     return true;
   } catch (error) {
-    if (!isAbortError(error)) {
+    const superseded = !!context.abortReason || !ensureCurrentNavigation(context);
+    if (!superseded && !isAbortError(error)) {
       emitNavigationError(context, {
         reason: "runtime-failure",
         error,
@@ -343,7 +345,7 @@ async function performNavigation(targetUrl, historyMode, popstateState) {
         reason: "runtime-failure",
         historyCommitted
       });
-      navigateViaBrowser(targetUrl, historyMode === "pop" || historyCommitted);
+      navigateViaBrowser(targetUrl, shouldReplaceBrowserNavigation(historyMode) || historyCommitted);
       return true;
     }
     dispatchNavigationFallback(context, context.abortReason || {
@@ -363,7 +365,7 @@ function isInternalLink(anchor) {
     return false;
   }
   const url = new URL(anchor.href, window.location.href);
-  return url.origin === window.location.origin;
+  return url.origin === window.location.origin && stripBasePath(url.pathname) !== null;
 }
 
 async function mountInitialRoute() {
@@ -387,6 +389,7 @@ function start() {
     currentUrl = new URL(window.location.href);
     queueScrollSnapshot();
   });
+${formsEnabled ? "  installEnhancedFormHandling();\n" : ""}
 
   document.addEventListener("click", function(event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

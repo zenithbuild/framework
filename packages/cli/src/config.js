@@ -1,95 +1,70 @@
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { normalizeImageConfig } from './images/shared.js';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { getDefaults, validateConfig as validateSharedConfig } from '@zenithbuild/core/config';
+import { loadConfigWithKeys } from '@zenithbuild/core/config/node';
 
-export const DEFAULT_CONFIG = {
-    router: false,
-    embeddedMarkupExpressions: false,
-    types: true,
-    typescriptDefault: true,
-    outDir: 'dist',
-    pagesDir: 'pages',
-    experimental: {},
-    strictDomLints: false,
-    images: normalizeImageConfig()
-};
+const CONFIG_META = Symbol('zenith.config.meta');
+export const DEFAULT_CONFIG = getDefaults();
 
-const TOP_LEVEL_SCHEMA = {
-    router: 'boolean',
-    embeddedMarkupExpressions: 'boolean',
-    types: 'boolean',
-    typescriptDefault: 'boolean',
-    outDir: 'string',
-    pagesDir: 'string',
-    experimental: 'object',
-    strictDomLints: 'boolean',
-    images: 'object'
-};
+function attachConfigMeta(config, explicitKeys) {
+    Object.defineProperty(config, CONFIG_META, {
+        value: { explicitKeys: new Set(explicitKeys), loaded: false },
+        enumerable: false,
+        configurable: true,
+        writable: true
+    });
+    return config;
+}
+
+function markLoaded(config) {
+    if (config?.[CONFIG_META]) {
+        config[CONFIG_META].loaded = true;
+    }
+    return config;
+}
+
+export function hasExplicitConfigKey(config, key) {
+    return Boolean(config?.[CONFIG_META]?.explicitKeys?.has(key));
+}
+
+export function isLoadedConfig(config) {
+    return Boolean(config?.[CONFIG_META]?.loaded === true);
+}
+
+export function isConfigKeyExplicit(config, key) {
+    if (config && typeof config === 'object' && config[CONFIG_META]) {
+        return hasExplicitConfigKey(config, key);
+    }
+    return Boolean(config && Object.prototype.hasOwnProperty.call(config, key));
+}
+
+export function resolveConfigPagesDir(projectRoot, config) {
+    if (isConfigKeyExplicit(config, 'pagesDir')) {
+        return resolve(projectRoot, config.pagesDir);
+    }
+
+    const rootPagesDir = join(projectRoot, 'pages');
+    if (existsSync(rootPagesDir)) {
+        return rootPagesDir;
+    }
+
+    const srcPagesDir = join(projectRoot, 'src', 'pages');
+    if (existsSync(srcPagesDir)) {
+        return srcPagesDir;
+    }
+
+    return resolve(projectRoot, config?.pagesDir || DEFAULT_CONFIG.pagesDir);
+}
+
+export function resolveConfigOutDir(projectRoot, config) {
+    return resolve(projectRoot, config?.outDir || DEFAULT_CONFIG.outDir);
+}
 
 export function validateConfig(config) {
-    if (config === null || config === undefined) {
-        return { ...DEFAULT_CONFIG, images: normalizeImageConfig() };
-    }
-    if (typeof config !== 'object' || Array.isArray(config)) {
-        throw new Error('[Zenith:Config] Config must be a plain object');
-    }
-
-    for (const key of Object.keys(config)) {
-        if (!(key in TOP_LEVEL_SCHEMA)) {
-            throw new Error(`[Zenith:Config] Unknown key: "${key}"`);
-        }
-    }
-
-    const result = {
-        ...DEFAULT_CONFIG,
-        images: normalizeImageConfig(DEFAULT_CONFIG.images)
-    };
-
-    for (const [key, expectedType] of Object.entries(TOP_LEVEL_SCHEMA)) {
-        if (!(key in config)) {
-            continue;
-        }
-        const value = config[key];
-        if (key === 'images') {
-            result.images = normalizeImageConfig(value);
-            continue;
-        }
-        if (expectedType === 'object') {
-            if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-                throw new Error(`[Zenith:Config] Key "${key}" must be a plain object`);
-            }
-            result[key] = { ...value };
-            continue;
-        }
-        if (typeof value !== expectedType) {
-            throw new Error(`[Zenith:Config] Key "${key}" must be ${expectedType}, got ${typeof value}`);
-        }
-        if (expectedType === 'string' && value.trim().length === 0) {
-            throw new Error(`[Zenith:Config] Key "${key}" must be a non-empty string`);
-        }
-        result[key] = value;
-    }
-
-    return result;
+    return attachConfigMeta(validateSharedConfig(config), Object.keys(config || {}));
 }
 
 export async function loadConfig(projectRoot) {
-    const configPath = join(projectRoot, 'zenith.config.js');
-    try {
-        const url = pathToFileURL(configPath).href;
-        const mod = await import(url);
-        return validateConfig(mod.default || mod);
-    } catch (error) {
-        const code = typeof error?.code === 'string' ? error.code : '';
-        const message = typeof error?.message === 'string' ? error.message : '';
-        if (
-            code === 'ERR_MODULE_NOT_FOUND'
-            || code === 'ENOENT'
-            || message.includes('Cannot find module')
-            || message.includes('ENOENT')
-        ) {
-            return validateConfig(null);
-        }
-        throw error;
-    }
+    const { config, explicitKeys } = await loadConfigWithKeys(projectRoot);
+    return markLoaded(attachConfigMeta(config, explicitKeys));
 }

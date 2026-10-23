@@ -1,0 +1,38 @@
+<script lang="ts">
+import type { DocumentationSectionGroup } from "@/server/documentationSource";
+
+const incoming = props as { sections: DocumentationSectionGroup[] };
+const cardsRef = ref<HTMLDivElement>();
+
+function escapeHtml(value: unknown) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderSectionCards(sections: DocumentationSectionGroup[]) {
+  return sections.map((group) => {
+    const count = Array.isArray(group.entries) ? group.entries.length : 0;
+    const href = group.entries[0]?.path || "/docs";
+    return [
+      '<a data-docs-section-card="true" href="' + escapeHtml(href) + '" class="group flex min-h-64 flex-col rounded-lg border border-border bg-card p-6 text-card-foreground transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">',
+      '<p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">' + count + " " + (count === 1 ? "article" : "articles") + "</p>",
+      '<h4 class="mt-8 font-heading text-2xl font-semibold uppercase leading-none tracking-tight text-foreground">' + escapeHtml(group.section.title) + "</h4>",
+      '<p class="mt-5 text-sm leading-7 text-muted-foreground">' + escapeHtml(group.section.description) + "</p>",
+      '<span class="mt-auto pt-8 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground">Open section</span>',
+      "</a>",
+    ].join("");
+  }).join("");
+}
+
+zenEffect(() => {
+  const cards = cardsRef.current;
+  if (!cards) return;
+  cards.innerHTML = renderSectionCards(Array.isArray(incoming.sections) ? incoming.sections : []);
+});
+</script>
+
+<div ref={cardsRef} class="grid gap-5 md:grid-cols-2 xl:grid-cols-4"></div>

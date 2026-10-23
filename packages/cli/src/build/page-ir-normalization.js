@@ -1,9 +1,62 @@
-import { rewritePropsExpression } from './scoped-identifier-rewrite.js';
 import { resolveStateKeyFromBindings } from './expression-rewrites.js';
+import { transpileTypeScriptToJs } from './hoisted-code-transforms.js';
 import {
     expandScopedShorthandPropertiesInSource,
     normalizeTypeScriptExpression
 } from './typescript-expression-utils.js';
+import { synthesizeAndResolveHelperModules } from './relative-helper-modules.js';
+
+export function synthesizeRelativeTypeScriptHelperModules(
+    pageIr,
+    sourceFile,
+    srcDir,
+    transformCache = null,
+    mergeMetrics = null
+) {
+    synthesizeAndResolveHelperModules(pageIr, sourceFile, srcDir, transformCache, mergeMetrics);
+}
+
+/**
+ * Collapse multi-line static import/export-from statements to a single line.
+ * This works around a vendor-bundler regex that cannot match specifiers across
+ * newlines inside named import blocks. It is a whitespace-only transformation.
+ *
+ * @param {string} source
+ * @returns {string}
+ */
+function collapseMultiLineImportStatements(source) {
+    if (typeof source !== 'string' || source.indexOf('\n') === -1) {
+        return source;
+    }
+    // Fast, linear pass: collapse only statements that start a line with import/export
+    // and span more than one line, ending at the first line that contains a semicolon.
+    // This avoids the catastrophic backtracking of a greedy regex across the whole source.
+    const lines = source.split('\n');
+    const out = [];
+    let buffer = null;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (buffer === null) {
+            const trimmed = line.trimStart();
+            if (/^(?:import|export)\b/.test(trimmed) && !trimmed.includes(';')) {
+                buffer = [line];
+            } else {
+                out.push(line);
+            }
+        } else {
+            buffer.push(line);
+            if (line.includes(';')) {
+                out.push(buffer.join(' ').replace(/\s+/g, ' '));
+                buffer = null;
+            }
+        }
+    }
+    if (buffer !== null) {
+        // Unterminated import/export: preserve original to avoid corruption.
+        out.push(...buffer);
+    }
+    return out.join('\n');
+}
 
 /**
  * @param {object} pageIr
@@ -60,6 +113,15 @@ export function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambig
         if (rewritten && rewritten !== current && bindings[index].literal === current) {
             bindings[index].literal = rewritten;
         }
+        if (
+            rewrittenBinding &&
+            typeof bindings[index].scoped_data_key === 'string' &&
+            bindings[index].scoped_data_key.length > 0 &&
+            !(typeof rewrittenBinding.scoped_data_key === 'string' && rewrittenBinding.scoped_data_key.length > 0)
+        ) {
+            continue;
+        }
+
         if (rewrittenBinding) {
             bindings[index].compiled_expr = rewrittenBinding.compiled_expr;
             bindings[index].signal_index = rewrittenBinding.signal_index;
@@ -67,6 +129,7 @@ export function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambig
             bindings[index].state_index = rewrittenBinding.state_index;
             bindings[index].component_instance = rewrittenBinding.component_instance;
             bindings[index].component_binding = rewrittenBinding.component_binding;
+            bindings[index].scoped_data_key = rewrittenBinding.scoped_data_key;
         } else if (rewritten && rewritten !== current && bindings[index].compiled_expr === current) {
             bindings[index].compiled_expr = rewritten;
         }
@@ -78,269 +141,6 @@ export function applyExpressionRewrites(pageIr, expressionMap, bindingMap, ambig
             bindings[index].compiled_expr === current
         ) {
             bindings[index].compiled_expr = current;
-        }
-    }
-}
-
-/**
- * @param {object} pageIr
- * @param {object} scopeRewrite
- * @param {Record<string, number> | null} [scopedMetrics]
- */
-export function applyScopedIdentifierRewrites(pageIr, scopeRewrite, scopedMetrics = null) {
-    if (!Array.isArray(pageIr?.expressions) || pageIr.expressions.length === 0) {
-        return;
-    }
-    const bindings = Array.isArray(pageIr.expression_bindings) ? pageIr.expression_bindings : [];
-    const scopeMap = scopeRewrite?.map instanceof Map ? scopeRewrite.map : null;
-    const scopeAmbiguous = scopeRewrite?.ambiguous instanceof Set ? scopeRewrite.ambiguous : null;
-    const scopeCandidates = scopeMap instanceof Map
-        ? new Set(
-            [...scopeMap.keys()].filter(
-                (identifier) => typeof identifier === 'string'
-                    && identifier.length > 0
-                    && !(scopeAmbiguous instanceof Set && scopeAmbiguous.has(identifier))
-            )
-        )
-        : null;
-    const rewriteContext = { scopeRewrite };
-    const rewriteCache = new Map();
-
-    const shouldCheckIdentifierCandidate = (charCode, isStart) => {
-        if (charCode === 36 || charCode === 95) return true;
-        if (charCode >= 65 && charCode <= 90) return true;
-        if (charCode >= 97 && charCode <= 122) return true;
-        if (!isStart && charCode >= 48 && charCode <= 57) return true;
-        return false;
-    };
-
-    const canSkipScopedRewrite = (value) => {
-        if (!(scopeCandidates instanceof Set) || scopeCandidates.size === 0) {
-            return true;
-        }
-        let token = '';
-        for (let index = 0; index < value.length; index++) {
-            const charCode = value.charCodeAt(index);
-            if (shouldCheckIdentifierCandidate(charCode, token.length === 0)) {
-                token += value[index];
-                continue;
-            }
-            if (token.length > 0) {
-                if (scopeCandidates.has(token)) {
-                    return false;
-                }
-                token = '';
-            }
-        }
-        return token.length > 0 ? !scopeCandidates.has(token) : true;
-    };
-
-    const addScopedMetric = (key, value) => {
-        if (!scopedMetrics || typeof scopedMetrics !== 'object' || !Number.isFinite(value)) {
-            return;
-        }
-        scopedMetrics[key] = (scopedMetrics[key] || 0) + value;
-    };
-
-    const rewriteScoped = (value) => {
-        if (typeof value !== 'string') {
-            return value;
-        }
-        addScopedMetric('totalValues', 1);
-        const cached = rewriteCache.get(value);
-        if (typeof cached === 'string') {
-            addScopedMetric('cacheHitCount', 1);
-            return cached;
-        }
-        addScopedMetric('cacheMissCount', 1);
-        const missStartedAt = performance.now();
-        const identifierCheckStartedAt = performance.now();
-        const shouldSkip = canSkipScopedRewrite(value);
-        const identifierCheckMs = performance.now() - identifierCheckStartedAt;
-        addScopedMetric('identifierCheckMs', identifierCheckMs);
-        if (shouldSkip) {
-            addScopedMetric('fastSkipCount', 1);
-            addScopedMetric('fastSkipMs', identifierCheckMs);
-            rewriteCache.set(value, value);
-            addScopedMetric('unchangedMissCount', 1);
-            addScopedMetric('cacheMissMs', performance.now() - missStartedAt);
-            return value;
-        }
-
-        const rewriteCallStartedAt = performance.now();
-        const rewritten = rewritePropsExpression(value, rewriteContext);
-        addScopedMetric('rewriteCallMs', performance.now() - rewriteCallStartedAt);
-        addScopedMetric(rewritten === value ? 'unchangedMissCount' : 'changedMissCount', 1);
-        addScopedMetric('cacheMissMs', performance.now() - missStartedAt);
-        rewriteCache.set(value, rewritten);
-        return rewritten;
-    };
-
-    for (let index = 0; index < pageIr.expressions.length; index++) {
-        const current = pageIr.expressions[index];
-        if (typeof current === 'string') {
-            pageIr.expressions[index] = rewriteScoped(current);
-        }
-        if (!bindings[index] || typeof bindings[index] !== 'object') {
-            continue;
-        }
-        if (typeof bindings[index].literal === 'string') {
-            bindings[index].literal = rewriteScoped(bindings[index].literal);
-        }
-        if (typeof bindings[index].compiled_expr === 'string') {
-            bindings[index].compiled_expr = rewriteScoped(bindings[index].compiled_expr);
-        }
-    }
-}
-
-export function synthesizeSignalBackedCompiledExpressions(pageIr) {
-    if (!Array.isArray(pageIr?.expression_bindings) || pageIr.expression_bindings.length === 0) {
-        return;
-    }
-
-    const stateBindings = Array.isArray(pageIr?.hoisted?.state) ? pageIr.hoisted.state : [];
-    const signals = Array.isArray(pageIr?.signals) ? pageIr.signals : [];
-    if (stateBindings.length === 0 || signals.length === 0) {
-        return;
-    }
-
-    const signalBackedStateIndices = new Set(
-        signals
-            .map((signal) => signal?.state_index)
-            .filter((value) => Number.isInteger(value))
-    );
-    const signalIndexByStateKey = new Map();
-    for (let index = 0; index < signals.length; index++) {
-        const stateIndex = signals[index]?.state_index;
-        const stateKey = Number.isInteger(stateIndex) ? stateBindings[stateIndex]?.key : null;
-        if (typeof stateKey === 'string' && stateKey.length > 0) {
-            signalIndexByStateKey.set(stateKey, index);
-        }
-    }
-    if (signalIndexByStateKey.size === 0) {
-        return;
-    }
-
-    for (let index = 0; index < pageIr.expression_bindings.length; index++) {
-        const binding = pageIr.expression_bindings[index];
-        if (!binding || typeof binding !== 'object') {
-            continue;
-        }
-        if (typeof binding.compiled_expr === 'string' && binding.compiled_expr.includes('signalMap.get(')) {
-            continue;
-        }
-
-        const candidate = typeof binding.literal === 'string' && binding.literal.trim().length > 0
-            ? binding.literal
-            : typeof pageIr.expressions?.[index] === 'string'
-                ? pageIr.expressions[index]
-                : null;
-        if (typeof candidate !== 'string' || candidate.trim().length === 0) {
-            continue;
-        }
-        if (
-            Number.isInteger(binding.state_index) &&
-            !signalBackedStateIndices.has(binding.state_index)
-        ) {
-            continue;
-        }
-
-        let rewritten = candidate;
-        const signalIndices = [];
-        for (const [stateKey, signalIndex] of signalIndexByStateKey.entries()) {
-            if (!rewritten.includes(stateKey)) {
-                continue;
-            }
-            const escaped = stateKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const pattern = new RegExp(`(?<!\\.)\\b${escaped}\\b`, 'g');
-            if (!pattern.test(rewritten)) {
-                continue;
-            }
-            rewritten = rewritten.replace(pattern, `signalMap.get(${signalIndex}).get()`);
-            signalIndices.push(signalIndex);
-        }
-
-        if (rewritten === candidate || signalIndices.length === 0) {
-            continue;
-        }
-        const uniqueSignalIndices = [...new Set(signalIndices)].sort((a, b) => a - b);
-        binding.compiled_expr = rewritten;
-        binding.signal_indices = uniqueSignalIndices;
-        if (uniqueSignalIndices.length === 1) {
-            binding.signal_index = uniqueSignalIndices[0];
-            const stateIndex = signals[uniqueSignalIndices[0]]?.state_index;
-            if (Number.isInteger(stateIndex)) {
-                binding.state_index = stateIndex;
-            }
-        }
-    }
-}
-
-export function normalizeExpressionBindingDependencies(pageIr) {
-    if (!Array.isArray(pageIr?.expression_bindings) || pageIr.expression_bindings.length === 0) {
-        return;
-    }
-
-    const signals = Array.isArray(pageIr.signals) ? pageIr.signals : [];
-    const dependencyRe = /signalMap\.get\((\d+)\)/g;
-
-    for (const binding of pageIr.expression_bindings) {
-        if (!binding || typeof binding !== 'object' || typeof binding.compiled_expr !== 'string') {
-            continue;
-        }
-
-        const indices = [];
-        dependencyRe.lastIndex = 0;
-        let match;
-        while ((match = dependencyRe.exec(binding.compiled_expr)) !== null) {
-            const index = Number.parseInt(match[1], 10);
-            if (Number.isInteger(index)) {
-                indices.push(index);
-            }
-        }
-
-        if (indices.length === 0) {
-            continue;
-        }
-
-        let signalIndices = [...new Set(indices)].sort((a, b) => a - b);
-        if (Number.isInteger(binding.state_index)) {
-            const owningSignalIndices = signals
-                .map((signal, index) => signal?.state_index === binding.state_index ? index : null)
-                .filter((value) => Number.isInteger(value));
-            const extractedMatchState =
-                signalIndices.length > 0 &&
-                signalIndices.every((index) => signals[index]?.state_index === binding.state_index);
-            if (owningSignalIndices.length > 0 && !extractedMatchState) {
-                signalIndices = owningSignalIndices;
-            }
-        }
-
-        if (
-            !Array.isArray(binding.signal_indices) ||
-            binding.signal_indices.length === 0 ||
-            binding.signal_indices.some((index) => signals[index]?.state_index !== binding.state_index)
-        ) {
-            binding.signal_indices = signalIndices;
-        }
-        if (
-            (!Number.isInteger(binding.signal_index) ||
-                signals[binding.signal_index]?.state_index !== binding.state_index) &&
-            signalIndices.length === 1
-        ) {
-            binding.signal_index = signalIndices[0];
-        }
-        if (!Number.isInteger(binding.state_index) && Number.isInteger(binding.signal_index)) {
-            const stateIndex = signals[binding.signal_index]?.state_index;
-            if (Number.isInteger(stateIndex)) {
-                binding.state_index = stateIndex;
-            }
-        }
-        if (signalIndices.length === 1) {
-            binding.compiled_expr = binding.compiled_expr.replace(
-                /signalMap\.get\(\d+\)/g,
-                `signalMap.get(${signalIndices[0]})`
-            );
         }
     }
 }
@@ -368,7 +168,12 @@ export function normalizeExpressionPayload(pageIr) {
     }
 }
 
-export function normalizeHoistedSourcePayload(pageIr) {
+export function normalizeHoistedSourcePayload(
+    pageIr,
+    sourceFile = 'component.zen',
+    transformCache = null,
+    mergeMetrics = null
+) {
     const declarations = Array.isArray(pageIr?.hoisted?.declarations) ? pageIr.hoisted.declarations : null;
     if (declarations) {
         pageIr.hoisted.declarations = declarations.map((entry) => {
@@ -379,13 +184,83 @@ export function normalizeHoistedSourcePayload(pageIr) {
         });
     }
 
+    const imports = Array.isArray(pageIr?.hoisted?.imports) ? pageIr.hoisted.imports : null;
+    if (imports) {
+        pageIr.hoisted.imports = imports.map((entry) =>
+            typeof entry === 'string' ? collapseMultiLineImportStatements(entry) : entry
+        );
+    }
+
     const codeBlocks = Array.isArray(pageIr?.hoisted?.code) ? pageIr.hoisted.code : null;
     if (codeBlocks) {
-        pageIr.hoisted.code = codeBlocks.map((entry) => {
+        pageIr.hoisted.code = codeBlocks.map((entry, index) => {
             if (typeof entry !== 'string') {
                 return entry;
             }
-            return expandScopedShorthandPropertiesInSource(entry);
+            const expanded = expandScopedShorthandPropertiesInSource(entry);
+            return transpileTypeScriptToJs(
+                expanded,
+                `${sourceFile}#hoisted-${index}.ts`,
+                transformCache,
+                mergeMetrics,
+                { target: 'esnext' }
+            );
+        });
+    }
+
+    const irImports = Array.isArray(pageIr?.imports) ? pageIr.imports : null;
+    if (irImports) {
+        for (const imp of irImports) {
+            if (imp && typeof imp === 'object' && typeof imp.spec === 'string') {
+                imp.spec = collapseMultiLineImportStatements(imp.spec);
+            }
+        }
+    }
+
+    const componentScripts = pageIr?.components_scripts && typeof pageIr.components_scripts === 'object'
+        ? pageIr.components_scripts
+        : null;
+    if (componentScripts) {
+        for (const [hoistId, script] of Object.entries(componentScripts)) {
+            if (!script || typeof script !== 'object' || typeof script.code !== 'string') {
+                continue;
+            }
+            if (Array.isArray(script.imports)) {
+                script.imports = script.imports.map((entry) =>
+                    typeof entry === 'string' ? collapseMultiLineImportStatements(entry) : entry
+                );
+            }
+            const expanded = expandScopedShorthandPropertiesInSource(collapseMultiLineImportStatements(script.code));
+            script.code = transpileTypeScriptToJs(
+                expanded,
+                `${sourceFile}#component-${hoistId}.ts`,
+                transformCache,
+                mergeMetrics,
+                { target: 'esnext' }
+            );
+        }
+    }
+
+    const modules = Array.isArray(pageIr?.modules) ? pageIr.modules : null;
+    if (modules) {
+        pageIr.modules = modules.map((module, index) => {
+            if (!module || typeof module !== 'object' || typeof module.source !== 'string') {
+                return module;
+            }
+            const moduleId = typeof module.id === 'string' && module.id.length > 0
+                ? module.id
+                : `${sourceFile}#module-${index}.ts`;
+            const expanded = expandScopedShorthandPropertiesInSource(collapseMultiLineImportStatements(module.source));
+            return {
+                ...module,
+                source: transpileTypeScriptToJs(
+                    expanded,
+                    moduleId,
+                    transformCache,
+                    mergeMetrics,
+                    { target: 'esnext' }
+                )
+            };
         });
     }
 }
@@ -399,10 +274,19 @@ export function rewriteLegacyMarkupIdentifiers(pageIr) {
     }
     const bindings = Array.isArray(pageIr.expression_bindings) ? pageIr.expression_bindings : [];
 
+    function failLegacyMarkup(source) {
+        throw new Error(
+            `[Zenith:Build] Legacy ${LEGACY_MARKUP_IDENT}\`...\` markup syntax is unsupported. ` +
+            'Use embedded markup expressions with embeddedMarkupExpressions: true, or unsafeHTML={value} for explicit raw HTML.'
+        );
+    }
+
     for (let i = 0; i < pageIr.expressions.length; i++) {
         if (typeof pageIr.expressions[i] === 'string' && pageIr.expressions[i].includes(LEGACY_MARKUP_IDENT)) {
             LEGACY_MARKUP_RE.lastIndex = 0;
-            pageIr.expressions[i] = pageIr.expressions[i].replace(LEGACY_MARKUP_RE, '__ZENITH_INTERNAL_ZENHTML');
+            if (LEGACY_MARKUP_RE.test(pageIr.expressions[i])) {
+                failLegacyMarkup(pageIr.expressions[i]);
+            }
         }
         if (
             bindings[i] &&
@@ -411,7 +295,9 @@ export function rewriteLegacyMarkupIdentifiers(pageIr) {
             bindings[i].literal.includes(LEGACY_MARKUP_IDENT)
         ) {
             LEGACY_MARKUP_RE.lastIndex = 0;
-            bindings[i].literal = bindings[i].literal.replace(LEGACY_MARKUP_RE, '__ZENITH_INTERNAL_ZENHTML');
+            if (LEGACY_MARKUP_RE.test(bindings[i].literal)) {
+                failLegacyMarkup(bindings[i].literal);
+            }
         }
         if (
             bindings[i] &&
@@ -420,7 +306,9 @@ export function rewriteLegacyMarkupIdentifiers(pageIr) {
             bindings[i].compiled_expr.includes(LEGACY_MARKUP_IDENT)
         ) {
             LEGACY_MARKUP_RE.lastIndex = 0;
-            bindings[i].compiled_expr = bindings[i].compiled_expr.replace(LEGACY_MARKUP_RE, '__ZENITH_INTERNAL_ZENHTML');
+            if (LEGACY_MARKUP_RE.test(bindings[i].compiled_expr)) {
+                failLegacyMarkup(bindings[i].compiled_expr);
+            }
         }
     }
 }

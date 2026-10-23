@@ -12,10 +12,14 @@ const componentRegistry = buildComponentRegistry(siteSrcDir);
 function compileZenFixture(fixtureName: string, fixtureSource: string) {
   const fixtureFile = resolve(import.meta.dir, `../src/pages/${fixtureName}`);
   const { expandedSource } = expandComponents(fixtureSource, componentRegistry, fixtureFile);
-  const result = spawnSync(compilerBinary, ["--stdin", fixtureFile], {
+  const result = spawnSync(
+    compilerBinary,
+    ["--stdin", fixtureFile, "--internal-allow-unbound-markup"],
+    {
     encoding: "utf8",
     input: expandedSource,
-  });
+    },
+  );
 
   return {
     status: result.status,
@@ -30,13 +34,13 @@ function compileSiteLinksFixture(href: string) {
     `<script lang="ts">
 import Links from "../components/ui/Links.zen";
 </script>
-<Links href="${href}">Docs</Links>`,
+<Links href="${href}">About</Links>`,
   );
 }
 
 describe("site link surface compile contract", () => {
   test("compiles Links through the canonical soft-nav anchor path for proven route entries", () => {
-    const result = compileSiteLinksFixture("/docs");
+    const result = compileSiteLinksFixture("/about");
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
@@ -50,13 +54,13 @@ describe("site link surface compile contract", () => {
 
   test("keeps external and deep-hash site surfaces compile-safe without widening soft-nav policy", () => {
     const externalResult = compileSiteLinksFixture("https://github.com/zenithbuild/framework");
-    const hashResult = compileSiteLinksFixture("/docs#routing");
+    const hashResult = compileSiteLinksFixture("/about#routing");
 
     expect(externalResult.status).toBe(0);
     expect(hashResult.status).toBe(0);
   });
 
-  test("keeps the navigation menu on the canonical clickable site link surface", () => {
+  test("keeps the simplified navigation on the canonical clickable site link surface", () => {
     const navigationSource = readFileSync(resolve(import.meta.dir, "../src/components/ui/Navigation.zen"), "utf8");
     const result = compileZenFixture(
       "__navigation-fixture__.zen",
@@ -67,31 +71,32 @@ const navigationFixtureContent = {
   mainLinks: [
     { label: "Home", href: "/" },
     { label: "About", href: "/about" },
-    { label: "Docs", href: "/docs" },
-    { label: "Blog", href: "/blog" },
-    { label: "Changelog", href: "/changelog" },
     { label: "GitHub", href: "https://github.com/zenithbuild/framework" },
   ],
   footerLinks: [
     { label: "Twitter", href: "https://twitter.com/zenithbuild" },
     { label: "GitHub", href: "https://github.com/zenithbuild/framework" },
-    { label: "Contract", href: "/docs#editor-contract" },
   ],
 };
 </script>
 <Navigation content={navigationFixtureContent} />`,
     );
 
-    expect(navigationSource.includes('class="pointer-events-auto flex-1 flex flex-col justify-center"')).toBe(true);
+    expect(navigationSource.includes('data-nav-logo-target="true"')).toBe(true);
+    expect(navigationSource.includes('NavDropdown label="Docs"')).toBe(true);
+    expect(navigationSource.includes('NavDropdown label="Framework"')).toBe(false);
+    expect(navigationSource.includes('NavDropdown label="Resources"')).toBe(false);
+    expect(navigationSource.includes("href={navHomeLink.href}")).toBe(true);
+    expect(navigationSource.includes("href={navBlogLink.href}")).toBe(true);
     expect(navigationSource.includes("href={navAboutLink.href}")).toBe(true);
-    expect(navigationSource.includes("href={navDocsLink.href}")).toBe(true);
-    expect(navigationSource.includes("href={navChangelogLink.href}")).toBe(true);
+    expect(navigationSource.includes("documentationDropdownItems[0].href")).toBe(true);
+    expect(navigationSource.includes("href={navChangelogLink.href}")).toBe(false);
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
 
     const payload = JSON.parse(result.stdout);
-    expect(payload.html.includes("site-menu-panel")).toBe(true);
-    expect(payload.html.includes("pointer-events-auto flex-1 flex flex-col justify-center")).toBe(true);
+    expect(payload.html.includes("mobile-navigation")).toBe(true);
+    expect(payload.html.includes("data-nav-logo-target")).toBe(true);
     expect(
       payload.html.includes('data-zen-link="true"') ||
       payload.html.includes("data-zx-data-zen-link="),

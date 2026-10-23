@@ -16,7 +16,14 @@ const bundlerReady = hasExecutable(bundlerBin);
 async function makeEntry() {
   const root = await createTempProject('zenith-phase2');
   const entry = path.join(root, 'index.zen');
-  await fsp.writeFile(entry, '<div><h1>{title}</h1></div>', 'utf8');
+  await fsp.writeFile(
+    entry,
+    `<script lang="ts">
+const title = "Hello from Zenith";
+</script>
+<div><h1>{title}</h1></div>`,
+    'utf8'
+  );
   return { root, entry };
 }
 

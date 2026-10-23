@@ -1,0 +1,38 @@
+<script lang="ts">
+interface Props {
+  size?: "hero" | "page" | "section" | "article" | "docs";
+  motion?: "route" | "scroll" | "none";
+  class?: string;
+  elementRef?: any;
+}
+
+const p = props as Props;
+const size = p.size || "section";
+const motionMode = p.motion || "none";
+const className = typeof p.class === "string" ? p.class : "";
+const forwardedRef = p.elementRef;
+const localRef = ref<HTMLElement>();
+const titleRef = forwardedRef || localRef;
+
+const sizeClasses: Record<string, string> = {
+  hero: "text-balance font-heading text-[clamp(4rem,11vw,9.5rem)] font-semibold leading-[0.84] tracking-normal text-foreground",
+  page: "text-balance font-heading text-6xl font-semibold leading-[0.88] tracking-normal text-foreground sm:text-7xl lg:text-8xl xl:text-9xl",
+  section: "font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl lg:text-7xl",
+  article: "text-balance font-heading text-[clamp(2.5rem,8vw,6.5rem)] font-semibold uppercase tracking-tighter leading-[0.9] text-foreground",
+  docs: "font-heading text-4xl font-semibold leading-none text-foreground sm:text-5xl",
+};
+
+const titleClass = ((sizeClasses[size] || sizeClasses.section) + " " + className).trim();
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const el = titleRef.current;
+  if (!win || !el) return;
+  if (motionMode === "route") el.setAttribute("data-route-title", "true");
+  if (motionMode === "scroll") el.setAttribute("data-route-entrance", "true");
+});
+</script>
+
+<h2 ref={titleRef} class={titleClass}>
+  <slot />
+</h2>

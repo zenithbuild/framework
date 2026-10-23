@@ -16,13 +16,18 @@ import { findMatchingComponentClose, findNextKnownComponentTag } from './compone
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const FRAMEWORK_COMPONENTS = [
-    ['Image', join(__dirname, 'framework-components', 'Image.zen')]
-];
-
 // ---------------------------------------------------------------------------
 // Registry: Map<PascalCaseName, absolutePath>
 // ---------------------------------------------------------------------------
+
+// Absolute paths of framework-provided components (the @zenithbuild/image
+// <Image>). Only these get framework Image materialization; a project-defined
+// Image.zen is an ordinary component.
+const FRAMEWORK_COMPONENT_PATHS = new Set();
+
+export function isFrameworkComponentPath(componentPath) {
+    return FRAMEWORK_COMPONENT_PATHS.has(componentPath);
+}
 
 /**
  * Walk `srcDir/components/` recursively. Return Map<PascalName, absPath>.
@@ -33,7 +38,7 @@ const FRAMEWORK_COMPONENTS = [
  * @param {string} srcDir — absolute path to the project's `src/` directory
  * @returns {Map<string, string>}
  */
-export function buildComponentRegistry(srcDir) {
+export function buildComponentRegistry(srcDir, { imageComponentPath = null } = {}) {
     /** @type {Map<string, string>} */
     const registry = new Map();
 
@@ -48,19 +53,16 @@ export function buildComponentRegistry(srcDir) {
         walkDir(dir, registry);
     }
 
-    for (const [componentName, componentPath] of FRAMEWORK_COMPONENTS) {
+    for (const [componentName, componentPath] of (imageComponentPath ? [['Image', imageComponentPath]] : [])) {
         if (!existsSync(componentPath)) {
             continue;
         }
+        // A project-defined component of the same name wins over the package one.
         if (registry.has(componentName)) {
-            throw new Error(
-                `Duplicate component name "${componentName}":\n` +
-                `  1) ${registry.get(componentName)}\n` +
-                `  2) ${componentPath}\n` +
-                'Rename the local component to avoid shadowing the Zenith framework component.'
-            );
+            continue;
         }
         registry.set(componentName, componentPath);
+        FRAMEWORK_COMPONENT_PATHS.add(componentPath);
     }
 
     return registry;

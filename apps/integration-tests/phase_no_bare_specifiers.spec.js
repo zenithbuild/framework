@@ -19,8 +19,8 @@ describe('Phase no-bare-specifiers', () => {
       await scaffoldZenithProject(root, {
         router: true,
         pages: {
-          'index.zen': `<script>
-import Button from './components/Button.zen'
+          'index.zen': `<script lang="ts">
+import Button from '../components/Button.zen'
 const count = signal(0)
 function inc() { count.set(count.get() + 1) }
 </script>
@@ -33,10 +33,15 @@ function inc() { count.set(count.get() + 1) }
       });
 
       await writeText(
-        path.join(root, 'pages', 'components', 'Button.zen'),
-        `<script>
-const label = __props.label
-const count = __props.count
+        path.join(root, 'components', 'Button.zen'),
+        `<script lang="ts">
+interface ButtonProps {
+  label?: string
+  count?: unknown
+}
+const incoming = props as ButtonProps
+const label = incoming.label
+const count = incoming.count
 </script>
 <article>
   <p>{label}</p>

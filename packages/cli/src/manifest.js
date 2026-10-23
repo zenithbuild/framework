@@ -1,25 +1,68 @@
-// ---------------------------------------------------------------------------
-// manifest.js — Zenith CLI V0
-// ---------------------------------------------------------------------------
-// File-based manifest engine.
-//
-// Scans a /pages directory and produces a deterministic RouteManifest.
-//
-// Rules:
-//   - index.zen → parent directory path
-//   - [param].zen → :param dynamic segment
-//   - [...slug].zen → *slug catch-all segment (must be terminal, 1+ segments;
-//                     root '/*slug' may match '/' in router matcher)
-//   - [[...slug]].zen → *slug? optional catch-all segment (must be terminal, 0+ segments)
-//   - Deterministic precedence: static > :param > *catchall
-//   - Tie-breaker: lexicographic route path
-// ---------------------------------------------------------------------------
+// File-based manifest engine. Scans /pages and produces deterministic RouteManifest entries.
+// Rules: static > :param > *catchall, then lexicographic tie-breaker.
 
+import { readFileSync, existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { join, relative, sep, basename, extname, dirname } from 'node:path';
+import { join, relative, sep, basename, extname, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { extractServerScript } from './build/server-script.js';
+import { analyzeResourceRouteModule, isResourceRouteFile } from './resource-route-module.js';
+import { composeServerScriptEnvelope, resolveAdjacentServerModules } from './server-script-composition.js';
+import { validateStaticExportPaths } from './static-export-paths.js';
+import { classifyPageRoute } from './route-classification.js';
+import { buildComponentRegistry } from './resolve-components.js';
+
+const SCOPED_SERVER_DATA_HELPER_UNAVAILABLE =
+    '[Zenith:ScopedServerData] Manifest integration helper is unavailable. Run the CLI build step before using scoped server data manifest integration.';
+
+function resolveManifestIntegrationPath() {
+    const moduleDir = dirname(fileURLToPath(import.meta.url));
+    return [
+        join(moduleDir, 'scoped-server-data', 'manifest-integration.js'),
+        join(moduleDir, '..', 'dist', 'scoped-server-data', 'manifest-integration.js')
+    ].find((candidate) => existsSync(candidate)) || null;
+}
+
+const manifestIntegrationPath = resolveManifestIntegrationPath();
+const manifestIntegration = manifestIntegrationPath
+    ? await import(pathToFileURL(manifestIntegrationPath).href)
+    : null;
+
+function getManifestIntegration() {
+    if (!manifestIntegration) {
+        throw new Error(SCOPED_SERVER_DATA_HELPER_UNAVAILABLE);
+    }
+
+    return manifestIntegration;
+}
+
+/** @type {typeof import('./scoped-server-data/manifest-integration.js').analyzeRouteScopedServerMetadata} */
+export function analyzeRouteScopedServerMetadata(options) {
+    return getManifestIntegration().analyzeRouteScopedServerMetadata(options);
+}
+
+/** @type {typeof import('./scoped-server-data/manifest-integration.js').assertNoScopedServerBuildErrors} */
+export function assertNoScopedServerBuildErrors(diagnostics, contextFile) {
+    return getManifestIntegration().assertNoScopedServerBuildErrors(diagnostics, contextFile);
+}
 
 /**
- * @typedef {{ path: string, file: string }} ManifestEntry
+ * @typedef {{
+ *   path: string,
+ *   file: string,
+ *   route_kind?: 'page' | 'resource',
+ *   path_kind: 'static' | 'dynamic',
+ *   render_mode: 'prerender' | 'server',
+ *   params: string[],
+ *   server_script?: string,
+ *   server_script_path?: string,
+ *   has_guard?: boolean,
+ *   has_load?: boolean,
+ *   has_action?: boolean,
+ *   has_scoped_server_data?: boolean,
+ *   scoped_server_data?: import('./scoped-server-data/types.js').ManifestScopedServerDataEntry[],
+ *   export_paths?: string[]
+ * }} ManifestEntry
  */
 
 /**
@@ -27,10 +70,21 @@ import { join, relative, sep, basename, extname, dirname } from 'node:path';
  *
  * @param {string} pagesDir - Absolute path to /pages directory
  * @param {string} [extension='.zen'] - File extension to scan for
+ * @param {{ compilerOpts?: object, srcDir?: string, registry?: Map<string, string> }} [options]
  * @returns {Promise<ManifestEntry[]>}
  */
-export async function generateManifest(pagesDir, extension = '.zen') {
-    const entries = await _scanDir(pagesDir, pagesDir, extension);
+export async function generateManifest(pagesDir, extension = '.zen', options = {}) {
+    const resolvedPagesDir = resolve(pagesDir);
+    const srcDir = resolve(options.srcDir || resolve(resolvedPagesDir, '..'));
+    const registry = options.registry || buildComponentRegistry(srcDir);
+    const scanContext = { srcDir, registry, compilerOpts: options.compilerOpts || {} };
+
+    const entries = await _scanDir(resolvedPagesDir, resolvedPagesDir, extension, scanContext);
+    const apiAliasState = _resolveSrcApiAliasState(pagesDir);
+    if (apiAliasState) {
+        const aliasEntries = await _scanResourceDir(apiAliasState.aliasDir, apiAliasState.srcDir);
+        entries.push(...aliasEntries);
+    }
 
     // Validate: no repeated param names in any single route
     for (const entry of entries) {
@@ -50,7 +104,7 @@ export async function generateManifest(pagesDir, extension = '.zen') {
  * @param {string} ext - Extension to match
  * @returns {Promise<ManifestEntry[]>}
  */
-async function _scanDir(dir, root, ext) {
+async function _scanDir(dir, root, ext, scanContext) {
     /** @type {ManifestEntry[]} */
     const entries = [];
 
@@ -69,15 +123,132 @@ async function _scanDir(dir, root, ext) {
         const info = await stat(fullPath);
 
         if (info.isDirectory()) {
-            const nested = await _scanDir(fullPath, root, ext);
+            const nested = await _scanDir(fullPath, root, ext, scanContext);
             entries.push(...nested);
         } else if (item.endsWith(ext)) {
             const routePath = _fileToRoute(fullPath, root, ext);
-            entries.push({ path: routePath, file: relative(root, fullPath) });
+            entries.push(buildPageManifestEntry({
+                fullPath,
+                root,
+                routePath,
+                scanContext
+            }));
+        } else if (isResourceRouteFile(item)) {
+            entries.push(analyzeResourceRouteModule(fullPath, root));
         }
     }
 
     return entries;
+}
+
+async function _scanResourceDir(dir, root) {
+    /** @type {ManifestEntry[]} */
+    const entries = [];
+    let items;
+    try {
+        items = await readdir(dir);
+    } catch {
+        return entries;
+    }
+
+    items.sort();
+
+    for (const item of items) {
+        const fullPath = join(dir, item);
+        const info = await stat(fullPath);
+        if (info.isDirectory()) {
+            const nested = await _scanResourceDir(fullPath, root);
+            entries.push(...nested);
+        } else if (isResourceRouteFile(item)) {
+            entries.push(analyzeResourceRouteModule(fullPath, root));
+        }
+    }
+
+    return entries;
+}
+
+function _resolveSrcApiAliasState(pagesDir) {
+    const resolvedPagesDir = resolve(pagesDir);
+    const srcDir = dirname(resolvedPagesDir);
+    if (basename(srcDir) !== 'src') {
+        return null;
+    }
+
+    const aliasDir = join(srcDir, 'api');
+    if (
+        aliasDir === resolvedPagesDir ||
+        aliasDir.startsWith(`${resolvedPagesDir}${sep}`)
+    ) {
+        return null;
+    }
+
+    return {
+        aliasDir,
+        srcDir
+    };
+}
+
+function buildPageManifestEntry({ fullPath, root, routePath, scanContext }) {
+    const { srcDir, registry, compilerOpts } = scanContext;
+    const rawSource = readFileSync(fullPath, 'utf8');
+    const inlineServerScript = extractServerScript(rawSource, fullPath, compilerOpts).serverScript;
+    const { guardPath, loadPath, actionPath } = resolveAdjacentServerModules(fullPath);
+    const composed = composeServerScriptEnvelope({
+        sourceFile: fullPath,
+        inlineServerScript,
+        adjacentGuardPath: guardPath,
+        adjacentLoadPath: loadPath,
+        adjacentActionPath: actionPath
+    });
+
+    const scopedMetadata = analyzeRouteScopedServerMetadata({
+        pageSource: rawSource,
+        pageFile: fullPath,
+        registry,
+        srcDir,
+        compilerOpts
+    });
+    const manifestFile = relative(root, fullPath);
+    assertNoScopedServerBuildErrors(scopedMetadata.diagnostics, manifestFile);
+
+    const exportPaths = Array.isArray(composed.serverScript?.export_paths)
+        ? validateStaticExportPaths(routePath, composed.serverScript.export_paths, fullPath)
+        : [];
+    const classification = classifyPageRoute({
+        file: manifestFile,
+        serverScript: composed.serverScript,
+        hasScopedServerData: scopedMetadata.hasScopedServerData
+    });
+
+    return {
+        path: routePath,
+        file: manifestFile,
+        route_kind: 'page',
+        path_kind: _isDynamic(routePath) ? 'dynamic' : 'static',
+        render_mode: classification.renderMode,
+        params: extractRouteParams(routePath),
+        has_guard: classification.hasGuard,
+        has_load: classification.hasLoad,
+        has_action: classification.hasAction,
+        ...(scopedMetadata.hasScopedServerData
+            ? {
+                has_scoped_server_data: true,
+                scoped_server_data: scopedMetadata.scopedServerData
+            }
+            : {}),
+        ...(exportPaths.length > 0 ? { export_paths: exportPaths } : {})
+    };
+}
+
+function extractRouteParams(routePath) {
+    return routePath
+        .split('/')
+        .filter(Boolean)
+        .filter((segment) => segment.startsWith(':') || segment.startsWith('*'))
+        .map((segment) => {
+            const raw = segment.slice(1);
+            return raw.endsWith('?') ? raw.slice(0, -1) : raw;
+        });
 }
 
 /**
@@ -314,7 +485,9 @@ function segmentWeight(segment) {
  * @returns {string}
  */
 export function serializeManifest(entries) {
-    const lines = entries.map((e) => {
+    const lines = entries
+        .filter((entry) => entry?.route_kind !== 'resource')
+        .map((e) => {
         const hasParams = _isDynamic(e.path);
         const loader = hasParams
             ? `(params) => import('./pages/${e.file}')`

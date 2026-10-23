@@ -5,11 +5,14 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["guides", "demos", "interactive"]
+section: "Styling and UI"
+sectionOrder: 5
+order: 2
 ---
 
 # Interactive Demos
 
-These demos are sourced from `zenith-docs/demos/*.zen`, compiled in CI, and rendered through whitelisted demo routes.
+These demos are sourced from `docs/demos/*.zen`, compiled in CI, and rendered through whitelisted demo routes.
 
 ## Counter
 
@@ -34,4 +37,9 @@ These demos are sourced from `zenith-docs/demos/*.zen`, compiled in CI, and rend
 ## Form Validation
 
 :::demo id="form-validation"
+:::
+
+## Navigation Shell
+
+:::demo id="navigation-shell"
 :::

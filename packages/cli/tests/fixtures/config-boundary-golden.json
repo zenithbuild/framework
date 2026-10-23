@@ -1,0 +1,359 @@
+{
+  "defaults": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "webp",
+          "avif"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "unknown config key": {
+    "accepted": false,
+    "error": "[Zenith:Config] Unknown key: \"unknown\""
+  },
+  "base path normalization": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/docs",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "webp",
+          "avif"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "invalid base path": {
+    "accepted": false,
+    "error": "[Zenith:Config] Key \"basePath\" must start with \"/\""
+  },
+  "quality upper bound": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "webp",
+          "avif"
+        ],
+        "quality": 101,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "quality lower bound": {
+    "accepted": false,
+    "error": "[Zenith:Config] images.quality must be a positive integer"
+  },
+  "image format normalization": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "gif"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "multiple formats": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "jpeg",
+          "webp"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "image widths": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "webp",
+          "avif"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          16,
+          32
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "remote pattern validation": {
+    "accepted": true,
+    "value": {
+      "router": false,
+      "embeddedMarkupExpressions": false,
+      "typescriptDefault": true,
+      "outDir": "dist",
+      "pagesDir": "pages",
+      "basePath": "/",
+      "target": "static",
+      "adapter": null,
+      "strictDomLints": false,
+      "images": {
+        "formats": [
+          "webp",
+          "avif"
+        ],
+        "quality": 75,
+        "deviceSizes": [
+          640,
+          750,
+          828,
+          1080,
+          1200,
+          1920,
+          2048,
+          3840
+        ],
+        "imageSizes": [
+          16,
+          32,
+          48,
+          64,
+          96,
+          128,
+          256,
+          384
+        ],
+        "remotePatterns": [
+          {
+            "protocol": "https",
+            "hostname": "example.com",
+            "port": "",
+            "pathname": "/**",
+            "search": ""
+          }
+        ],
+        "allowSvg": false,
+        "maxRemoteBytes": 10485760,
+        "maxPixels": 40000000,
+        "minimumCacheTTL": 60,
+        "dangerouslyAllowLocalNetwork": false
+      },
+      "plugins": []
+    }
+  },
+  "local network policy type": {
+    "accepted": false,
+    "error": "[Zenith:Config] images.dangerouslyAllowLocalNetwork must be boolean"
+  },
+  "cache lifetime boundary": {
+    "accepted": false,
+    "error": "[Zenith:Config] images.minimumCacheTTL must be a positive integer"
+  }
+}

@@ -1,0 +1,400 @@
+<script setup="ts">
+import { gsap } from "gsap";
+import { Flip } from "gsap/Flip";
+import { SplitText } from "gsap/SplitText";
+import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
+import TransitionIdentity from "@/components/transition/TransitionIdentity.zen";
+
+const transitionTiming = {
+  artworkIn: 0.42, ringStagger: 0.07, markStagger: 0.06, logoReveal: 0.72,
+  labelEntrance: 0.72, labelHoldShort: 1.0, labelHoldMedium: 1.3, labelHoldLong: 1.6,
+  labelExit: 0.72, labelWordStagger: 0.06,
+  artworkOut: 0.36, ringExitStagger: 0.04,
+  overlayMaskAway: 0.32, destinationEntrance: 0.44, backdropFade: 0.26, overlayFade: 0.12,
+  introPhraseHold: 1.2, introLogoFlip: 1.02, introHeroStagger: 0.08,
+  reducedHold: 0.5,
+} as const;
+
+type IntroPhase = "pending" | "loading" | "revealingMark" | "markRevealed" | "movingLogo" | "logoSettled" | "svgExit" | "revealingContent" | "complete";
+
+interface ElementRef<T> { current?: T | null; }
+
+interface Props {
+  enabled?: boolean;
+  navigationShellRef: ElementRef<HTMLElement>;
+  navigationLogoTargetRef: ElementRef<HTMLElement>;
+  navigationLinksRef: ElementRef<HTMLElement>;
+  navigationActionsRef: ElementRef<HTMLElement>;
+  pageShellRef: ElementRef<HTMLElement>;
+  footerShellRef: ElementRef<HTMLElement>;
+  heroEyebrowRef?: ElementRef<HTMLElement>;
+  heroTitleRef?: ElementRef<HTMLElement>;
+  heroDescriptionRef?: ElementRef<HTMLElement>;
+  heroActionsRef?: ElementRef<HTMLElement>;
+  heroSupportRef?: ElementRef<HTMLElement>;
+}
+
+interface IntroWindow extends Window {
+  __zenithIntroCommitted?: boolean;
+  __zenithIntroComplete?: boolean;
+  __zenithIntroStarted?: boolean;
+  __zenithIntroPlayed?: boolean;
+  __zenithIntroTimelineActive?: boolean;
+}
+
+const introProps = props as Props;
+const introEnabled = introProps.enabled === true;
+const phrases = ["Prime trusted runtime", "Compile route graph", "Place Zenith mark"];
+
+const fallbackHeroEyebrowRef = ref<HTMLElement>();
+const fallbackHeroTitleRef = ref<HTMLElement>();
+const fallbackHeroDescriptionRef = ref<HTMLElement>();
+const fallbackHeroActionsRef = ref<HTMLElement>();
+const fallbackHeroSupportRef = ref<HTMLElement>();
+const heroEyebrowRef = introProps.heroEyebrowRef || fallbackHeroEyebrowRef;
+const heroTitleRef = introProps.heroTitleRef || fallbackHeroTitleRef;
+const heroDescriptionRef = introProps.heroDescriptionRef || fallbackHeroDescriptionRef;
+const heroActionsRef = introProps.heroActionsRef || fallbackHeroActionsRef;
+const heroSupportRef = introProps.heroSupportRef || fallbackHeroSupportRef;
+
+const loaderRef = ref<HTMLElement>();
+const backdropRef = ref<HTMLElement>();
+const lineRef = ref<HTMLElement>();
+const surfaceRef = ref<HTMLElement>();
+const compositionRef = ref<HTMLElement>();
+const handoffLayerRef = ref<HTMLElement>();
+const markMaskRef = ref<HTMLElement>();
+const markTravelerRef = ref<HTMLElement>();
+
+state phrase = phrases[0];
+state introPhase = "pending";
+
+function normalizedPath(win: Window) {
+  return win.location.pathname.replace(/\/+$/, "") || "/";
+}
+
+function commitIntroRun(win: IntroWindow) {
+  win.__zenithIntroCommitted = true;
+  win.__zenithIntroStarted = true;
+  win.__zenithIntroTimelineActive = true;
+}
+
+function setDocumentState(phase: IntroPhase) {
+  introPhase = phase;
+  zenDocument()?.documentElement.setAttribute("data-zenith-intro-state", phase);
+}
+
+function setGateAccess(gates: HTMLElement[], hidden: boolean) {
+  gates.forEach((gate) => {
+    if (hidden) { gate.setAttribute("inert", ""); gate.setAttribute("aria-hidden", "true"); return; }
+    gate.removeAttribute("inert");
+    gate.removeAttribute("aria-hidden");
+  });
+}
+
+zenMount((ctx) => {
+  const win = zenWindow() as IntroWindow | null;
+  const doc = zenDocument();
+  const loader = loaderRef.current;
+  const backdrop = backdropRef.current;
+  const line = lineRef.current;
+  const surface = surfaceRef.current;
+  const composition = compositionRef.current;
+  const markMask = markMaskRef.current;
+  const markTraveler = markTravelerRef.current;
+  const handoffLayer = handoffLayerRef.current;
+  const navigationShell = introProps.navigationShellRef.current || null;
+  const logoTarget = introProps.navigationLogoTargetRef.current || null;
+  const allGates = collectRefs(introProps.navigationShellRef, introProps.pageShellRef, introProps.footerShellRef) as HTMLElement[];
+  const contentGates = collectRefs(introProps.pageShellRef, introProps.footerShellRef) as HTMLElement[];
+  const navigationParts = collectRefs(introProps.navigationLinksRef, introProps.navigationActionsRef) as HTMLElement[];
+  const heroElements = collectRefs(heroEyebrowRef, heroDescriptionRef, heroActionsRef, heroSupportRef) as HTMLElement[];
+  const heroTitle = heroTitleRef.current || null;
+
+  if (!win || !doc || !loader || !backdrop || !line || !surface || !composition || !markMask || !markTraveler || !handoffLayer) return;
+
+  // zen-allow:dom-query — query shared composition elements from parent-owned wrapper
+  // This is safe because compositionRef is a local ref that exists before zenMount runs.
+  // DOM elements rendered by TransitionIdentity exist when the template renders, regardless
+  // of when the child component's zenMount callback executes.
+  const artwork = composition.querySelector<HTMLElement>('[data-transition-artwork="true"]');
+  const glow = composition.querySelector<HTMLElement>('[data-transition-glow="true"]');
+  const decorRingOuter = composition.querySelector<HTMLElement>('[data-transition-ring="outer"]');
+  const decorRingMid = composition.querySelector<HTMLElement>('[data-transition-ring="middle"]');
+  const decorRingInner = composition.querySelector<HTMLElement>('[data-transition-ring="inner"]');
+  const markRing = composition.querySelector<HTMLElement>('[data-transition-mark-ring="true"]');
+  const markCore = composition.querySelector<HTMLElement>('[data-transition-mark-core="true"]');
+  const labelFrame = composition.querySelector<HTMLElement>('[data-transition-label-frame="true"]');
+  const label = composition.querySelector<HTMLElement>('[data-transition-label="true"]');
+  if (label) label.className = 'font-heading text-2xl font-medium tracking-tight text-foreground sm:text-3xl';
+  const decorRings = [decorRingOuter, decorRingMid, decorRingInner].filter(Boolean) as HTMLElement[];
+
+  if (!artwork || !glow || !markRing || !markCore || !labelFrame || !label || decorRings.length < 3) return;
+
+  const scrollbarWidth = Math.max(0, win.innerWidth - doc.documentElement.clientWidth);
+  doc.documentElement.style.setProperty("--zenith-scrollbar-width", `${scrollbarWidth}px`);
+
+  gsap.registerPlugin(Flip, SplitText);
+  let bootTimeline: gsap.core.Timeline | null = null;
+  let flipTimeline: gsap.core.Timeline | null = null;
+  let revealTimeline: gsap.core.Timeline | null = null;
+  let svgExitTimeline: gsap.core.Timeline | null = null;
+  let heroSplit: SplitText | null = null;
+  let heroLineTween: gsap.core.Tween | null = null;
+  let phraseSplit: SplitText | null = null;
+  let handoffFrame = 0;
+  let cancelled = false;
+  let ownsTimeline = false;
+  let heroRevealComplete = false;
+
+  function disposeHeroSplit() {
+    if (!heroSplit) return;
+    heroSplit.revert(); heroSplit.kill(); heroSplit = null; heroLineTween = null;
+  }
+
+  let phraseToken = 0;
+
+  function disposePhraseSplit() {
+    if (!phraseSplit) return;
+    gsap.set(label, { autoAlpha: 0 });
+    phraseSplit.revert(); phraseSplit.kill(); phraseSplit = null;
+    label.textContent = "";
+  }
+
+  function markComplete() {
+    win.__zenithIntroPlayed = true;
+    win.__zenithIntroComplete = true;
+    win.__zenithIntroTimelineActive = false;
+  }
+
+  function unlockPage() {
+    setGateAccess(allGates, false);
+    gsap.set([...allGates, ...navigationParts, ...heroElements, ...decorRings], { clearProps: "opacity,visibility,transform,pointerEvents,willChange" });
+    if (logoTarget) gsap.set(logoTarget, { clearProps: "opacity,visibility,transform" });
+  }
+
+  function completeImmediately() {
+    disposePhraseSplit();
+    gsap.set(label, { autoAlpha: 0 });
+    label.textContent = "";
+    disposeHeroSplit();
+    if (svgExitTimeline) { svgExitTimeline.kill(); svgExitTimeline = null; }
+    heroRevealComplete = true;
+    setDocumentState("complete"); unlockPage();
+    if (logoTarget) gsap.set(logoTarget, { autoAlpha: 1 });
+    gsap.set(markTraveler, { autoAlpha: 0 });
+    gsap.set(loader, { autoAlpha: 0 });
+    markComplete();
+  }
+
+  function prepareHeroSplit() {
+    if (!heroTitle || heroSplit) return;
+    heroSplit = SplitText.create(heroTitle, {
+      type: "lines", mask: "lines", autoSplit: true, aria: "auto", linesClass: "zenith-hero-line",
+      onSplit(split) {
+        if (heroRevealComplete) { gsap.set(split.lines, { clearProps: "opacity,visibility,transform" }); heroLineTween = null; return; }
+        heroLineTween = gsap.fromTo(split.lines, { yPercent: 112 }, { yPercent: 0, duration: transitionTiming.introHeroStagger * 9, stagger: transitionTiming.introHeroStagger, ease: "power3.out", paused: true });
+        return heroLineTween;
+      },
+    });
+  }
+
+  function finishReveal() {
+    heroRevealComplete = true;
+    if (heroSplit) gsap.set(heroSplit.lines, { clearProps: "opacity,visibility,transform" });
+    setDocumentState("complete"); unlockPage(); markComplete();
+    gsap.set([surface, markRing, markCore, ...decorRings, label, labelFrame, glow], { clearProps: "willChange" });
+    gsap.set(loader, { autoAlpha: 0 });
+  }
+
+  function revealContent() {
+    setDocumentState("revealingContent");
+    gsap.set(contentGates, { autoAlpha: 1, y: 0 });
+    if (navigationShell) gsap.set(navigationShell, { autoAlpha: 1, y: 0 });
+    gsap.set(navigationParts, { autoAlpha: 0, y: -8 });
+    gsap.set(heroElements, { autoAlpha: 0, y: 18 });
+    revealTimeline = gsap.timeline({ paused: true, defaults: { ease: "power3.out" }, onComplete: finishReveal });
+    revealTimeline
+      .to([backdrop, surface], { autoAlpha: 0, duration: 0.34 }, 0)
+      .to(heroEyebrowRef.current || [], { autoAlpha: 1, y: 0, duration: 0.36 }, 0.08);
+    if (heroLineTween) { revealTimeline.add(heroLineTween, 0.18); heroLineTween.paused(false); }
+    revealTimeline
+      .to(heroDescriptionRef.current || [], { autoAlpha: 1, y: 0, duration: 0.5 }, 0.48)
+      .to(heroActionsRef.current || [], { autoAlpha: 1, y: 0, duration: 0.48 }, 0.62)
+      .to(heroSupportRef.current || [], { autoAlpha: 1, y: 0, duration: 0.62 }, 0.74)
+      .to(navigationParts, { autoAlpha: 1, y: 0, duration: 0.42, stagger: 0.06 }, 0.84)
+      .to(loader, { autoAlpha: 0, duration: 0.2 }, 1.2);
+    revealTimeline.play(0);
+  }
+
+  function animateSvgExit() {
+    setDocumentState("svgExit");
+    svgExitTimeline = gsap.timeline({ defaults: { ease: "power2.out" }, onComplete: revealContent });
+    svgExitTimeline
+      .to(decorRingOuter, { scale: 1.1, autoAlpha: 0, duration: 0.34 }, 0)
+      .to(decorRingMid, { scale: 0.5, autoAlpha: 0, duration: 0.3, ease: "power2.inOut" }, 0.04)
+      .to(decorRingInner, { scale: 0.25, autoAlpha: 0, duration: 0.26, ease: "power2.inOut" }, 0.08)
+      .to(markRing, { scale: 1.2, autoAlpha: 0, duration: 0.32 }, 0.06)
+      .to(markCore, { scale: 0.15, autoAlpha: 0, duration: 0.24, ease: "power2.in" }, 0.1)
+      .to(markMask, { autoAlpha: 0, duration: 0.18 }, 0.12)
+      .to(glow, { autoAlpha: 0, scale: 0.8, duration: 0.26 }, 0.06)
+      .to(line, { autoAlpha: 0, duration: 0.2 }, 0.14);
+  }
+
+  function settleLogo() {
+    setDocumentState("logoSettled");
+    handoffFrame = win.requestAnimationFrame(() => {
+      if (navigationShell) gsap.set(navigationShell, { autoAlpha: 1, y: 0 });
+      gsap.set(navigationParts, { autoAlpha: 0, y: -8 });
+      if (logoTarget) gsap.set(logoTarget, { autoAlpha: 1 });
+      gsap.set(markTraveler, { autoAlpha: 0 });
+      animateSvgExit();
+    });
+  }
+
+  function startLogoFlip() {
+    if (!logoTarget || Flip.isFlipping(markTraveler) || cancelled) { completeImmediately(); return; }
+    disposePhraseSplit();
+    phrase = phrases[2];
+    setDocumentState("movingLogo");
+    const firstState = Flip.getState(markTraveler, { simple: true });
+    handoffLayer.appendChild(markTraveler);
+    Flip.fit(markTraveler, logoTarget, { absolute: true, scale: true, simple: true });
+    flipTimeline = Flip.from(firstState, { absolute: true, scale: true, simple: true, duration: transitionTiming.introLogoFlip, ease: "power3.inOut", onComplete: settleLogo });
+  }
+
+  let phraseTimeline: gsap.core.Timeline | null = null;
+
+  function playPhrase(text: string, onComplete: () => void) {
+    phraseToken++;
+    const myToken = phraseToken;
+    disposePhraseSplit();
+    label.textContent = text;
+    let words: HTMLElement[];
+    try {
+      phraseSplit = SplitText.create(label, { type: "words", mask: "words", aria: "auto", wordsClass: "zenith-intro-word" });
+      words = phraseSplit.words;
+    } catch {
+      phraseSplit = null;
+      words = [label];
+    }
+    gsap.set(labelFrame, { transformPerspective: 560 });
+    gsap.set(words, { autoAlpha: 0, yPercent: 110, rotationX: -48, transformOrigin: "50% 100%" });
+    gsap.set(label, { autoAlpha: 1 });
+    phraseTimeline = gsap.timeline()
+      .to(words, { autoAlpha: 1, yPercent: 0, rotationX: 0, duration: transitionTiming.labelEntrance, stagger: transitionTiming.labelWordStagger, ease: "power3.out" })
+      .to({}, { duration: transitionTiming.introPhraseHold })
+      .to(words, { autoAlpha: 0, yPercent: -105, rotationX: 42, duration: transitionTiming.labelExit, stagger: transitionTiming.labelWordStagger, ease: "power3.in" })
+      .call(() => {
+        if (myToken !== phraseToken) return;
+        disposePhraseSplit();
+        onComplete();
+      });
+  }
+
+  function startIntroSequence() {
+    if (cancelled || !ownsTimeline) return;
+    prepareHeroSplit();
+    setDocumentState("revealingMark");
+    bootTimeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+    bootTimeline
+      .to([markRing, markCore], { autoAlpha: 1, scale: 1, duration: transitionTiming.artworkIn, stagger: transitionTiming.markStagger })
+      .to(markMask, { clipPath: "inset(0 0% 0 0)", duration: transitionTiming.logoReveal, ease: "power3.inOut" }, 0.08)
+      .call(() => setDocumentState("markRevealed"))
+      .call(() => playPhrase(phrases[0], () => {
+        phrase = phrases[1];
+        playPhrase(phrases[1], () => startLogoFlip());
+      }));
+  }
+
+  const duplicateTimeline = win.__zenithIntroTimelineActive === true;
+  const shouldSkip = !introEnabled || normalizedPath(win) !== "/" || win.__zenithIntroCommitted === true || win.__zenithIntroComplete === true || win.__zenithIntroPlayed === true || win.__zenithIntroStarted === true;
+
+  if (duplicateTimeline) { gsap.set(loader, { autoAlpha: 0 }); return; }
+  if (shouldSkip) { completeImmediately(); return; }
+
+  commitIntroRun(win);
+  ownsTimeline = true;
+  setDocumentState("loading");
+  setGateAccess(allGates, true);
+  gsap.set(loader, { autoAlpha: 1 });
+  gsap.set(allGates, { autoAlpha: 0, y: 10 });
+  if (navigationShell) gsap.set(navigationShell, { autoAlpha: 0, y: -10 });
+  gsap.set(navigationParts, { autoAlpha: 0, y: -8 });
+  if (logoTarget) gsap.set(logoTarget, { autoAlpha: 0 });
+  gsap.set(backdrop, { autoAlpha: 1 });
+  gsap.set([line, surface], { autoAlpha: 1 });
+  gsap.set(markMask, { clipPath: "inset(0 100% 0 0)" });
+  gsap.set(markTraveler, { autoAlpha: 1, clearProps: "transform" });
+  gsap.set([markRing, markCore], { autoAlpha: 0, scale: 0.94, willChange: "transform, opacity" });
+  gsap.set(glow, { autoAlpha: 0, scale: 0.68, willChange: "transform, opacity" });
+  gsap.set(label, { autoAlpha: 0 });
+
+  if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setDocumentState("revealingMark");
+    gsap.set([markRing, markCore], { autoAlpha: 1, scale: 1 });
+    gsap.set(markMask, { clipPath: "inset(0 0% 0 0)" });
+    gsap.set(markTraveler, { autoAlpha: 1 });
+    gsap.set(glow, { autoAlpha: 1, scale: 1 });
+    gsap.set(label, { autoAlpha: 1 });
+    let rmIdx = 0;
+    function showReducedPhrase() {
+      if (rmIdx >= phrases.length) {
+        completeImmediately();
+        return;
+      }
+      label.textContent = phrases[rmIdx];
+      gsap.set(label, { autoAlpha: 1 });
+      gsap.timeline()
+        .to({}, { duration: transitionTiming.reducedHold })
+        .to(label, { autoAlpha: 0, duration: 0.3, ease: "power3.in" })
+        .call(() => {
+          label.textContent = "";
+          rmIdx++;
+          showReducedPhrase();
+        });
+    }
+    showReducedPhrase();
+  } else {
+    const fontsReady = doc.fonts ? doc.fonts.ready : Promise.resolve();
+    Promise.resolve(fontsReady).then(startIntroSequence);
+  }
+
+  ctx.cleanup(() => {
+    cancelled = true;
+    if (handoffFrame) win.cancelAnimationFrame(handoffFrame);
+    bootTimeline?.kill(); phraseTimeline?.kill(); flipTimeline?.kill(); revealTimeline?.kill();
+    if (svgExitTimeline) { svgExitTimeline.kill(); svgExitTimeline = null; }
+    Flip.killFlipsOf(markTraveler, false);
+    gsap.killTweensOf([loader, backdrop, line, surface, markMask, markTraveler, markRing, markCore, glow, label, labelFrame, ...decorRings, ...allGates, ...navigationParts, ...heroElements]);
+    disposeHeroSplit(); disposePhraseSplit();
+    if (ownsTimeline && introPhase !== "complete") completeImmediately();
+  });
+});
+</script>
+
+<div
+  ref={loaderRef}
+  data-home-intro-root={introEnabled ? "true" : undefined}
+  data-intro-loader="true"
+  data-intro-phase={introPhase}
+  aria-hidden={introPhase === "complete" ? "true" : "false"}
+  style={introEnabled ? undefined : "display: none;"}
+  class="fixed inset-0 z-[80] grid place-items-center overflow-hidden bg-transparent text-foreground"
+>
+  <div ref={backdropRef} class="absolute inset-0 bg-background"></div>
+  <div ref={lineRef} class="absolute inset-x-0 top-1/2 h-px bg-border/70" aria-hidden="true"></div>
+  <div ref={handoffLayerRef} data-intro-handoff-layer="true" class="pointer-events-none fixed inset-0 z-20"></div>
+
+  <section ref={surfaceRef} role="status" aria-live="polite" class="relative z-10 w-full max-w-md px-6">
+    <div ref={compositionRef} data-intro-composition="true">
+      <TransitionIdentity>
+        <div ref={markMaskRef} data-intro-logo-mask="true" class="relative h-20 w-20 overflow-hidden rounded-full" style="clip-path: inset(0 100% 0 0);">
+          <div ref={markTravelerRef} data-intro-logo-traveler="true" class="group relative h-20 w-20 shrink-0">
+            <ZenithNavigationMark />
+          </div>
+        </div>
+      </TransitionIdentity>
+    </div>
+  </section>
+</div>

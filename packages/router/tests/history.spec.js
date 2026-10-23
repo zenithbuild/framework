@@ -5,15 +5,20 @@
 import { push, replace, listen, current } from '../src/history.js';
 
 describe('History Layer', () => {
-    test('push updates pathname', () => {
-        push('/about');
-        expect(window.location.pathname).toBe('/about');
+    beforeEach(() => {
+        window.history.replaceState({}, '', '/');
+        replace('/');
     });
 
-    test('replace updates pathname without new entry', () => {
+    test('push updates the source-router current path', () => {
+        push('/about');
+        expect(current()).toBe('/about');
+    });
+
+    test('replace updates the source-router current path without a new entry', () => {
         push('/first');
         replace('/replaced');
-        expect(window.location.pathname).toBe('/replaced');
+        expect(current()).toBe('/replaced');
     });
 
     test('current returns pathname', () => {
@@ -26,8 +31,8 @@ describe('History Layer', () => {
         const unlisten = listen((path) => calls.push(path));
 
         // Simulate popstate
-        push('/page-a');
-        push('/page-b');
+        window.history.pushState({}, '', '/page-a');
+        window.history.pushState({}, '', '/page-b');
 
         // JSDOM doesn't auto-fire popstate on pushState,
         // so we fire it manually

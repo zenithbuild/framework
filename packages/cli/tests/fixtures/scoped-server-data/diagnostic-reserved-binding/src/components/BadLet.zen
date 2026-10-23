@@ -1,0 +1,5 @@
+<script server lang="ts">
+let title = "bad"
+</script>
+
+<p>{title}</p>

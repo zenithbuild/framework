@@ -1,0 +1,46 @@
+<script setup="ts">
+import ZenithLogoMark from "./ZenithLogoMark.zen";
+</script>
+
+<footer class="relative min-h-screen overflow-hidden bg-background px-6 py-8 text-foreground sm:px-10 lg:px-14">
+    <div class="relative z-10 grid min-h-[calc(100vh-4rem)] grid-cols-6 grid-rows-[auto_1fr_auto] gap-x-8 gap-y-16 lg:grid-cols-12">
+        <div class="col-span-full row-start-1 grid gap-5 text-lg font-semibold text-foreground/88 lg:grid-cols-12 lg:items-start">
+            <a
+                href="mailto:contact@zenithbuild.com"
+                class="w-max transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue lg:col-span-4"
+            >
+                contact@zenithbuild.com
+            </a>
+
+            <nav class="flex flex-wrap justify-start gap-5 lg:col-span-4 lg:col-start-9 lg:justify-end lg:gap-6" aria-label="Social links">
+                <a class="transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue" href="https://linkedin.com/in/zenithbuild" rel="noreferrer">Linkedin</a>
+                <a class="transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue" href="https://www.instagram.com" rel="noreferrer">Github</a>
+                <a class="transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue" href="https://www.linkedin.com" rel="noreferrer">Open Collective</a>
+            </nav>
+        </div>
+
+        <div class="col-span-full row-start-2 grid min-w-0 items-center gap-10 self-center lg:grid-cols-[minmax(15rem,30rem)_minmax(0,1fr)] lg:gap-16">
+            <div class="grid aspect-square w-[min(58vw,30rem)] place-items-center justify-self-start lg:w-full">
+                <ZenithLogoMark />
+            </div>
+
+            <p class="min-w-0 max-w-full uppercase text-[clamp(3rem,7vw,9rem)] font-black leading-none tracking-normal text-foreground/90" style="overflow-wrap: anywhere;">
+                zenithbuild
+            </p>
+        </div>
+
+        <div class="col-span-full row-start-3 grid gap-6 self-end lg:grid-cols-12 lg:items-end">
+            <p class="text-lg font-semibold text-foreground/78 lg:col-span-5">
+                © 2025 Zenith Build Framework
+            </p>
+
+            <a
+                data-zen-link="true"
+                href="/"
+                class="w-max text-lg font-semibold text-foreground/88 transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue lg:col-span-2 lg:col-start-11 lg:justify-self-end"
+            >
+                Legal
+            </a>
+        </div>
+    </div>
+</footer>

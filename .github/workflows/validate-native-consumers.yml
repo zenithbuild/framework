@@ -1,0 +1,50 @@
+name: Native candidate consumers
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master, train, beta, integration/v1]
+
+permissions:
+  contents: read
+
+jobs:
+  packed-consumer:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-22.04, windows-latest, macos-14, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - run: bun install --frozen-lockfile
+      - name: Build matching wrappers and native packages
+        run: |
+          export ZENITH_TRAIN_VERSION="$(cat TRAIN_VERSION)"
+          bun run --cwd packages/runtime build
+          bun run --cwd packages/router build
+          bun run --cwd packages/core build
+          bun run --cwd packages/image build
+          bun run --cwd packages/cli build
+          cargo build --locked --release --manifest-path packages/compiler/Cargo.toml
+          bun run --cwd packages/compiler build
+          bun run --cwd packages/bundler build
+      - name: Execute vendor consumer regressions on the host
+        run: cargo test --locked --manifest-path packages/bundler/Cargo.toml --test vendor_module_semantics
+      - name: Install and execute packed 0.9.0-rc.0 consumers outside the checkout
+        run: node scripts/smoke-cross-os.mjs --packed
+      - name: Exercise relocated Node SSR and real image transformations
+        run: |
+          bun run --cwd packages/cli test --runTestsByPath tests/adapter-platform-node.spec.js tests/cli-entrypoint-paths.spec.js
+          bun run --cwd packages/image test

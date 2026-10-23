@@ -5,7 +5,8 @@
     "checkJs": false
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/config/**/*.js"
   ],
   "exclude": [
     "dist",

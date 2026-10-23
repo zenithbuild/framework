@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "runtime", "hydration"]
+section: "Server and Data"
+sectionOrder: 4
+order: 8
 ---
 
 # Hydration Contract
@@ -13,12 +16,15 @@ tags: ["contracts", "runtime", "hydration"]
 
 Contract: hydration consumes explicit payload tables with stable index alignment.
 
+Component Server Values hydrate from serialized Scoped Server Data slices keyed by owner/runtime metadata. Missing scoped slices fail deterministically instead of falling back to empty data.
+
 Banned:
 - Runtime discovery passes.
 - Fallback behavior for broken payload contracts.
+- Client refetch or client execution of scoped server values during hydration.
 
 Definition of Done:
 - Payload validation throws on drift.
 - Marker/expression/event ordering is preserved exactly.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/HYDRATION_CONTRACT.md`.
+Canonical source: `packages/runtime/HYDRATION_CONTRACT.md`.

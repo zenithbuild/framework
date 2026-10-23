@@ -1,5 +1,7 @@
 import { relative } from 'node:path';
 
+import { classifyPageRoute } from '../route-classification.js';
+import { assertNoScopedServerBuildErrors } from '../manifest.js';
 import {
     createBindingResolutionTotals,
     createComponentLoopPhaseTotals,
@@ -21,7 +23,6 @@ export function createPageLoopCaches() {
         componentIrCache: new Map(),
         componentDocumentModeCache: new Map(),
         componentExpressionRewriteCache: new Map(),
-        templateExpressionCache: new Map(),
         hoistedCodeTransformCache: {
             transpileToJs: new Map(),
             deferRuntime: new Map()
@@ -33,9 +34,8 @@ export function createPageLoopExecutionState() {
     return {
         expressionRewriteMetrics: {
             calls: 0,
-            cacheHits: 0,
-            cacheMisses: 0,
-            templateCompileMs: 0
+            compilerOwnedBindings: 0,
+            ambiguousBindings: 0
         },
         pagePhaseTotals: createPagePhaseTotals(),
         occurrenceApplyPhaseTotals: createOccurrenceApplyPhaseTotals(),
@@ -64,31 +64,42 @@ export function preparePageIrForMerge(pageIr) {
 export function applyServerEnvelopeToPageIr({
     pageIr,
     composedServer,
-    hasGuard,
-    hasLoad,
     entry,
     srcDir,
-    sourceFile
+    sourceFile,
+    scopedMetadata
 }) {
+    assertNoScopedServerBuildErrors(scopedMetadata.diagnostics, entry.file);
+
+    const classification = classifyPageRoute({
+        file: entry.file,
+        serverScript: composedServer.serverScript,
+        hasScopedServerData: scopedMetadata.hasScopedServerData
+    });
+
     if (composedServer.serverScript) {
-        pageIr.server_script = composedServer.serverScript;
-        pageIr.prerender = composedServer.serverScript.prerender === true;
+        const {
+            has_action: _unusedHasAction,
+            export_paths: _unusedExportPaths,
+            ...serverScript
+        } = composedServer.serverScript;
+        pageIr.server_script = serverScript;
+        pageIr.prerender = classification.prerender;
         if (pageIr.ssr_data === undefined) {
             pageIr.ssr_data = null;
         }
     }
 
-    if (pageIr.prerender === true && (hasGuard || hasLoad)) {
-        throw new Error(
-            `[zenith] Build failed for ${entry.file}: protected routes require SSR/runtime. ` +
-            'Cannot prerender a static route with a `guard` or `load` function.'
-        );
-    }
-
-    pageIr.has_guard = hasGuard;
-    pageIr.has_load = hasLoad;
+    pageIr.has_guard = classification.hasGuard;
+    pageIr.has_load = classification.hasLoad;
+    pageIr.has_action = classification.hasAction;
+    pageIr.has_scoped_server_data = scopedMetadata.hasScopedServerData;
+    pageIr.scoped_server_data = scopedMetadata.hasScopedServerData
+        ? scopedMetadata.scopedServerData
+        : [];
     pageIr.guard_module_ref = composedServer.guardPath ? relative(srcDir, composedServer.guardPath).replaceAll('\\', '/') : null;
     pageIr.load_module_ref = composedServer.loadPath ? relative(srcDir, composedServer.loadPath).replaceAll('\\', '/') : null;
+    pageIr.action_module_ref = composedServer.actionPath ? relative(srcDir, composedServer.actionPath).replaceAll('\\', '/') : null;
     preparePageIrForMerge(pageIr);
 }
 

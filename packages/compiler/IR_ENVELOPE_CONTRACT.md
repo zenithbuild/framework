@@ -1,6 +1,6 @@
 # IR Envelope Contract (Zenith V0)
 
-Canonical public docs: `../zenith-docs/documentation/contracts/ir-envelope.md`
+Canonical public docs: `../../docs/documentation/contracts/ir-envelope.md`
 
 
 Status: FROZEN

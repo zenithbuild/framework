@@ -1,13 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 
-use regex::Regex;
-
 use crate::ast::{Attribute, ElementNode, Node, SourceSpan};
 use crate::event_contract;
-use crate::script::{
-    ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript, SCRIPT_ID_ATTR,
-    SCRIPT_PLACEHOLDER_TAG,
-};
+use crate::expression_scope::analyze_scoped_expression;
+use crate::script::{ComponentInstanceBinding, ComponentScriptAsset, HoistedOutput, HoistedScript};
+use crate::transform_helpers::{is_raw_text_container, quote_js_string, script_placeholder_id};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MarkerKind {
@@ -55,6 +52,7 @@ pub fn transform(
 ) -> (
     Node,
     Vec<String>,
+    Vec<String>,
     HoistedOutput,
     BTreeMap<String, ComponentScriptAsset>,
     Vec<ComponentInstanceBinding>,
@@ -72,6 +70,7 @@ pub fn transform(
         .sort_by(|a, b| a.index.cmp(&b.index));
     (
         transformed_root,
+        transformer.raw_expressions,
         transformer.expressions,
         transformer.hoisted,
         transformer.component_scripts,
@@ -91,6 +90,7 @@ enum RewriteContext {
 }
 
 struct Transformer {
+    raw_expressions: Vec<String>,
     expressions: Vec<String>,
     scripts: HashMap<usize, HoistedScript>,
     scopes: Vec<HashMap<String, String>>,
@@ -122,6 +122,7 @@ impl Transformer {
         }
 
         Self {
+            raw_expressions: Vec::new(),
             expressions: Vec::new(),
             scripts: map,
             scopes: if global_scope.is_empty() {
@@ -140,8 +141,9 @@ impl Transformer {
         }
     }
 
-    fn add_expression(&mut self, expr: String) -> usize {
+    fn add_expression(&mut self, raw_expr: String, expr: String) -> usize {
         let idx = self.expressions.len();
+        self.raw_expressions.push(raw_expr);
         self.expressions.push(expr);
         idx
     }
@@ -172,7 +174,7 @@ impl Transformer {
     }
 
     fn transform_element(&mut self, mut elem: ElementNode) -> Node {
-        if self.script_placeholder_id(&elem).is_some() {
+        if script_placeholder_id(&elem).is_some() {
             return Node::Text(String::new());
         }
 
@@ -180,7 +182,7 @@ impl Transformer {
         let mut component_markers = Vec::new();
         for child in &elem.children {
             if let Node::Element(child_elem) = child {
-                if let Some(script_id) = self.script_placeholder_id(child_elem) {
+                if let Some(script_id) = script_placeholder_id(child_elem) {
                     let script = self.scripts.get(&script_id).unwrap_or_else(|| {
                         panic!("Missing script payload for placeholder id {}", script_id)
                     });
@@ -200,6 +202,7 @@ impl Transformer {
                             factory: script.factory_name.clone(),
                             imports: script.imports.clone(),
                             code: script.factory_code.clone(),
+                            bindings: script.bindings.clone(),
                         });
 
                     for binding in &script.bindings {
@@ -244,7 +247,7 @@ impl Transformer {
                         });
                     }
                     let rewritten = self.rewrite_expression(&handler, RewriteContext::Event);
-                    let idx = self.add_expression(rewritten);
+                    let idx = self.add_expression(handler.clone(), rewritten);
                     let selector = format!(r#"[data-zx-on-{}="{}"]"#, canonical, idx);
                     self.insert_marker(MarkerBinding {
                         index: idx,
@@ -266,7 +269,7 @@ impl Transformer {
                 }
                 Attribute::Expression { name, value, span } => {
                     let rewritten = self.rewrite_expression(&value, RewriteContext::Attribute);
-                    let idx = self.add_expression(rewritten);
+                    let idx = self.add_expression(value.clone(), rewritten);
                     self.insert_marker(MarkerBinding {
                         index: idx,
                         kind: MarkerKind::Attr,
@@ -325,7 +328,7 @@ impl Transformer {
             }
         }
 
-        let raw_text_container = Self::is_raw_text_container(&elem.tag);
+        let raw_text_container = is_raw_text_container(&elem.tag);
         let raw_text_only_children = elem
             .children
             .iter()
@@ -348,17 +351,21 @@ impl Transformer {
 
         if raw_text_container && raw_text_only_children && expression_child_count > 0 {
             let mut combined_parts = Vec::new();
+            let mut combined_raw_parts = Vec::new();
             let mut combined_source = None;
 
             for child in elem.children {
                 match child {
                     Node::Text(text) => {
                         if !text.is_empty() {
-                            combined_parts.push(Self::quote_js_string(&text));
+                            let quoted = quote_js_string(&text);
+                            combined_parts.push(quoted.clone());
+                            combined_raw_parts.push(quoted);
                         }
                     }
                     Node::Expression { value, span } => {
                         let rewritten = self.rewrite_expression(&value, RewriteContext::Text);
+                        combined_raw_parts.push(format!("({})", value));
                         combined_parts.push(format!("({})", rewritten));
                         if combined_source.is_none() {
                             combined_source = Some(span);
@@ -375,8 +382,13 @@ impl Transformer {
             } else {
                 combined_parts.join(" + ")
             };
+            let combined_raw_expression = if combined_raw_parts.is_empty() {
+                "\"\"".to_string()
+            } else {
+                combined_raw_parts.join(" + ")
+            };
 
-            let idx = self.add_expression(combined_expression);
+            let idx = self.add_expression(combined_raw_expression, combined_expression);
             self.insert_marker(MarkerBinding {
                 index: idx,
                 kind: MarkerKind::Text,
@@ -407,12 +419,12 @@ impl Transformer {
 
         for child in elem.children {
             match child {
-                Node::Element(child_elem) if self.script_placeholder_id(&child_elem).is_some() => {
+                Node::Element(child_elem) if script_placeholder_id(&child_elem).is_some() => {
                     continue;
                 }
                 Node::Expression { value, span } => {
                     let rewritten = self.rewrite_expression(&value, RewriteContext::Text);
-                    let idx = self.add_expression(rewritten);
+                    let idx = self.add_expression(value, rewritten);
                     let selector = if materialize_text_placeholders {
                         format!("comment:zx-e:{}", idx)
                     } else {
@@ -458,49 +470,13 @@ impl Transformer {
         Node::Element(elem)
     }
 
-    fn script_placeholder_id(&self, elem: &ElementNode) -> Option<usize> {
-        if elem.tag != SCRIPT_PLACEHOLDER_TAG {
-            return None;
-        }
-
-        for attr in &elem.attributes {
-            if let Attribute::Static { name, value } = attr {
-                if name == SCRIPT_ID_ATTR {
-                    return value.parse::<usize>().ok();
-                }
-            }
-        }
-
-        None
-    }
-
-    fn is_raw_text_container(tag: &str) -> bool {
-        matches!(tag, "title" | "textarea" | "script" | "style")
-    }
-
-    fn quote_js_string(value: &str) -> String {
-        let mut quoted = String::from("\"");
-        for ch in value.chars() {
-            match ch {
-                '\\' => quoted.push_str("\\\\"),
-                '"' => quoted.push_str("\\\""),
-                '\n' => quoted.push_str("\\n"),
-                '\r' => quoted.push_str("\\r"),
-                '\t' => quoted.push_str("\\t"),
-                _ => quoted.push(ch),
-            }
-        }
-        quoted.push('"');
-        quoted
-    }
-
     fn rewrite_expression(&self, expr: &str, _context: RewriteContext) -> String {
         let trimmed = expr.trim();
         if trimmed.is_empty() {
             return String::new();
         }
 
-        let mut flattened: HashMap<String, String> = HashMap::new();
+        let mut flattened = BTreeMap::new();
         for scope in &self.scopes {
             for (key, replacement) in scope {
                 flattened.insert(key.clone(), replacement.clone());
@@ -511,26 +487,6 @@ impl Transformer {
             return trimmed.to_string();
         }
 
-        let mut bindings = flattened.into_iter().collect::<Vec<_>>();
-        bindings.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
-
-        let mut rewritten = trimmed.to_string();
-        for (original, replacement) in &bindings {
-            let pattern = Regex::new(&format!(r"\b{}\b", regex::escape(original))).unwrap();
-            let current_rewritten = rewritten.clone();
-            rewritten = pattern
-                .replace_all(&current_rewritten, |caps: &regex::Captures| {
-                    let matched = caps.get(0).expect("rewrite match");
-                    if matched.start() > 0
-                        && current_rewritten.as_bytes().get(matched.start() - 1) == Some(&b'.')
-                    {
-                        return matched.as_str().to_string();
-                    }
-                    replacement.clone()
-                })
-                .into_owned();
-        }
-
-        rewritten
+        analyze_scoped_expression(trimmed, &flattened).rewritten
     }
 }

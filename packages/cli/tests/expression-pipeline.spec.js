@@ -39,20 +39,38 @@ async function makeWorkspaceProject(files) {
     return { root, pagesDir, outDir };
 }
 
-async function readBuiltPageAsset(outDir, route = 'index.html') {
+async function readBuiltPageAsset(outDir, route = 'index.html', { allowMissing = false } = {}) {
     const html = await readFile(join(outDir, route), 'utf8');
     const scriptMatch = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"[^>]*>/i);
-    expect(scriptMatch).toBeTruthy();
+    if (!scriptMatch) {
+        if (allowMissing) {
+            return null;
+        }
+        expect(scriptMatch).toBeTruthy();
+        return null;
+    }
     const scriptPath = String(scriptMatch?.[1] || '').replace(/^\//, '');
     return readFile(join(outDir, scriptPath), 'utf8');
 }
 
 async function readBuiltRuntimeAsset(outDir) {
+    const rootEntries = await readdir(outDir);
+    let runtimeFile = rootEntries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
+    if (runtimeFile) {
+        return readFile(join(outDir, runtimeFile), 'utf8');
+    }
+
     const assetsDir = join(outDir, 'assets');
-    const entries = await readdir(assetsDir);
-    const runtimeFile = entries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
+    const assetEntries = await readdir(assetsDir);
+    runtimeFile = assetEntries.find((name) => name.startsWith('runtime.') && name.endsWith('.js'));
     expect(runtimeFile).toBeTruthy();
     return readFile(join(assetsDir, String(runtimeFile)), 'utf8');
+}
+
+function extractPayloadExpressionRows(asset) {
+    const match = asset.match(/const __zenith_payload_expression_rows\s*=\s*(\[[\s\S]*?\]);/);
+    expect(match).toBeTruthy();
+    return Function(`"use strict";return (${String(match?.[1] || '[]')});`)();
 }
 
 describe('expression pipeline regressions', () => {
@@ -107,9 +125,14 @@ describe('expression pipeline regressions', () => {
         expect(pageAsset).not.toMatch(/signalMap\.get\(\d+\)\.get\(\)\.title/);
     });
 
-    test('emits fn_index expressions against __ctx.fragment instead of __zenith_fragment', async () => {
+    test('emits fn_index expressions against __ctx.fragment tags instead of __zenith_fragment aliases', async () => {
         project = await makeWorkspaceProject({
-            'src/pages/index.zen': '<main>{cond ? (<a>Hi</a>) : null}</main>\n'
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'state cond = true;',
+                '</script>',
+                '<main>{cond ? (<a>Hi</a>) : null}</main>'
+            ].join('\n')
         });
 
         await build({
@@ -119,8 +142,70 @@ describe('expression pipeline regressions', () => {
         });
         const pageAsset = await readBuiltPageAsset(project.outDir);
 
-        expect(pageAsset).toContain('__ctx.fragment(');
-        expect(pageAsset).not.toContain('return __zenith_fragment(');
+        expect(pageAsset).toMatch(/__ctx\.fragment\s*`<a>Hi<\/a>`/);
+        expect(pageAsset).not.toContain('__zenith_fragment = __ctx.fragment');
+        expect(pageAsset).not.toContain('const fragment = __ctx.fragment');
+    });
+
+    test('preserves shadowed callback params after component expansion', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/ShadowPanel.zen': [
+                '<script lang="ts">',
+                'state count = 1;',
+                'const items = [1, 2, 3];',
+                '</script>',
+                '<section>{items.map((count) => count + 1).join(",")}</section>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><ShadowPanel /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+
+        expect(pageAsset).toContain('.map((count) => count + 1)');
+        expect(pageAsset).not.toContain('.map((signalMap.get(');
+    });
+
+    test('preserves destructuring locals after component expansion while rewriting free state structurally', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/DestructurePanel.zen': [
+                '<script lang="ts">',
+                'state total = 5;',
+                'const items = [{ count: 1 }, { count: 2 }];',
+                '</script>',
+                '<section>{items.map(({ count }) => count + total).join(",")}</section>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><DestructurePanel /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+
+        expect(pageAsset).toMatch(/\.map\(\(\{\s*count\s*\}\)\s*=>\s*count\s*\+\s*signalMap\.get\(/);
+        expect(pageAsset).not.toMatch(/\(\{\s*signalMap\.get/);
+    });
+
+    test('direct local identifier bindings stay compiler-scoped after component expansion', async () => {
+        project = await makeWorkspaceProject({
+            'src/components/TitleBadge.zen': [
+                '<script lang="ts">',
+                'const resolvedTitle = typeof props.title === "string" ? props.title : "Zenith";',
+                '</script>',
+                '<h1>{resolvedTitle}</h1>'
+            ].join('\n'),
+            'src/pages/index.zen': '<main><TitleBadge title="About" /></main>\n'
+        });
+
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir });
+        const pageAsset = await readBuiltPageAsset(project.outDir);
+        const bindings = extractPayloadExpressionRows(String(pageAsset)).filter((row) =>
+            String(Array.isArray(row) ? row[1] : '').includes('resolvedTitle')
+        );
+
+        expect(bindings.length).toBeGreaterThan(0);
+        expect(bindings.some((row) => Number.isInteger(Array.isArray(row) ? row[3] : null))).toBe(true);
+        expect(bindings.every((row) => String(Array.isArray(row) ? row[1] : '') !== 'resolvedTitle')).toBe(true);
+        expect(pageAsset).not.toContain('return resolvedTitle;');
     });
 
     test('keeps distinct signal rewrites when multiple components share the same state alias', async () => {
@@ -146,20 +231,36 @@ describe('expression pipeline regressions', () => {
             config: { embeddedMarkupExpressions: true }
         });
         const pageAsset = await readBuiltPageAsset(project.outDir);
-        const matches = Array.from(
-            pageAsset.matchAll(
-                /signalMap\.get\((\d+)\)\.get\(\) \? "(First|Second) Open" : "(First|Second) Closed"/g
-            )
+        const bindings = extractPayloadExpressionRows(String(pageAsset)).filter((row) =>
+            /First Open|Second Open/.test(String(Array.isArray(row) ? row[1] : ''))
         );
 
-        expect(matches).toHaveLength(2);
-        expect(new Set(matches.map((match) => match[1])).size).toBe(2);
+        expect(bindings).toHaveLength(2);
+        const signalIndices = bindings.flatMap((row) => {
+            if (!Array.isArray(row)) {
+                return [];
+            }
+            const indices = [];
+            if (Array.isArray(row[4])) {
+                indices.push(...row[4]);
+            }
+            if (typeof row[5] === 'number') {
+                indices.push(row[5]);
+            }
+            return indices;
+        });
+        expect(new Set(signalIndices).size).toBe(2);
         expect(pageAsset).not.toContain('return open ?');
     });
 
     test('strips temporary ZENITH_DIAG runtime logging from emitted runtime asset', async () => {
         project = await makeWorkspaceProject({
-            'src/pages/index.zen': '<main><h1>Hello</h1></main>\n'
+            'src/pages/index.zen': [
+                '<script lang="ts">',
+                'state count = 1;',
+                '</script>',
+                '<main><h1>{count}</h1></main>'
+            ].join('\n')
         });
 
         await build({ pagesDir: project.pagesDir, outDir: project.outDir });

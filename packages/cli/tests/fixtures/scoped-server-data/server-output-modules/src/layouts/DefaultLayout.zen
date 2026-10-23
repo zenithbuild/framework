@@ -1,0 +1,5 @@
+<script server lang="ts">
+const navigation = { title: "CSV_OUTPUT_LAYOUT_SENTINEL" }
+</script>
+
+<section>{navigation.title}<slot /></section>

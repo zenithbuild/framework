@@ -18,6 +18,25 @@ export function collectExpandedComponentOccurrences(source, registry, sourceFile
     return occurrences;
 }
 
+/**
+ * Unique layout/component `.zen` paths reachable from a page dependency graph.
+ *
+ * @param {string} source
+ * @param {Map<string, string>} registry
+ * @param {string} sourceFile
+ * @returns {string[]}
+ */
+export function collectReachableOwnerPaths(source, registry, sourceFile) {
+    const occurrences = collectExpandedComponentOccurrences(source, registry, sourceFile);
+    const paths = new Set();
+    for (const occurrence of occurrences) {
+        if (occurrence.componentPath) {
+            paths.add(occurrence.componentPath);
+        }
+    }
+    return [...paths];
+}
+
 function walkSource(source, registry, context, chain, occurrences) {
     let cursor = 0;
 

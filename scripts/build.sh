@@ -4,18 +4,40 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+node ./scripts/check-toolchain.mjs
+
 if [[ -f "$ROOT/TRAIN_VERSION" ]]; then
   export ZENITH_TRAIN_VERSION="$(tr -d '[:space:]' < "$ROOT/TRAIN_VERSION")"
 fi
 
 bun run --cwd packages/runtime build
 bun run --cwd packages/router build
+bun run --cwd packages/core build
+bun run --cwd packages/extension-registry build
+bun run --cwd packages/image build
 bun run --cwd packages/cli build
 bun run --cwd packages/create-zenith build
 bun run --cwd packages/language-server build
 bun run --cwd packages/language build
 
-cargo build --release --manifest-path packages/compiler/Cargo.toml
+# Ensure workspace bin links exist for freshly-built CLI.
+# Bun skips .bin symlinks when the target file is absent during initial install;
+# re-linking after building the CLI restores the `zenith` command for downstream
+# workspace scripts (e.g. apps/smoke-test `zenith build`).
+CLI_BIN="$ROOT/packages/cli/dist/index.js"
+if [[ -f "$CLI_BIN" ]]; then
+  for bindir in "$ROOT/node_modules/.bin" "$ROOT/apps/smoke-test/node_modules/.bin"; do
+    mkdir -p "$bindir"
+    ln -sf "$CLI_BIN" "$bindir/zenith"
+  done
+fi
+
+# Clean workspace crates to prevent stale binaries from CI cache fallback.
+# This only removes local crate artifacts (~1s), not cached dependencies.
+cargo clean --release -p zenith_compiler -p zenith_cli --manifest-path packages/compiler/Cargo.toml 2>/dev/null || true
+cargo clean --release -p zenith-bundler --manifest-path packages/bundler/Cargo.toml 2>/dev/null || true
+
+cargo build --locked --release --manifest-path packages/compiler/Cargo.toml
 bun run --cwd packages/compiler build
 bun run --cwd packages/bundler build
 

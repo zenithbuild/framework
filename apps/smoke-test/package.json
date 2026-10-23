@@ -13,21 +13,21 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@zenithbuild/core": "0.7.0"
+    "@zenithbuild/core": "0.9.0-rc.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/cli": "^4.1.18",
     "@types/bun": "latest",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
     "@typescript-eslint/parser": "^8.53.0",
-    "@zenithbuild/bundler": "0.7.0",
-    "@zenithbuild/cli": "0.7.0",
-    "@zenithbuild/compiler": "0.7.0",
-    "@zenithbuild/router": "0.7.0",
-    "@zenithbuild/runtime": "0.7.0",
+    "@zenithbuild/bundler": "0.9.0-rc.0",
+    "@zenithbuild/cli": "0.9.0-rc.0",
+    "@zenithbuild/compiler": "0.9.0-rc.0",
+    "@zenithbuild/router": "0.9.0-rc.0",
+    "@zenithbuild/runtime": "0.9.0-rc.0",
     "eslint": "^9.39.2",
-    "playwright": "^1.58.2",
+    "playwright": "^1.60.0",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.18"
   }

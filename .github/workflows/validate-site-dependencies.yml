@@ -1,0 +1,79 @@
+name: Site dependency security
+
+on:
+  pull_request:
+    branches: [integration/v1]
+    paths:
+      - 'site/package.json'
+      - 'site/bun.lock'
+      - 'scripts/security/site-dependency-security.spec.mjs'
+      - '.github/workflows/validate-site-dependencies.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Explicit bash runs steps with -eo pipefail, so `| tee` cannot hide a failed command.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  site-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Install the site lockfile without changes
+        working-directory: site
+        run: bun install --frozen-lockfile
+      - name: Exercise the installed security boundaries
+        run: node --test scripts/security/site-dependency-security.spec.mjs
+      - name: Verify content loading and documentation contracts
+        working-directory: site
+        run: bun test tests/documentation-architecture.test.ts tests/search-index.test.ts
+      - name: Keep every active root and site advisory blocking
+        if: always()
+        # Exit 0 clean, 1 findings, 2 audit error. Empty or unparseable output is an
+        # error, never clean, and an error in either scope wins over findings.
+        run: |
+          result=0
+          for scope in root site; do
+            dir=.; [ "$scope" = site ] && dir=site
+            status=0
+            (cd "$dir" && bun audit --json) > "$scope-audit.json" || status=$?
+            cat "$scope-audit.json"
+            verdict=0
+            node -e '
+              const [file, status] = process.argv.slice(1);
+              let report;
+              try { report = JSON.parse(require("fs").readFileSync(file, "utf8")); } catch { process.exit(2); }
+              if (!report || typeof report !== "object" || Array.isArray(report)) process.exit(2);
+              const found = Object.keys(report).length > 0;
+              if (status === "0" && !found) process.exit(0);
+              process.exit(Number(status) <= 1 && found ? 1 : 2);
+            ' "$scope-audit.json" "$status" || verdict=$?
+            if [ "$verdict" -ge 2 ]; then
+              echo "::error::$scope bun audit exited $status without a usable JSON report (empty, unparseable or missing findings); results are incomplete"
+              result=2
+            elif [ "$verdict" -eq 1 ] && [ "$result" -eq 0 ]; then
+              result=1
+            fi
+          done
+          exit "$result"
+      - name: Retain audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dependency-security-${{ github.sha }}
+          path: |
+            root-audit.json
+            site-audit.json

@@ -1,0 +1,5 @@
+<script server lang="ts">
+export const data = async (ctx) => ctx.deny(403, "Nope")
+</script>
+
+<div>{data.ok}</div>

@@ -2,10 +2,10 @@
   "name": "@zenithbuild/language",
   "displayName": "Zenith Language Support",
   "description": "Canonical Zenith syntax highlighting, snippets, and VS Code integration",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "publisher": "ZenithBuild",
   "license": "MIT",
-  "private": false,
+  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/zenithbuild/framework",
@@ -42,9 +42,6 @@
     "LICENSE",
     "package.json"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "bun run build:server && rm -rf out && mkdir -p out && bun x esbuild src/extension.ts --bundle --outfile=out/extension.cjs --external:vscode --external:vscode-languageclient/node --format=cjs --platform=node && cp ../language-server/dist/server.mjs out/server.mjs",
     "build:server": "bun run --cwd ../language-server build",
@@ -54,7 +51,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@zenithbuild/compiler": "0.7.0",
+    "@zenithbuild/compiler": "0.8.0",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.11",
     "vscode-languageclient": "^9.0.1"
@@ -62,7 +59,7 @@
   "devDependencies": {
     "@types/node": "latest",
     "@types/vscode": "^1.90.0",
-    "esbuild": "^0.25.11",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.3",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.2.0"

@@ -13,8 +13,8 @@ export const compilerBin = process.env.ZENITH_COMPILER_BIN ||
 export const bundlerBin = process.env.ZENITH_BUNDLER_BIN ||
   path.join(repoRoot, 'packages', 'bundler', 'target', 'release', 'zenith-bundler');
 
-export const cliEntry = path.join(repoRoot, 'packages', 'cli', 'src', 'index.js');
-export const cliBuildModule = path.join(repoRoot, 'packages', 'cli', 'src', 'build.js');
+export const cliEntry = path.join(repoRoot, 'packages', 'cli', 'dist', 'index.js');
+export const cliBuildModule = path.join(repoRoot, 'packages', 'cli', 'dist', 'build.js');
 
 export const compilerBridgeModule = path.join(repoRoot, 'packages', 'compiler', 'dist', 'index.js');
 

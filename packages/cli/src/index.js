@@ -4,19 +4,19 @@
 // ---------------------------------------------------------------------------
 // Commands:
 //   zenith dev      — Development server + HMR
-//   zenith build    — Static site generation to /dist
-//   zenith preview  — Serve /dist statically
+//   zenith build    — Static site generation to the configured output dir
+//   zenith preview  — Serve the configured output dir statically
 //
 // Minimal arg parsing. No heavy dependencies.
 // ---------------------------------------------------------------------------
 
-import { resolve, join, dirname } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve, join, dirname, relative } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createZenithLogger } from './ui/logger.js';
-import { loadConfig } from './config.js';
+import { loadConfig, resolveConfigOutDir, resolveConfigPagesDir } from './config.js';
 
-const COMMANDS = ['dev', 'build', 'preview'];
+const COMMANDS = ['dev', 'build', 'preview', 'plugin', 'adapter'];
 const DEFAULT_VERSION = '0.0.0';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,13 +35,26 @@ function printUsage(logger) {
     logger.heading('V0');
     logger.print('Usage:');
     logger.print('  zenith dev [port|--port <port>]      Start development server');
-    logger.print('  zenith build                         Build static site to /dist');
-    logger.print('  zenith preview [port|--port <port>]  Preview /dist statically');
+    logger.print('  zenith build                         Build static site to the configured output dir');
+    logger.print('  zenith preview [port|--port <port>]  Preview the configured output dir statically');
+    logger.print('  zenith plugin list|search|info        List and inspect official plugins');
+    logger.print('  zenith adapter list                   List official adapters and built-in targets');
     logger.print('');
     logger.print('Options:');
     logger.print('  -h, --help        Show this help message');
     logger.print('  -v, --version     Print Zenith CLI version');
     logger.print('');
+}
+
+function formatOutputDir(projectRoot, outDir) {
+    const relativePath = relative(projectRoot, outDir);
+    if (!relativePath || relativePath.length === 0) {
+        return '.';
+    }
+    if (relativePath.startsWith('..')) {
+        return outDir;
+    }
+    return `./${relativePath}`;
 }
 
 function resolvePort(args, fallback) {
@@ -89,17 +102,29 @@ export async function cli(args, cwd) {
         process.exit(0);
     }
 
-    if (!command || !COMMANDS.includes(command)) {
+    if (!command) {
         printUsage(logger);
-        process.exit(command ? 1 : 0);
+        process.exit(0);
+    }
+
+    if (!COMMANDS.includes(command)) {
+        logger.print(`Unknown command: ${command}`);
+        logger.print('');
+        printUsage(logger);
+        process.exit(1);
     }
 
     const projectRoot = resolve(cwd || process.cwd());
-    const rootPagesDir = join(projectRoot, 'pages');
-    const srcPagesDir = join(projectRoot, 'src', 'pages');
-    const pagesDir = existsSync(rootPagesDir) ? rootPagesDir : srcPagesDir;
-    const outDir = join(projectRoot, 'dist');
+
+    if (command === 'plugin' || command === 'adapter') {
+        const mod = await import(`./commands/${command}/index.js`);
+        const exitCode = await mod.runCommand(args.slice(1), { projectRoot, logger });
+        process.exit(exitCode ?? 0);
+    }
+
     const config = await loadConfig(projectRoot);
+    const pagesDir = resolveConfigPagesDir(projectRoot, config);
+    const outDir = resolveConfigOutDir(projectRoot, config);
 
     if (command === 'build' || command === 'dev') {
         const { maybeWarnAboutZenithVersionMismatch } = await import('./version-check.js');
@@ -115,7 +140,7 @@ export async function cli(args, cwd) {
         logger.build('Building…');
         const result = await build({ pagesDir, outDir, config, logger, showBundlerInfo: false });
         logger.ok(`Built ${result.pages} page(s), ${result.assets.length} asset(s)`);
-        logger.summary([{ label: 'Output', value: './dist' }], 'BUILD');
+        logger.summary([{ label: 'Output', value: formatOutputDir(projectRoot, outDir) }], 'BUILD');
     }
 
     if (command === 'dev') {
@@ -125,8 +150,18 @@ export async function cli(args, cwd) {
             : resolvePort(args.slice(1), 3000);
         const host = process.env.ZENITH_DEV_HOST || '127.0.0.1';
         logger.dev('Starting dev server…');
-        const dev = await createDevServer({ pagesDir, outDir, port, host, config, logger });
-        logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${dev.port}`);
+        const dev = await createDevServer({ pagesDir, outDir, projectRoot, port, host, config, logger });
+        const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+        const servingUrl = `http://${displayHost}:${dev.port}`;
+        if (dev.portFallback) {
+            const occupied = Array.isArray(dev.portFallback.occupiedPorts)
+                ? dev.portFallback.occupiedPorts.join(', ')
+                : String(dev.requestedPort);
+            logger.warn(`Requested port ${dev.requestedPort} is occupied; using ${dev.port}.`, {
+                hint: `Occupied port(s): ${occupied}; serving at ${servingUrl}`
+            });
+        }
+        logger.ok(servingUrl);
 
         // Graceful shutdown
         process.on('SIGINT', () => {
@@ -140,11 +175,24 @@ export async function cli(args, cwd) {
     }
 
     if (command === 'preview') {
-        const { createPreviewServer } = await import('./preview.js');
         const port = resolvePort(args.slice(1), 4000);
         const host = process.env.ZENITH_PREVIEW_HOST || '127.0.0.1';
         logger.dev('Starting preview server…');
-        const preview = await createPreviewServer({ distDir: outDir, port, host, logger, config, projectRoot });
+        const preview = config.target === 'node'
+            ? await import(pathToFileURL(join(outDir, 'index.js')).href).then(async (mod) => {
+                if (typeof mod.createNodeServer !== 'function') {
+                    throw new Error('[Zenith:Preview] Node target output is missing createNodeServer()');
+                }
+                return mod.createNodeServer({ distDir: outDir, port, host });
+            })
+            : await import('./preview.js').then((mod) => mod.createPreviewServer({
+                distDir: outDir,
+                port,
+                host,
+                logger,
+                config,
+                projectRoot
+            }));
         logger.ok(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${preview.port}`);
 
         process.on('SIGINT', () => {
@@ -158,16 +206,33 @@ export async function cli(args, cwd) {
     }
 }
 
-// Auto-run if called directly
-const isDirectRun = process.argv[1] && (
-    process.argv[1].endsWith('/index.js') ||
-    process.argv[1].endsWith('/zenith')
-);
-
-if (isDirectRun) {
-    cli(process.argv.slice(2)).catch((error) => {
-        const logger = createZenithLogger(process);
-        logger.error(error);
+/**
+ * Run the CLI with Zenith's formatted diagnostics and exit code 1 on failure.
+ * Shared by a direct run and the public `@zenithbuild/core` bin.
+ *
+ * @param {string[]} [args] - Process arguments (without node and script paths)
+ * @param {string} [cwd] - Working directory override
+ * @returns {Promise<void>}
+ */
+export async function runCli(args = process.argv.slice(2), cwd) {
+    try {
+        await cli(args, cwd);
+    } catch (error) {
+        createZenithLogger(process).error(error);
         process.exit(1);
-    });
+    }
+}
+
+// Auto-run if called directly
+function isDirectRun() {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === realpathSync(__filename);
+    } catch {
+        return false;
+    }
+}
+
+if (isDirectRun()) {
+    void runCli(process.argv.slice(2));
 }

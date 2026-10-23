@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/router",
-  "version": "0.7.0",
+  "version": "0.9.0-rc.0",
   "description": "File-based SPA router for Zenith framework with deterministic, compile-time route resolution",
   "license": "MIT",
   "type": "module",
@@ -9,9 +9,11 @@
     "dist",
     "template.js",
     "template-core.js",
+    "template-document.js",
+    "template-form.js",
     "template-lifecycle.js",
     "template-navigation.js",
-    "index.js",
+    "template-refresh.js",
     "index.d.ts",
     "README.md",
     "dist/**",
@@ -54,7 +56,7 @@
     "contract:deps": "node dependency_contract.spec.js",
     "contract:scan": "node contract-scan.mjs",
     "contract:template": "node template-contract.spec.js",
-    "test": "npm run contract:deps && npm run contract:scan && npm run contract:template",
+    "test": "npm run contract:deps && npm run contract:scan && npm run contract:template && npm run test:legacy",
     "test:legacy": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.js",
     "prepublishOnly": "npm run build"
   },
@@ -63,9 +65,12 @@
   },
   "private": false,
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
     "@napi-rs/cli": "^2.18.4",
     "@types/bun": "latest",
     "@types/node": "latest",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "prettier": "^3.7.4",
     "typescript": "^5.7.3"
   }

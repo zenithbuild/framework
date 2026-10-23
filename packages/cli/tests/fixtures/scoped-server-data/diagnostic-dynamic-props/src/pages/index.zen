@@ -1,0 +1,6 @@
+<script lang="ts">
+import RepoStats from "../components/RepoStats.zen";
+const repoId = "zenith";
+</script>
+
+<RepoStats repoId={repoId} />

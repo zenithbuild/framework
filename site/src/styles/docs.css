@@ -1,0 +1,42 @@
+@layer components {
+  .docs-richtext {
+    @apply min-w-0 text-foreground/80;
+  }
+
+  .docs-richtext > :first-child {
+    @apply mt-0;
+  }
+
+  .docs-richtext h2 {
+    @apply border-t border-border pt-10 text-3xl font-semibold md:text-4xl;
+  }
+
+  .docs-richtext h3 {
+    @apply text-2xl font-semibold md:text-3xl;
+  }
+
+  .docs-richtext code {
+    @apply bg-muted text-foreground;
+  }
+
+  .docs-richtext pre {
+    @apply max-w-full rounded-lg border-border bg-card p-5 shadow-sm sm:p-6;
+  }
+
+  .docs-richtext pre code {
+    @apply bg-transparent text-card-foreground;
+  }
+
+  .docs-richtext blockquote {
+    @apply rounded-r-lg border-l-2 bg-card px-5 py-4 text-foreground;
+  }
+
+  .docs-richtext table {
+    @apply max-w-full bg-card;
+  }
+
+  .docs-richtext th,
+  .docs-richtext td {
+    @apply whitespace-normal;
+  }
+}

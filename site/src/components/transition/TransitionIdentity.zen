@@ -1,0 +1,19 @@
+<script lang="ts">
+import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
+</script>
+
+<div data-transition-identity="true" class="relative z-10 grid w-full max-w-md place-items-center gap-8 px-6 text-center">
+  <div data-transition-artwork="true" class="relative grid aspect-square w-[min(19rem,calc(100vw-3rem))] place-items-center">
+    <span data-transition-glow="true" class="absolute h-48 w-48 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"></span>
+    <span data-transition-ring="outer" class="absolute inset-0 rounded-full border border-border/80 bg-card/30 shadow-2xl shadow-primary/10"></span>
+    <span data-transition-ring="middle" class="absolute inset-12 rounded-full border border-primary/25"></span>
+    <span data-transition-ring="inner" class="absolute inset-20 rounded-full border border-border/70"></span>
+    <span data-transition-mark-ring="true" class="absolute h-36 w-36 rounded-full border border-border opacity-0"></span>
+    <span data-transition-mark-core="true" class="absolute h-24 w-24 rounded-full border border-border/70 opacity-0"></span>
+    <slot />
+  </div>
+
+  <div data-transition-label-frame="true" class="min-h-[3rem] w-full overflow-hidden sm:min-h-[3.5rem]">
+    <p data-transition-label="true" class="font-heading font-medium tracking-tight text-foreground"></p>
+  </div>
+</div>

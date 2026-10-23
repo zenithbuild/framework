@@ -9,8 +9,13 @@ import {
   listMarkdown,
   toRelative,
 } from "./shared.mjs";
+import {
+  documentationSectionByTitle,
+  isPublicDocumentationPath,
+  PUBLIC_DOCUMENTATION_STATUS,
+} from "../../public-documentation-policy.mjs";
 
-const REQUIRED_DOC_KEYS = ["title", "status"];
+const REQUIRED_DOC_KEYS = ["title", "description", "status", "section", "sectionOrder", "order"];
 
 function fail(violations) {
   if (violations.length === 0) {
@@ -26,9 +31,15 @@ function fail(violations) {
 async function main() {
   const docsFiles = await listMarkdown(DOCS_ROOT, { excludeSegments: ["_legacy"] });
   const violations = [];
+  let scanned = 0;
 
   for (const fullPath of docsFiles) {
     const rel = toRelative(fullPath);
+    const relToDocs = path.relative(DOCS_ROOT, fullPath).replace(/\\/g, "/");
+    if (!isPublicDocumentationPath(relToDocs)) {
+      continue;
+    }
+    scanned += 1;
     const raw = await fs.readFile(fullPath, "utf8");
 
     let parsed;
@@ -53,8 +64,22 @@ async function main() {
       );
     }
 
+    if (status !== PUBLIC_DOCUMENTATION_STATUS) {
+      violations.push(`${rel}: public documentation status must be '${PUBLIC_DOCUMENTATION_STATUS}'`);
+    }
+
+    const section = documentationSectionByTitle(meta.section);
+    if (!section) {
+      violations.push(`${rel}: invalid public documentation section '${meta.section || "<missing>"}'`);
+    } else if (meta.sectionOrder !== section.order) {
+      violations.push(`${rel}: sectionOrder must be ${section.order} for '${section.title}'`);
+    }
+
+    if (!Number.isInteger(meta.order) || meta.order < 1) {
+      violations.push(`${rel}: frontmatter 'order' must be a positive integer`);
+    }
+
     if (status === "internal" || status === "archived") {
-      const relToDocs = path.relative(DOCS_ROOT, fullPath).replace(/\\/g, "/");
       if (!relToDocs.startsWith("_legacy/")) {
         violations.push(`${rel}: status '${status}' is only allowed under documentation/_legacy`);
       }
@@ -74,7 +99,7 @@ async function main() {
     return;
   }
 
-  console.log(`docs:structure passed (${docsFiles.length} docs scanned)`);
+  console.log(`docs:structure passed (${scanned} public docs scanned)`);
 }
 
 main().catch((error) => {

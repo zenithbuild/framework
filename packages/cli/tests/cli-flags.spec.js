@@ -40,4 +40,20 @@ describe('cli global flags', () => {
         expect(result.status).toBe(0);
         expect(result.stdout.trim()).toBe(`zenith ${CLI_VERSION}`);
     });
+
+    test('unknown commands fail hard (no false command advertising)', () => {
+        const result = spawnSync(process.execPath, [CLI_ENTRY, 'deploy'], {
+            encoding: 'utf8',
+            env: {
+                ...process.env,
+                ZENITH_NO_UI: '1',
+                NO_COLOR: '1',
+                CI: '1'
+            }
+        });
+
+        expect(result.status).not.toBe(0);
+        const output = `${result.stdout}${result.stderr}`.replace(/\r/g, '');
+        expect(output).toContain('Unknown command');
+    });
 });

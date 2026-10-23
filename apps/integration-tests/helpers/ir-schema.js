@@ -27,7 +27,11 @@ export function validateCompilerIR(ir) {
     'marker_bindings',
     'event_bindings',
     'style_blocks',
-    'nodes'
+    'nodes',
+    'diagnostics',
+    'warnings',
+    'ref_bindings',
+    'schemaVersion'
   ]);
 
   if (!Object.prototype.hasOwnProperty.call(ir, 'ir_version') || ir.ir_version !== 1) {

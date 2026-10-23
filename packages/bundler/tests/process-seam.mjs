@@ -40,7 +40,7 @@ const sandboxRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zenith-bundler-seam-'
 const fixturePath = path.join(sandboxRoot, 'fixture.zen');
 const outDir = path.join(sandboxRoot, 'dist-test');
 
-fs.writeFileSync(fixturePath, '<main><h1>{title}</h1></main>\n', 'utf8');
+fs.writeFileSync(fixturePath, '<main><h1>{props.title}</h1></main>\n', 'utf8');
 
 const compileResult = spawnSync(compilerBin, [fixturePath], {
   encoding: 'utf8'

@@ -95,12 +95,12 @@ describe('SSR Route Independence & Payload Smoke Test', () => {
             ].join('\n')
         });
 
-        await build({ pagesDir: project.pagesDir, outDir: project.outDir, config: { softNavigation: false } });
+        await build({ pagesDir: project.pagesDir, outDir: project.outDir, config: { router: false } });
         dev = await createDevServer({
             pagesDir: project.pagesDir,
             outDir: project.outDir,
             port: 0,
-            config: { softNavigation: false }
+            config: { router: false }
         });
 
         preview = await createPreviewServer({ distDir: project.outDir, port: 0 });

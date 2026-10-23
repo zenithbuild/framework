@@ -22,10 +22,9 @@ fi
 
 FALLBACK_DIST_TAG="${PUBLISH_FALLBACK_TAG:-latest}"
 NPM_REGISTRY_URL="${PUBLISH_NPM_REGISTRY:-https://registry.npmjs.org/}"
-
-PACKAGES=(
-  "packages/create-zenith|create-zenith"
-)
+NPM_BIN="${NPM_BIN:-npm}"
+NODE_BIN="${NODE_BIN:-node}"
+PACKAGES=()
 
 published=()
 skipped=()
@@ -48,41 +47,6 @@ read_manifest_field() {
       process.stdout.write(JSON.stringify(value));
     }
   ' "$manifest" "$field"
-}
-
-validate_publish_manifest() {
-  local manifest="$1"
-  node -e '
-    const fs = require("node:fs");
-    const manifestPath = process.argv[1];
-    const expectedRepositoryUrl = process.argv[2];
-    const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-    if (!Array.isArray(pkg.files) || pkg.files.length === 0) {
-      console.error(`Missing non-empty files whitelist in ${manifestPath}`);
-      process.exit(1);
-    }
-    if (pkg.private === true) {
-      console.error(`Refusing to publish private package manifest: ${manifestPath}`);
-      process.exit(1);
-    }
-    const repository = pkg.repository;
-    const repositoryUrl =
-      repository && typeof repository === "object"
-        ? repository.url
-        : typeof repository === "string"
-          ? repository
-          : "";
-    if (typeof repositoryUrl !== "string" || repositoryUrl.trim() === "") {
-      console.error(`Missing repository.url in ${manifestPath}`);
-      process.exit(1);
-    }
-    if (repositoryUrl !== expectedRepositoryUrl) {
-      console.error(
-        `Invalid repository.url in ${manifestPath}: expected ${expectedRepositoryUrl}, found ${repositoryUrl}`
-      );
-      process.exit(1);
-    }
-  ' "$manifest" "https://github.com/zenithbuild/framework"
 }
 
 extract_npm_json() {
@@ -125,7 +89,7 @@ npm_view_json() {
   shift
   local output
 
-  if output="$(npm view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
+  if output="$(env -u NPM_CONFIG_TAG -u npm_config_tag "$NPM_BIN" view "$@" --json --loglevel=error --registry "$NPM_REGISTRY_URL" 2>&1)"; then
     printf '%s' "$output"
     return 0
   fi
@@ -171,96 +135,7 @@ highest_published_version() {
       echo "$output" >&2
       exit 1
     fi
-
-    node -e '
-      function parseVersion(version) {
-        const raw = String(version || "").trim();
-        const match = raw.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
-        if (!match) {
-          return null;
-        }
-        return {
-          raw,
-          major: Number.parseInt(match[1], 10),
-          minor: Number.parseInt(match[2], 10),
-          patch: Number.parseInt(match[3], 10),
-          prerelease: match[4] || "",
-          prereleaseParts: match[4] ? match[4].split(".") : []
-        };
-      }
-
-      function compareIdentifiers(left, right) {
-        const leftNumeric = /^\d+$/.test(left);
-        const rightNumeric = /^\d+$/.test(right);
-        if (leftNumeric && rightNumeric) {
-          return Number(left) - Number(right);
-        }
-        if (leftNumeric) {
-          return -1;
-        }
-        if (rightNumeric) {
-          return 1;
-        }
-        return left.localeCompare(right);
-      }
-
-      function compareVersions(leftVersion, rightVersion) {
-        const left = parseVersion(leftVersion);
-        const right = parseVersion(rightVersion);
-        if (!left || !right) {
-          return 0;
-        }
-
-        const numberDelta =
-          (left.major - right.major)
-          || (left.minor - right.minor)
-          || (left.patch - right.patch);
-        if (numberDelta !== 0) {
-          return numberDelta;
-        }
-
-        if (!left.prerelease && !right.prerelease) {
-          return 0;
-        }
-        if (!left.prerelease) {
-          return 1;
-        }
-        if (!right.prerelease) {
-          return -1;
-        }
-
-        const length = Math.max(left.prereleaseParts.length, right.prereleaseParts.length);
-        for (let index = 0; index < length; index += 1) {
-          const leftPart = left.prereleaseParts[index];
-          const rightPart = right.prereleaseParts[index];
-          if (leftPart === undefined) {
-            return -1;
-          }
-          if (rightPart === undefined) {
-            return 1;
-          }
-          const delta = compareIdentifiers(leftPart, rightPart);
-          if (delta !== 0) {
-            return delta;
-          }
-        }
-
-        return 0;
-      }
-
-      const raw = JSON.parse(process.argv[1]);
-      const versions = Array.isArray(raw) ? raw : [raw];
-      let highest = "";
-      for (const version of versions) {
-        if (typeof version !== "string") {
-          continue;
-        }
-        if (!highest || compareVersions(version, highest) > 0) {
-          highest = version;
-        }
-      }
-      process.stdout.write(highest);
-    ' "$json"
+    "$NODE_BIN" "./scripts/publish-version-utils.mjs" highest "$json"
     return
   else
     status=$?
@@ -276,84 +151,7 @@ highest_published_version() {
 compare_versions() {
   local left_version="$1"
   local right_version="$2"
-
-  node -e '
-    function parseVersion(version) {
-      const raw = String(version || "").trim();
-      const match = raw.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
-      if (!match) {
-        return null;
-      }
-      return {
-        major: Number.parseInt(match[1], 10),
-        minor: Number.parseInt(match[2], 10),
-        patch: Number.parseInt(match[3], 10),
-        prerelease: match[4] || "",
-        prereleaseParts: match[4] ? match[4].split(".") : []
-      };
-    }
-
-    function compareIdentifiers(left, right) {
-      const leftNumeric = /^\d+$/.test(left);
-      const rightNumeric = /^\d+$/.test(right);
-      if (leftNumeric && rightNumeric) {
-        return Number(left) - Number(right);
-      }
-      if (leftNumeric) {
-        return -1;
-      }
-      if (rightNumeric) {
-        return 1;
-      }
-      return left.localeCompare(right);
-    }
-
-    function compareVersions(leftVersion, rightVersion) {
-      const left = parseVersion(leftVersion);
-      const right = parseVersion(rightVersion);
-      if (!left || !right) {
-        throw new Error(`Invalid semver comparison: ${leftVersion} vs ${rightVersion}`);
-      }
-
-      const numberDelta =
-        (left.major - right.major)
-        || (left.minor - right.minor)
-        || (left.patch - right.patch);
-      if (numberDelta !== 0) {
-        return numberDelta;
-      }
-
-      if (!left.prerelease && !right.prerelease) {
-        return 0;
-      }
-      if (!left.prerelease) {
-        return 1;
-      }
-      if (!right.prerelease) {
-        return -1;
-      }
-
-      const length = Math.max(left.prereleaseParts.length, right.prereleaseParts.length);
-      for (let index = 0; index < length; index += 1) {
-        const leftPart = left.prereleaseParts[index];
-        const rightPart = right.prereleaseParts[index];
-        if (leftPart === undefined) {
-          return -1;
-        }
-        if (rightPart === undefined) {
-          return 1;
-        }
-        const delta = compareIdentifiers(leftPart, rightPart);
-        if (delta !== 0) {
-          return delta;
-        }
-      }
-
-      return 0;
-    }
-
-    process.stdout.write(String(compareVersions(process.argv[1], process.argv[2])));
-  ' "$left_version" "$right_version"
+  "$NODE_BIN" "./scripts/publish-version-utils.mjs" compare "$left_version" "$right_version"
 }
 
 print_list() {
@@ -383,6 +181,23 @@ print_list() {
   done
 }
 
+load_publish_matrix() {
+  local args=("$NODE_BIN" "./scripts/verify-publish-surface.mjs" "--list" "--selection" "scaffolder")
+  PACKAGES=()
+  while IFS= read -r line; do
+    PACKAGES+=("$line")
+  done < <("${args[@]}")
+
+  if [[ "${#PACKAGES[@]}" -eq 0 ]]; then
+    echo "No publish packages resolved from the authoritative publish surface matrix." >&2
+    exit 1
+  fi
+}
+
+verify_publish_surface() {
+  "$NODE_BIN" "./scripts/verify-publish-surface.mjs" "--selection" "scaffolder"
+}
+
 echo "Publishing create-zenith scaffolder"
 if [[ -n "$TRAIN_VERSION" ]]; then
   echo "TRAIN_VERSION=${TRAIN_VERSION}"
@@ -392,6 +207,11 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 else
   echo "Mode=publish"
 fi
+echo
+
+echo "Verifying publish surface truth"
+verify_publish_surface
+load_publish_matrix
 echo
 
 for entry in "${PACKAGES[@]}"; do
@@ -404,8 +224,6 @@ for entry in "${PACKAGES[@]}"; do
     echo "Missing package manifest: ${manifest}" >&2
     exit 1
   fi
-
-  validate_publish_manifest "$manifest"
 
   actual_name="$(read_manifest_field "$manifest" "name")"
   version="$(read_manifest_field "$manifest" "version")"
@@ -451,9 +269,9 @@ for entry in "${PACKAGES[@]}"; do
   (
     cd "${ROOT}/${package_dir}"
     if [[ -n "$publish_tag" ]]; then
-      npm publish --access public --tag "$publish_tag" --registry "$NPM_REGISTRY_URL"
+      "$NPM_BIN" publish --access public --tag "$publish_tag" --registry "$NPM_REGISTRY_URL"
     else
-      npm publish --access public --registry "$NPM_REGISTRY_URL"
+      "$NPM_BIN" publish --access public --registry "$NPM_REGISTRY_URL"
     fi
   )
   echo "  published"

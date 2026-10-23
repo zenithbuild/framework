@@ -1,0 +1,75 @@
+<script lang="ts">
+import { zenNavigationShell } from "@zenithbuild/router";
+
+const shellRef = ref<HTMLElement>();
+const shellPhase = signal("idle");
+const shellType = signal("none");
+
+const shell = zenNavigationShell(shellRef, {
+  timeoutMs: 180,
+  onStateChange(state) {
+    shellPhase.set(state.phase);
+    shellType.set(state.navigationType ?? "none");
+  }
+});
+
+zenMount((ctx) => {
+  ctx.cleanup(shell.mount());
+});
+</script>
+
+<section
+  ref={shellRef}
+  data-demo-navigation-shell
+  class="grid gap-4 rounded-3xl border border-slate-700 bg-slate-950/80 p-6 shadow-xl shadow-black/25 transition"
+>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <p class="text-xs uppercase tracking-[0.26em] text-sky-300">Navigation Shell</p>
+      <h2 class="mt-2 text-2xl font-semibold text-slate-100">Route-level visual shell state</h2>
+    </div>
+    <div class="flex items-center gap-2">
+      <span
+        class={
+          shellPhase.get() === "idle"
+            ? "rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300"
+            : "rounded-full border border-sky-400/50 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100"
+        }
+      >
+        {shellPhase.get()}
+      </span>
+      <span class="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+        {shellType.get()}
+      </span>
+    </div>
+  </div>
+
+  <p class="text-sm leading-6 text-slate-300">
+    The shell node receives route-level phase metadata through <code>data-zen-navigation-phase</code>.
+    It stays visual-only and resets to <code>idle</code> on abort or error.
+  </p>
+
+  <div class="flex flex-wrap gap-3">
+    <a
+      data-zen-link="true"
+      href="/"
+      class="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-sky-400/50 hover:text-sky-100"
+    >
+      Home
+    </a>
+    <a
+      data-zen-link="true"
+      href="/docs"
+      class="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-sky-400/50 hover:text-sky-100"
+    >
+      Docs
+    </a>
+    <a
+      data-zen-link="true"
+      href="/blog"
+      class="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-sky-400/50 hover:text-sky-100"
+    >
+      Blog
+    </a>
+  </div>
+</section>

@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["guides", "troubleshooting", "hydration"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 9
 ---
 
 # Troubleshooting Guide

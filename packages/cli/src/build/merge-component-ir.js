@@ -11,6 +11,11 @@ import {
     stripNonCssStaticImportsInSource,
     transpileTypeScriptToJs
 } from './hoisted-code-transforms.js';
+import {
+    extractImportSpecifier,
+    getCanonicalModuleId,
+    isRelativeRuntimeHelperSpecifier
+} from './relative-helper-modules.js';
 
 export function createPageIrMergeCache(pageIr) {
     const hoisted = pageIr?.hoisted || {};
@@ -112,12 +117,20 @@ export function mergeComponentIr(
     addMergeMetric(mergeMetrics, 'refBindingsMs', performance.now() - refBindingsStartedAt);
 
     const importsStartedAt = performance.now();
+    if (!Array.isArray(pageIr.import_records)) {
+        pageIr.import_records = [];
+    }
     if (compIr.hoisted?.imports?.length) {
-        for (const imp of compIr.hoisted.imports) {
+        for (let i = 0; i < compIr.hoisted.imports.length; i++) {
+            const imp = compIr.hoisted.imports[i];
+            const sourceRecord = compIr.import_records?.[i];
             const rebased = rewriteStaticImportLine(imp, compPath, pageFile);
             if (options.cssImportsOnly) {
-                const spec = extractStaticImportSpecifier(rebased);
-                if (!spec || !isCssSpecifier(spec)) {
+                const sourceSpecifier = sourceRecord?.specifier
+                    || extractImportSpecifier(imp)
+                    || extractStaticImportSpecifier(imp)
+                    || '';
+                if (!isCssSpecifier(sourceSpecifier) && !isRelativeRuntimeHelperSpecifier(sourceSpecifier)) {
                     continue;
                 }
             }
@@ -131,6 +144,20 @@ export function mergeComponentIr(
             }
             if (!mergeCache?.importSet || mergeCache.importSet.has(rebased)) {
                 pageIr.hoisted.imports.push(rebased);
+                const resolvedSrcDir = options.srcDir || (compPath.includes('/src/') ? compPath.slice(0, compPath.indexOf('/src/') + 4) : '');
+                if (sourceRecord && typeof sourceRecord === 'object') {
+                    const importerId = sourceRecord.importer_module_id || getCanonicalModuleId(compPath, resolvedSrcDir);
+                    pageIr.import_records.push({ ...sourceRecord, importer_module_id: importerId, occurrence_index: pageIr.import_records.length });
+                } else {
+                    const spec = extractImportSpecifier(imp) || extractStaticImportSpecifier(imp) || '';
+                    pageIr.import_records.push({
+                        occurrence_index: pageIr.import_records.length,
+                        importer_module_id: getCanonicalModuleId(compPath, resolvedSrcDir),
+                        specifier: spec,
+                        raw_source: imp,
+                        resolved_module_id: null
+                    });
+                }
             }
         }
     }

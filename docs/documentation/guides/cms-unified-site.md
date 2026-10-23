@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["guides", "cms", "site"]
+section: "Advanced"
+sectionOrder: 8
+order: 14
 ---
 
 # CMS Unified Site Guide

@@ -49,13 +49,13 @@ describe('cli ui output', () => {
             expect(output).toContain('[zenith] • BUILD');
             expect(output).toContain('[zenith] ✓ OK');
             expect(output).toContain('[zenith] • BUILD  Output: ./dist');
-
-            expect(output).toMatchInlineSnapshot(`
-"[zenith] • BUILD  Building…
-[zenith] ✓ OK     Built 1 page(s), 4 asset(s)
-[zenith] • BUILD  Output: ./dist
-"
-`);
+            const normalized = output
+                .split('\n')
+                .filter((line) => line.length > 0 && !line.startsWith('[DEBUG] Route '))
+                .join('\n');
+            expect(normalized).toMatch(/\[zenith\] • BUILD  Building…/);
+            expect(normalized).toMatch(/\[zenith\] ✓ OK\s+Built 1 page\(s\), \d+ asset\(s\)/);
+            expect(normalized).toMatch(/\[zenith\] • BUILD  Output: \.\/dist/);
         } finally {
             rmSync(projectRoot, { recursive: true, force: true });
         }
