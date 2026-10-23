@@ -15,7 +15,7 @@ node ./scripts/verify-publish-surface.mjs --selection scaffolder
 
 bun run --cwd packages/runtime typecheck
 bun run --cwd packages/router typecheck
-bun run --cwd packages/config typecheck
+bun run --cwd packages/core typecheck
 bun run --cwd packages/image typecheck
 bun run --cwd packages/cli typecheck
 bun run --cwd packages/language-server typecheck
