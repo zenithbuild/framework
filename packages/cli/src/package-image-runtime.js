@@ -1,8 +1,10 @@
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+const UNAVAILABLE_IMAGE_SERVICE = fileURLToPath(new URL('./server-runtime/image-service-unavailable.js', import.meta.url));
 
 // Emitted server files that stand in for @zenithbuild/core/config subpaths. Server
 // output is self-contained: it never resolves @zenithbuild/core/config at runtime.
@@ -95,8 +97,9 @@ export async function packageImageRuntime(serverDir, imagePackage) {
         await writeFile(emitted, rewriteConfigSpecifiers(await readFile(emitted, 'utf8'), { filePath: emitted, serverDir }));
     }
     if (!imagePackage?.packageRoot) {
-        const stub = "export async function handleImageRequest(_req, res) { res.writeHead(404); res.end('Not Found'); }\nexport async function handleImageFetchRequest() { return new Response('Not Found', { status: 404 }); }\n";
-        await writeFile(join(target, 'service.js'), stub);
+        // Same /_zenith/image responses as the full service for every request
+        // it rejects before fetching; imports only the emitted image-config.js.
+        await cp(UNAVAILABLE_IMAGE_SERVICE, join(target, 'service.js'));
         await writeFile(join(target, 'index.js'), "export * from './service.js';\n");
         return;
     }

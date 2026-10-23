@@ -72,23 +72,28 @@ describe('hosted server functions without @zenithbuild/image', () => {
         return outDir;
     }
     const imageRequest = () => new Request('https://example.test/_zenith/image?url=%2Flogo.png&w=64&q=75');
+    // f504c98d answered this request with the same 400 JSON before fetching anything.
+    const expectBaseImageResponse = async (response) => {
+        expect([response.status, response.headers.get('content-type'), await response.text()])
+            .toEqual([400, 'application/json', '{"error":"image_request_failed","message":"Invalid URL"}']);
+    };
 
-    test('vercel functions ship image-config.js; SSR renders and the image endpoint is a 404 stub', async () => {
+    test('vercel functions ship image-config.js; SSR renders and the image endpoint answers like f504c98d', async () => {
         const fnDir = join(await buildHosted('vercel'), 'functions', '__zenith');
         expect(existsSync(join(fnDir, 'ssr.func', 'image-config.js'))).toBe(true);
         const ssr = await import(join(fnDir, 'ssr.func', 'index.js'));
         expect((await ssr.default.fetch(new Request('https://example.test/ssr'))).status).toBe(200);
         const image = await import(join(fnDir, 'image.func', 'index.js'));
-        expect((await image.default.fetch(imageRequest())).status).toBe(404);
+        await expectBaseImageResponse(await image.default.fetch(imageRequest()));
     });
 
-    test('netlify functions ship image-config.js; SSR renders and the image endpoint is a 404 stub', async () => {
+    test('netlify functions ship image-config.js; SSR renders and the image endpoint answers like f504c98d', async () => {
         const fnDir = join(await buildHosted('netlify'), 'functions');
         expect(existsSync(join(fnDir, '_zenith', 'image-config.js'))).toBe(true);
         const ssr = await import(join(fnDir, '__zenith_ssr.mjs'));
         expect((await ssr.default(new Request('https://example.test/ssr'))).status).toBe(200);
         const image = await import(join(fnDir, '__zenith_image.mjs'));
-        expect((await image.default(imageRequest())).status).toBe(404);
+        await expectBaseImageResponse(await image.default(imageRequest()));
     });
 });
 
@@ -160,9 +165,9 @@ describe('image package marker', () => {
         expect(typeof api.handleImageRequest).toBe('function');
         // A different dist directory did not come from this build: no package API.
         const other = await createProjectImageApi(root, join(root, 'elsewhere'))();
-        const res = { status: 0, writeHead(code) { this.status = code; }, end() {} };
-        await other.handleImageRequest({}, res);
-        expect(res.status).toBe(404);
+        const res = { status: 0, body: '', writeHead(code) { this.status = code; }, end(chunk) { this.body = String(chunk); } };
+        await other.handleImageRequest({}, res, { requestUrl: new URL('http://127.0.0.1/_zenith/image'), config: {} });
+        expect([res.status, res.body]).toEqual([400, '{"error":"missing_url"}']);
     });
 });
 

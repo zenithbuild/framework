@@ -6,6 +6,10 @@ import { discoverPublicAssets } from './public-assets.js';
 import { createRequire } from 'node:module';
 import { loadImagePackage } from './image-package-loader.js';
 import { devInstallCommand } from './install-command.js';
+import {
+    handleImageFetchRequest as handleUnavailableImageFetchRequest,
+    handleImageRequest as handleUnavailableImageRequest
+} from './server-runtime/image-service-unavailable.js';
 
 const CLI_VERSION = createRequire(import.meta.url)('../package.json').version;
 
@@ -42,8 +46,9 @@ const NO_IMAGES = {
     materializeImageMarkupInHtmlFiles: async () => {},
     injectImageRuntimePayload,
     injectImageRuntimePayloadIntoHtmlFiles,
-    handleImageRequest: async (_req, res) => { res.writeHead(404); res.end('Not Found'); },
-    handleImageFetchRequest: async () => new Response('Not Found', { status: 404 })
+    // Same /_zenith/image responses as the emitted no-image server service.
+    handleImageRequest: handleUnavailableImageRequest,
+    handleImageFetchRequest: handleUnavailableImageFetchRequest
 };
 
 // Non-public build metadata: lives next to .zenith-output/manifest.json, never
