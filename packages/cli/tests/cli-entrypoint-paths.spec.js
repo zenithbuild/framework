@@ -3,7 +3,7 @@ import {
     readdirSync, rmSync, writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -52,6 +52,21 @@ test('executes a relocated package in a path with spaces', () => {
         const target = join(relocated, 'node_modules', name);
         mkdirSync(dirname(target), { recursive: true });
         cpSync(join(cliRoot, 'node_modules', name), target, { recursive: true, dereference: true });
+    }
+    // Required peers (@zenithbuild/core, which owns the config modules) are
+    // installed by the consumer; copy them without their own node_modules,
+    // since core's workspace links lead back to the CLI.
+    const requiredPeers = Object.keys(cliManifest.peerDependencies || {})
+        .filter((name) => !cliManifest.peerDependenciesMeta?.[name]?.optional);
+    for (const name of requiredPeers) {
+        const source = join(cliRoot, 'node_modules', name);
+        const target = join(relocated, 'node_modules', name);
+        mkdirSync(dirname(target), { recursive: true });
+        cpSync(source, target, {
+            recursive: true,
+            dereference: true,
+            filter: (path) => !relative(source, path).split(sep).includes('node_modules')
+        });
     }
     const result = run(join(relocated, 'dist', 'index.js'), ['--version']);
     if (result.status !== 0) throw new Error(`Relocated CLI failed: ${result.stdout}${result.stderr}`);
