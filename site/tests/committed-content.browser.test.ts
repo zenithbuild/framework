@@ -6,10 +6,10 @@ const PORT = 4022;
 const origin = `http://localhost:${PORT}`;
 
 async function startDevServer() {
-  return startSiteDevServer(PORT);
+  return startSiteDevServer(PORT, { ZENITH_BLOG_SOURCE: "git", ZENITH_DOCUMENTATION_SOURCE: "local" });
 }
 
-describe("Tina-managed committed content routes", () => {
+describe("committed content routes", () => {
   test("renders Blog, Docs, About, sponsorship, and people through direct loads and browser history", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
