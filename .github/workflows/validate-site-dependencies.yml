@@ -42,12 +42,33 @@ jobs:
         run: bun test tests/documentation-architecture.test.ts tests/search-index.test.ts
       - name: Keep every active root and site advisory blocking
         if: always()
+        # Exit 0 clean, 1 findings, 2 audit error. Empty or unparseable output is an
+        # error, never clean, and an error in either scope wins over findings.
         run: |
-          audit_status=0
-          bun audit --json > root-audit.json || audit_status=$?
-          (cd site && bun audit --json) > site-audit.json || audit_status=$?
-          cat root-audit.json site-audit.json
-          exit "$audit_status"
+          result=0
+          for scope in root site; do
+            dir=.; [ "$scope" = site ] && dir=site
+            status=0
+            (cd "$dir" && bun audit --json) > "$scope-audit.json" || status=$?
+            cat "$scope-audit.json"
+            verdict=0
+            node -e '
+              const [file, status] = process.argv.slice(1);
+              let report;
+              try { report = JSON.parse(require("fs").readFileSync(file, "utf8")); } catch { process.exit(2); }
+              if (!report || typeof report !== "object" || Array.isArray(report)) process.exit(2);
+              const found = Object.keys(report).length > 0;
+              if (status === "0" && !found) process.exit(0);
+              process.exit(Number(status) <= 1 && found ? 1 : 2);
+            ' "$scope-audit.json" "$status" || verdict=$?
+            if [ "$verdict" -ge 2 ]; then
+              echo "::error::$scope bun audit exited $status without a usable JSON report (empty, unparseable or missing findings); results are incomplete"
+              result=2
+            elif [ "$verdict" -eq 1 ] && [ "$result" -eq 0 ]; then
+              result=1
+            fi
+          done
+          exit "$result"
       - name: Retain audit evidence
         if: always()
         uses: actions/upload-artifact@v4
