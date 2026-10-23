@@ -1,8 +1,10 @@
 # JUD-83 image package boundary
 
-Judah approved the independent shared config package (option A) before this
-implementation. See [the architecture decision](./jud-83-config-boundary-proposal.md)
-and [migration and packaging details](./jud-83-image-migration.md).
+Judah first approved an independent shared config package (option A); that
+decision is superseded by the 12:16 PM CT Oct 23 decision to move the config
+source into `@zenithbuild/core` and retire `@zenithbuild/config`. See
+[the architecture decision](./jud-83-config-boundary-proposal.md) and
+[migration and packaging details](./jud-83-image-migration.md).
 
 ## Loader contract
 
@@ -23,11 +25,13 @@ compilation or output removal. It excludes dependency, Git and standard generate
 directories and does not follow directory symlinks. Dev repeats detection on
 rebuild, including the first image added to a project, and its request handler
 reuses that result. Preview resolves once from the build's package marker. An absent image pipeline
-uses identity/no-op helpers and a 404 image endpoint.
+uses identity/no-op helpers and an image endpoint stub that answers no-image
+projects with the same status, headers and body as f504c98d.
 
 The Image component is registered from the package selected by the loader.
-The image package owns the image pipeline and Sharp; it depends on the pure
-shared config package, never on CLI or core. Rust materialization stays native.
+The image package owns the image pipeline and Sharp; it peer-depends on
+`@zenithbuild/core` for the pure config modules (`@zenithbuild/core/config/*`)
+and never imports the CLI. Rust materialization stays native.
 
 ## Compatibility and deployment
 

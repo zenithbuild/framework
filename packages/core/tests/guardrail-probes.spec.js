@@ -74,6 +74,13 @@ describe('guardrail probes: @zenithbuild module references', () => {
             .toEqual(['import-type']);
     });
 
+    test.each(['.tsx', '.jsx'])('JSX markup in a %s module still parses and reports the import', (ext) => {
+        const source = "import { Image } from '@zenithbuild/image';\nexport const view = <div><Image src=\"/a.png\" /></div>;\n";
+        const { violations } = scanProbe(ext, source);
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toContain(`config/probe${ext}:`);
+    });
+
     test.each(MODULE_EXTENSIONS)('comments and non-Zenith specifiers in a %s module pass', (ext) => {
         const source = [
             '// @zenithbuild/image is optional here',

@@ -10,11 +10,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-export const MODULE_EXTENSIONS = ['.ts', '.js', '.mjs', '.cjs', '.mts', '.cts'];
+export const MODULE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts'];
 const ZENITH_PREFIX = '@zenithbuild/';
 
 function scriptKindFor(fileName) {
-    if (/\.[cm]?tsx?$/.test(fileName)) return ts.ScriptKind.TS;
+    if (fileName.endsWith('.tsx')) return ts.ScriptKind.TSX;
+    if (fileName.endsWith('.jsx')) return ts.ScriptKind.JSX;
+    if (/\.[cm]?ts$/.test(fileName)) return ts.ScriptKind.TS;
     return ts.ScriptKind.JS;
 }
 
