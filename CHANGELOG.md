@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-- Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds, and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
+- Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds (outside CI, newer Node and Rust patch releases on the pinned minor are accepted; Bun stays exact), and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
 - Restrict Cargo caches in CI and publish workflows to native target directories and retire the cache namespace that restored physical directories over Bun workspace links (JUD-15).
 
 ## [0.8.0] - 2026-07-01
