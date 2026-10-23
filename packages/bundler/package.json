@@ -1,6 +1,6 @@
 {
   "name": "@zenithbuild/bundler",
-  "version": "0.8.0",
+  "version": "0.9.0-rc.0",
   "scripts": {
     "build": "node ../../scripts/check-toolchain.mjs && rm -rf dist && cargo build --locked --release && tsc -p tsconfig.meta.json && node ../../scripts/stage-bundler-platform-package.mjs",
     "contract:deps": "node dependency_contract.spec.js",
@@ -36,14 +36,14 @@
   },
   "homepage": "https://github.com/zenithbuild/framework#readme",
   "dependencies": {
-    "@zenithbuild/router": "0.8.0",
-    "@zenithbuild/runtime": "0.8.0"
+    "@zenithbuild/router": "0.9.0-rc.0",
+    "@zenithbuild/runtime": "0.9.0-rc.0"
   },
   "optionalDependencies": {
-    "@zenithbuild/bundler-darwin-arm64": "0.8.0",
-    "@zenithbuild/bundler-darwin-x64": "0.8.0",
-    "@zenithbuild/bundler-linux-x64": "0.8.0",
-    "@zenithbuild/bundler-win32-x64": "0.8.0"
+    "@zenithbuild/bundler-darwin-arm64": "0.9.0-rc.0",
+    "@zenithbuild/bundler-darwin-x64": "0.9.0-rc.0",
+    "@zenithbuild/bundler-linux-x64": "0.9.0-rc.0",
+    "@zenithbuild/bundler-win32-x64": "0.9.0-rc.0"
   },
   "type": "module",
   "private": false

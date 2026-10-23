@@ -5,7 +5,7 @@ framework train in projects that use `<Image>`, or to optimize raster files in
 `public/` (without it they are copied unoptimized):
 
 ```sh
-npm i -D @zenithbuild/image@0.8.0
+npm i -D @zenithbuild/image@0.9.0-rc.0
 ```
 
 CLI detects these inputs before compilation and output mutation, loads this

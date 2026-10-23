@@ -8,7 +8,7 @@ describe('drift release train', () => {
             readFileSync(resolve(REPO_ROOT, 'packages/core/package.json'), 'utf8')
         );
         const coreVersion = String(coreManifest.version || '');
-        expect(coreVersion).toMatch(/^0\.\d+\.\d+$/);
+        expect(coreVersion).toMatch(/^0\.\d+\.\d+(?:-(?:train|rc)\.\d+)?$/);
 
         const mismatches = [];
         for (const manifestRel of TRAIN_MANIFESTS) {

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0-rc.0] - TBD
+
 ### Changed
 
 - Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the audit step exits 2 when `bun audit` returns empty or unparseable output instead of passing. The proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils and KaTeX exception requests and binds to the refreshed `site/bun.lock`. braces GHSA-vfj7-8cjw-p6xm was withdrawn upstream, so it is recorded as withdrawn and no exception is requested (JUD-21).
