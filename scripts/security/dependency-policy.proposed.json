@@ -63,26 +63,6 @@
       "approvalUrl": null
     },
     {
-      "advisory": "GHSA-hp3w-g68c-fv3c",
-      "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
-      "package": "sprintf-js",
-      "severity": "moderate",
-      "versions": ["1.0.3"],
-      "scopes": ["root", "site"],
-      "paths": ["root: babel-plugin-istanbul -> load-nyc-config -> js-yaml -> argparse -> sprintf-js", "site: gray-matter and Tina GraphQL -> js-yaml -> argparse -> sprintf-js"],
-      "boundary": "Unbounded precision in attacker-controlled FORMAT strings throws RangeError; the library trigger reproduces.",
-      "compatibilityBlocker": "The primary advisory lists no patch; the latest 1.1.3 remains affected.",
-      "controlsProposed": ["Keep argparse usage/help format strings static and reviewed", "Do not execute the YAML CLI on untrusted command definitions", "Keep CI credentials out of untrusted PR jobs"],
-      "reachability": "js-yaml imports argparse in its CLI, not its normal YAML parser. No frontmatter-value-to-format-string path was found; gray-matter is still a production graph dependency.",
-      "owner": "Release Captain",
-      "followUp": "JUD-21 / GitHub #224 and #217",
-      "reviewAt": "2026-10-23T14:00:00Z",
-      "expiresAtProposed": "2026-10-29T05:00:00Z",
-      "status": "pending-judah-approval",
-      "approvedAt": null,
-      "approvalUrl": null
-    },
-    {
       "advisory": "GHSA-7mx3-vvmw-hjmv",
       "url": "https://github.com/advisories/GHSA-7mx3-vvmw-hjmv",
       "package": "@graphql-tools/utils",
@@ -121,6 +101,18 @@
       "status": "pending-judah-approval",
       "approvedAt": null,
       "approvalUrl": null
+    }
+  ],
+  "withdrawnAdvisoryRecords": [
+    {
+      "advisory": "GHSA-hp3w-g68c-fv3c",
+      "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+      "package": "sprintf-js",
+      "versions": ["1.0.3"],
+      "withdrawnAt": "2026-10-22T19:21:04Z",
+      "evidence": "gh api /advisories/GHSA-hp3w-g68c-fv3c returns withdrawn_at 2026-10-22T19:21:04Z and the summary 'Withdrawn Advisory: sprintf-js vulnerable to denial of service through unbounded precision specifiers'. GitHub's stated reason: it is the responsibility of an application to handle exceptions appropriately.",
+      "auditStatus": "bun audit no longer reports it at root or in site.",
+      "disposition": "Removed from exceptionRequests. A withdrawal is not a risk exception, so no exception is requested."
     }
   ]
 }
