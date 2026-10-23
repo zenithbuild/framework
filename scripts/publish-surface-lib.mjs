@@ -27,10 +27,9 @@ export const PUBLISH_SURFACE_MATRIX = [
     entry('packages/compiler', '@zenithbuild/compiler', 'release', ['dist/index.js']),
     entry('packages/runtime', '@zenithbuild/runtime', 'release', ['dist/index.js', 'dist/template.js']),
     entry('packages/router', '@zenithbuild/router', 'release', ['dist/index.js', 'dist/ZenLink.zen', 'template.js']),
-    entry('packages/config', '@zenithbuild/config', 'release', ['dist/index.js', 'dist/node.js']),
-    entry('packages/image', '@zenithbuild/image', 'release', ['dist/index.js', 'components/Image.zen']),
-    entry('packages/core', '@zenithbuild/core', 'release', ['dist/index.js', 'bin/zenith.js']),
-    entry('packages/cli', '@zenithbuild/cli', 'release', ['dist/index.js']),
+    entry('packages/image', '@zenithbuild/image', 'release', ['dist/index.js']),
+    entry('packages/core', '@zenithbuild/core', 'release', ['dist/index.js', 'dist/config/node.js', 'bin/zenith.js']),
+    entry('packages/cli', '@zenithbuild/cli', 'release', ['dist/index.js', 'dist/framework-components/Image.zen']),
     entry('packages/zenithbuild', 'zenithbuild', 'manual', ['README.md', 'AGENTS.md', 'SKILL.md', 'rules/zenith-agent-contract.md']),
     entry('packages/create-zenith', 'create-zenith', 'scaffolder', ['dist/cli.js'])
 ];
