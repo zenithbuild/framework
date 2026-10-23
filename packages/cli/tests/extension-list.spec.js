@@ -13,9 +13,9 @@ function createTestLogger() {
 }
 
 describe('extension registry and read-only CLI', () => {
-    test('alias resolution maps image to @zenithbuild/plugin-image', () => {
+    test('alias resolution maps image to @zenithbuild/image', () => {
         const entry = resolveExtension('image', 'plugin');
-        expect(entry?.name).toBe('@zenithbuild/plugin-image');
+        expect(entry?.name).toBe('@zenithbuild/image');
     });
 
     test('plugin list returns registry plugins', async () => {
@@ -27,7 +27,7 @@ describe('extension registry and read-only CLI', () => {
         const { logger, lines } = createTestLogger();
         const code = await runPluginCommand(['list'], { projectRoot: process.cwd(), logger });
         expect(code).toBe(0);
-        expect(lines.join('')).toContain('@zenithbuild/plugin-image');
+        expect(lines.join('')).toContain('@zenithbuild/image');
     });
 
     test('zenith plugin search finds image', async () => {
@@ -41,7 +41,7 @@ describe('extension registry and read-only CLI', () => {
         const { logger, lines } = createTestLogger();
         const code = await runPluginCommand(['info', 'image'], { projectRoot: process.cwd(), logger });
         expect(code).toBe(0);
-        expect(lines.join('')).toContain('image -> @zenithbuild/plugin-image');
+        expect(lines.join('')).toContain('image -> @zenithbuild/image');
         expect(lines.join('')).toContain('Not installed');
     });
 

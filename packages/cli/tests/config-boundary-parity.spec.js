@@ -2,7 +2,7 @@ import { validateConfig as core } from '../../core/dist/config.js';
 import { validateConfig as cli } from '../dist/config.js';
 import { loadConfig as loadCore } from '../../core/dist/config.js';
 import { loadConfig as loadCli } from '../dist/config.js';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,8 +31,22 @@ function evaluate(validate, input) {
     }
 }
 
-test.each(cases)('shared config boundary preserves current core/CLI behavior: %s', (_, input) => {
-    expect(evaluate(cli, input)).toEqual(evaluate(core, input));
+// Golden results captured from integration/v1 f504c98d, where core and CLI
+// still had independent config implementations that agreed on every case.
+// Both facades now share one implementation, so comparing them with each
+// other could never fail; each one is compared with the pre-merge behavior.
+const golden = JSON.parse(await readFile(new URL('./fixtures/config-boundary-golden.json', import.meta.url), 'utf8'));
+
+test('golden covers every case', () => {
+    expect(Object.keys(golden).sort()).toEqual(cases.map(([name]) => name).sort());
+});
+
+test.each(cases)('core config matches pre-merge behavior: %s', (name, input) => {
+    expect(evaluate(core, input)).toEqual(golden[name]);
+});
+
+test.each(cases)('CLI config matches pre-merge behavior: %s', (name, input) => {
+    expect(evaluate(cli, input)).toEqual(golden[name]);
 });
 
 test('shared plugin loading retains CLI messages from thrown plain objects', async () => {
