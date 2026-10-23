@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Run site dependency validation steps with `bash -eo pipefail` so a failed CMS build or content audit piped through `tee` fails the job; the proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and requests an exception for @graphql-tools/utils GHSA-c4qx-w738-7hr3 (JUD-21).
 
+### Removed
+
+- Removed every CMS layer from the site (Tina, its `tina/` config and generated `src/public/admin` bundle, the Directus client, and the `cms:dev`/`cms:build`/`cms:audit` scripts); the site now reads its committed markdown and JSON content directly, which drops Tina's dependency tree and its advisories (including @graphql-tools/utils GHSA-c4qx-w738-7hr3) from `site/bun.lock`. Site overrides are now `sharp` 0.35.5 and `dompurify` 3.4.17 only (JUD-21).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
