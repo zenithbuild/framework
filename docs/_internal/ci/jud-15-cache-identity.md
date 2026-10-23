@@ -17,9 +17,10 @@ these directories in place. Resolving the workspace wrapper from core then
 fails with MODULE_NOT_FOUND; the diagnostic also reproduces the public-bin
 and Bun-script failure. This is cache corruption, not a mixed-train waiver.
 
-The three CI lanes now cache only `packages/compiler/target` and
+The three CI lanes and the two publish workflows (`publish.yml` and
+`publish-create-zenith.yml`) now cache only `packages/compiler/target` and
 `packages/bundler/target`, plus Cargo's registry/git caches. Their namespace
 includes Rust 1.97.1 and schema v2, with no fallback to the contaminated
-legacy archive. No existing cache is deleted. A regression checks all three
-lanes' explicit paths and namespace. Hosted full-CI and warm-cache results
+legacy archive. No existing cache is deleted. A regression checks every
+workflow's Cargo cache paths and namespace. Hosted full-CI and warm-cache results
 are recorded separately in the PR/Linear.
