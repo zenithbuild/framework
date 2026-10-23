@@ -6,10 +6,10 @@ const require = createRequire(import.meta.url);
 
 // Emitted server files that stand in for @zenithbuild/config subpaths. Server
 // output is self-contained: it never resolves @zenithbuild/config at runtime.
-export const CONFIG_RUNTIME_FILES = Object.freeze({
+export const CONFIG_RUNTIME_FILES = {
     '@zenithbuild/config/base-path': 'base-path.js',
     '@zenithbuild/config/images': 'image-config.js'
-});
+};
 
 const SPECIFIER_FILE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts']);
 // Static `import … from`, `export … from`, side-effect `import '…'`, and

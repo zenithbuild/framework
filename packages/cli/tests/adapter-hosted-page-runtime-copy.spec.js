@@ -32,6 +32,7 @@ async function createCoreOutput() {
 
     for (const file of [
         'base-path.js',
+        'image-config.js',
         'server-contract.js',
         'server-middleware.js',
         'server-error.js',
