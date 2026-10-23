@@ -41,28 +41,7 @@
     "activation": "A separately reviewed implementation must validate the approved records. No pending entry can suppress a finding.",
     "recheck": "Re-audit every PR and release candidate; re-evaluate exposure when callers, deployment or dependencies change."
   },
-  "exceptionRequests": [
-    {
-      "advisory": "GHSA-vfj7-8cjw-p6xm",
-      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "severity": "high",
-      "versions": ["3.0.3"],
-      "scopes": ["root", "site"],
-      "paths": ["root: Jest -> micromatch -> braces", "site: @tailwindcss/cli -> @parcel/watcher -> micromatch -> braces"],
-      "boundary": "Deeply nested glob AST compilation can exhaust the stack. A controlled small-stack trigger reproduces the defect.",
-      "compatibilityBlocker": "The primary advisory and registry list no patched release; upgrading to current 3.0.3 cannot fix it.",
-      "controlsProposed": ["Use reviewed repository glob/watch configuration only", "Do not expose dev/watch tooling as a public service", "Run untrusted PR builds without privileged credentials"],
-      "uncertainty": "Build-tool classification does not prove every transitive caller rejects attacker-controlled patterns.",
-      "owner": "Release Captain",
-      "followUp": "JUD-21 / GitHub #224 and #217",
-      "reviewAt": "2026-10-23T14:00:00Z",
-      "expiresAtProposed": "2026-10-25T05:00:00Z",
-      "status": "pending-judah-approval",
-      "approvedAt": null,
-      "approvalUrl": null
-    }
-  ],
+  "exceptionRequests": [],
   "withdrawnAdvisoryRecords": [
     {
       "advisory": "GHSA-hp3w-g68c-fv3c",
@@ -71,6 +50,17 @@
       "versions": ["1.0.3"],
       "withdrawnAt": "2026-10-22T19:21:04Z",
       "evidence": "gh api /advisories/GHSA-hp3w-g68c-fv3c returns withdrawn_at 2026-10-22T19:21:04Z and the summary 'Withdrawn Advisory: sprintf-js vulnerable to denial of service through unbounded precision specifiers'. GitHub's stated reason: it is the responsibility of an application to handle exceptions appropriately.",
+      "auditStatus": "bun audit no longer reports it at root or in site.",
+      "disposition": "Removed from exceptionRequests. A withdrawal is not a risk exception, so no exception is requested."
+    },
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "versions": ["3.0.3"],
+      "withdrawnAt": "2026-10-23T12:53:02Z",
+      "checkedAt": "2026-10-23",
+      "evidence": "gh api /advisories/GHSA-vfj7-8cjw-p6xm returns withdrawn_at 2026-10-23T12:53:02Z and the summary 'Withdrawn Advisory: braces vulnerable to stack-exhaustion denial of service through deeply nested patterns'. GitHub's stated reason: it is not a practically exploitable vulnerability.",
       "auditStatus": "bun audit no longer reports it at root or in site.",
       "disposition": "Removed from exceptionRequests. A withdrawal is not a risk exception, so no exception is requested."
     }
