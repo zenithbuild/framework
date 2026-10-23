@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 interface SitePackage {
   scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 const sitePackage = JSON.parse(
@@ -12,8 +14,7 @@ const sitePackage = JSON.parse(
 
 describe("site consumer CLI contract", () => {
   test("normal framework commands resolve through the installed Zenith CLI", () => {
-    const dev = sitePackage.scripts?.dev;
-    expect(dev === "zenith dev" || /^tinacms dev --noTelemetry -c "zenith dev\s*"$/.test(dev)).toBe(true);
+    expect(sitePackage.scripts?.dev).toBe("zenith dev");
     expect(sitePackage.scripts?.build).toBe("zenith build");
     expect(sitePackage.scripts?.preview).toBe("zenith preview");
 
@@ -23,13 +24,15 @@ describe("site consumer CLI contract", () => {
     expect(scripts).not.toContain("ZENITH_PREFER_WORKSPACE_PACKAGES");
   });
 
-  test("Tina delegates to the installed consumer development command", () => {
-    const command = sitePackage.scripts?.["cms:dev"] || sitePackage.scripts?.dev;
-    const delegated = command?.match(/-c "([^"]+)"$/)?.[1].trim();
-    if (delegated === "bun run dev") {
-      expect(sitePackage.scripts?.dev).toBe("zenith dev");
-    } else {
-      expect(delegated).toBe("zenith dev");
-    }
+  test("reads committed content files without a CMS layer", () => {
+    const siteRoot = resolve(import.meta.dir, "..");
+    const scripts = Object.entries(sitePackage.scripts || {});
+    const packages = Object.keys({ ...sitePackage.dependencies, ...sitePackage.devDependencies });
+
+    expect(scripts.filter(([name, command]) => /cms/i.test(name) || /tinacms|directus/i.test(command))).toEqual([]);
+    expect(packages.filter((name) => /tina|directus/i.test(name))).toEqual([]);
+    expect(existsSync(resolve(siteRoot, "tina"))).toBe(false);
+    expect(existsSync(resolve(siteRoot, "src/public/admin"))).toBe(false);
+    expect(existsSync(resolve(siteRoot, "src/server/directusClient.ts"))).toBe(false);
   });
 });

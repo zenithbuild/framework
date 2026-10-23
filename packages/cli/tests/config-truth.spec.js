@@ -15,7 +15,9 @@ process.env.NO_COLOR = '1';
 process.env.CI = '1';
 
 const PNG_1X1 = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+xIhUAAAAASUVORK5CYII=',
+    // A valid 1x1 RGBA image, including the IDAT checksum. Decode it normally;
+    // the security floor and Sharp's corrupt-input checks remain enabled.
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=',
     'base64'
 );
 const PHASE_ONE_BASELINE_KEYS = [

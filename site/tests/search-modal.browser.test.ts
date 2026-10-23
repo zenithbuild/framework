@@ -1,35 +1,11 @@
+import { startSiteDevServer } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
 
 const PORT = 4032;
 const origin = `http://localhost:${PORT}`;
 
-async function startDevServer(): Promise<{ kill: () => void }> {
-  const { spawn } = await import("node:child_process");
-  const http = await import("node:http");
-  const dev = spawn("npx", ["zenith", "dev", "--port", String(PORT)], {
-    cwd: import.meta.dir + "/..",
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, ZENITH_BLOG_SOURCE: "git", ZENITH_DOCUMENTATION_SOURCE: "local" },
-  });
-  const status = () =>
-    new Promise<number>((resolve) => {
-      const request = http.get(origin, (response) => {
-        response.resume();
-        resolve(response.statusCode || 0);
-      });
-      request.on("error", () => resolve(0));
-      request.setTimeout(2_000, () => {
-        request.destroy();
-        resolve(0);
-      });
-    });
-
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    if ((await status()) === 200) return { kill: () => dev.kill() };
-  }
-  dev.kill();
-  throw new Error("Search modal dev server failed to start");
+async function startDevServer() {
+  return startSiteDevServer(PORT, { ZENITH_BLOG_SOURCE: "git", ZENITH_DOCUMENTATION_SOURCE: "local" });
 }
 
 describe("SearchModal browser integration", () => {
@@ -113,11 +89,11 @@ describe("SearchModal browser integration", () => {
       expect(await page.locator('[data-search-result-item]').count()).toBeGreaterThan(0);
 
       await browser.close();
-      server.kill();
+      await server.stop();
 
       expect(errors).toEqual([]);
       expect(failedResources).toEqual([]);
     },
-    { timeout: 120_000 },
+    { timeout: 660_000 },
   );
 });

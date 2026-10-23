@@ -60,6 +60,7 @@ export function createDevBuildSession(options) {
     };
     let previousPublicAssetPaths = new Set();
 
+    ensureToolchainCompatibility(compilerBin);
     ensureToolchainCompatibility(bundlerBin);
 
     const state = createDevBuildState(config, basePath);

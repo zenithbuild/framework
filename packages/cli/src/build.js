@@ -80,7 +80,10 @@ export async function build(options) {
         strictDomLints: config.strictDomLints === true
     };
 
-    ensureToolchainCompatibility(bundlerBin);
+    startupProfile.measureSync('toolchain_probe', () => {
+        ensureToolchainCompatibility(compilerBin);
+        ensureToolchainCompatibility(bundlerBin);
+    });
     const resolvedBundlerCandidate = getActiveToolchainCandidate(bundlerBin);
 
     if (logger) {
