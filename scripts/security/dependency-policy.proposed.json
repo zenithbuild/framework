@@ -61,26 +61,6 @@
       "status": "pending-judah-approval",
       "approvedAt": null,
       "approvalUrl": null
-    },
-    {
-      "advisory": "GHSA-238p-pmpm-9mq7",
-      "url": "https://github.com/advisories/GHSA-238p-pmpm-9mq7",
-      "package": "katex",
-      "severity": "low",
-      "versions": ["0.16.47"],
-      "scopes": ["site"],
-      "paths": ["Tina admin -> Mermaid -> KaTeX"],
-      "boundary": "Pre-existing prototype pollution can make mathematical rendering inherit trust settings and emit unsafe links/resources.",
-      "compatibilityBlocker": "Patched 0.18.2 crosses Mermaid's 0.16 range. KaTeX 0.18 changes internal CSS class names; visual migration is outside this no-frontend task.",
-      "controlsProposed": ["Restrict CMS content editing to trusted editors", "Do not enable trusted math rendering for untrusted expressions", "Treat prototype-pollution findings as an unresolved prerequisite, not an independent harmless issue"],
-      "uncertainty": "The advisory is a gadget requiring another pollution source; no universal absence of such a source is claimed.",
-      "owner": "Release Captain; Judah owns renderer migration approval",
-      "followUp": "JUD-21 / GitHub #217",
-      "reviewAt": "2026-10-23T14:00:00Z",
-      "expiresAtProposed": "2026-10-29T05:00:00Z",
-      "status": "pending-judah-approval",
-      "approvedAt": null,
-      "approvalUrl": null
     }
   ],
   "withdrawnAdvisoryRecords": [
