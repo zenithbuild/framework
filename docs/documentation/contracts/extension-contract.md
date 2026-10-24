@@ -3,7 +3,7 @@ title: "Extension Contract"
 description: "Formal definition of Zenith's stance on plugins and extensions."
 version: "0.4"
 status: "canonical"
-last_updated: "2026-06-07"
+last_updated: "2026-10-24"
 tags: ["contracts", "plugins", "extensions"]
 section: "Advanced"
 sectionOrder: 8
@@ -39,7 +39,7 @@ The `adapter` is an **advanced deployment configuration surface**, not a general
 - It is only permitted to map the already-classified output into host-specific routing rules and server-side deployment layouts (e.g., Serverless/Edge functions, `_redirects`).
 - It has no access to the compilation phase, manifest generation, or client runtime execution.
 
-Built-in `vercel` and `netlify` global middleware support is current adapter compatibility. It does not define a public adapter plugin middleware API.
+Built-in `vercel` and `netlify` global middleware support is locally conformance-tested adapter compatibility. It is not a live provider verification, and it does not define a public adapter plugin middleware API.
 
 ## CLI Extension Discovery Commands
 
