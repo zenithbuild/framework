@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Production page bundles omit reactive source spans (`source.file`, positions, and snippets) from `__zenith_refs`, `__zenith_events`, and compacted payload tables. Dev-stable builds (`--dev-stable-assets`) still emit full spans for overlays. Absolute build-machine paths and source snippets no longer ship in production client JS (JUD-90).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed

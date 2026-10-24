@@ -81,6 +81,12 @@ The exact field names above are the bundler/bootstrap-facing counterparts of
 the `hydrate(payload)` contract in `packages/runtime/RUNTIME_CONTRACT.md §1`.
 The runtime owns interpretation of that payload.
 
+Production builds omit `source` from `__zenith_refs`, `__zenith_events`,
+markers, and expression bindings. Compacted production tables emit a null
+source column, an empty `__zenith_payload_files` list, and no snippet column.
+Dev-stable builds (`--dev-stable-assets`) keep full spans, including `file`
+and `snippet`, for editor overlays. Hydration accepts a missing `source`.
+
 ---
 
 ## 3. Expression Array Contract

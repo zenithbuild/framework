@@ -1,3 +1,4 @@
+use super::bundler_emit_page_tables::{event_bindings_for_output, map_runtime_ref_bindings};
 use super::*;
 
 pub(crate) fn generate_entry_js(
@@ -46,9 +47,10 @@ pub(crate) fn generate_entry_js(
         image_materialization: Default::default(),
     };
 
-    let events_json = serde_json::to_string(events)
+    let include_source = output_mode.is_dev_stable();
+    let events_json = serde_json::to_string(&event_bindings_for_output(events, include_source))
         .map_err(|e| format!("failed to serialize event table: {e}"))?;
-    let refs_json = serde_json::to_string(&map_runtime_ref_bindings(ir)?)
+    let refs_json = serde_json::to_string(&map_runtime_ref_bindings(ir, include_source)?)
         .map_err(|e| format!("failed to serialize ref table: {e}"))?;
     let (component_imports, components_table) =
         generate_component_bootstrap_js(ir, component_assets, base_path)?;
@@ -351,51 +353,6 @@ fn generate_state_table_js(bindings: &[CompilerStateBinding]) -> Result<String, 
     }
     out.push_str("];\n");
     Ok(out)
-}
-
-fn map_runtime_ref_bindings(ir: &CompilerIr) -> Result<Vec<RuntimeRefBinding>, String> {
-    let mut out = Vec::new();
-    for binding in &ir.ref_bindings {
-        let Some(state_index) = resolve_ref_state_index(&ir.hoisted.state, &binding.identifier)
-        else {
-            return Err(format!(
-                "failed to resolve ref binding '{}' to hoisted state key",
-                binding.identifier
-            ));
-        };
-        out.push(RuntimeRefBinding {
-            index: binding.index,
-            state_index,
-            selector: binding.selector.clone(),
-            source: binding.source.clone(),
-        });
-    }
-    Ok(out)
-}
-
-fn resolve_ref_state_index(bindings: &[CompilerStateBinding], identifier: &str) -> Option<usize> {
-    if identifier.is_empty() {
-        return None;
-    }
-
-    for (index, binding) in bindings.iter().enumerate() {
-        if binding.key == identifier {
-            return Some(index);
-        }
-    }
-
-    let suffix = format!("_{}", identifier);
-    let mut match_index: Option<usize> = None;
-    for (index, binding) in bindings.iter().enumerate() {
-        if binding.key.ends_with(&suffix) {
-            if match_index.is_some() {
-                return None;
-            }
-            match_index = Some(index);
-        }
-    }
-
-    match_index
 }
 
 fn generate_state_keys_js(bindings: &[CompilerStateBinding]) -> Result<String, String> {
