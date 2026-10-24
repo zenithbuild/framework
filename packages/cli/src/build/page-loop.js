@@ -311,18 +311,6 @@ export async function buildPageEnvelopes(input) {
         pagePhase.normalizeMs = startupProfile.roundMs(performance.now() - normalizeStartedAt);
 
         const requiresJs = detectRequiresJs(pageIr, routerEnabled);
-        if (!requiresJs) {
-            console.log(`[DEBUG] Route ${entry.path} is STATIC (no JS required)`);
-        } else {
-            const reasons = [];
-            if (routerEnabled) reasons.push('routerEnabled');
-            if (pageIr.signals.length > 0) reasons.push('signals');
-            if (pageIr.event_bindings.length > 0) reasons.push('event_bindings');
-            if (pageIr.marker_bindings.length > 0) reasons.push('marker_bindings');
-            if (pageIr.component_instances.length > 0) reasons.push('component_instances');
-            if (pageIr.hoisted?.code?.length > 0) reasons.push('hoisted.code');
-            console.log(`[DEBUG] Route ${entry.path} is INTERACTIVE. Reasons: ${reasons.join(', ')}`);
-        }
 
         addBreakdown(pagePhaseTotals, pagePhase);
         addBreakdown(occurrenceApplyPhaseTotals, pageOccurrenceApplyBreakdown);
