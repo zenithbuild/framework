@@ -21,6 +21,8 @@ describe('Zenith Router Navigation Constraints', () => {
         expect(routerSource).toContain('window.location.replace(targetUrl.href);');
         expect(routerSource).toContain('closest("a[data-zen-link]")');
         expect(routerSource).toContain('"navigation:request"');
+        expect(routerSource).toContain('refreshCurrentRouteInternal()');
+        expect(routerSource).toContain('performNavigation(targetUrl, "refresh", null)');
         expect(routerSource).toContain('await emitNavigationEvent(context, "navigation:before-leave"');
         expect(routerSource).toContain('emitNavigationEvent(context, "navigation:enter-complete"');
     });

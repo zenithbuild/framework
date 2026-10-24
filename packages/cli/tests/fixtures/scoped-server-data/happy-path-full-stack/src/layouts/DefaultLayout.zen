@@ -1,0 +1,6 @@
+<script server lang="ts">
+const secret = "CSV_CLOSEOUT_LAYOUT_SERVER_SOURCE"
+const navigation = { title: "CSV_CLOSEOUT_NAV", secretLength: secret.length }
+</script>
+
+<nav data-testid="layout">{navigation.title}<slot /></nav>

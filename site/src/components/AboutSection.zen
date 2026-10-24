@@ -1,0 +1,42 @@
+<script setup="ts">
+import MotionGroup from "@/components/motion/MotionGroup.zen";
+
+const aboutRootRef = ref<HTMLElement>();
+const aboutHeadingRef = ref<HTMLElement>();
+const aboutDetailsRef = ref<HTMLElement>();
+
+</script>
+
+<section ref={aboutRootRef} data-motion-section="home-about" data-motion-ready="false" data-motion-state="unprepared" class="relative min-h-screen overflow-hidden bg-background px-6 py-20 text-foreground sm:px-10 lg:px-14 lg:py-28">
+    <div class="relative z-10 grid min-h-[calc(100vh-10rem)] grid-cols-6 grid-rows-[auto_1fr_auto] gap-x-8 gap-y-16 lg:grid-cols-12">
+        <p class="col-span-full row-start-1 max-w-xs text-2xl font-semibold leading-none text-foreground/76 sm:text-3xl lg:col-span-3">
+            Zenith Build Framework
+        </p>
+
+        <h2 ref={aboutHeadingRef} data-motion-target="true" class="col-span-full row-start-2 self-start justify-self-start text-[clamp(3rem,14vw,5.5rem)] font-semibold leading-[0.98] tracking-normal text-foreground sm:text-[clamp(4rem,8.8vw,10.5rem)] lg:col-span-8 lg:col-start-5">
+            A framework<br />
+            for fast, reliable<br />
+            web applications
+        </h2>
+
+        <div ref={aboutDetailsRef} data-motion-target="true" class="col-span-full row-start-3 grid gap-10 self-end lg:grid-cols-12 lg:items-end">
+            <div class="flex flex-col items-start gap-2 lg:col-span-3">
+                <span class="rounded-full bg-foreground/10 px-3 py-1 text-sm font-semibold uppercase tracking-normal text-foreground/90">
+                    Compiler-first
+                </span>
+                <span class="rounded-full bg-foreground/10 px-3 py-1 text-sm font-semibold uppercase tracking-normal text-foreground/90">
+                    Server-first
+                </span>
+                <span class="rounded-full bg-foreground/10 px-3 py-1 text-sm font-semibold uppercase tracking-normal text-foreground/90">
+                    Reactive components
+                </span>
+            </div>
+
+            <p class="max-w-4xl text-xl font-medium leading-relaxed text-foreground/74 lg:col-span-8 lg:col-start-5 lg:text-2xl">
+                Build with server-owned routes, compiler-visible components, and reactive primitives that keep
+                browser work explicit. Zenith makes authored intent easier to trace into shipped output.
+            </p>
+        </div>
+    </div>
+    <MotionGroup rootRef={aboutRootRef} targetARef={aboutHeadingRef} targetBRef={aboutDetailsRef} />
+</section>

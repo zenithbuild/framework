@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "compiler", "ir"]
+section: "Advanced"
+sectionOrder: 8
+order: 8
 ---
 
 # IR Envelope Contract
@@ -19,4 +22,4 @@ Definition of Done:
 - Envelope shape remains deterministic.
 - Any shape change increments IR version and updates validators/tests.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/IR_ENVELOPE_CONTRACT.md`.
+Canonical source: `packages/compiler/IR_ENVELOPE_CONTRACT.md`.

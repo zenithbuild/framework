@@ -9,6 +9,7 @@ fn compile_with_embedded_markup(input: &str) -> Result<CompilerOutput, String> {
         CompileOptions {
             embedded_markup_expressions: true,
             strict_dom_lints: false,
+            ..CompileOptions::default()
         },
     )
 }
@@ -16,6 +17,7 @@ fn compile_with_embedded_markup(input: &str) -> Result<CompilerOutput, String> {
 #[test]
 fn lowers_component_tags_inside_expression_to_fragments() {
     let input = r##"
+<script lang="ts">const items = [{ slug: "a", title: "A" }]</script>
 <main>
   {items.map((item) => (
     <Button href={"#cat-" + item.slug}>
@@ -29,7 +31,7 @@ fn lowers_component_tags_inside_expression_to_fragments() {
     let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
-        expr.contains("__zenith_fragment("),
+        expr.contains("__zenith_fragment`"),
         "expected embedded markup lowering, got: {}",
         expr
     );
@@ -48,6 +50,7 @@ fn lowers_component_tags_inside_expression_to_fragments() {
 #[test]
 fn lowers_nested_markup_inside_markup_interpolations() {
     let input = r#"
+<script lang="ts">const cond = true; const ok = true</script>
 <main>
   {cond ? (
     <span>
@@ -61,14 +64,38 @@ fn lowers_nested_markup_inside_markup_interpolations() {
     let expr = output.expressions.first().cloned().unwrap_or_default();
 
     assert!(
-        expr.matches("__zenith_fragment(").count() >= 3,
+        expr.matches("__zenith_fragment`").count() >= 3,
         "expected nested fragment lowering, got: {}",
         expr
     );
     assert!(
-        expr.contains("${ok ? (__zenith_fragment("),
+        expr.contains("? (__zenith_fragment`"),
         "nested markup branches should be lowered inside interpolation: {}",
         expr
+    );
+}
+
+#[test]
+fn preserves_unicode_inside_embedded_markup() {
+    let input = r#"
+<script lang="ts">const items = ["compiler"]</script>
+<main>{items.map((item) => <span title="Café…">{item} · Open result →</span>)}</main>
+"#;
+
+    let output = compile_with_embedded_markup(input).expect("compile should succeed");
+    let expr = output.expressions.first().cloned().unwrap_or_default();
+
+    assert!(
+        expr.contains("Café…"),
+        "attribute text was corrupted: {expr}"
+    );
+    assert!(
+        expr.contains("· Open result →"),
+        "text content was corrupted: {expr}"
+    );
+    assert!(
+        !expr.contains("Ã") && !expr.contains("â"),
+        "mojibake leaked: {expr}"
     );
 }
 

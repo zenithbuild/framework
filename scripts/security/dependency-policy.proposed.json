@@ -1,0 +1,68 @@
+{
+  "ticket": "JUD-21",
+  "status": "pending-judah-approval",
+  "effective": false,
+  "proposedAt": "2026-10-22",
+  "approver": "Judah Sullivan",
+  "implementationOwner": "Codex",
+  "reviewOwner": "Release Captain / independent engineering reviewers",
+  "candidateBinding": {
+    "branch": "codex/jud-21-dependency-advisories",
+    "base": "f504c98d05579ce39069d11fb5d0825161add867",
+    "rootLockSHA256": "949ed6d625743c6db69355e0510ea1148a46b74449cf96c2edc5e5db1832d02a",
+    "siteLockSHA256": "837278169f63e30261c0e68a245d2c2ce200b91b52891e9053f28da4bfdd4f2e",
+    "approvalBinding": "An approval must name the exact PR commit SHA and these lockfile hashes."
+  },
+  "enforcement": {
+    "scopes": ["root bun.lock", "site/bun.lock", "isolated packed-consumer lockfiles"],
+    "blockingSeverities": ["low", "moderate", "high", "critical"],
+    "auditCommand": "bun audit --json",
+    "failOnAuditError": true,
+    "failOnMalformedReport": true,
+    "exceptionsActive": false,
+    "currentBehavior": "Every active advisory still fails CI. This proposal is not loaded by the gate.",
+    "withdrawnAdvisories": "Require primary-source withdrawal evidence and an exact advisory ID; withdrawal is not a risk exception.",
+    "releaseEvidence": "Retain raw root, site and clean packed-consumer audits, tool versions, commit SHA, lock hashes, dependency owners, test results and reviewer disposition."
+  },
+  "exceptionRequirements": {
+    "approval": "Only Judah may explicitly approve each exception; a PR, draft record or green test is not approval.",
+    "requiredFields": [
+      "advisory ID and primary source",
+      "package, exact versions, dependency paths and affected scope",
+      "candidate commit and lockfile SHA256",
+      "source-to-sink assessment and uncertainties",
+      "reason a compatible fix is unavailable",
+      "compensating controls and evidence",
+      "owner, follow-up ticket, review date and UTC expiry",
+      "Judah approval URL and approval timestamp"
+    ],
+    "maximumDays": { "critical": 0, "high": 3, "moderate": 7, "low": 14 },
+    "expiryBehavior": "Fail closed on expiry, missing approval, scope/version/lock drift, new reachability or new advisory. No automatic renewal.",
+    "activation": "A separately reviewed implementation must validate the approved records. No pending entry can suppress a finding.",
+    "recheck": "Re-audit every PR and release candidate; re-evaluate exposure when callers, deployment or dependencies change."
+  },
+  "exceptionRequests": [],
+  "withdrawnAdvisoryRecords": [
+    {
+      "advisory": "GHSA-hp3w-g68c-fv3c",
+      "url": "https://github.com/advisories/GHSA-hp3w-g68c-fv3c",
+      "package": "sprintf-js",
+      "versions": ["1.0.3"],
+      "withdrawnAt": "2026-10-22T19:21:04Z",
+      "evidence": "gh api /advisories/GHSA-hp3w-g68c-fv3c returns withdrawn_at 2026-10-22T19:21:04Z and the summary 'Withdrawn Advisory: sprintf-js vulnerable to denial of service through unbounded precision specifiers'. GitHub's stated reason: it is the responsibility of an application to handle exceptions appropriately.",
+      "auditStatus": "bun audit no longer reports it at root or in site.",
+      "disposition": "Removed from exceptionRequests. A withdrawal is not a risk exception, so no exception is requested."
+    },
+    {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "versions": ["3.0.3"],
+      "withdrawnAt": "2026-10-23T12:53:02Z",
+      "checkedAt": "2026-10-23",
+      "evidence": "gh api /advisories/GHSA-vfj7-8cjw-p6xm returns withdrawn_at 2026-10-23T12:53:02Z and the summary 'Withdrawn Advisory: braces vulnerable to stack-exhaustion denial of service through deeply nested patterns'. GitHub's stated reason: it is not a practically exploitable vulnerability.",
+      "auditStatus": "bun audit no longer reports it at root or in site.",
+      "disposition": "Removed from exceptionRequests. A withdrawal is not a risk exception, so no exception is requested."
+    }
+  ]
+}

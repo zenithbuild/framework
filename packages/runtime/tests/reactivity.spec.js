@@ -23,6 +23,24 @@ describe('signal()', () => {
 
         expect(calls).toEqual([2, 3]);
     });
+
+    test('subscriber mutations are snapshot-isolated during notification', () => {
+        const count = signal(0);
+        const calls = [];
+        let unsubscribeSecond = () => {};
+        const unsubscribeFirst = count.subscribe((value) => {
+            calls.push(`first:${value}`);
+            unsubscribeSecond();
+        });
+        unsubscribeSecond = count.subscribe((value) => calls.push(`second:${value}`));
+
+        count.set(1);
+        count.set(2);
+        unsubscribeFirst();
+        count.set(3);
+
+        expect(calls).toEqual(['first:1', 'second:1', 'first:2']);
+    });
 });
 
 describe('state()', () => {
@@ -40,6 +58,32 @@ describe('state()', () => {
         const store = state({ count: 1 });
         store.set((prev) => ({ ...prev, count: prev.count + 1 }));
         expect(store.get()).toEqual({ count: 2 });
+    });
+
+    test('merges patch objects and replaces with functional updater results', () => {
+        const store = state({ count: 1, label: 'one' });
+        const calls = [];
+        store.subscribe((value) => calls.push(value));
+
+        store.set({ label: 'two' });
+        store.set((prev) => ({ count: prev.count + 1 }));
+
+        expect(calls).toEqual([
+            { count: 1, label: 'two' },
+            { count: 2 }
+        ]);
+        expect(store.get()).toEqual({ count: 2 });
+    });
+
+    test.each([
+        ['array patch', []],
+        ['null patch', null],
+        ['function returning array', () => []],
+        ['function returning null', () => null]
+    ])('rejects invalid %s', (_label, patch) => {
+        const store = state({ ok: true });
+        expect(() => store.set(patch)).toThrow('[Zenith Runtime] state.set(next) must resolve to a plain object');
+        expect(store.get()).toEqual({ ok: true });
     });
 });
 

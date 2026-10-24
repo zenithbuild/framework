@@ -69,15 +69,25 @@ describe('hydrate() event contract', () => {
         });
 
         let thrown = null;
+        let uncaught = null;
         const onWindowError = (event) => {
             thrown = event.error;
             if (typeof event.preventDefault === 'function') {
                 event.preventDefault();
             }
         };
+
+        const onUncaught = (err) => {
+            uncaught = err;
+        };
+
         window.addEventListener('error', onWindowError);
+        process.on('uncaughtException', onUncaught);
+        
         container.querySelector('button').click();
+        
         window.removeEventListener('error', onWindowError);
+        process.off('uncaughtException', onUncaught);
 
         expect(thrown).toBeTruthy();
         expect(thrown.zenithRuntimeError).toBeTruthy();

@@ -25,17 +25,27 @@ import { spawnSync } from 'node:child_process'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const REPO_ROOT = path.resolve(__dirname, '../../..')
 
-// Resolve site dist relative to monorepo root
-const SITE_DIST = path.resolve(__dirname, '../../../site/dist/assets')
+function resolveSiteDist() {
+  const candidates = [
+    process.env.ZENITH_SITE_DIST,
+    path.resolve(REPO_ROOT, '../site/dist/assets'),
+    path.resolve(REPO_ROOT, 'site/dist/assets')
+  ].filter(Boolean)
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0] || ''
+}
+
+const SITE_DIST = resolveSiteDist()
 
 // Pattern matches TypeScript type annotations in arrow-function callback params
 // e.g. `(item: string) =>`, `(record: any, index: number) =>`
 const TS_ANNOTATION_IN_CALLBACK = /\(\w+:\s*(string|number|any|boolean|object|unknown|never|void|Array|Record)\b[^)]*\)\s*=>/g
 
 test('emitted page chunks: no TypeScript annotations in expression functions', () => {
-  if (!fs.existsSync(SITE_DIST)) {
-    // Skip if site hasn't been built (CI may not build site in this test suite)
+  if (!SITE_DIST || !fs.existsSync(SITE_DIST)) {
+    // Skip if the standalone site repo has not been built for this local test run.
     return
   }
 
@@ -76,7 +86,7 @@ test('emitted page chunks: no TypeScript annotations in expression functions', (
 })
 
 test('emitted page chunks: all pass node syntax check', () => {
-  if (!fs.existsSync(SITE_DIST)) {
+  if (!SITE_DIST || !fs.existsSync(SITE_DIST)) {
     return
   }
 

@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "bundler", "determinism"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 4
 ---
 
 # Bundler Contract
@@ -21,4 +24,4 @@ Definition of Done:
 - Export/data-attribute contracts are preserved.
 - Hashing and ordering remain deterministic.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-bundler/BUNDLER_CONTRACT.md`.
+Canonical source: `packages/bundler/BUNDLER_CONTRACT.md`.

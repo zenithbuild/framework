@@ -12,14 +12,21 @@ import {
 
 describe("site link policy", () => {
   test("keeps the proven soft-nav route-entry set explicit", () => {
-    expect(PROVEN_SOFT_NAV_ROUTE_ENTRIES).toEqual(["/", "/about", "/blog", "/changelog", "/docs"]);
+    expect(PROVEN_SOFT_NAV_ROUTE_ENTRIES).toEqual([
+      "/",
+      "/about",
+      "/blog",
+      "/blog/building-zenith-0-8",
+      "/docs",
+      "/docs/getting-started",
+    ]);
   });
 
   test("normalizes route-entry hrefs deterministically", () => {
     expect(normalizeRouteEntryHref("/")).toBe("/");
-    expect(normalizeRouteEntryHref("/docs/")).toBe("/docs");
-    expect(normalizeRouteEntryHref("/docs/?tab=api")).toBe("/docs");
-    expect(normalizeRouteEntryHref("/docs#routing")).toBe("/docs");
+    expect(normalizeRouteEntryHref("/about/")).toBe("/about");
+    expect(normalizeRouteEntryHref("/about/?tab=api")).toBe("/about");
+    expect(normalizeRouteEntryHref("/about#routing")).toBe("/about");
   });
 
   test("classifies external href families as plain-anchor surfaces", () => {
@@ -34,21 +41,22 @@ describe("site link policy", () => {
 
   test("keeps same-page and deep-hash links out of soft-nav", () => {
     expect(isHashHref("#routing")).toBe(true);
-    expect(isHashHref("/docs#routing")).toBe(true);
+    expect(isHashHref("/about#routing")).toBe(true);
     expect(classifySiteHref("#routing")).toBe("hash");
-    expect(classifySiteHref("/docs#routing")).toBe("hash");
+    expect(classifySiteHref("/about#routing")).toBe("hash");
   });
 
   test("only classifies the proven route-entry set as soft-nav eligible", () => {
     expect(isProvenSoftNavRouteEntry("/")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/about")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/blog")).toBe(true);
-    expect(isProvenSoftNavRouteEntry("/changelog")).toBe(true);
+    expect(isProvenSoftNavRouteEntry("/changelog")).toBe(false);
     expect(isProvenSoftNavRouteEntry("/docs")).toBe(true);
-    expect(isProvenSoftNavRouteEntry("/docs#routing")).toBe(false);
-    expect(isProvenSoftNavRouteEntry("/docs?tab=api")).toBe(false);
+    expect(isProvenSoftNavRouteEntry("/docs/getting-started")).toBe(true);
+    expect(isProvenSoftNavRouteEntry("/about#routing")).toBe(false);
+    expect(isProvenSoftNavRouteEntry("/about?tab=api")).toBe(false);
     expect(isProvenSoftNavRouteEntry("/pricing")).toBe(false);
-    expect(classifySiteHref("/changelog")).toBe("proven-route-entry");
+    expect(classifySiteHref("/about")).toBe("proven-route-entry");
     expect(classifySiteHref("/docs")).toBe("proven-route-entry");
     expect(classifySiteHref("/pricing")).toBe("internal-fallback");
   });

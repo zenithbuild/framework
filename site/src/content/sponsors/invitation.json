@@ -1,0 +1,17 @@
+{
+  "kind": "invitation",
+  "name": "First sponsor invitation",
+  "title": "Become Zenith’s first sponsor.",
+  "description": "Zenith is built publicly and independently. Sponsorship gives sustained time to the compiler, runtime, documentation, tooling, and the ecosystem work that connects them.",
+  "recognitionText": "A prominent place on the Zenith front page, paired with sustained work on the framework’s public foundation.",
+  "ctaLabel": "Sponsor Zenith",
+  "ctaUrl": "https://github.com/sponsors/zenithbuild",
+  "supportingStatements": [
+    "authored contracts",
+    "browser execution",
+    "clear adoption",
+    "developer flow"
+  ],
+  "active": true,
+  "featured": false
+}

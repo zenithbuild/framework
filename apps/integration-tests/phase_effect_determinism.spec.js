@@ -22,21 +22,26 @@ describe('Phase effect determinism', () => {
             pages: {
                 'index.zen': `<script lang="ts">
 const count = signal(0);
-const runs = signal(0);
-const cleanups = signal(0);
+let runCount = 0;
+let cleanupCount = 0;
+
+globalThis.__zenithEffectAudit = () => ({
+  runs: runCount,
+  cleanups: cleanupCount
+});
 
 zenEffect(() => {
-  const val = count.get();
-  runs.set(runs.get() + 1);
-  return () => cleanups.set(cleanups.get() + 1);
+  count.get();
+  runCount += 1;
+  return () => {
+    cleanupCount += 1;
+  };
 });
 
 function inc() { count.set(count.get() + 1); }
 </script>
 <main>
   <p id="count">{count}</p>
-  <p id="runs">{runs}</p>
-  <p id="cleanups">{cleanups}</p>
   <button id="inc" on:click={inc}>+</button>
 </main>`
             }
@@ -56,8 +61,8 @@ function inc() { count.set(count.get() + 1); }
             await page.waitForTimeout(200);
 
             // Initial run: effect fires once (autotrack mode)
-            const initialRuns = ((await page.textContent('#runs')) || '').trim();
-            expect(Number(initialRuns)).toBeGreaterThanOrEqual(1);
+            const initialAudit = await page.evaluate(() => window.__zenithEffectAudit());
+            expect(initialAudit.runs).toBeGreaterThanOrEqual(1);
 
             // Click 3 times
             for (let i = 0; i < 3; i++) {
@@ -68,11 +73,12 @@ function inc() { count.set(count.get() + 1); }
             expect(((await page.textContent('#count')) || '').trim()).toBe('3');
 
             // Runs should have increased (autotrack rerun)
-            const finalRuns = Number(((await page.textContent('#runs')) || '').trim());
+            const finalAudit = await page.evaluate(() => window.__zenithEffectAudit());
+            const finalRuns = Number(finalAudit.runs);
             expect(finalRuns).toBeGreaterThanOrEqual(4); // 1 initial + 3 reruns
 
             // Cleanups should be exactly 1 less than runs (cleanup-before-rerun)
-            const finalCleanups = Number(((await page.textContent('#cleanups')) || '').trim());
+            const finalCleanups = Number(finalAudit.cleanups);
             expect(finalCleanups).toBe(finalRuns - 1);
 
             await page.close();
@@ -117,6 +123,11 @@ zenMount(() => {
             page.on('pageerror', (err) => consoleErrors.push(err.message));
 
             await page.goto(`http://localhost:${port}/`, { waitUntil: 'load' });
+            await page.waitForFunction(
+                () => (document.querySelector('#mounted')?.textContent || '').trim() === 'yes',
+                null,
+                { timeout: 3000 }
+            );
             expect(((await page.textContent('#mounted')) || '').trim()).toBe('yes');
 
             // Navigate away and back — mount cleanup must not throw
@@ -124,6 +135,11 @@ zenMount(() => {
             await page.waitForURL(`http://localhost:${port}/about`, { timeout: 3000 });
             await page.click('#link-home');
             await page.waitForURL(`http://localhost:${port}/`, { timeout: 3000 });
+            await page.waitForFunction(
+                () => (document.querySelector('#mounted')?.textContent || '').trim() === 'yes',
+                null,
+                { timeout: 3000 }
+            );
 
             expect(((await page.textContent('#mounted')) || '').trim()).toBe('yes');
             expect(consoleErrors).toEqual([]);

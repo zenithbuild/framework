@@ -1,0 +1,5 @@
+<script lang="ts">
+import StaticBlockedLayout from "../layouts/StaticBlockedLayout.zen";
+</script>
+
+<StaticBlockedLayout />

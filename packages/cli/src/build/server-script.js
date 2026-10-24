@@ -1,17 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { findNextKnownComponentTag } from '../component-tag-parser.js';
+import { readRouteHandlerExport } from '../route-handler-export-analysis.js';
+import { extractStaticExportPaths } from '../static-export-paths.js';
 
 /**
  * @param {string} source
  * @param {string} sourceFile
  * @param {object} [compilerOpts]
- * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, source_path: string } | null }}
+ * @returns {{ source: string, serverScript: { source: string, prerender: boolean, has_guard: boolean, has_load: boolean, has_action: boolean, source_path: string, export_paths?: string[] } | null }}
  */
 export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     const serverMatches = [];
     const reservedServerExportRe =
-        /\bexport\s+const\s+(?:data|prerender|guard|load|ssr_data|props|ssr)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard)\s*\(|\bexport\s+const\s+(?:load|guard)\s*=/;
+        /\bexport\s+const\s+(?:data|prerender|guard|load|action|ssr_data|props|ssr)\b|\bexport\s+(?:async\s+)?function\s+(?:load|guard|action)\s*\(|\bexport\s+const\s+(?:load|guard|action)\s*=/;
 
     for (const match of source.matchAll(scriptRe)) {
         const attrs = String(match[1] || '');
@@ -22,7 +24,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
-                `  Reason: guard/load/data exports are only allowed in <script server lang="ts"> or adjacent .guard.ts / .load.ts files\n` +
+                `  Reason: guard/load/action/data exports are only allowed in <script server lang="ts"> or adjacent .guard.ts / .load.ts / .action.ts files\n` +
                 `  Example: move the export into <script server lang="ts">`
             );
         }
@@ -74,17 +76,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
-    const loadFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+load\s*\(([^)]*)\)/);
-    const loadConstParenMatch = serverSource.match(/\bexport\s+const\s+load\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
-    const loadConstSingleArgMatch = serverSource.match(
-        /\bexport\s+const\s+load\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
-    );
-    const hasLoad = Boolean(loadFnMatch || loadConstParenMatch || loadConstSingleArgMatch);
-    const loadMatchCount =
-        Number(Boolean(loadFnMatch)) +
-        Number(Boolean(loadConstParenMatch)) +
-        Number(Boolean(loadConstSingleArgMatch));
-    if (loadMatchCount > 1) {
+    const loadExport = readRouteHandlerExport(serverSource, 'load');
+    const hasLoad = loadExport.hasExport;
+    if (loadExport.matchCount > 1) {
         throw new Error(
             `Zenith server script contract violation:\n` +
             `  File: ${sourceFile}\n` +
@@ -93,22 +87,25 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         );
     }
 
-    const guardFnMatch = serverSource.match(/\bexport\s+(?:async\s+)?function\s+guard\s*\(([^)]*)\)/);
-    const guardConstParenMatch = serverSource.match(/\bexport\s+const\s+guard\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/);
-    const guardConstSingleArgMatch = serverSource.match(
-        /\bexport\s+const\s+guard\s*=\s*(?:async\s*)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>/
-    );
-    const hasGuard = Boolean(guardFnMatch || guardConstParenMatch || guardConstSingleArgMatch);
-    const guardMatchCount =
-        Number(Boolean(guardFnMatch)) +
-        Number(Boolean(guardConstParenMatch)) +
-        Number(Boolean(guardConstSingleArgMatch));
-    if (guardMatchCount > 1) {
+    const guardExport = readRouteHandlerExport(serverSource, 'guard');
+    const hasGuard = guardExport.hasExport;
+    if (guardExport.matchCount > 1) {
         throw new Error(
             `Zenith server script contract violation:\n` +
             `  File: ${sourceFile}\n` +
             `  Reason: multiple guard exports detected\n` +
             `  Example: keep exactly one export const guard = async (ctx) => ({ ... })`
+        );
+    }
+
+    const actionExport = readRouteHandlerExport(serverSource, 'action');
+    const hasAction = actionExport.hasExport;
+    if (actionExport.matchCount > 1) {
+        throw new Error(
+            `Zenith server script contract violation:\n` +
+            `  File: ${sourceFile}\n` +
+            `  Reason: multiple action exports detected\n` +
+            `  Example: keep exactly one export const action = async (ctx) => ({ ... })`
         );
     }
 
@@ -135,10 +132,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     }
 
     if (hasLoad) {
-        const singleArg = String(loadConstSingleArgMatch?.[1] || '').trim();
-        const paramsText = String((loadFnMatch || loadConstParenMatch)?.[1] || '').trim();
-        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-        if (arity !== 1) {
+        if (loadExport.arity !== null && loadExport.arity !== 1) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
@@ -149,15 +143,23 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
     }
 
     if (hasGuard) {
-        const singleArg = String(guardConstSingleArgMatch?.[1] || '').trim();
-        const paramsText = String((guardFnMatch || guardConstParenMatch)?.[1] || '').trim();
-        const arity = singleArg ? 1 : paramsText.length === 0 ? 0 : paramsText.split(',').length;
-        if (arity !== 1) {
+        if (guardExport.arity !== null && guardExport.arity !== 1) {
             throw new Error(
                 `Zenith server script contract violation:\n` +
                 `  File: ${sourceFile}\n` +
                 `  Reason: guard(ctx) must accept exactly one argument\n` +
                 `  Example: export const guard = async (ctx) => ({ ... })`
+            );
+        }
+    }
+
+    if (hasAction) {
+        if (actionExport.arity !== null && actionExport.arity !== 1) {
+            throw new Error(
+                `Zenith server script contract violation:\n` +
+                `  File: ${sourceFile}\n` +
+                `  Reason: action(ctx) must accept exactly one argument\n` +
+                `  Example: export const action = async (ctx) => ({ ... })`
             );
         }
     }
@@ -176,6 +178,7 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
         }
         prerender = rawValue.startsWith('true');
     }
+    const exportPaths = extractStaticExportPaths(serverSource, sourceFile) || [];
 
     const start = match.index ?? -1;
     if (start < 0) {
@@ -186,7 +189,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
                 prerender,
                 has_guard: hasGuard,
                 has_load: hasLoad,
-                source_path: sourceFile
+                has_action: hasAction,
+                source_path: sourceFile,
+                export_paths: exportPaths
             }
         };
     }
@@ -200,7 +205,9 @@ export function extractServerScript(source, sourceFile, compilerOpts = {}) {
             prerender,
             has_guard: hasGuard,
             has_load: hasLoad,
-            source_path: sourceFile
+            has_action: hasAction,
+            source_path: sourceFile,
+            export_paths: exportPaths
         }
     };
 }

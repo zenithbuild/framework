@@ -8,13 +8,29 @@ Start with [`./docs/README.md`](./docs/README.md).
 
 ## What Lives Here
 - `packages/` for core packages: compiler, bundler, runtime, router, CLI, core, and `create-zenith`
+- `skills/zenithbuild/` for the skills.sh-installable Zenith agent skill
 - `docs/` for canonical documentation and release notes
 - `apps/` for monorepo apps and smoke fixtures
 - `governance/` and `contracts/` for repo rules and canonical contracts
 
+## Agent Skill
+
+Install the Zenith agent skill with skills.sh:
+
+```bash
+npx skills add zenithbuild/framework --skill zenithbuild
+```
+
+Direct path install:
+
+```bash
+npx skills add https://github.com/zenithbuild/framework/tree/master/skills/zenithbuild
+```
+
 ## What Stays Separate
 - Plugins live in separate repositories.
 - `zenith-language` and `zenith-language-server` remain separate repositories.
+- `site` is a separate public deployable app boundary for the marketing site, docs, blog, changelog, and Vercel surface.
 - Imported source refs are tracked in [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md).
 
 ## Repository Settings
@@ -28,3 +44,14 @@ Topics to add:
 - `ui-framework`
 - `rust`
 - `typescript`
+
+## Support Zenith
+
+Zenith is an open source project built around compiler-first UI, deterministic output, explicit contracts, and minimal runtime behavior.
+
+If you use Zenith or want to support its continued development, you can help fund core engineering, tooling, documentation, and long-term maintenance:
+- **[GitHub Sponsors](https://github.com/sponsors/zenithbuild)**: For direct individual sponsorship.
+- **[Open Collective](https://opencollective.com/zenithbuild)**: For broader open-source contributions and organizational funding.
+
+A limited number of design partner and implementation/advisory relationships are also available for teams exploring Zenith seriously via our Open Collective organizational tiers.
+<!-- GitAds-Verify: S6XFY3ERS2IGQIDEW83CGDZAMKG58ZPK -->

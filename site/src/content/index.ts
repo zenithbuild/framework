@@ -1,23 +1,17 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { readFileSync } from "node:fs";
 
-const contentRoot = path.dirname(fileURLToPath(import.meta.url));
-
-function readJson<T>(relativePath: string): T {
-  const filePath = path.join(contentRoot, relativePath);
-  return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
+function readJson<T>(file: URL): T {
+  return JSON.parse(readFileSync(file, "utf8")) as T;
 }
 
-const pageIndex = readJson("./pages/index.json");
-const pageDocs = readJson("./pages/docs.json");
-const pageBlog = readJson("./pages/blog.json");
-const pageChangelog = readJson("./pages/changelog.json");
-const pageBlogPosts = readJson("./pages/blog-posts.json");
-const pageAbout = readJson("./pages/about.json");
-
-const siteNavigation = readJson("./site/navigation.json");
-const siteFooter = readJson("./site/footer.json");
+const pageIndex = readJson(new URL("./pages/index.json", import.meta.url));
+const pageDocs = readJson(new URL("./pages/docs.json", import.meta.url));
+const pageBlog = readJson(new URL("./pages/blog.json", import.meta.url));
+const pageChangelog = readJson(new URL("./pages/changelog.json", import.meta.url));
+const pageBlogPosts = readJson(new URL("./pages/blog-posts.json", import.meta.url));
+const pageAbout = readJson(new URL("./pages/about.json", import.meta.url));
+const siteNavigation = readJson(new URL("./site/navigation.json", import.meta.url));
+const siteFooter = readJson(new URL("./site/footer.json", import.meta.url));
 
 export const pageContent = {
   index: pageIndex,

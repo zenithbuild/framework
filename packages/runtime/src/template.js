@@ -1,43 +1,42 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildRuntimeTemplateProfile, RUNTIME_TEMPLATE_PROFILES, normalizeRuntimeTemplateProfile } from './runtime-template-profile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function normalizeNewlines(value) {
-    return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+function normalizeNewlines(value) { return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+function readRuntimeSourceFile(fileName) { return normalizeNewlines(readFileSync(join(__dirname, fileName), 'utf8')); }
+
+const runtimeTemplateProfileCache = new Map();
+
+function resolveRuntimeTemplateProfile(profile) {
+    const resolvedProfile = normalizeRuntimeTemplateProfile(profile);
+    if (runtimeTemplateProfileCache.has(resolvedProfile)) return runtimeTemplateProfileCache.get(resolvedProfile);
+    const built = buildRuntimeTemplateProfile({
+        profile: resolvedProfile,
+        normalizeNewlines,
+        readRuntimeSourceFile
+    });
+    runtimeTemplateProfileCache.set(resolvedProfile, built);
+    return built;
 }
 
-function readRuntimeSourceFile(fileName) {
-    const fullPath = join(__dirname, fileName);
-    return normalizeNewlines(readFileSync(fullPath, 'utf8'));
-}
-
-function stripImports(source) {
-    return source.replace(/^\s*import\s+[^;]+;\s*$/gm, '').trim();
-}
-
-function buildRuntimeModuleSource() {
-    const segments = [
-        stripImports(readRuntimeSourceFile('zeneffect.js')),
-        stripImports(readRuntimeSourceFile('ref.js')),
-        stripImports(readRuntimeSourceFile('env.js')),
-        stripImports(readRuntimeSourceFile('platform.js')),
-        stripImports(readRuntimeSourceFile('signal.js')),
-        stripImports(readRuntimeSourceFile('state.js')),
-        stripImports(readRuntimeSourceFile('diagnostics.js')),
-        stripImports(readRuntimeSourceFile('cleanup.js')),
-        stripImports(readRuntimeSourceFile('hydrate.js'))
-    ].filter(Boolean);
-
-    return normalizeNewlines(segments.join('\n\n'));
-}
-
-const RUNTIME_MODULE_SOURCE = buildRuntimeModuleSource();
+const RUNTIME_MODULE_SOURCE = resolveRuntimeTemplateProfile(RUNTIME_TEMPLATE_PROFILES.DEFAULT).source;
 
 export function runtimeModuleSource() {
     return RUNTIME_MODULE_SOURCE;
+}
+
+export function runtimeModuleProfileSnapshot(profile = RUNTIME_TEMPLATE_PROFILES.DEFAULT) {
+    const resolved = resolveRuntimeTemplateProfile(profile);
+    return {
+        profile: resolved.profile,
+        source: resolved.source,
+        contributors: resolved.contributors.map((entry) => ({ ...entry })),
+        coverageBytes: resolved.coverageBytes
+    };
 }
 
 const RUNTIME_DEV_CLIENT_SOURCE = `(() => {

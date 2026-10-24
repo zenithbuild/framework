@@ -1,0 +1,217 @@
+<script lang="ts">
+import { gsap } from "gsap";
+
+interface ReaderHeading { id: string; text: string; level: number; }
+interface ElementRef<T> { current?: T | null; }
+interface Props {
+  headings: ReaderHeading[];
+  articleRef: ElementRef<HTMLElement>;
+  endRef: ElementRef<HTMLElement>;
+  labelId: string;
+  surface: "blog" | "docs";
+}
+
+const readerTocProps = props as Props;
+const readerTocHeadings = (Array.isArray(readerTocProps.headings) ? readerTocProps.headings : [])
+  .filter((heading) => heading && (heading.level === 2 || heading.level === 3) && heading.id && heading.text);
+const readerTocHeadingIds = new Set(readerTocHeadings.map((heading) => heading.id));
+const readerTocNavRef = ref<HTMLElement>();
+const readerTocLinksRef = ref<HTMLElement>();
+const readerTocIndicatorRef = ref<HTMLElement>();
+let readerTocMeasureFrame = 0;
+let readerTocScrollFrame = 0;
+
+function readerTocEscape(value: unknown): string {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function readerTocRenderLinks(activeId: string): string {
+  return readerTocHeadings.map((heading) => {
+    const active = heading.id === activeId;
+    const depth = heading.level === 3 ? "pl-7 text-xs" : "pl-4 text-sm";
+    const tone = active ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground";
+    const current = active ? ' aria-current="location"' : "";
+    return '<a href="#' + readerTocEscape(heading.id) + '" data-reader-heading-link="' + readerTocEscape(heading.id)
+      + '" class="block min-h-10 py-2 pr-3 leading-5 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
+      + depth + " " + tone + '"' + current + ">" + readerTocEscape(heading.text) + "</a>";
+  }).join("");
+}
+
+state readerTocActiveId = readerTocHeadings[0]?.id || "";
+const readerTocInitialLinksHtml = readerTocRenderLinks(readerTocActiveId);
+
+function readerTocFindLink(root: HTMLElement, id: string): HTMLElement | null {
+  for (const child of Array.from(root.children)) {
+    const element = child as HTMLElement;
+    if (element.dataset?.readerHeadingLink === id) return element;
+    const nested = readerTocFindLink(element, id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function readerTocMoveIndicator(immediate = false) {
+  const win = zenWindow();
+  const nav = readerTocNavRef.current;
+  const indicator = readerTocIndicatorRef.current;
+  if (!win || !nav || !indicator) return;
+  if (readerTocMeasureFrame) win.cancelAnimationFrame(readerTocMeasureFrame);
+  readerTocMeasureFrame = win.requestAnimationFrame(() => {
+    const activeLink = readerTocFindLink(nav, readerTocActiveId);
+    if (!activeLink) return;
+    const reduced = win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const values = { y: activeLink.offsetTop, height: activeLink.offsetHeight, autoAlpha: 1 };
+    gsap.killTweensOf(indicator);
+    if (immediate || reduced) gsap.set(indicator, values);
+    else gsap.to(indicator, { ...values, duration: 0.2, ease: "power2.out", overwrite: true });
+  });
+}
+
+function readerTocSetActive(id: string, immediate = false) {
+  if (!readerTocHeadingIds.has(id)) return;
+  if (readerTocActiveId !== id) {
+    readerTocActiveId = id;
+    const links = readerTocLinksRef.current;
+    if (links) links.innerHTML = readerTocRenderLinks(id);
+  }
+  readerTocMoveIndicator(immediate);
+}
+
+function readerTocHandleClick(event: MouseEvent) {
+  let target = event.target as HTMLElement | null;
+  const root = readerTocNavRef.current;
+  while (target && target !== root) {
+    const id = target.dataset?.readerHeadingLink || "";
+    if (id) {
+      readerTocSetActive(id);
+      return;
+    }
+    target = target.parentElement;
+  }
+}
+
+function readerTocCollectHeadings(root: HTMLElement): HTMLElement[] {
+  const result: HTMLElement[] = [];
+  function visit(node: Element) {
+    for (const child of Array.from(node.children)) {
+      const element = child as HTMLElement;
+      if ((element.tagName === "H2" || element.tagName === "H3") && readerTocHeadingIds.has(element.id)) result.push(element);
+      if (element.children.length > 0) visit(element);
+    }
+  }
+  visit(root);
+  return result;
+}
+
+function readerTocHashId(hash: string): string {
+  try { return decodeURIComponent(String(hash || "").replace(/^#/, "")); }
+  catch { return ""; }
+}
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const doc = zenDocument();
+  const article = readerTocProps.articleRef.current;
+  if (!win || !doc || !article || readerTocHeadings.length === 0) return;
+  const links = readerTocLinksRef.current;
+  if (links) links.innerHTML = readerTocInitialLinksHtml;
+  const headingElements = readerTocCollectHeadings(article);
+  let headingPositions: Array<{ id: string; top: number }> = [];
+  const measureHeadingPositions = () => {
+    headingPositions = headingElements.map((element) => ({
+      id: element.id,
+      top: element.getBoundingClientRect().top + win.scrollY,
+    }));
+  };
+  const chooseFromScrollPosition = () => {
+    if (win.scrollY + win.innerHeight >= doc.documentElement.scrollHeight - 4) {
+      readerTocSetActive(readerTocHeadings.at(-1)?.id || "");
+      return;
+    }
+    const readingLine = win.scrollY + 112;
+    const passed = headingPositions.filter((position) => position.top <= readingLine);
+    const selected = passed.at(-1) || headingPositions.find((position) => position.top > readingLine) || headingPositions.at(-1);
+    if (selected) readerTocSetActive(selected.id);
+  };
+  measureHeadingPositions();
+  const initialId = readerTocHashId(win.location.hash);
+  readerTocSetActive(readerTocHeadingIds.has(initialId) ? initialId : readerTocHeadings[0]?.id || "", true);
+
+  const syncHash = () => {
+    const id = readerTocHashId(win.location.hash);
+    if (readerTocHeadingIds.has(id)) readerTocSetActive(id);
+  };
+  ctx.cleanup(zenOn(win, "hashchange", syncHash));
+  ctx.cleanup(zenOn(win, "scroll", () => {
+    if (readerTocScrollFrame) return;
+    readerTocScrollFrame = win.requestAnimationFrame(() => {
+      readerTocScrollFrame = 0;
+      chooseFromScrollPosition();
+    });
+  }, { passive: true }));
+  const stopResize = zenResize(() => {
+    measureHeadingPositions();
+    chooseFromScrollPosition();
+  });
+  ctx.cleanup(stopResize);
+
+  if (typeof win.ResizeObserver === "function") {
+    const contentObserver = new win.ResizeObserver(() => measureHeadingPositions());
+    contentObserver.observe(article);
+    ctx.cleanup(() => contentObserver.disconnect());
+  }
+
+  if (typeof win.IntersectionObserver !== "function") return;
+  let endVisible = false;
+  const chooseActive = () => {
+    if (endVisible) {
+      readerTocSetActive(readerTocHeadings.at(-1)?.id || "");
+      return;
+    }
+    chooseFromScrollPosition();
+  };
+  const headingObserver = new win.IntersectionObserver(chooseActive, {
+    rootMargin: "-96px 0px -70% 0px",
+    threshold: [0, 0.15, 1],
+  });
+  headingElements.forEach((heading) => headingObserver.observe(heading));
+  ctx.cleanup(() => headingObserver.disconnect());
+
+  const end = readerTocProps.endRef.current;
+  if (end) {
+    const endObserver = new win.IntersectionObserver((entries) => {
+      endVisible = entries.some((entry) => entry.isIntersecting);
+      chooseActive();
+    }, { rootMargin: "0px 0px -4% 0px", threshold: 0 });
+    endObserver.observe(end);
+    ctx.cleanup(() => endObserver.disconnect());
+  }
+
+  ctx.cleanup(() => {
+    if (readerTocMeasureFrame) win.cancelAnimationFrame(readerTocMeasureFrame);
+    if (readerTocScrollFrame) win.cancelAnimationFrame(readerTocScrollFrame);
+    const indicator = readerTocIndicatorRef.current;
+    if (indicator) gsap.killTweensOf(indicator);
+  });
+});
+</script>
+
+<aside
+  data-reader-toc={readerTocProps.surface}
+  aria-labelledby={readerTocProps.labelId}
+  class="border-y border-border py-5 lg:border-y-0 lg:py-0"
+  style={readerTocHeadings.length > 0 ? undefined : "display: none;"}
+>
+  <p id={readerTocProps.labelId} class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">On this page</p>
+  <div class="relative mt-4">
+    <span ref={readerTocIndicatorRef} aria-hidden="true" class="pointer-events-none absolute left-0 top-0 w-px bg-primary opacity-0"></span>
+    <nav ref={readerTocNavRef} aria-label="On this page" on:click={readerTocHandleClick}>
+      <div ref={readerTocLinksRef} class="grid" unsafeHTML={readerTocInitialLinksHtml}></div>
+    </nav>
+  </div>
+</aside>

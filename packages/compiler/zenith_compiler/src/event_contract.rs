@@ -1,3 +1,5 @@
+use crate::expression_syntax::is_direct_call_handler_expression;
+
 const EVENT_ALIASES: &[(&str, &str)] = &[
     ("hoverin", "pointerenter"),
     ("hoverout", "pointerleave"),
@@ -116,139 +118,7 @@ pub fn suggest_known_event(event: &str) -> Option<String> {
 }
 
 pub fn is_direct_call_expression(expression: &str) -> bool {
-    let trimmed = expression.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    if trimmed.contains("=>") {
-        return false;
-    }
-
-    if trimmed.starts_with("function")
-        || trimmed.starts_with("async function")
-        || trimmed.starts_with("(function")
-        || trimmed.starts_with("((function")
-    {
-        return false;
-    }
-
-    let chars: Vec<char> = trimmed.chars().collect();
-    let len = chars.len();
-    let mut idx = 0usize;
-
-    if !is_ident_start(chars[idx]) {
-        return false;
-    }
-    idx += 1;
-    while idx < len && is_ident_continue(chars[idx]) {
-        idx += 1;
-    }
-
-    loop {
-        while idx < len && chars[idx].is_whitespace() {
-            idx += 1;
-        }
-
-        if idx < len && chars[idx] == '.' {
-            idx += 1;
-            if idx >= len || !is_ident_start(chars[idx]) {
-                return false;
-            }
-            idx += 1;
-            while idx < len && is_ident_continue(chars[idx]) {
-                idx += 1;
-            }
-            continue;
-        }
-        break;
-    }
-
-    while idx < len && chars[idx].is_whitespace() {
-        idx += 1;
-    }
-
-    if idx >= len || chars[idx] != '(' {
-        return false;
-    }
-
-    let Some(close_idx) = find_matching_paren(&chars, idx) else {
-        return false;
-    };
-
-    let mut rest = close_idx + 1;
-    while rest < len && chars[rest].is_whitespace() {
-        rest += 1;
-    }
-    if rest == len {
-        return true;
-    }
-
-    rest == len - 1 && chars[rest] == ';'
-}
-
-fn find_matching_paren(chars: &[char], open_idx: usize) -> Option<usize> {
-    let mut depth = 0usize;
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    let mut idx = open_idx;
-
-    while idx < chars.len() {
-        let ch = chars[idx];
-        if let Some(q) = quote {
-            if escaped {
-                escaped = false;
-                idx += 1;
-                continue;
-            }
-            if ch == '\\' {
-                escaped = true;
-                idx += 1;
-                continue;
-            }
-            if ch == q {
-                quote = None;
-            }
-            idx += 1;
-            continue;
-        }
-
-        if ch == '"' || ch == '\'' || ch == '`' {
-            quote = Some(ch);
-            idx += 1;
-            continue;
-        }
-
-        if ch == '(' {
-            depth += 1;
-            idx += 1;
-            continue;
-        }
-
-        if ch == ')' {
-            if depth == 0 {
-                return None;
-            }
-            depth -= 1;
-            if depth == 0 {
-                return Some(idx);
-            }
-            idx += 1;
-            continue;
-        }
-
-        idx += 1;
-    }
-
-    None
-}
-
-fn is_ident_start(ch: char) -> bool {
-    ch.is_ascii_alphabetic() || ch == '_' || ch == '$'
-}
-
-fn is_ident_continue(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '_' || ch == '$'
+    is_direct_call_handler_expression(expression)
 }
 
 fn levenshtein(a: &str, b: &str) -> usize {
@@ -290,7 +160,12 @@ mod tests {
     fn call_expression_detection() {
         assert!(is_direct_call_expression("handleClick()"));
         assert!(is_direct_call_expression("menu.close()"));
+        assert!(is_direct_call_expression("(handleClick())"));
+        assert!(is_direct_call_expression("handlers[\"save\"]()"));
+        assert!(is_direct_call_expression("doThing?.()"));
+        assert!(is_direct_call_expression("factory().handler"));
         assert!(!is_direct_call_expression("handleClick"));
+        assert!(!is_direct_call_expression("menu.close"));
         assert!(!is_direct_call_expression("() => handleClick()"));
         assert!(!is_direct_call_expression("(event) => submit(event)"));
         assert!(!is_direct_call_expression(

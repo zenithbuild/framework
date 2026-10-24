@@ -21,13 +21,20 @@ export function assertSuccess(result, label) {
 }
 
 export function startProcess(command, args, options = {}) {
+  const useProcessGroup = process.platform !== 'win32' && options.detached !== false;
   const proc = spawn(command, args, {
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: useProcessGroup,
     ...options
   });
 
   let stdout = '';
   let stderr = '';
+  const closePromise = new Promise((resolve) => {
+    proc.once('close', (code, signal) => {
+      resolve({ code, signal });
+    });
+  });
 
   proc.stdout.setEncoding('utf8');
   proc.stderr.setEncoding('utf8');
@@ -40,14 +47,53 @@ export function startProcess(command, args, options = {}) {
     stderr += chunk;
   });
 
-  async function stop() {
-    if (proc.exitCode === null) {
-      proc.kill('SIGTERM');
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (proc.exitCode === null) {
-        proc.kill('SIGKILL');
+  function signalProcessTree(signal) {
+    if (proc.exitCode !== null || proc.pid == null) {
+      return;
+    }
+
+    if (useProcessGroup) {
+      try {
+        process.kill(-proc.pid, signal);
+        return;
+      } catch {
+        // Fall through to direct child signaling if the group no longer exists.
       }
     }
+
+    proc.kill(signal);
+  }
+
+  async function waitForClose(timeoutMs) {
+    let timer = null;
+    try {
+      return await Promise.race([
+        closePromise.then(() => true),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve(false), timeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  }
+
+  async function stop() {
+    if (proc.exitCode !== null) {
+      await closePromise;
+      return;
+    }
+
+    signalProcessTree('SIGTERM');
+    const terminatedGracefully = await waitForClose(1000);
+    if (terminatedGracefully) {
+      return;
+    }
+
+    signalProcessTree('SIGKILL');
+    await closePromise;
   }
 
   function logs() {

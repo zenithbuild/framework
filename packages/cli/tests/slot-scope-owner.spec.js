@@ -166,7 +166,9 @@ describe('slot scope owner attribution', () => {
         });
 
         const pageAsset = await readBuiltPageAsset(project.outDir);
-        const propsMatch = pageAsset.match(/var props = \{[^}]*slotRef:[^}]*slotMode:[^}]*slotSignal:[^}]*\};/);
+        const propsMatch = pageAsset.match(
+            /(?:var|const|let)\s+props\s*=\s*\{[^}]*slotRef:[^}]*slotMode:[^}]*slotSignal:[^}]*\};?/
+        );
         expect(propsMatch).toBeTruthy();
         const propsObject = String(propsMatch?.[0] || '');
 
@@ -177,9 +179,9 @@ describe('slot scope owner attribution', () => {
         const wrapperState = extractScopedIdentifier(pageAsset, 'src_components_Wrapper_zen_script0_', 'viewMode');
         const wrapperSignal = extractScopedIdentifier(pageAsset, 'src_components_Wrapper_zen_script0_', 'valueSignal');
 
-        expect(propsObject).toContain(`slotRef: ${parentRef}`);
-        expect(propsObject).toContain(`slotMode: ${parentState}`);
-        expect(propsObject).toContain(`slotSignal: ${parentSignal}.get()`);
+        expect(propsObject).toMatch(new RegExp(String.raw`slotRef:\s*${escapeRegex(parentRef)}\b`));
+        expect(propsObject).toMatch(new RegExp(String.raw`slotMode:\s*${escapeRegex(parentState)}\b`));
+        expect(propsObject).toMatch(new RegExp(String.raw`slotSignal:\s*${escapeRegex(parentSignal)}(?:\.get\(\))+`));
 
         expect(propsObject).not.toContain('slotRef: headingTextRef');
         expect(propsObject).not.toContain('slotMode: viewMode');

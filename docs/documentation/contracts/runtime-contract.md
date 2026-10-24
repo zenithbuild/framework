@@ -1,10 +1,13 @@
 ---
 title: "Runtime Contract"
 description: "Sealed runtime interface and prohibited behavior."
-version: "0.3"
+version: "0.4"
 status: "canonical"
-last_updated: "2026-02-25"
+last_updated: "2026-03-29"
 tags: ["contracts", "runtime"]
+section: "Advanced"
+sectionOrder: 8
+order: 6
 ---
 
 # Runtime Contract
@@ -21,7 +24,14 @@ Definition of Done:
 - Runtime behavior is explicit and minimal.
 - Contract drift triggers hard errors.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/RUNTIME_CONTRACT.md`.
+Allowed narrow helper surface:
+- `zenPresence(...)` may coordinate phase-based presence for ref-owned, always-mounted nodes.
+- `presence(...)` may exist as an optional secondary alias, but `zenPresence(...)` stays canonical.
+- It remains a normal runtime import, not a compiler-owned implicit global.
+- It may expose narrow phase callbacks such as `onPhaseChange` for node-local coordination.
+- It may not retain fragments, delay conditional unmount, or bypass the deterministic patch loop.
+
+Canonical source: `packages/runtime/RUNTIME_CONTRACT.md`.
 
 See also:
 - [HMR V1 Contract](/docs/contracts/hmr-v1-contract)

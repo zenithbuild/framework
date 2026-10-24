@@ -6,6 +6,311 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0-rc.0] - TBD
+
+### Changed
+
+- Run site dependency validation steps with `bash -eo pipefail` and drop its CMS build, content audit and generated-asset checks now that the site has no CMS; the audit step exits 2 when `bun audit` returns empty or unparseable output instead of passing. The proposed advisory policy drops the withdrawn sprintf-js advisory (GHSA-hp3w-g68c-fv3c) and the @graphql-tools/utils and KaTeX exception requests and binds to the refreshed `site/bun.lock`. braces GHSA-vfj7-8cjw-p6xm was withdrawn upstream, so it is recorded as withdrawn and no exception is requested (JUD-21).
+- Move the shared configuration source into `@zenithbuild/core` (`@zenithbuild/core/config`, `/config/node`, `/config/plugins`, `/config/base-path`, `/config/images`); core imports no other Zenith package, and core's public API and `zenith` command ownership are preserved (JUD-83).
+- Move image processing and Sharp into the optional, exact-train `@zenithbuild/image` package. No-image CLI installs omit Sharp; image projects receive an early install instruction. `Image.zen` stays in `@zenithbuild/cli` for 0.9 so `<Image>` output is unchanged. See [migration notes](docs/_internal/ci/jud-83-image-migration.md) (JUD-83).
+- Require `@zenithbuild/image` only for `<Image>` in the source directory; raster files in `public/` alone are copied unoptimized with an install hint, dev and preview stop rescanning the project per request, and install commands follow the project's package manager (JUD-83).
+- **Migration:** projects that serve remote images through `/_zenith/image` with `images.remotePatterns` set must install `@zenithbuild/image`. Without it, allowed remote URLs return `400` `image_request_failed` ("Remote image optimization requires @zenithbuild/image") instead of being transformed with Sharp as in 0.8. Local `<Image>` builds are unaffected (JUD-83).
+
+### Removed
+
+- Removed every CMS layer from the site (Tina, its `tina/` config and generated `src/public/admin` bundle, the Directus client, and the `cms:dev`/`cms:build`/`cms:audit` scripts); the site now reads its committed markdown and JSON content directly, which drops Tina's dependency tree and its advisories (including @graphql-tools/utils GHSA-c4qx-w738-7hr3) from `site/bun.lock`. The only remaining site override is `sharp` 0.35.5 (JUD-21).
+
+### Fixed
+
+- Bump `rand` 0.8.5 → 0.8.6 (GHSA-cq8v-f236-94qc) and `xxhash-rust` 0.8.15 → 0.8.16 (GHSA-6g2r-675j-hx59) in `packages/bundler/Cargo.lock`; lockfile-only, bundler output unchanged.
+- Publish release packages in dependency order (`runtime`, `router`, `compiler`, `bundler`, `cli`, `core`, `image`, after the native packages) and fail `verify-publish-surface` if a package publishes before a package it lists in `dependencies` or `optionalDependencies`, or in `peerDependencies` unless that peer closes a cycle with a hard dependency (cli peers on core while core pins cli; reported as a note); previously core was published before the cli it pins exactly, bundler before runtime and router, and image before the core it peers on (JUD-83).
+- Check every selected package name on npm before `scripts/publish-packages.sh` publishes anything: missing names fail with one `::error::` listing all of them and the bootstrap steps (exit 1), registry or network lookup failures fail closed with exit 2, and `--dry-run` runs the same check (JUD-83).
+- Add `scripts/publish-packages.sh --preflight-only`, which checks every release and native package name without packing or publishing, and run it in the Publish workflow's `preflight` job so a missing name stops the release before any package publishes, and registry errors fail closed instead of being reported as missing (JUD-83).
+- Probe compiler compatibility before build and dev work, preserve compiler-bridge version probing, and assert both native probes in the compiler-to-bundler process contract (JUD-86).
+- Pin Node, Bun and Rust consistently, reject mismatched local toolchains before builds (outside CI, newer Node and Rust patch releases on the pinned minor are accepted; Bun stays exact), and run CI and native consumers for pull requests into `integration/v1` (JUD-15).
+- Restrict Cargo caches in CI and publish workflows to native target directories and retire the cache namespace that restored physical directories over Bun workspace links (JUD-15).
+- Replace the withdrawn esbuild-specific assertion with current root/site audit evidence, preserve active findings and audit failures, and keep core validation running without treating unresolved security findings as a pass (JUD-85).
+- Correct an invalid PNG test-fixture checksum exposed by the restored core validation lane, retaining real image processing and the Sharp security floor (JUD-85).
+- Give dependency audits that cannot run their own exit code (2) apart from active advisory findings (1), and end core with a line stating why it is red (JUD-85).
+- Stabilized the site browser tests by starting `zenith dev` through `site/tests/helpers/dev-server.ts` with the `ZENITH_SITE_CLI_ENTRY` override, and fixed the DocsArticleTransition mount, the getting-started page markup, and CodeWorkbench tab `aria-selected` and `tabIndex` sync that they exposed (JUD-48).
+- Fixed site grid layouts whose arbitrary `grid-cols-[...]` tracks were comma-separated (Blog article, Feature showcase, About page) by switching to underscore separators, and added a regression test for the syntax (JUD-65).
+- Fix Windows CLI direct-entry execution and prevent commands from running when the CLI is imported by an application (JUD-87).
+- Use portable relative tarball dependencies in the Windows packed-consumer harness (JUD-87).
+- Route `zenith` command failures through the public `@zenithbuild/core` bin to Zenith's formatted error output with exit code 1, instead of Node's raw stack trace (JUD-87).
+- Keep the image runtime payload script on `unsafeHTML` pages when `@zenithbuild/image` is not installed, matching 0.8.0 output; the payload contract now lives in `@zenithbuild/core/config/images` (JUD-83).
+- Rewrite every `@zenithbuild/core/config` import in packaged server image runtime files, ship the standalone `image-config.js` module with Vercel and Netlify server functions, and fail the build if any package specifier is left unresolved (JUD-83).
+- Record the image package build marker in `.zenith-output/image-package.json` instead of the deployable `_zenith/image/package.json` (JUD-83).
+- Export `ZENITH_TARGETS` from `@zenithbuild/core/config` and derive the CLI's known deployment targets from it (JUD-83).
+- Name the project files that use `<Image>` in the missing `@zenithbuild/image` error, and let a project-defined `Image.zen` take precedence without requiring the package (JUD-83).
+- List the image package as `@zenithbuild/image` in the extension registry (JUD-83).
+
+## [0.8.0] - 2026-07-01
+
+### Changed
+
+#### Adapter and plugin boundary groundwork
+
+- Confirmed the internal adapter contract around `AdapterDriver` and `resolveBuildAdapter(...)` without shipping a public adapter plugin API.
+- Verified built-in Vercel and Netlify adapters already route through the normalized internal adapter contract and shared hosted infrastructure.
+- Added the delegated adapter surface RFC as planning material only, keeping `target` as the stable deployment selector and the raw `adapter` object as an advanced surface.
+- Kept extension registry source internal for this train while preserving the read-only plugin and adapter discovery commands in `@zenithbuild/cli`.
+
+#### Middleware and route-check planning
+
+- Closed the post-V1 middleware expansion design lane with explicit decisions: arrays deferred, nested scopes rejected, controlled header staging deferred, and route-check participation deferred.
+- Kept global middleware V1 narrow: TypeScript root middleware only, `next` / `redirect` / `deny` only, no arbitrary headers, no nested scopes, no arrays, and no route-check participation.
+- Confirmed JavaScript-authored middleware remains unsupported until a separate project language-mode contract is approved.
+
+#### Security, editor tooling, and dependency cleanup
+
+- Removed the legacy V1 compiler `ws` surface and pinned the workspace to a patched `ws` version.
+- Closed the v0.8 editor/tooling diagnostics follow-up for the framework language-server path.
+- Updated esbuild to address GHSA-gv7w-rqvm-qjhr.
+- Removed the benchmark/performance surface that pulled in benchmark-only Astro, Vite, Nuxt, and Next dependencies after high-severity Dependabot alerts; no active `astro` manifest or lockfile references remain.
+- Verified the post-removal dependency surface with `bun audit --audit-level high`.
+- Added route data contract edge-case coverage and reliability fixes for framework server behavior.
+
+#### Maintainability and release hygiene
+
+- Split oversized CLI drift-gate, dev-server, and server-routing contract test suites into focused owner-area suites.
+- Split oversized runtime dom-binding and integration test suites while preserving existing behavior.
+- Split active bundler helper clusters and the main output phase into smaller modules under the file-size policy.
+- Split docs/site generation helpers, overlay sheet documentation, AI endpoint generation, and site workspace public-asset helpers into narrower files.
+- Calibrated generated/legacy file-size audit policy and documented Graphify/Kimi scoped evaluation as optional maintainer context, not required workflow.
+- Added internal audits for Rolldown bundler integration and contract truth alignment for runtime, hydration, and bundler payload ownership.
+
+#### What this release does not change
+
+- No public adapter plugin API ships in this release.
+- No middleware arrays, nested middleware scopes, controlled response headers, `middleware.js`, or route-check middleware participation ship in this release.
+- No Graphify workflow is required for issue closeout or framework development.
+- No native binary distribution migration is introduced.
+
+## [0.7.12] - 2026-06-02
+
+### Changed
+
+#### Component Server Values v1
+
+- Added Component Server Values for layout/component-owned server values, implemented internally as Scoped Server Data.
+- Added the Component Server Values architecture lock, owner scanner, scoped diagnostics, and manifest/classification metadata that feed the Scoped Server Data pipeline.
+- Added request-time scoped execution across Node, dev, preview, Vercel, and Netlify server paths.
+- Added scoped server-output packaging, owner-local SSR template binding, runtime hydration from serialized scoped payloads, repeated component instance keys, static literal prop support, and generated scoped server data declarations.
+- Added CSV diagnostics and final regression fixtures covering invalid owner APIs, prerender conflicts, dynamic scoped props, server-source leakage, serialization, SSR, hydration, hosted parity, and type declarations.
+
+#### Server data, adapter, and middleware groundwork
+
+- Stabilized the server-data pipeline around route-owned `guard(ctx)`, `action(ctx)`, and `load(ctx)` while keeping Component Server Values owner-local.
+- Added TypeScript migration groundwork for hosted adapter infrastructure and adapter entrypoints without shipping a public adapter plugin API.
+- Added internal adapter driver types and an adapter plugin surface RFC as planning material only; this release does not ship a public adapter plugin API.
+- Added global middleware groundwork across runtime paths while preserving the current TypeScript-only root middleware contract and without shipping middleware arrays, nested scopes, controlled headers, or route-check participation.
+
+#### Config and release integrity
+
+- Added a conservative config-time V1 plugin surface for named plugin objects with an optional `config()` hook that may patch safe config keys only.
+- Kept plugin scope narrow: no transform, middleware, route/security policy, compiler, bundler, dev-server, or public adapter hooks are shipped.
+- Aligned the framework release publish surface and platform binary smoke/recovery checks so the lockstep train excludes standalone editor packages and verifies native binary packages more reliably.
+
+#### Docs and project hygiene
+
+- Added Component Server Values documentation and migration guidance, including the v1 non-goals: no React Server Components, no client scoped refetch, no build-time scoped prerender, and no component/layout route-control APIs.
+- Added current server-data pipeline audit and architecture-lock documentation for the completed Component Server Values v1 work.
+- Regenerated public AI docs artifacts for the updated server data, routing, hydration, props, diagnostics, and Component Server Values documentation.
+- Ignored generated Zenith output in create-zenith starter projects.
+
+## [0.7.11] - 2026-05-17
+
+### Changed
+
+#### Compiler hardening and diagnostics
+
+- Tightened `.zen` event handler validation so direct-call handler forms are rejected consistently while preserving identifier/member references and inline function handlers.
+- Added stable compiler diagnostics for invalid scripts, invalid markup expressions, and clearly unbound markup identifiers: `ZEN-SCRIPT-SYNTAX`, `ZEN-EXPR-SYNTAX`, and `ZEN-EXPR-UNBOUND`.
+- Converted malformed markup parser failures into structured `ZEN-MARKUP-PARSE` diagnostics, including mismatched tags and unexpected EOF, without panic-style bridge output.
+
+#### Image optimizer hardening
+
+- Hardened remote image optimization so allowed remote image URLs are resolved and validated before fetch, with the validated target pinned across the initial request and each redirect hop while preserving expected host semantics.
+
+#### Runtime cleanup and embedded markup hardening
+
+- Ensured structural fragment replacement drains nested cleanup before text or HTML replacement.
+- Made cleanup continue after throwing disposers and report collected cleanup errors deterministically.
+- Rolled back `zeneffect` subscriptions and cleanup registrations when setup or registration fails.
+- Hardened embedded-markup URL-bearing attributes, including `srcset`, by decoding and normalizing values before protocol validation.
+
+#### Build, routing, and server output
+
+- Shared route classification across build and manifest paths so protected routes cannot be marked prerender.
+- Fixed dev output to honor configured `basePath`, including soft navigation under the configured prefix.
+- Tightened dev rebuild cache invalidation for route deletions and static-to-interactive transitions.
+- Made server route output names collision-resistant.
+
+#### Dev server stability
+
+- Improved dev rebuild and browser refresh recovery so failed builds surface clear build-error responses without wedging the dev server.
+- Preserved resource route execution while page refreshes are served build-error responses.
+- Added automatic next-available-port fallback with clear CLI output for requested and occupied ports, without killing processes.
+
+#### Server and resource hardening
+
+- Validated SSE `event`, `id`, and `retry` metadata while preserving safe headers, `retry: 0`, and multiline `data` framing.
+- Added packaged Node support for `ZENITH_PUBLIC_ORIGIN` / `publicOrigin` so secure cookies are set correctly behind HTTPS termination while local HTTP behavior remains unchanged.
+
+#### Package, release, and CI integrity
+
+- Made Windows CLI bin entrypoint detection platform-safe and locked package `.bin` ownership.
+- Made native binary publish smoke checks fail closed and kept Windows `.exe` handling covered.
+- Derived CI integration shard coverage from the filesystem and included the router legacy Jest suite in the core release gate.
+- Audited CI/release/publish trust boundaries, hardened workflow permissions, scoped OIDC to npm publish jobs, and added static workflow policy coverage.
+- Cleaned dependency audit findings through dev/test/browser automation updates without adding an allowlist or changing production-shipped runtime dependencies.
+
+#### Dev/CI maintenance
+
+- Kept Batch 1 regression coverage inside focused test files and fixed the PR touched-file audit path so CI can evaluate changed files from pull request checkouts.
+
+#### Docs and API contract clarity
+
+- Extended docs gates to catch forbidden component callsite DOM event prop drift while preserving ordinary callback props.
+- Clarified router route-policy APIs as advisory UX only and kept server `guard(ctx)` / `load(ctx)` as the security boundary.
+- Aligned router event type declarations with emitted route events and centralized generated `Zenith.LoadContext` declarations around the real server route contract.
+- Documented that signed session cookies provide integrity and tamper resistance, not confidentiality.
+- Aligned public config truth for `static-export`, target parity, unknown-key rejection, env-driven `ZENITH_DEV_TRACE`, and dev config-change restart warnings.
+- Updated hosted image endpoint wording to reflect current `node`, `vercel`, `netlify`, and `static-export` behavior.
+
+#### Route-local middleware and plugin surface
+
+- Added end-to-end parity coverage for route-local `withMiddleware(...)` across page and resource routes, dev, packaged Node, and hosted function paths without introducing a global middleware primitive.
+- Quarantined archived legacy plugin code from the current public API surface and clarified that the public plugin API is currently closed.
+
+#### Language server and editor DX
+
+- Made the framework language-server package expose a reliable `zenith-language-server` stdio entrypoint while preserving explicit transport arguments.
+- Added protocol-level LSP smoke coverage for initialization, diagnostics, hover, and completion, plus honest Neovim smoke coverage and docs for current limitations.
+- Note: standalone `zenith-language` and `zenith-language-server` repositories have separate `v0.7.12` tags, but their npm publish remains separate from this framework release and was blocked locally by npm auth.
+
+#### Maintainability planning
+
+- Added the ZFW-26 oversized-file refactor plan and focused follow-up issues for active bundler source, runtime tests, CLI tests, generated/golden policy, docs/site scripts, the overlay sheet docs page, and archived legacy bundler audit handling.
+
+## [0.7.10] - 2026-04-25
+
+### Changed
+
+#### Router package surface
+
+- Fixed the published `@zenithbuild/router` package surface so `template-refresh.js` ships with the router template entrypoint that imports it.
+- Added a router package contract assertion that fails if the refresh helper exists in source but is omitted from the package `files` allowlist again.
+
+#### Vercel/build compatibility
+
+- Restored fresh installs of the lockstep Zenith package set for consumers building with hosted package installs, including Vercel builds that resolve `@zenithbuild/*` from npm instead of a local workspace checkout.
+- This closes the `Cannot find module ... @zenithbuild/router/template-refresh.js` failure seen when a site installed the published `0.7.9` package set.
+
+#### What this release does not change
+
+- No router runtime behavior changed.
+- No new public API or route syntax was added.
+- No site-side workaround or `node_modules` patch is required; this is a framework package-surface fix published through the monorepo train.
+
+## [0.7.9] - 2026-04-23
+
+### Changed
+
+#### Compiler hardening follow-up
+
+- Finalized the new foreign-syntax compiler gate so it still rejects foreign DOM event spellings on native markup while preserving existing Zenith component handler props such as `onClick`, `onPress`, `onInput`, and `onSubmit` when they are passed through component boundaries.
+- This patch closes the false positive exposed by the initial `0.7.8` release candidate, where component-level function props were being misclassified as forbidden DOM event syntax.
+
+#### Diagnostics and contract stability
+
+- Added regression coverage proving event-like component props remain valid input alongside the new foreign-syntax diagnostics contract.
+- The compiler continues to reject native foreign event syntax such as `@click`, `onClick`, and `onclick` on real DOM elements with the same actionable Zenith rewrite hints.
+
+#### What this release does not change
+
+- No new syntax was added.
+- No runtime behavior changed.
+- No UI-layer workaround was introduced.
+- This is a compiler follow-up patch that narrows the invariant to the correct DOM-vs-component boundary.
+
+## [0.7.8] - 2026-04-23
+
+### Changed
+
+#### Compiler hardening
+
+- Guard surfaced copied foreign template/control syntax leaking into real `.zen` source. Zenith now rejects foreign control/template forms such as `@if`, `@else`, `@elseif`, `{#if}`, `{/if}`, `{#each}`, `{/each}`, `v-if`, `v-else`, and `v-for` before parser/emission can carry them into compiled output.
+- The new invariant runs as a compiler-owned pre-parse gate, so this class of foreign syntax now fails at compile time instead of reaching rendered UI as literal text.
+
+#### Event syntax enforcement
+
+- Zenith now rejects foreign event spellings inside `.zen`, including directive forms like `@click`, `@input`, `@change` and DOM prop forms like `onClick`, `onInput`, `onclick`, and other known camelCase/lowercase DOM event props.
+- Foreign event diagnostics now point authors back to the canonical Zenith event contract: `on:<event>={handler}`.
+
+#### Diagnostics and author guidance
+
+- Structured compiler diagnostics now emit stable foreign-syntax error codes, messages, ranges, docs paths, and correction hints for both control-syntax and event-syntax violations.
+- Golden compiler tests lock the diagnostic wording and hint shape so future compiler changes cannot silently regress this contract.
+- Canonical docs now show the invalid foreign tokens (`@if`, `@click`, `onClick`) alongside the correct Zenith forms, and the generated AI docs index was refreshed so the public docs surface stays aligned with the compiler contract.
+
+#### What this release does not change
+
+- No new template or event syntax was added.
+- No runtime behavior changed.
+- No UI-layer workaround was introduced.
+- This release is compiler enforcement, diagnostics, tests, and docs hardening only.
+
+## [0.7.7] - 2026-04-04
+
+### Changed
+
+- Fixed release pipeline Playwright browser provisioning by aligning workflow installs to the `apps/smoke-test` workspace Playwright version, removing the revision mismatch that caused `Publish (npm)` and CI smoke failures on tagged releases.
+
+## [0.7.6] - 2026-04-03
+
+### Changed
+
+- Added resource-route streaming (`stream(...)`) and SSE (`sse(...)`) helpers as resource-only standalone contract results, with local/hosted parity and Node runtime streaming behavior aligned to the same server contract.
+- Added `src/api/**` resource-route DX aliasing and explicit route-level middleware composition (`withMiddleware(...)`) while preserving the single non-HTML server model and existing server/runtime contracts.
+- Hardened publication benchmark truth gates so empty/timeouts/runtime-error categories fail explicitly, and locked publication policy to keep Zenith determinism as a hard gate with external-framework determinism reported as caveat metadata.
+- Reduced emitted interactive payload materially across the optimization lane, including production-only runtime/router/page compaction and deterministic production runtime/router/page minification, while keeping determinism, zero-JS static omission, and hosted parity green.
+- Completed structural decomposition on bundler/compiler/CLI hot paths (`main.rs`, compiler/parser/script, dev-server/preview/server-contract/dev-build-session) and added file-size audit governance with scoped CI enforcement.
+
+## [0.7.5] - 2026-03-30
+
+### Changed
+
+- Added the rewrite-free `static-export` deployment target with explicit `exportPaths`, base-path-aware public output, and target-aware preview behavior on the existing manifest/server contract.
+- Added `zenPresence(...)`, the optional `presence(...)` alias, `zenNavigationShell(...)`, and the canonical always-mounted overlay/sheet pattern so Zenith now ships one documented UI composition path on top of the existing lifecycle.
+- Added route-owned multipart uploads, truthful cookie sessions on `ctx.auth`, explicit resource routes with `json(...)`, `text(...)`, and `download(...)`, and the router-side `refreshCurrentRoute()` bridge for re-running the current page route after non-HTML writes.
+- Moved final build/static HTML image materialization into bundler-owned truth while keeping runtime/server image materialization explicit, and tightened tests/docs around that build/runtime split.
+- Restored and expanded hosted parity on `vercel` and `netlify` for packaged page-route execution, page-route cookie sessions, hosted resource `json(...)` / `text(...)` routes with redirect/deny/auth/cookie behavior, and the `/_zenith/image` runtime endpoint.
+
+## [0.7.4] - 2026-03-28
+
+### Changed
+
+- Bumped the lockstep framework train to `0.7.4` so published `@zenithbuild/compiler` and optional `@zenithbuild/compiler-*` platform packages ship a `zenith-compiler` binary that includes `--merge-image-materialization` (Track B static image props artifact), matching CI verification of staged platform binaries.
+- Aligned language tooling packages (`@zenithbuild/language-server`, `@zenithbuild/language`) and workspace consumers on the same compiler train version.
+
+## [0.7.2] - 2026-03-24
+
+### Changed
+
+- Landed the deployment target system as a real framework contract across `static`, `vercel-static`, `netlify-static`, `vercel`, `netlify`, and `node`, with canonical `.zenith-output/manifest.json` and `.zenith-output/server/` layers consumed by adapters instead of host-specific route inference.
+- Hardened the server packaging and runtime contract around packaged `guard` / `load` execution, deterministic SSR payload injection, explicit redirect / deny / error response behavior, and target-aware `zenith preview` semantics.
+- Added deployment smoke coverage to CI, aligned starter templates and deployment docs to the truthful target model, and froze manifest/server contract coverage with dedicated fixture snapshots and platform smoke tests.
+- Added deployment-wide `basePath` support so public app URLs, bundled assets, router navigation, SSR URL reconstruction, `/_zenith/image`, `/__zenith/route-check`, preview, adapters, and the Node runtime now behave consistently under non-root deploy paths.
+- Moved the lockstep framework packages and their internal references from `0.7.1` to `0.7.2`.
+
+## [0.7.1] - 2026-03-22
+
+### Changed
+
+- Finalized the OIDC-only trusted publishing contract so prerelease tags publish from `train`, stable tags publish from `master`, and the legacy latest-promotion flow is removed from the framework release path.
+- Aligned publish workflow naming, script paths, and internal release-policy docs around one direct-publish `beta` / `train` / `latest` model.
+
 ## [0.7.0] - 2026-03-21
 
 ### Changed

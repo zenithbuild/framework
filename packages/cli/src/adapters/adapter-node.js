@@ -1,0 +1,151 @@
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const NODE_RUNTIME_FILES = [
+    {
+        from: new URL('../server-runtime/node-server.js', import.meta.url),
+        to: 'runtime/node-server.js'
+    },
+    {
+        from: new URL('../server/resolve-request-route.js', import.meta.url),
+        to: 'runtime/resolve-request-route.js'
+    },
+    {
+        from: new URL('../request-origin.js', import.meta.url),
+        to: 'request-origin.js'
+    },
+    {
+        from: new URL('../server-error.js', import.meta.url),
+        to: 'server-error.js'
+    }
+];
+
+function createNodeEntrySource() {
+    return [
+        "import { fileURLToPath } from 'node:url';",
+        "import { dirname, resolve } from 'node:path';",
+        "import { createNodeServer as createZenithNodeServer, createRequestHandler as createZenithRequestHandler } from './server/runtime/node-server.js';",
+        '',
+        'const __filename = fileURLToPath(import.meta.url);',
+        'const __dirname = dirname(__filename);',
+        '',
+        'export function createRequestHandler(options = {}) {',
+        '  return createZenithRequestHandler({',
+        '    distDir: __dirname,',
+        '    ...options',
+        '  });',
+        '}',
+        '',
+        'export function createNodeServer(options = {}) {',
+        '  return createZenithNodeServer({',
+        '    distDir: __dirname,',
+        '    ...options',
+        '  });',
+        '}',
+        '',
+        'const isDirectRun = process.argv[1] && resolve(process.argv[1]) === __filename;',
+        '',
+        'if (isDirectRun) {',
+        '  const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;',
+        "  const host = process.env.HOST || '0.0.0.0';",
+        '  createNodeServer({ port, host }).then(({ port: actualPort }) => {',
+        "    const displayHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;",
+        '    console.log(`http://${displayHost}:${actualPort}`);',
+        '  }).catch((error) => {',
+        '    console.error(error);',
+        '    process.exit(1);',
+        '  });',
+        '}',
+        ''
+    ].join('\n');
+}
+
+function createNodePackageJson(sharpVersionRange) {
+    return {
+        private: true,
+        type: 'module',
+        main: './index.js',
+        dependencies: sharpVersionRange ? { sharp: sharpVersionRange } : {}
+    };
+}
+
+function createSharpRuntimeSource() {
+    return [
+        'async function loadSharp() {',
+        '  try {',
+        "    const mod = await import('sharp');",
+        '    return mod.default || mod;',
+        '  } catch (error) {',
+        "    throw new Error('[Zenith:NodeAdapter] Missing generated Sharp runtime dependency. Run npm install, bun install, or pnpm install in the generated artifact directory before starting it.', { cause: error });",
+        '  }',
+        '}',
+        '',
+        'const sharp = await loadSharp();',
+        'export default sharp;',
+        ''
+    ].join('\n');
+}
+
+async function copyNodeRuntimeFiles(serverDir) {
+    for (const file of NODE_RUNTIME_FILES) {
+        const targetPath = join(serverDir, file.to);
+        await mkdir(join(targetPath, '..'), { recursive: true });
+        await cp(file.from, targetPath, { force: true });
+    }
+
+    const imageServicePath = join(serverDir, 'images', 'service.js');
+    let sharpVersionRange = null;
+    try {
+        sharpVersionRange = JSON.parse(await readFile(join(serverDir, 'images', 'package.json'), 'utf8')).dependencies?.sharp || null;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (!sharpVersionRange) return null;
+    const imageServiceSource = await readFile(imageServicePath, 'utf8');
+    await writeFile(
+        imageServicePath,
+        imageServiceSource.replace("import sharp from 'sharp';", "import sharp from './sharp-runtime.js';"),
+        'utf8'
+    );
+    await writeFile(join(serverDir, 'images', 'sharp-runtime.js'), createSharpRuntimeSource(), 'utf8');
+    return sharpVersionRange;
+}
+
+export const nodeAdapter = {
+    name: 'node',
+    validateRoutes() {},
+    async adapt(options) {
+        const staticDir = join(options.coreOutput, 'static');
+        const packagedServerDir = join(options.coreOutput, 'server');
+        const targetServerDir = join(options.outDir, 'server');
+
+        // Route meaning is fixed upstream in the manifest/server package.
+        // The adapter only maps already-classified output into a Node runtime layout.
+        await rm(options.outDir, { recursive: true, force: true });
+        await mkdir(options.outDir, { recursive: true });
+        await cp(staticDir, join(options.outDir, 'static'), { recursive: true, force: true });
+        await cp(packagedServerDir, targetServerDir, { recursive: true, force: true });
+        const sharpVersionRange = await copyNodeRuntimeFiles(targetServerDir);
+
+        await writeFile(
+            join(options.outDir, 'manifest.json'),
+            `${JSON.stringify(options.manifest, null, 2)}\n`,
+            'utf8'
+        );
+        await writeFile(
+            join(targetServerDir, 'config.json'),
+            `${JSON.stringify({
+                target: 'node',
+                base_path: options.manifest.base_path || '/',
+                static_dir: '../static',
+                build_manifest: '../manifest.json',
+                images: options.config?.images || {}
+            }, null, 2)}\n`,
+            'utf8'
+        );
+        await writeFile(join(options.outDir, 'index.js'), createNodeEntrySource(), 'utf8');
+        await writeFile(
+            join(options.outDir, 'package.json'),
+            `${JSON.stringify(createNodePackageJson(sharpVersionRange), null, 2)}\n`,
+            'utf8'
+        );
+    }
+};

@@ -1,0 +1,21 @@
+<script lang="ts">
+export interface Props {
+  label?: string;
+  title: string;
+  description: string;
+  tone?: "blue" | "gold" | "purple";
+}
+
+const incoming = props as Props;
+const calloutLabel = incoming.label || "Note";
+const calloutTitle = incoming.title || "";
+const calloutDescription = incoming.description || "";
+const calloutTone = incoming.tone || "purple";
+const calloutAccentClass = calloutTone === "blue" ? "text-brand-blue" : calloutTone === "gold" ? "text-brand-gold" : "text-primary";
+</script>
+
+<aside class="mt-6 rounded-lg border border-border bg-card p-6 text-card-foreground">
+  <p class={"font-mono text-[10px] uppercase tracking-[0.18em] " + calloutAccentClass}>{calloutLabel}</p>
+  <h3 class="mt-4 font-heading text-2xl font-semibold leading-none text-foreground">{calloutTitle}</h3>
+  <p class="mt-4 text-sm leading-7 text-muted-foreground">{calloutDescription}</p>
+</aside>

@@ -47,7 +47,9 @@ fn tag_name_has_no_semantic_meaning() {
 #[test]
 fn no_runtime_behavior_attached() {
     // Output never contains runtime-specific keywords
-    let output = compile(r#"<button on:click={handler}>click</button>"#);
+    let output = compile(
+        r#"<script lang="ts">function handler() {}</script><button on:click={handler}>click</button>"#,
+    );
 
     assert!(!output.contains("addEventListener"));
     assert!(!output.contains("proxy"));
@@ -60,7 +62,7 @@ fn no_runtime_behavior_attached() {
 
 #[test]
 fn no_virtual_dom_concepts() {
-    let output = compile("<div>{x}</div>");
+    let output = compile("<div>{props.x}</div>");
 
     assert!(!output.contains("vnode"));
     assert!(!output.contains("createElement"));
@@ -72,7 +74,7 @@ fn no_virtual_dom_concepts() {
 
 #[test]
 fn output_always_has_exact_three_exports() {
-    let output = compile("<div>{x}</div>");
+    let output = compile("<div>{props.x}</div>");
 
     // Exactly three exports: __zenith_expr, setup, default
     assert!(output.contains("export const __zenith_expr"));
@@ -91,9 +93,9 @@ fn output_always_has_exact_three_exports() {
 #[test]
 fn expression_strings_emitted_unmodified() {
     // Expression identity preservation
-    let output = compile(r#"<div>{myVar_123}</div>"#);
-    assert!(output.contains(r#""myVar_123""#));
+    let output = compile(r#"<div>{props.myVar_123}</div>"#);
+    assert!(output.contains(r#""props.myVar_123""#));
 
-    let output2 = compile(r#"<div>{some_long_expression_name}</div>"#);
-    assert!(output2.contains(r#""some_long_expression_name""#));
+    let output2 = compile(r#"<div>{props.some_long_expression_name}</div>"#);
+    assert!(output2.contains(r#""props.some_long_expression_name""#));
 }

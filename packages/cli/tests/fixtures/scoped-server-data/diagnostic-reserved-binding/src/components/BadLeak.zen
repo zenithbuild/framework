@@ -1,0 +1,9 @@
+<script server lang="ts">
+const secret = "CSV_CLIENT_LEAK_SENTINEL"
+</script>
+
+<script lang="ts">
+console.log(secret)
+</script>
+
+<p>{secret}</p>

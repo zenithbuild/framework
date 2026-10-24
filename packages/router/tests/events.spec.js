@@ -3,12 +3,15 @@
 // ---------------------------------------------------------------------------
 
 import { jest } from '@jest/globals';
+import fs from 'node:fs';
 
 import {
     onRouteChange,
     _dispatchRouteChange,
     _clearSubscribers,
     _getSubscriberCount,
+    setAdvisoryRoutePolicy,
+    _getAdvisoryRoutePolicy,
     setRouteProtectionPolicy,
     _getRouteProtectionPolicy,
     on,
@@ -17,6 +20,42 @@ import {
     _dispatchRouteEventAsync,
     _clearRouteEventListeners
 } from '../dist/events.js';
+import { renderRouterModule } from '../template.js';
+
+function extractTemplateEventNames(source) {
+    const match = source.match(/const __ZENITH_ROUTE_EVENT_NAMES = \[([\s\S]*?)\];/);
+    if (!match) {
+        return [];
+    }
+    return Array.from(match[1].matchAll(/"([^"]+)"/g), (entry) => entry[1]);
+}
+
+function extractRouteEventNamesFromSource(source) {
+    const match = source.match(/const ROUTE_EVENT_NAMES = \[([\s\S]*?)\] as const;/);
+    if (!match) {
+        return [];
+    }
+    return Array.from(match[1].matchAll(/'([^']+)'/g), (entry) => entry[1]);
+}
+
+function extractRouteEventNamesFromTypes(source) {
+    const match = source.match(/export type RouteEventName =([\s\S]*?);/);
+    if (!match) {
+        return [];
+    }
+    return Array.from(match[1].matchAll(/"([^"]+)"/g), (entry) => entry[1]);
+}
+
+function extractTemplateEmittedEventNames(source) {
+    const names = new Set();
+    for (const match of source.matchAll(/dispatchRouteEvent\(\s*["']([^"']+)["']/g)) {
+        names.add(match[1]);
+    }
+    for (const match of source.matchAll(/emitNavigationEvent\([^,]+,\s*["']([^"']+)["']/g)) {
+        names.add(match[1]);
+    }
+    return Array.from(names).sort();
+}
 
 describe('Route Change Events', () => {
     afterEach(() => {
@@ -122,22 +161,38 @@ describe('Route Protection Events & Policy', () => {
     });
 
     test('policy state is initialized and configurable', () => {
-        setRouteProtectionPolicy({
+        setAdvisoryRoutePolicy({
             onDeny: 'stay',
             defaultLoginPath: '/login-custom',
             deny401RedirectToLogin: true,
             forbiddenPath: '/forbidden'
         });
 
-        const policy = _getRouteProtectionPolicy();
+        const policy = _getAdvisoryRoutePolicy();
         expect(policy.onDeny).toBe('stay');
         expect(policy.defaultLoginPath).toBe('/login-custom');
         expect(policy.deny401RedirectToLogin).toBe(true);
         expect(policy.forbiddenPath).toBe('/forbidden');
     });
 
-    test('policy/event stores are shared on globalThis for template interop', () => {
+    test('legacy route protection policy aliases share advisory policy state', () => {
         setRouteProtectionPolicy({
+            defaultLoginPath: '/login-legacy'
+        });
+
+        expect(_getAdvisoryRoutePolicy().defaultLoginPath).toBe('/login-legacy');
+
+        setAdvisoryRoutePolicy({
+            forbiddenPath: '/blocked'
+        });
+
+        const policy = _getRouteProtectionPolicy();
+        expect(policy.defaultLoginPath).toBe('/login-legacy');
+        expect(policy.forbiddenPath).toBe('/blocked');
+    });
+
+    test('policy/event stores are shared on globalThis for template interop', () => {
+        setAdvisoryRoutePolicy({
             defaultLoginPath: '/login-global'
         });
 
@@ -145,6 +200,29 @@ describe('Route Protection Events & Policy', () => {
         expect(globalThis.__zenith_route_event_listeners).toBeDefined();
         expect(globalThis.__zenith_route_event_listeners['route-check:start'] instanceof Set).toBe(true);
         expect(globalThis.__zenith_route_event_listeners['navigation:before-leave'] instanceof Set).toBe(true);
+    });
+
+    test('declared route event names match template initialization and emissions', () => {
+        const source = renderRouterModule({
+            manifestJson: JSON.stringify({ routes: [], chunks: {}, server_routes: [] }),
+            runtimeImport: '@zenithbuild/runtime',
+            coreImport: '@zenithbuild/core',
+            routeCheck: true
+        });
+        const runtimeSource = fs.readFileSync(new URL('../src/events.ts', import.meta.url), 'utf8');
+        const typeSource = fs.readFileSync(new URL('../index.d.ts', import.meta.url), 'utf8');
+        const declared = extractRouteEventNamesFromSource(runtimeSource).sort();
+        const typed = extractRouteEventNamesFromTypes(typeSource).sort();
+        const initialized = extractTemplateEventNames(source).sort();
+        const emitted = extractTemplateEmittedEventNames(source);
+
+        expect(typed).toEqual(declared);
+        expect(declared).toEqual(initialized);
+        for (const eventName of emitted) {
+            expect(declared).toContain(eventName);
+        }
+        expect(declared).not.toContain('guard:start');
+        expect(declared).not.toContain('guard:end');
     });
 
     test('event lifecycle dispatches listeners in order', () => {

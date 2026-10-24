@@ -1,6 +1,6 @@
 # Zenith V0 Script Boundary Contract
 
-Canonical public docs: `../zenith-docs/documentation/contracts/script-boundary.md`
+Canonical public docs: `../../docs/documentation/contracts/script-boundary.md`
 
 
 Status: FROZEN (V0)

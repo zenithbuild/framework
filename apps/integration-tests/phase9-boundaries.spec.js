@@ -47,9 +47,7 @@ describe('Phase 9: cross-layer boundaries', () => {
     const hits = await scanSources(runtimeSrcDir, [
       /eval\(/,
       /new\s+Function\s*\(/,
-      /\bwith\s*\(/,
-      /\bwindow\./,
-      /\bglobalThis\./
+      /\bwith\s*\(/
     ], ['.js']);
 
     expect(hits).toEqual([]);

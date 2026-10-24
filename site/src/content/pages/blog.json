@@ -1,10 +1,10 @@
 {
-  "pageTitle": "Journal",
+  "pageTitle": "Blog",
   "description": "Long-form Zenith notes on routing, tooling, releases, and site-system work.",
   "intro": {
-    "eyebrow": "Journal",
-    "title": "LONG FORM. SAME TRAIN.",
-    "description": "The Zenith journal carries the longer engineering notes behind the train line: routing hardening, tooling packaging, site-system experiments, and release editorials that explain why the work moved."
+    "eyebrow": "Zenith Blog",
+    "title": "Notes from the framework.",
+    "description": "Engineering notes on Zenith’s compiler, routing model, tooling, releases, and the decisions behind the work."
   },
   "chips": [
     "Routing deep dives",
@@ -12,9 +12,9 @@
     "Release editorials"
   ],
   "archive": {
-    "eyebrow": "Journal archive",
-    "title": "Dispatches from the framework work.",
-    "description": "These posts are editorial and explanatory. The version-by-version release log lives separately under the changelog route."
+    "eyebrow": "Article archive",
+    "title": "Every published article.",
+    "description": "Browse engineering notes, framework decisions, and release context from the committed Blog collection."
   },
   "labels": {
     "trainPrefix": "Current train",

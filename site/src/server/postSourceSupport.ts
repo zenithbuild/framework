@@ -34,68 +34,6 @@ export const toneByCategory: Record<string, AccentTone> = {
   releases: "gold",
 };
 
-export const fallbackCategory: BlogCategory = {
-  slug: "engineering",
-  title: "Engineering",
-  routeBase: "/blog",
-};
-
-export function normalizeCategory(category: {
-  slug?: string | null;
-  title?: string | null;
-  route_base?: string | null;
-} | null | undefined): BlogCategory | null {
-  if (!category?.slug) {
-    return null;
-  }
-
-  return {
-    slug: String(category.slug),
-    title: cleanText(category.title || humanizeSlug(category.slug)),
-    routeBase: cleanText(category.route_base || "/blog"),
-  };
-}
-
-export function mapTagRecords(
-  records: Array<{ tag?: any; tags_id?: any } | any> | null | undefined,
-): BlogTag[] {
-  const tags = (records || [])
-    .map((record) => ("tag" in Object(record) ? record.tag : "tags_id" in Object(record) ? record.tags_id : record))
-    .filter((tag): tag is { slug?: string | null; title?: string | null; color?: string | null; order?: number | null } => Boolean(tag?.slug || tag?.title))
-    .map((tag) => ({
-      slug: cleanText(tag.slug || slugify(tag.title || "tag")),
-      title: cleanText(tag.title || humanizeSlug(tag.slug || "tag")),
-      color: tag.color || null,
-      order: typeof tag.order === "number" ? tag.order : null,
-    }));
-
-  return [...tags].sort((left, right) => {
-    const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-    return left.slug.localeCompare(right.slug);
-  });
-}
-
-export function normalizeImage(
-  file: { id?: string | null; title?: string | null; width?: number | null; height?: number | null } | string | null | undefined,
-  baseUrl: string,
-  title: string,
-): BlogImage | null {
-  if (!file || typeof file === "string" || !file.id) {
-    return null;
-  }
-
-  return {
-    url: `${baseUrl}/assets/${file.id}`,
-    alt: cleanText(file.title || title),
-    width: typeof file.width === "number" ? file.width : null,
-    height: typeof file.height === "number" ? file.height : null,
-  };
-}
-
 export function defaultPostCta(category: BlogCategory) {
   if (category.slug === "releases") {
     return {
@@ -166,6 +104,9 @@ export function renderLocalSections(record: { sections?: Array<Record<string, an
 
 export function decorateBlogHtml(html: string) {
   return html
+    .replace(/<h1([^>]*) class="scroll-mt-28">/g, '<h1$1 class="scroll-mt-28 font-display text-[clamp(2.6rem,4vw,4.2rem)] leading-[0.94] tracking-tight text-foreground">')
+    .replace(/<h2([^>]*) class="scroll-mt-28">/g, '<h2$1 class="scroll-mt-28 mt-12 font-display text-[clamp(1.9rem,3vw,3.1rem)] leading-[0.96] tracking-tight text-foreground first:mt-0">')
+    .replace(/<h3([^>]*) class="scroll-mt-28">/g, '<h3$1 class="scroll-mt-28 mt-8 font-display text-[clamp(1.35rem,2.2vw,1.95rem)] leading-tight text-foreground">')
     .replace(/<h1>/g, '<h1 class="font-display text-[clamp(2.6rem,4vw,4.2rem)] leading-[0.94] tracking-tight text-foreground">')
     .replace(/<h2>/g, '<h2 class="mt-12 font-display text-[clamp(1.9rem,3vw,3.1rem)] leading-[0.96] tracking-tight text-foreground first:mt-0">')
     .replace(/<h3>/g, '<h3 class="mt-8 font-display text-[clamp(1.35rem,2.2vw,1.95rem)] leading-tight text-foreground">')
@@ -224,4 +165,11 @@ export function escapeHtml(value: string) {
 
 export function stripHtmlTags(value: string) {
   return String(value || "").replace(/<[^>]+>/g, " ");
+}
+
+export function renderBlogHeadingLinks(headings: Array<{ id: string; text: string }>) {
+  return headings.map((heading) => {
+    const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(heading.id) ? heading.id : "section";
+    return `<a href="#${id}" class="border-l border-border py-2 pl-4 text-sm text-muted-foreground hover:border-foreground/40 hover:text-foreground">${escapeHtml(heading.text)}</a>`;
+  }).join("");
 }

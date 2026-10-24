@@ -63,12 +63,12 @@ fn mixed_case_tag_preserved_exactly() {
 
 #[test]
 fn uppercase_tag_has_no_special_behavior() {
-    let a = compile(r#"<div id={x} />"#);
-    let b = compile(r#"<Widget id={x} />"#);
+    let a = compile(r#"<div id={props.x} />"#);
+    let b = compile(r#"<Widget id={props.x} />"#);
 
     // Both must produce identical expression tables
-    assert!(a.contains(r#"__zenith_expr = ["x"]"#));
-    assert!(b.contains(r#"__zenith_expr = ["x"]"#));
+    assert!(a.contains(r#"__zenith_expr = ["props.x"]"#));
+    assert!(b.contains(r#"__zenith_expr = ["props.x"]"#));
 
     // Both must produce identical attribute transformation
     assert!(a.contains(r#"data-zx-id="0""#));
@@ -92,7 +92,7 @@ fn attributes_emitted_in_source_order() {
 
 #[test]
 fn expression_attributes_preserve_source_order() {
-    let output = compile(r#"<div alpha={a} beta={b} gamma={c} />"#);
+    let output = compile(r#"<div alpha={props.a} beta={props.b} gamma={props.c} />"#);
 
     let alpha_pos = output
         .find(r#"data-zx-alpha="0""#)
@@ -108,7 +108,7 @@ fn expression_attributes_preserve_source_order() {
 
 #[test]
 fn mixed_static_and_expression_attributes_preserve_order() {
-    let output = compile(r#"<div id="s" dynamic={d} class="c" />"#);
+    let output = compile(r#"<div id="s" dynamic={props.d} class="c" />"#);
 
     let id_pos = output.find(r#"id="s""#).expect("id not found");
     let dyn_pos = output

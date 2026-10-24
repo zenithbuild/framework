@@ -1,38 +1,48 @@
 <script server lang="ts">
-import { pageContent, siteContent } from "../../content/index";
+import { siteContent } from "../../content/index";
+import { createContentMetadata } from "../../content/site/metadata";
 import { loadBlogDetailSource } from "../../server/postSource";
+import { loadSearchIndex } from "../../server/searchIndexLoader";
 
 export const load = async (ctx) => {
-    const { blogPost, relatedPosts, sourceMode } = await loadBlogDetailSource(ctx.params.slug);
+  const slug = String(ctx.params?.slug || "");
+  const source = await loadBlogDetailSource(slug);
+  if (!source.blogPost) return ctx.deny(404);
+  const post = source.blogPost;
+  const metadata = createContentMetadata({
+    path: post.canonicalPath,
+    title: post.seoTitle,
+    description: post.seoDescription,
+    label: post.title,
+    kind: "blog-posting",
+    published: post.publishedAt || undefined,
+    updated: post.updatedAt || undefined,
+    author: post.author.name,
+  });
+  const searchIndex = await loadSearchIndex();
 
-    if (!blogPost) {
-        if (/^v\d+-\d+-\d+$/.test(ctx.params.slug || "")) {
-            return ctx.redirect(`/changelog/${ctx.params.slug}`);
-        }
-
-        return ctx.deny(404, "Post not found");
-    }
-
-    return {
-        pageTitle: blogPost.title,
-        pageDescription: blogPost.description,
-        pageContent: pageContent.blog,
-        blogPost,
-        relatedPosts,
-        sourceMode,
-        site: {
-            navigation: siteContent.navigation,
-            footer: siteContent.footer,
-        }
-    };
+  return ctx.data({
+    pageTitle: post.title,
+    pageDescription: post.description,
+    metadata,
+    post,
+    relatedPosts: source.relatedPosts,
+    previousPost: source.previousPost,
+    nextPost: source.nextPost,
+    searchIndex,
+    site: {
+      navigation: siteContent.navigation,
+      footer: siteContent.footer,
+    },
+  });
 };
 </script>
 
 <script setup="ts">
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import BlogDetailSurface from "@/components/surfaces/BlogDetailSurface.zen";
+import BlogArticle from "@/components/BlogArticle.zen";
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} navigationContent={data.site.navigation} footerContent={data.site.footer}>
-    <BlogDetailSurface content={data.pageContent} post={data.blogPost} relatedPosts={data.relatedPosts} sourceMode={data.sourceMode} />
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.post.path} searchIndex={data.searchIndex}>
+  <BlogArticle post={data.post} relatedPosts={data.relatedPosts} previousPost={data.previousPost} nextPost={data.nextPost} />
 </DefaultLayout>

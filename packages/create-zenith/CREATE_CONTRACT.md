@@ -1,6 +1,6 @@
 # CREATE_CONTRACT.md — Deterministic Project Scaffolder
 
-Canonical public docs: `../zenith-docs/documentation/contracts/create-contract.md`
+Canonical public docs: `../../docs/documentation/contracts/create-contract.md`
 
 
 > **This document is a legal boundary.**
@@ -25,10 +25,11 @@ It then terminates.
 
 - **Template Copying**: Copying static assets from `templates/{preset}` to target.
 - **Config Generation**: Writing `zenith.config.js` based on preset.
-- **Version Pinning**: Writing `package.json` using **hard-coded** versions from `src/version.js`.
+- **Package Manifest Rewriting**: Updating scaffolded `package.json` metadata such as app name while preserving the checked-in template dependency surface.
 - **Project layout**: Creating specific directories (`pages`, `src`, `public`).
-- **Interactive Prompts**: Asking for project name and preset selection (if not provided).
+- **Interactive Prompts**: Asking for project name, template, and optional tooling selections (if not provided).
 - **Package Manager Execution**: Running `install` command (detects pm, but does NOT alter output files).
+- **Feature Overlays**: Adding optional ESLint / Prettier template overlays when explicitly selected.
 
 ---
 
@@ -44,21 +45,26 @@ It then terminates.
 6.  **Use browser globals** (`window`, `document`).
 7.  **Generate non-deterministic output** (no timestamps, no random IDs).
 8.  **Inject hidden defaults** (what you see in the template is what you get).
-9.  **Read versions from installed packages** (source of truth is `src/version.js`).
+9.  **Read versions from installed packages** to change scaffold output.
 10. **Alter output based on package manager** (generated files must be identical regardless of npm/yarn/pnpm).
 
 ---
 
-## 4. Presets (V0)
+## 4. Templates
 
-Only two presets are defined for V0. **Presets are static template bundles.**
+The shipped scaffolder templates are static bundles under `templates/`:
 
-| Preset | Description | Config | Key Feature |
+| Template | Description | Config | Key Feature |
 |---|---|---|---|
-| `basic` | MPA only | `router: false` | Simple `.zen` pages, no client router |
-| `router` | SPA enabled | `router: true` | Client router script injected, dynamic route example |
+| `basic` | Single-page starter | `router: false` | Minimal baseline with one route |
+| `css` | Multi-page starter | `target: 'static'` | Curated CSS workflow |
+| `tailwind` | Multi-page starter | `target: 'static'` | Tailwind-enabled workflow |
 
-> **Note**: `fullstack` is RESERVED for future use and must not be implemented in V0.
+Rules:
+
+- `templates/` is authoritative for scaffold output.
+- `examples/` are demo-only and must not drive the generated file tree.
+- Optional tooling overlays live under `templates/features/`.
 
 ---
 
@@ -69,8 +75,10 @@ Every generated project must have:
 ```text
 my-app/
   ├── node_modules/   (if install ran)
-  ├── pages/
-  │   └── index.zen
+  ├── src/
+  │   ├── layouts/
+  │   ├── pages/
+  │   └── public/
   ├── package.json
   └── zenith.config.js
 ```
@@ -96,11 +104,9 @@ For any given version of `create-zenith`:
 
 ## 7. Version Authority
 
-`src/version.js` is the **only** authority for:
-- Zenith package versions
-- Node engine requirements
+The scaffolded dependency surface is defined by the checked-in template manifests and explicit create-time rewrites.
 
-`create-zenith` must **not** dynamically resolve versions from its own `node_modules`.
+`create-zenith` must not dynamically resolve versions from installed packages or mutate template dependencies based on the caller's package manager.
 
 ---
 

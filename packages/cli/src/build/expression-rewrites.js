@@ -1,14 +1,8 @@
 import { performance } from 'node:perf_hooks';
-import { extractTemplate } from '../resolve-components.js';
-import { runCompiler } from './compiler-runtime.js';
+import { rewriteCompilerSignalMapReferences } from './compiler-signal-expression.js';
 
 /**
- * @param {string} compPath
- * @param {string} componentSource
  * @param {object} compIr
- * @param {object} compilerOpts
- * @param {string|object} compilerBin
- * @param {Map<string, string[]> | null} [templateExpressionCache]
  * @param {Record<string, number> | null} [rewriteMetrics]
  * @returns {{
  *   map: Map<string, string>,
@@ -18,7 +12,8 @@ import { runCompiler } from './compiler-runtime.js';
  *     signal_indices: number[],
  *     state_index: number | null,
  *     component_instance: string | null,
- *     component_binding: string | null
+ *     component_binding: string | null,
+ *     scoped_data_key: string | null
  *   }>,
  *   signals: Array<{ id?: number, kind?: string, state_index?: number }>,
  *   stateBindings: Array<{ key?: string, value?: string }>,
@@ -27,14 +22,11 @@ import { runCompiler } from './compiler-runtime.js';
  * }}
  */
 export function buildComponentExpressionRewrite(
-    compPath,
-    componentSource,
     compIr,
-    compilerOpts,
-    compilerBin,
-    templateExpressionCache = null,
     rewriteMetrics = null
 ) {
+    // Downstream is only allowed to read compiler-owned raw->rewritten pairs here.
+    // It must not synthesize new identifier meaning beyond this mapping.
     const out = {
         map: new Map(),
         bindings: new Map(),
@@ -49,64 +41,20 @@ export function buildComponentExpressionRewrite(
         return out;
     }
 
-    const hoistedState = Array.isArray(compIr?.hoisted?.state) ? compIr.hoisted.state : [];
-    const hoistedFunctions = Array.isArray(compIr?.hoisted?.functions) ? compIr.hoisted.functions : [];
-    const hoistedDeclarations = Array.isArray(compIr?.hoisted?.declarations) ? compIr.hoisted.declarations : [];
-    const signals = Array.isArray(compIr?.signals) ? compIr.signals : [];
-    if (
-        hoistedState.length === 0 &&
-        hoistedFunctions.length === 0 &&
-        hoistedDeclarations.length === 0 &&
-        signals.length === 0
-    ) {
-        return out;
-    }
     if (rewriteMetrics && typeof rewriteMetrics === 'object') {
         rewriteMetrics.calls += 1;
     }
-
-    const templateOnly = extractTemplate(componentSource);
-    if (!templateOnly.trim()) {
-        return out;
-    }
-
-    const cacheKey = `${compPath}\u0000${templateOnly}`;
-    let rawExpressions = null;
-    if (templateExpressionCache instanceof Map && templateExpressionCache.has(cacheKey)) {
-        rawExpressions = templateExpressionCache.get(cacheKey);
-        if (rewriteMetrics && typeof rewriteMetrics === 'object') {
-            rewriteMetrics.cacheHits += 1;
-        }
-    } else {
-        let templateIr;
-        const templateCompileStartedAt = performance.now();
-        try {
-            templateIr = runCompiler(compPath, templateOnly, compilerOpts, {
-                suppressWarnings: true,
-                compilerToolchain: compilerBin
-            });
-        } catch {
-            return out;
-        }
-        rawExpressions = Array.isArray(templateIr?.expressions) ? templateIr.expressions : [];
-        if (templateExpressionCache instanceof Map) {
-            templateExpressionCache.set(cacheKey, rawExpressions);
-        }
-        if (rewriteMetrics && typeof rewriteMetrics === 'object') {
-            rewriteMetrics.cacheMisses += 1;
-            rewriteMetrics.templateCompileMs += Math.round((performance.now() - templateCompileStartedAt) * 100) / 100;
-        }
-    }
-
-    const count = Math.min(rawExpressions.length, rewrittenExpressions.length);
-    for (let i = 0; i < count; i++) {
-        const raw = rawExpressions[i];
+    for (let i = 0; i < rewrittenExpressions.length; i++) {
         const rewritten = rewrittenExpressions[i];
-        if (typeof raw !== 'string' || typeof rewritten !== 'string') {
+        if (typeof rewritten !== 'string') {
             continue;
         }
 
         const binding = rewrittenBindings[i];
+        // Compiler emits the raw source literal for exact lookup; CLI only transports it.
+        const raw = typeof binding?.literal === 'string' && binding.literal.length > 0
+            ? binding.literal
+            : rewritten;
         const normalizedBinding = binding && typeof binding === 'object'
             ? {
                 compiled_expr: typeof binding.compiled_expr === 'string' ? binding.compiled_expr : null,
@@ -119,6 +67,13 @@ export function buildComponentExpressionRewrite(
                 component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
             }
             : null;
+        if (
+            normalizedBinding &&
+            typeof binding.scoped_data_key === 'string' &&
+            binding.scoped_data_key.length > 0
+        ) {
+            normalizedBinding.scoped_data_key = binding.scoped_data_key;
+        }
 
         out.sequence.push({ raw, rewritten, binding: normalizedBinding });
 
@@ -150,6 +105,11 @@ export function buildComponentExpressionRewrite(
         }
     }
 
+    if (rewriteMetrics && typeof rewriteMetrics === 'object') {
+        rewriteMetrics.compilerOwnedBindings += out.sequence.length;
+        rewriteMetrics.ambiguousBindings += out.ambiguous.size;
+    }
+
     return out;
 }
 
@@ -166,28 +126,41 @@ export function remapCompiledExpressionSignals(
     componentStateBindings,
     pageSignalIndexByStateKey
 ) {
+    // This is a mechanical index remap across page merge boundaries, not a second compiler pass.
     if (typeof compiledExpr !== 'string' || compiledExpr.length === 0) {
         return null;
     }
 
-    return compiledExpr.replace(/signalMap\.get\((\d+)\)/g, (full, rawIndex) => {
-        const localIndex = Number.parseInt(rawIndex, 10);
-        if (!Number.isInteger(localIndex)) {
-            return full;
-        }
-        const signal = componentSignals[localIndex];
+    return rewriteCompilerSignalMapReferences(compiledExpr, ({ ts, signalIndex, valueRead }) => {
+        const signal = componentSignals[signalIndex];
         if (!signal || !Number.isInteger(signal.state_index)) {
-            return full;
+            return null;
         }
         const stateKey = componentStateBindings[signal.state_index]?.key;
         if (typeof stateKey !== 'string' || stateKey.length === 0) {
-            return full;
+            return null;
         }
         const pageIndex = pageSignalIndexByStateKey.get(stateKey);
         if (!Number.isInteger(pageIndex)) {
-            return full;
+            return null;
         }
-        return `signalMap.get(${pageIndex})`;
+
+        const signalMapRead = ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('signalMap'),
+                'get'
+            ),
+            undefined,
+            [ts.factory.createNumericLiteral(String(pageIndex))]
+        );
+        if (valueRead) {
+            return ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(signalMapRead, 'get'),
+                undefined,
+                []
+            );
+        }
+        return signalMapRead;
     });
 }
 
@@ -271,7 +244,10 @@ export function resolveRewrittenBindingMetadata(
         signal_indices: [],
         state_index: null,
         component_instance: typeof binding.component_instance === 'string' ? binding.component_instance : null,
-        component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null
+        component_binding: typeof binding.component_binding === 'string' ? binding.component_binding : null,
+        scoped_data_key: typeof binding.scoped_data_key === 'string' && binding.scoped_data_key.length > 0
+            ? binding.scoped_data_key
+            : null
     };
 
     if (typeof next.compiled_expr === 'string' && next.compiled_expr.includes('signalMap.get(')) {
@@ -350,6 +326,62 @@ export function resolveRewrittenBindingMetadata(
  * @param {object} pageBindingContext
  * @param {Record<string, number> | null} [bindingResolutionMetrics]
  */
+function compiledExprUsesSignalMap(compiledExpr) {
+    return typeof compiledExpr === 'string' && compiledExpr.includes('signalMap.get(');
+}
+
+function chooseMergedBinding(existing, resolved, raw) {
+    if (!existing || typeof existing !== 'object') {
+        return 'resolved';
+    }
+    const existingUsesSignal = compiledExprUsesSignalMap(existing.compiled_expr);
+    const resolvedUsesSignal = compiledExprUsesSignalMap(resolved.compiled_expr);
+    if (resolvedUsesSignal && !existingUsesSignal) {
+        return 'resolved';
+    }
+    if (existingUsesSignal && !resolvedUsesSignal) {
+        return 'existing';
+    }
+    const existingIsRaw = existing.compiled_expr === raw;
+    const resolvedIsRaw = resolved.compiled_expr === raw;
+    if (!resolvedIsRaw && existingIsRaw) {
+        return 'resolved';
+    }
+    if (resolvedIsRaw && !existingIsRaw) {
+        return 'existing';
+    }
+    // Both bindings have a real compiled expression. Prefer the resolved binding
+    // unless the existing one is strictly more specific, and keep either when the
+    // compiled expressions are identical after remapping. Only fall back to
+    // ambiguous when two different compiled expressions compete for the same raw.
+    if (resolvedUsesSignal && existingUsesSignal) {
+        if (existing.compiled_expr === resolved.compiled_expr) {
+            return 'resolved';
+        }
+        return null;
+    }
+    const existingSpecificity = measureBindingSpecificity(existing, raw);
+    const resolvedSpecificity = measureBindingSpecificity(resolved, raw);
+    if (resolvedSpecificity > existingSpecificity) {
+        return 'resolved';
+    }
+    if (existingSpecificity > resolvedSpecificity) {
+        return 'existing';
+    }
+    if (existing.compiled_expr === resolved.compiled_expr) {
+        return 'resolved';
+    }
+    return null;
+}
+
+/**
+ * @param {Map<string, string>} pageMap
+ * @param {Map<string, object>} pageBindingMap
+ * @param {Set<string>} pageAmbiguous
+ * @param {object} componentRewrite
+ * @param {object} pageBindingContext
+ * @param {Record<string, number> | null} [bindingResolutionMetrics]
+ */
 export function mergeExpressionRewriteMaps(
     pageMap,
     pageBindingMap,
@@ -364,6 +396,7 @@ export function mergeExpressionRewriteMaps(
         pageBindingMap.delete(raw);
     }
 
+    const resolvedRaws = new Set();
     for (const [raw, binding] of componentRewrite.bindings.entries()) {
         if (pageAmbiguous.has(raw)) {
             continue;
@@ -375,17 +408,35 @@ export function mergeExpressionRewriteMaps(
             bindingResolutionMetrics
         );
         const existing = pageBindingMap.get(raw);
-        if (existing && JSON.stringify(existing) !== JSON.stringify(resolved)) {
+        const preference = chooseMergedBinding(existing, resolved, raw);
+        if (preference === null) {
             pageAmbiguous.add(raw);
             pageMap.delete(raw);
             pageBindingMap.delete(raw);
+            resolvedRaws.add(raw);
             continue;
         }
-        pageBindingMap.set(raw, resolved);
+        const chosenBinding = preference === 'resolved' ? resolved : existing;
+        pageBindingMap.set(raw, chosenBinding);
+
+        const existingMap = pageMap.get(raw);
+        const componentMap = componentRewrite.map.get(raw);
+        let chosenMap;
+        if (preference === 'resolved') {
+            chosenMap = componentMap !== undefined
+                ? componentMap
+                : (existingMap !== undefined ? existingMap : (typeof resolved.compiled_expr === 'string' ? resolved.compiled_expr : undefined));
+        } else {
+            chosenMap = existingMap !== undefined ? existingMap : componentMap;
+        }
+        if (chosenMap !== undefined) {
+            pageMap.set(raw, chosenMap);
+        }
+        resolvedRaws.add(raw);
     }
 
     for (const [raw, rewritten] of componentRewrite.map.entries()) {
-        if (pageAmbiguous.has(raw)) {
+        if (pageAmbiguous.has(raw) || resolvedRaws.has(raw)) {
             continue;
         }
         const existing = pageMap.get(raw);
@@ -397,6 +448,39 @@ export function mergeExpressionRewriteMaps(
         }
         pageMap.set(raw, rewritten);
     }
+}
+function measureBindingSpecificity(binding, raw) {
+    if (!binding || typeof binding !== 'object') {
+        return 0;
+    }
+
+    let score = 0;
+    if (
+        typeof binding.compiled_expr === 'string' &&
+        binding.compiled_expr.length > 0 &&
+        binding.compiled_expr !== raw
+    ) {
+        score += 4;
+    }
+    if (Number.isInteger(binding.signal_index)) {
+        score += 2;
+    }
+    if (Array.isArray(binding.signal_indices) && binding.signal_indices.length > 0) {
+        score += 2;
+    }
+    if (Number.isInteger(binding.state_index)) {
+        score += 1;
+    }
+    if (typeof binding.component_instance === 'string' && binding.component_instance.length > 0) {
+        score += 1;
+    }
+    if (typeof binding.component_binding === 'string' && binding.component_binding.length > 0) {
+        score += 1;
+    }
+    if (typeof binding.scoped_data_key === 'string' && binding.scoped_data_key.length > 0) {
+        score += 1;
+    }
+    return score;
 }
 
 /**

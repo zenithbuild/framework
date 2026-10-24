@@ -4,6 +4,12 @@ dist/
 coverage/
 target/
 .zenith/
+.zenith-output/
 playwright-report/
 test-results/
 *.log
+/cms/
+.vercel
+
+# Graphify local repo-context output
+graphify-out/

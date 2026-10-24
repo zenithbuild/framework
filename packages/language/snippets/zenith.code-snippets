@@ -36,7 +36,7 @@
     "prefix": "zen-guard-load",
     "body": [
       "<script server lang=\"ts\">",
-      "import { allow, redirect, deny, data } from '@zenithbuild/core/server'",
+      "import { allow, redirect, deny, data } from 'zenith:server-contract'",
       "",
       "export const guard = async (ctx) => {",
       "\t${1:// return allow(), redirect(url), or deny()}",

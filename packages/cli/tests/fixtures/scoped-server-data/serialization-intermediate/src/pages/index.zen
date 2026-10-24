@@ -1,0 +1,5 @@
+<script lang="ts">
+import DerivedCard from "../components/DerivedCard.zen";
+</script>
+
+<DerivedCard />

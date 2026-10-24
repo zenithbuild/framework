@@ -29,7 +29,7 @@ async function buildOutDir() {
   const root = await createTempProject('zenith-phase4');
   const entry = path.join(root, 'index.zen');
   const outDir = path.join(root, 'dist');
-  await fsp.writeFile(entry, '<div><h1>{title}</h1><button on:click={save}>Save</button></div>', 'utf8');
+  await fsp.writeFile(entry, '<script lang="ts">const title = "Home"; function save() {}</script><div><h1>{title}</h1><button on:click={save}>Save</button></div>', 'utf8');
   const result = await pipeCompilerToBundler(entry, outDir);
   if (result.bundler.exitCode !== 0) {
     throw new Error(`Bundler failed:\n${result.bundler.stderr}`);
@@ -40,6 +40,48 @@ async function buildOutDir() {
 function extractFirstModuleScript(html) {
   const m = html.match(/<script[^>]*src=['\"]([^'\"]+\.js)['\"][^>]*>/i);
   return m ? m[1] : null;
+}
+
+function extractRuntimeImportNames(jsSource) {
+  const match = jsSource.match(/import\s*\{([^}]+)\}\s*from\s*['"]\.\/runtime\.[^'"]+\.js['"]/);
+  if (!match) {
+    return [];
+  }
+  return match[1]
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(/\s+as\s+/)[0].trim());
+}
+
+function createRuntimeStubSource(importNames) {
+  const uniqueNames = [...new Set(importNames)];
+  return uniqueNames.map((name) => {
+    switch (name) {
+      case 'hydrate':
+        return 'export function hydrate() {}';
+      case 'signal':
+        return 'export function signal(value) { return { get: () => value, set() {}, subscribe() { return () => {}; } }; }';
+      case 'state':
+        return 'export function state(value) { return value; }';
+      case 'ref':
+        return 'export function ref(value = null) { return { current: value }; }';
+      case 'zeneffect':
+      case 'zenEffect':
+      case 'zenMount':
+      case 'zenOn':
+      case 'zenResize':
+        return `export function ${name}() { return () => {}; }`;
+      case 'zenWindow':
+        return 'export function zenWindow() { return globalThis.window ?? null; }';
+      case 'zenDocument':
+        return 'export function zenDocument() { return globalThis.document ?? null; }';
+      case 'collectRefs':
+        return 'export function collectRefs(...refs) { return refs.map((ref) => ref?.current ?? ref).filter(Boolean); }';
+      default:
+        return `export const ${name} = undefined;`;
+    }
+  }).join('\n');
 }
 
 describe('Phase 4: runtime output safety', () => {
@@ -91,6 +133,7 @@ describe('Phase 4: runtime output safety', () => {
     });
 
     const beforeKeys = new Set(Object.keys(dom.window));
+    const runtimeImportNames = extractRuntimeImportNames(jsSource);
 
     const module = new vm.SourceTextModule(jsSource, {
       context,
@@ -100,12 +143,7 @@ describe('Phase 4: runtime output safety', () => {
     await module.link(async () => {
       // Provide a deterministic stub for runtime module imports in this VM check.
       return new vm.SourceTextModule(
-        [
-          'export function hydrate() {}',
-          'export function signal(v) { return { get: () => v, set() {} }; }',
-          'export function state(v) { return v; }',
-          'export function zeneffect() {}'
-        ].join('\n'),
+        createRuntimeStubSource(runtimeImportNames),
         { context }
       );
     });

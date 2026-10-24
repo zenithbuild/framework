@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import * as compiler from '../dist/index.js'
 
@@ -128,4 +129,20 @@ test('compiler bridge returns structured diagnostics for hard failures', () => {
   assert.equal(result.diagnostics[0].severity, 'error')
   assert.equal(result.diagnostics[0].source, 'compiler')
   assert.ok(typeof result.diagnostics[0].suggestion === 'string')
+})
+
+test('compiler bridge reports malformed markup without panic stderr', () => {
+  const script = [
+    "import * as compiler from './dist/index.js';",
+    "const result = compiler.compile('<main></section>', '/tmp/malformed.zen');",
+    "console.log(JSON.stringify(result));"
+  ].join('\n')
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: projectRoot,
+    encoding: 'utf8'
+  })
+  assert.equal(child.status, 0)
+  assert.equal(child.stderr.includes("thread 'main' panicked"), false)
+  const result = JSON.parse(child.stdout)
+  assert.equal(result.diagnostics[0].code, 'ZEN-MARKUP-PARSE')
 })

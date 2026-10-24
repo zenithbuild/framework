@@ -5,6 +5,9 @@ version: "0.1"
 status: "canonical"
 last_updated: "2026-03-10"
 tags: ["contracts", "editor", "lsp", "snippets", "diagnostics"]
+section: "Build and Tooling"
+sectionOrder: 6
+order: 6
 ---
 
 # Editor Integration Contract
@@ -67,7 +70,7 @@ When `zenith.strictDomLints` is `true`, ZEN-DOM-* diagnostics are reported as **
 The canonical hover/completion surface is limited to Zenith primitives and syntax:
 
 - Script and expression completions: `zenMount`, `zenEffect`, `state`, `signal`, `ref`, `zenWindow`, `zenDocument`, `zenOn`, `zenResize`, `collectRefs`
-- Markup attribute completions: canonical `on:*` event attributes plus the handler-prop convention (`onClick={handler}` at component callsites)
+- Markup attribute completions: canonical `on:*` event attributes plus ordinary component callback props such as `onPress={handler}` at component callsites
 - Hovers for `zenEffect`, `zenMount`, `state`, `signal`, `ref` must include a short definition, a tiny example, and a `Docs:` line pointing at canonical docs
 - Editor tooling must not register React/Vue/Svelte snippet templates for `.zen`
 
@@ -120,6 +123,8 @@ Run the server directly:
 zenith-language-server
 ```
 
+The binary defaults to stdio when no transport flag is provided. Plain LSP clients may still pass `--stdio` explicitly, but it is not required for the default Neovim setup.
+
 Example Neovim `lspconfig` setup:
 
 ```lua
@@ -146,10 +151,35 @@ lspconfig.zenith = {
 lspconfig.zenith.setup({})
 ```
 
+Supported Neovim/plain-LSP features:
+
+- compiler-backed diagnostics for `.zen`, `.zen.html`, and `.zenx`
+- DOM-safety code actions for supported `ZEN-DOM-*` diagnostics
+- limited doc-backed hover and completion for canonical Zenith primitives and documented `on:*` events
+
+Repository smoke test:
+
+```bash
+bun test packages/language-server/test/neovim-smoke.spec.ts
+```
+
+The smoke test runs Neovim headlessly when `nvim` is installed, starts the local
+`zenith-language-server` package binary with no transport args, confirms the LSP
+client attaches to a `.zen` buffer, and verifies compiler diagnostics through
+`vim.diagnostic`. Environments without Neovim print `SKIP: nvim not installed`;
+Neovim versions older than 0.10 print `SKIP: nvim >= 0.10 required`. The
+protocol-level stdio harness remains the required CI proof in either skip case.
+
+Current limitations:
+
+- Zenith does not provide full TypeScript semantic completion or typechecking through the language server yet.
+- Completion is intentionally limited to compiler-safe Zenith syntax and documented framework primitives.
+
 ## Verified Parity
 
 - Packaged VS Code verification passed for compiler-backed diagnostics, `strictDomLints`, supported `ZEN-DOM-*` quick fixes, canonical hovers, and canonical completions.
-- Direct Neovim verification passed on the default Node `--stdio` path for the same diagnostics, quick fixes, hover, and completion surface.
+- Direct plain-LSP verification covers package-bin startup, initialize capabilities, `.zen` diagnostics publication, valid-document empty diagnostics, hover, and completion over stdio.
+- Headless Neovim verification covers `.zen` filetype attachment, `vim.lsp.start({ cmd = { "zenith-language-server" } })`, compiler diagnostics in `vim.diagnostic`, and diagnostics clearing for valid content when `nvim` is available.
 - VS Code-compatible environments consume the packaged `@zenithbuild/language` extension path; plain LSP clients consume `@zenithbuild/language-server` directly.
 
 ## Troubleshooting

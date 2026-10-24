@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-22"
 tags: ["contracts", "compiler", "no-magic"]
+section: "Advanced"
+sectionOrder: 8
+order: 9
 ---
 
 # No Magic Contract
@@ -13,7 +16,7 @@ tags: ["contracts", "compiler", "no-magic"]
 
 Contract: Compiler and runtime behavior must depend on explicit source inputs and declared APIs.
 
-Invariant: No hidden globals provide route data, params, or load context.
+Invariant: No hidden globals provide route data, params, mutation state, or server context.
 
 Banned:
 - Hidden data context injection.
@@ -22,7 +25,7 @@ Banned:
 
 Definition of Done:
 - Components receive only declared props and imports.
-- Server context is available only through `load(ctx)`.
+- Server context is available only through explicit `guard(ctx)` / `action(ctx)` / `load(ctx)` inputs.
 
 Failure Modes:
 - Route behavior changes based on implicit global variables.

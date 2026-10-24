@@ -279,7 +279,7 @@ describe('toolchain cross-OS fallback', () => {
         const platformPackage = currentPlatformPackage('compiler');
 
         try {
-            expect(resolveCompilerBin(projectRoot)).toContain(
+            expect(resolveCompilerBin(projectRoot, {})).toContain(
                 `/node_modules/@zenithbuild/${platformPackage.packageDirName}/bin/${platformPackage.binaryName}`
             );
         } finally {

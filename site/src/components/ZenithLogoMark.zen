@@ -1,0 +1,4 @@
+<div class="relative grid h-full w-full place-items-center" data-shared-mark="true">
+  <span class="absolute inset-0 rounded-full border border-border bg-card shadow-lg shadow-primary/10" aria-hidden="true"></span>
+  <img src="/logo.png" alt="Zenith framework logo" loading="eager" decoding="sync" fetchpriority="high" class="relative z-10 h-[72%] w-[72%] rounded-full object-contain" />
+</div>

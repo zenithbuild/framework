@@ -18,14 +18,17 @@ describe('Phase preview SSR', () => {
 
     await scaffoldZenithProject(root, {
       router: true,
+      target: 'node',
       pages: {
         'index.zen': '<main><a id="user-link" href="/users/42">User</a></main>',
-        'users/[id].zen': `<script server>
-export const ssr = {
-  user: { name: params.id }
+        'users/[id].zen': `<script server lang="ts">
+export async function load(ctx) {
+  return ctx.data({
+    user: { name: ctx.params.id }
+  });
 }
 </script>
-<main><h1 id="name">{ssr.user.name}</h1></main>`
+<main><h1 id="name">{data.user.name}</h1></main>`
       }
     });
 
@@ -68,6 +71,7 @@ export const ssr = {
 
     await scaffoldZenithProject(root, {
       router: true,
+      target: 'node',
       pages: {
         'index.zen': '<main><a id="user-link" href="/users/42">User</a></main>',
         'users/[id].zen': `<script server>
@@ -82,7 +86,7 @@ export const ssr_data = { count: counter };
     assertSuccess(npmInstall(root), 'npm install');
     assertSuccess(runCli(root, ['build']), 'zenith build');
 
-    const manifestPath = path.join(root, 'dist', 'assets', 'router-manifest.json');
+    const manifestPath = path.join(root, 'dist', 'server', 'manifest.json');
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
     const userRoute = Array.isArray(manifest.routes)
       ? manifest.routes.find((entry) => entry.path === '/users/:id')
@@ -90,7 +94,7 @@ export const ssr_data = { count: counter };
     expect(userRoute).toBeTruthy();
     expect(typeof userRoute.page_asset).toBe('string');
 
-    const pageAssetPath = path.join(root, 'dist', userRoute.page_asset);
+    const pageAssetPath = path.join(root, 'dist', 'static', userRoute.page_asset);
     const beforeAsset = await fs.readFile(pageAssetPath, 'utf8');
 
     const port = await getFreePort();
@@ -119,6 +123,7 @@ export const ssr_data = { count: counter };
 
     await scaffoldZenithProject(root, {
       router: true,
+      target: 'node',
       pages: {
         'index.zen': `<script server lang="ts">
 export const ssr_data = {
@@ -156,9 +161,15 @@ export const ssr_data = {
 });
 
 function readInjectedSsr(html) {
-  const match = html.match(/window\.__zenith_ssr_data\s*=\s*Object\.freeze\(([\s\S]*?)\);<\/script>/i);
-  if (!match) {
-    return null;
+  const frozenMatch = html.match(/window\.__zenith_ssr_data\s*=\s*Object\.freeze\(([\s\S]*?)\);<\/script>/i);
+  if (frozenMatch) {
+    return JSON.parse(frozenMatch[1]);
   }
-  return JSON.parse(match[1]);
+
+  const plainMatch = html.match(/window\.__zenith_ssr_data\s*=\s*(\{[\s\S]*?\});<\/script>/i);
+  if (plainMatch) {
+    return JSON.parse(plainMatch[1]);
+  }
+
+  return null;
 }

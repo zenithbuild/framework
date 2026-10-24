@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-25"
 tags: ["contracts", "compiler", "runtime", "components"]
+section: "Advanced"
+sectionOrder: 8
+order: 4
 ---
 
 # Component Script Hoisting Contract
@@ -23,4 +26,4 @@ Definition of Done:
 - Bundler deduplicates by `hoist_id`.
 - Runtime mounts factories from payload only.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-compiler/COMPONENT_SCRIPT_HOISTING.md`.
+Canonical source: `packages/compiler/COMPONENT_SCRIPT_HOISTING.md`.

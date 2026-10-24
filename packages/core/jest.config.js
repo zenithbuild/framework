@@ -4,6 +4,7 @@ export default {
     transform: {},
     testMatch: [
         '**/tests/config.spec.js',
+        '**/tests/define-config.spec.js',
         '**/tests/path.spec.js',
         '**/tests/order.spec.js',
         '**/tests/hash.spec.js',
@@ -11,7 +12,9 @@ export default {
         '**/tests/version.spec.js',
         '**/tests/guards.spec.js',
         '**/tests/guardrails.spec.js',
+        '**/tests/guardrail-probes.spec.js',
         '**/tests/ir-schema.spec.js',
+        '**/tests/bin-entrypoint-batch4.spec.js',
         '**/tests/core-template.spec.js',
         '**/tests/side-effects.spec.js',
         '**/tests/package-surface.spec.js'

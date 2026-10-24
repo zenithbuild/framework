@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   detect:
@@ -84,13 +83,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.97.1
 
       - name: Resolve Playwright version
         id: playwright_version
@@ -116,10 +115,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            packages/**/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
+            packages/compiler/target
+            packages/bundler/target
+          key: ${{ runner.os }}-cargo-1.97.1-v2-${{ hashFiles('packages/**/Cargo.lock', 'packages/**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-1.97.1-v2-
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -129,7 +129,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bunx playwright install --with-deps chromium
 
@@ -149,16 +149,19 @@ jobs:
     if: needs.detect.outputs.publish_scaffolder == 'true' && needs.ci.result == 'success'
     runs-on: ubuntu-latest
     environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.19.0"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.0"
 
       - name: Assert OIDC-only publish auth
         shell: bash
@@ -177,16 +180,41 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - name: Publish create-zenith
         env:
           NPM_CONFIG_PROVENANCE: "true"
         run: ./scripts/publish-scaffolder.sh
 
-  release_create_zenith:
+  verify_registry:
     needs: [detect, publish_scaffolder]
     if: needs.detect.outputs.publish_scaffolder == 'true' && needs.publish_scaffolder.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+
+      - name: Verify npm registry propagation
+        shell: bash
+        env:
+          SCAFFOLDER_VERSION: ${{ needs.detect.outputs.scaffolder_version }}
+        run: |
+          set -euo pipefail
+          ./scripts/verify-npm-registry.mjs scaffolder "${SCAFFOLDER_VERSION}" "latest" scaffolder-release-verification.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scaffolder-release-verification
+          path: scaffolder-release-verification.json
+          if-no-files-found: error
+
+  release_create_zenith:
+    needs: [detect, verify_registry]
+    if: needs.detect.outputs.publish_scaffolder == 'true' && needs.verify_registry.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

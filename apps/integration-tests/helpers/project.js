@@ -15,6 +15,7 @@ export async function createTempProject(prefix) {
 
 export async function scaffoldZenithProject(rootDir, options = {}) {
   const router = options.router === true;
+  const target = typeof options.target === 'string' ? options.target : 'static';
   const pages = options.pages || {
     'index.zen': '<div>Home</div>'
   };
@@ -29,8 +30,19 @@ export async function scaffoldZenithProject(rootDir, options = {}) {
       preview: 'zenith preview'
     },
     dependencies: {
+      '@zenithbuild/core': fileDep(path.join(repoRoot, 'packages', 'core')),
       '@zenithbuild/cli': fileDep(path.join(repoRoot, 'packages', 'cli')),
       '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler'))
+    },
+    overrides: {
+      '@zenithbuild/core': fileDep(path.join(repoRoot, 'packages', 'core')),
+      '@zenithbuild/cli': fileDep(path.join(repoRoot, 'packages', 'cli')),
+      '@zenithbuild/image': fileDep(path.join(repoRoot, 'packages', 'image')),
+      '@zenithbuild/compiler': fileDep(path.join(repoRoot, 'packages', 'compiler')),
+      '@zenithbuild/bundler': fileDep(path.join(repoRoot, 'packages', 'bundler')),
+      '@zenithbuild/extension-registry': fileDep(path.join(repoRoot, 'packages', 'extension-registry')),
+      '@zenithbuild/runtime': fileDep(path.join(repoRoot, 'packages', 'runtime')),
+      '@zenithbuild/router': fileDep(path.join(repoRoot, 'packages', 'router'))
     }
   };
 
@@ -41,7 +53,7 @@ export async function scaffoldZenithProject(rootDir, options = {}) {
 
   await writeText(
     path.join(rootDir, 'zenith.config.js'),
-    `export default {\n  router: ${router ? 'true' : 'false'}\n};\n`
+    `export default {\n  router: ${router ? 'true' : 'false'},\n  target: ${JSON.stringify(target)}\n};\n`
   );
 
   await ensureDir(path.join(rootDir, 'pages'));

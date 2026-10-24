@@ -1,0 +1,20 @@
+<script server lang="ts">
+export function load(ctx) {
+  return ctx.data({ viewer: "Ada", routeOnly: true })
+}
+</script>
+
+<script lang="ts">
+import DefaultLayout from "../layouts/DefaultLayout.zen";
+import StatusBadge from "../components/StatusBadge.zen";
+import Card from "../components/Card.zen";
+</script>
+
+<DefaultLayout>
+  <main>
+    <p data-testid="route">{data.viewer}</p>
+    <StatusBadge />
+    <Card title="First" count={1} featured />
+    <Card title="Second" count={2} />
+  </main>
+</DefaultLayout>

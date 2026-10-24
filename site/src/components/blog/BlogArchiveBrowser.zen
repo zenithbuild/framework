@@ -1,0 +1,286 @@
+<script lang="ts">
+import type { BlogPost } from "@/server/postSource";
+
+export interface Props {
+  posts: BlogPost[];
+  categories: string[];
+  tags: string[];
+  description: string;
+  actionLabel: string;
+}
+
+const blogArchiveIncoming = props as Props;
+const blogArchivePosts = Array.isArray(blogArchiveIncoming.posts) ? blogArchiveIncoming.posts : [];
+const blogArchiveCategories = Array.isArray(blogArchiveIncoming.categories) ? blogArchiveIncoming.categories : [];
+const blogArchiveTags = Array.isArray(blogArchiveIncoming.tags) ? blogArchiveIncoming.tags : [];
+const blogArchiveDescription = blogArchiveIncoming.description || "Browse every published Zenith article.";
+const blogArchiveActionLabel = blogArchiveIncoming.actionLabel || "Read article";
+const blogArchiveCategoryRootRef = ref<HTMLElement>();
+const blogArchiveCategoryTriggerRef = ref<HTMLButtonElement>();
+const blogArchiveCategoryPanelRef = ref<HTMLElement>();
+const blogArchiveTagRootRef = ref<HTMLElement>();
+const blogArchiveTagTriggerRef = ref<HTMLButtonElement>();
+const blogArchiveTagPanelRef = ref<HTMLElement>();
+
+function blogArchiveCleanFilter(value: string | null | undefined) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function blogArchiveNormalizedFilter(value: string | null | undefined) {
+  return blogArchiveCleanFilter(value).toLowerCase();
+}
+
+function blogArchiveFilterArticles(articles: BlogPost[], category: string, tag: string) {
+  const categoryKey = blogArchiveNormalizedFilter(category);
+  const tagKey = blogArchiveNormalizedFilter(tag);
+  const allKey = blogArchiveNormalizedFilter("All");
+  return articles.filter((article) => {
+    const categoryMatches = categoryKey === allKey || blogArchiveNormalizedFilter(article.category?.title) === categoryKey;
+    const tagMatches = tagKey === allKey || article.tags.some((articleTag) => blogArchiveNormalizedFilter(articleTag) === tagKey);
+    return categoryMatches && tagMatches;
+  });
+}
+
+function blogArchiveDescribeFilters(category = "All", tag = "All") {
+  const categoryActive = blogArchiveNormalizedFilter(category) !== "all";
+  const tagActive = blogArchiveNormalizedFilter(tag) !== "all";
+  if (categoryActive && tagActive) return `${blogArchiveCleanFilter(category)} · ${blogArchiveCleanFilter(tag)}`;
+  if (categoryActive) return blogArchiveCleanFilter(category);
+  if (tagActive) return `Tagged “${blogArchiveCleanFilter(tag)}”`;
+  return "All articles";
+}
+
+function blogArchiveEscapeHtml(value: unknown): string {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function blogArchiveRenderTags(post: BlogPost): string {
+  const values = Array.isArray(post.tags) ? post.tags.filter(Boolean) : [];
+  if (values.length === 0) return "";
+  return '<ul class="mt-5 flex flex-wrap gap-x-4 gap-y-2" role="list">'
+    + values.map((tag) => '<li class="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">' + blogArchiveEscapeHtml(tag) + "</li>").join("")
+    + "</ul>";
+}
+
+function blogArchiveRenderRows(values: BlogPost[]): string {
+  return values.map((post, index) => {
+    const category = post.category?.title || "";
+    const author = post.author?.name || "";
+    const date = post.displayPublishedAt ? '<p class="mt-3 text-sm text-muted-foreground">' + blogArchiveEscapeHtml(post.displayPublishedAt) + "</p>" : "";
+    const readingTime = post.readingTime ? "<span>" + blogArchiveEscapeHtml(post.readingTime) + "</span>" : "";
+    const authorLine = author ? "<span>By " + blogArchiveEscapeHtml(author) + "</span>" : "";
+    const number = String(index + 1).padStart(2, "0");
+    return [
+      '<article data-blog-article-row="true" data-blog-category="' + blogArchiveEscapeHtml(category) + '" class="border-b border-border">',
+      '<a href="' + blogArchiveEscapeHtml(post.path) + '" class="group grid min-h-11 grid-cols-4 gap-x-6 gap-y-6 py-8 transition-colors hover:bg-muted/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:grid-cols-12 lg:gap-x-12 lg:py-10">',
+      '<div class="col-span-4 flex items-start justify-between gap-4 md:col-span-3">',
+      '<div><p class="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">' + blogArchiveEscapeHtml(category) + "</p>" + date + "</div>",
+      '<span class="font-mono text-[10px] text-muted-foreground md:hidden">' + number + "</span>",
+      "</div>",
+      '<div class="col-span-4 md:col-span-6">',
+      '<h3 class="font-heading text-3xl font-semibold leading-none text-foreground transition-colors group-hover:text-primary sm:text-4xl">' + blogArchiveEscapeHtml(post.title) + "</h3>",
+      '<p class="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground md:text-base md:leading-8">' + blogArchiveEscapeHtml(post.excerpt) + "</p>",
+      blogArchiveRenderTags(post),
+      "</div>",
+      '<div class="col-span-4 flex items-end justify-between gap-5 md:col-span-3 md:flex-col md:items-end">',
+      '<span class="hidden font-mono text-[10px] text-muted-foreground md:block">' + number + "</span>",
+      '<div class="flex flex-col gap-2 text-sm text-muted-foreground md:items-end md:text-right">' + readingTime + authorLine + '<span class="mt-2 font-semibold text-foreground transition-colors group-hover:text-primary">' + blogArchiveEscapeHtml(blogArchiveActionLabel) + "</span></div>",
+      "</div>",
+      "</a>",
+      "</article>",
+    ].join("");
+  }).join("");
+}
+
+function blogArchiveRenderOptions(values: string[], kind: "category" | "tag", selected: string): string {
+  return ["All", ...values].map((value) => {
+    const checked = value.toLowerCase() === selected.toLowerCase();
+    const classes = checked
+      ? "w-full rounded-md bg-muted px-3 py-2.5 text-left text-sm font-medium text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      : "w-full rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+    return '<button type="button" role="menuitemradio" aria-checked="' + (checked ? "true" : "false")
+      + '" data-blog-filter-option="' + kind + '" data-blog-filter-value="' + blogArchiveEscapeHtml(value)
+      + '" class="' + classes + '">' + blogArchiveEscapeHtml(value) + "</button>";
+  }).join("");
+}
+
+state blogArchiveOpenMenu = "";
+state blogArchiveSelectedCategory = "All";
+state blogArchiveSelectedTag = "All";
+state blogArchiveResultHeading = blogArchiveDescribeFilters();
+state blogArchiveResultCount = blogArchivePosts.length;
+state blogArchiveRowsHtml = blogArchiveRenderRows(blogArchivePosts);
+state blogArchiveCategoryOptionsHtml = blogArchiveRenderOptions(blogArchiveCategories, "category", "All");
+state blogArchiveTagOptionsHtml = blogArchiveRenderOptions(blogArchiveTags, "tag", "All");
+
+function blogArchiveCloseMenus() {
+  blogArchiveOpenMenu = "";
+}
+
+function blogArchiveToggleCategory() {
+  blogArchiveOpenMenu = blogArchiveOpenMenu === "category" ? "" : "category";
+}
+
+function blogArchiveToggleTag() {
+  blogArchiveOpenMenu = blogArchiveOpenMenu === "tag" ? "" : "tag";
+}
+
+function blogArchiveCommitFilters() {
+  const filtered = blogArchiveFilterArticles(blogArchivePosts, blogArchiveSelectedCategory, blogArchiveSelectedTag);
+  blogArchiveResultHeading = blogArchiveDescribeFilters(blogArchiveSelectedCategory, blogArchiveSelectedTag);
+  blogArchiveResultCount = filtered.length;
+  blogArchiveRowsHtml = blogArchiveRenderRows(filtered);
+  blogArchiveCategoryOptionsHtml = blogArchiveRenderOptions(blogArchiveCategories, "category", blogArchiveSelectedCategory);
+  blogArchiveTagOptionsHtml = blogArchiveRenderOptions(blogArchiveTags, "tag", blogArchiveSelectedTag);
+}
+
+function blogArchiveSelectFilter(kind: "category" | "tag", value: string) {
+  if (kind === "category") blogArchiveSelectedCategory = value;
+  if (kind === "tag") blogArchiveSelectedTag = value;
+  blogArchiveCommitFilters();
+  blogArchiveCloseMenus();
+  if (kind === "category") blogArchiveCategoryTriggerRef.current?.focus();
+  if (kind === "tag") blogArchiveTagTriggerRef.current?.focus();
+}
+
+function blogArchiveHandleRegionClick(event: Event) {
+  const target = event.target as HTMLElement | null;
+  const kind = target?.dataset.blogFilterOption;
+  const value = target?.dataset.blogFilterValue;
+  if ((kind === "category" || kind === "tag") && value) blogArchiveSelectFilter(kind, value);
+}
+
+function blogArchiveFocusOption(panel: HTMLElement | undefined, direction: "first" | "last") {
+  const option = direction === "first" ? panel?.firstElementChild : panel?.lastElementChild;
+  if (option instanceof HTMLElement) option.focus();
+}
+
+function blogArchiveMoveOption(target: HTMLElement, direction: "next" | "previous" | "first" | "last") {
+  const parent = target.parentElement;
+  if (!parent) return;
+  const candidate = direction === "first"
+    ? parent.firstElementChild
+    : direction === "last"
+      ? parent.lastElementChild
+      : direction === "next"
+        ? target.nextElementSibling || parent.firstElementChild
+        : target.previousElementSibling || parent.lastElementChild;
+  if (candidate instanceof HTMLElement) candidate.focus();
+}
+
+function blogArchiveHandleMenuKeydown(
+  event: KeyboardEvent,
+  kind: "category" | "tag",
+  trigger: HTMLButtonElement | undefined,
+  panel: HTMLElement | undefined,
+) {
+  const target = event.target as HTMLElement | null;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    blogArchiveCloseMenus();
+    trigger?.focus();
+    return;
+  }
+  if (target === trigger && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    blogArchiveOpenMenu = kind;
+    zenWindow()?.requestAnimationFrame(() => blogArchiveFocusOption(panel, event.key === "ArrowDown" ? "first" : "last"));
+    return;
+  }
+  if (target?.dataset.blogFilterOption !== kind) return;
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  if (event.key === "ArrowDown") blogArchiveMoveOption(target, "next");
+  if (event.key === "ArrowUp") blogArchiveMoveOption(target, "previous");
+  if (event.key === "Home") blogArchiveMoveOption(target, "first");
+  if (event.key === "End") blogArchiveMoveOption(target, "last");
+}
+
+function blogArchiveHandleCategoryKeydown(event: KeyboardEvent) {
+  blogArchiveHandleMenuKeydown(event, "category", blogArchiveCategoryTriggerRef.current, blogArchiveCategoryPanelRef.current);
+}
+
+function blogArchiveHandleTagKeydown(event: KeyboardEvent) {
+  blogArchiveHandleMenuKeydown(event, "tag", blogArchiveTagTriggerRef.current, blogArchiveTagPanelRef.current);
+}
+
+function blogArchiveResetFilters() {
+  blogArchiveSelectedCategory = "All";
+  blogArchiveSelectedTag = "All";
+  blogArchiveCommitFilters();
+  blogArchiveCloseMenus();
+}
+
+zenMount((ctx) => {
+  const doc = zenDocument();
+  if (!doc) return;
+  const offPointerDown = zenOn(doc, "pointerdown", (event: PointerEvent) => {
+    const target = event.target as Node | null;
+    const inCategory = Boolean(target && blogArchiveCategoryRootRef.current?.contains(target));
+    const inTag = Boolean(target && blogArchiveTagRootRef.current?.contains(target));
+    if (!inCategory && !inTag) blogArchiveCloseMenus();
+  });
+  ctx.cleanup(offPointerDown);
+});
+</script>
+
+<section data-blog-archive-browser="true" aria-labelledby="all-articles" class="border-b border-border bg-background px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+  <div class="mx-auto w-full max-w-7xl">
+    <div class="grid grid-cols-4 gap-x-6 gap-y-8 md:grid-cols-12 lg:gap-x-12">
+      <div class="col-span-4 md:col-span-3">
+        <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Browse the Blog</p>
+        <p class="mt-4 max-w-xs text-sm leading-7 text-muted-foreground">Search is coming later. Category and tag filters update the committed article archive now.</p>
+      </div>
+
+      <div class="col-span-4 md:col-span-9">
+        <div data-blog-search="presentation-only">
+          <label for="blog-search" class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Search articles</label>
+          <input id="blog-search" name="blog-search" type="search" placeholder="Search articles" readonly aria-describedby="blog-search-note" class="mt-3 min-h-12 w-full rounded-lg border border-input bg-background px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
+          <span id="blog-search-note" class="sr-only">Search is not available yet. Use the category and tag filters below.</span>
+        </div>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <div ref={blogArchiveCategoryRootRef} data-blog-filter-root="category" class="relative" on:click={blogArchiveHandleRegionClick} on:keydown={blogArchiveHandleCategoryKeydown}>
+            <span id="blog-category-label" class="sr-only">Filter articles by category</span>
+            <button ref={blogArchiveCategoryTriggerRef} type="button" data-blog-filter-trigger="category" aria-labelledby="blog-category-label blog-category-value" aria-haspopup="menu" aria-expanded={blogArchiveOpenMenu === "category" ? "true" : "false"} aria-controls="blog-category-menu" class="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg border border-input bg-background px-4 text-left text-sm font-medium text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" on:click={blogArchiveToggleCategory}>
+              <span><span class="text-muted-foreground">Category</span> <span id="blog-category-value">{blogArchiveSelectedCategory}</span></span>
+              <span aria-hidden="true">↓</span>
+            </button>
+            <div ref={blogArchiveCategoryPanelRef} id="blog-category-menu" data-blog-filter-menu="category" role="menu" aria-label="Categories" class="absolute left-0 right-0 top-full z-30 mt-2 grid rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl" style={blogArchiveOpenMenu === "category" ? undefined : "display: none;"} inert={blogArchiveOpenMenu === "category" ? undefined : true} unsafeHTML={blogArchiveCategoryOptionsHtml}></div>
+          </div>
+
+          <div ref={blogArchiveTagRootRef} data-blog-filter-root="tag" class="relative" on:click={blogArchiveHandleRegionClick} on:keydown={blogArchiveHandleTagKeydown}>
+            <span id="blog-tag-label" class="sr-only">Filter articles by tag</span>
+            <button ref={blogArchiveTagTriggerRef} type="button" data-blog-filter-trigger="tag" aria-labelledby="blog-tag-label blog-tag-value" aria-haspopup="menu" aria-expanded={blogArchiveOpenMenu === "tag" ? "true" : "false"} aria-controls="blog-tag-menu" class="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg border border-input bg-background px-4 text-left text-sm font-medium text-foreground transition-colors hover:border-ring focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" on:click={blogArchiveToggleTag}>
+              <span><span class="text-muted-foreground">Tag</span> <span id="blog-tag-value">{blogArchiveSelectedTag}</span></span>
+              <span aria-hidden="true">↓</span>
+            </button>
+            <div ref={blogArchiveTagPanelRef} id="blog-tag-menu" data-blog-filter-menu="tag" role="menu" aria-label="Tags" class="absolute left-0 right-0 top-full z-30 mt-2 grid max-h-72 overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl" style={blogArchiveOpenMenu === "tag" ? undefined : "display: none;"} inert={blogArchiveOpenMenu === "tag" ? undefined : true} unsafeHTML={blogArchiveTagOptionsHtml}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-12 border-t border-border pt-10">
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Archive</p>
+          <h2 id="all-articles" class="mt-4 font-heading text-4xl font-semibold leading-none text-foreground sm:text-5xl">{blogArchiveResultHeading}</h2>
+          <p class="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground md:text-base">{blogArchiveDescription}</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <p data-blog-result-count="true" aria-live="polite" class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{blogArchiveResultCount} {blogArchiveResultCount === 1 ? "post" : "posts"}</p>
+          <button type="button" data-blog-filter-reset="true" class="min-h-11 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" style={blogArchiveSelectedCategory !== "All" || blogArchiveSelectedTag !== "All" ? undefined : "display: none;"} on:click={blogArchiveResetFilters}>Clear filters</button>
+        </div>
+      </div>
+
+      <div data-blog-results="true" class="mt-10 border-t border-border" style={blogArchiveResultCount > 0 ? undefined : "display: none;"} unsafeHTML={blogArchiveRowsHtml}></div>
+      <div data-blog-empty-state="true" class="mt-10 rounded-lg border border-border bg-card p-6 text-sm leading-7 text-muted-foreground" style={blogArchiveResultCount === 0 ? undefined : "display: none;"}>No articles match these filters. Clear the filters to see every post.</div>
+    </div>
+  </div>
+</section>

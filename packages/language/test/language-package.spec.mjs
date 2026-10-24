@@ -80,7 +80,7 @@ test('extension package ships the bundled server runtime dependencies and VS Cod
   const pkg = JSON.parse(await fs.readFile(path.join(packageRoot, 'package.json'), 'utf8'));
   const extensionSource = await fs.readFile(path.join(packageRoot, 'src', 'extension.ts'), 'utf8');
 
-  assert.equal(pkg.dependencies['@zenithbuild/compiler'], '0.7.0');
+  assert.equal(pkg.dependencies['@zenithbuild/compiler'], pkg.version);
   assert.ok(pkg.dependencies['vscode-languageserver']);
   assert.ok(pkg.dependencies['vscode-languageserver-textdocument']);
   assert.match(extensionSource, /module:\s*serverPath/);
@@ -183,6 +183,19 @@ test('snippet file contains no React/Vue/Svelte/JSX framework drift', async () =
   assert.equal(/\bjsx\b/i.test(serialized), false, 'snippets must not reference JSX');
   assert.equal(/\bonClick\b/.test(serialized), false, 'snippets must not use onClick (React pattern)');
   assert.equal(/\b@click\b/.test(serialized), false, 'snippets must not use @click (Vue pattern)');
+});
+
+test('guard/load snippet uses the canonical server-contract import', async () => {
+  const snippets = JSON.parse(
+    await fs.readFile(path.join(packageRoot, 'snippets', 'zenith.code-snippets'), 'utf8')
+  );
+  const guardLoad = snippets['zen-guard-load'];
+
+  assert.ok(guardLoad, 'zen-guard-load snippet must exist');
+  const body = Array.isArray(guardLoad.body) ? guardLoad.body.join('\n') : '';
+
+  assert.match(body, /zenith:server-contract/);
+  assert.doesNotMatch(body, /@zenithbuild\/core\/server/);
 });
 
 test('language-configuration includes wordPattern and indentation rules', async () => {

@@ -1,0 +1,221 @@
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { cli } from '../dist/index.js';
+
+process.env.ZENITH_NO_UI = '1';
+process.env.NO_COLOR = '1';
+process.env.CI = '1';
+
+async function createProject(files) {
+    const root = join(tmpdir(), `zenith-server-output-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    for (const [relativePath, contents] of Object.entries(files)) {
+        const absolutePath = join(root, relativePath);
+        await mkdir(join(absolutePath, '..'), { recursive: true });
+        await writeFile(absolutePath, contents, 'utf8');
+    }
+    return root;
+}
+
+async function readJson(filePath) {
+    return JSON.parse(await readFile(filePath, 'utf8'));
+}
+
+function normalizeHashedAsset(value) {
+    if (typeof value !== 'string') {
+        return value;
+    }
+    return value.replace(/\.[a-f0-9]{8,}\.js$/i, '.[hash].js');
+}
+
+function normalizeServerRoute(projectRoot, route) {
+    return {
+        ...route,
+        page_asset: normalizeHashedAsset(route.page_asset),
+        page_asset_file: normalizeHashedAsset(route.page_asset_file),
+        server_script_path: typeof route.server_script_path === 'string'
+            ? route.server_script_path.replace(projectRoot, '<project>')
+            : route.server_script_path
+    };
+}
+
+describe('server output contract', () => {
+    let projectRoot = null;
+
+    afterEach(async () => {
+        if (projectRoot) {
+            await rm(projectRoot, { recursive: true, force: true });
+            projectRoot = null;
+        }
+    });
+
+    test('build emits stable server manifest metadata and route package layout', async () => {
+        projectRoot = await createProject({
+            'pages/secure/index.zen': [
+                '<script server lang="ts">',
+                'export async function guard(ctx) {',
+                '  if (ctx.url.searchParams.get("auth") !== "yes") return ctx.redirect("/login", 307);',
+                '  ctx.env.viewer = "allowed";',
+                '  return ctx.allow();',
+                '}',
+                '</script>',
+                '<main>secure</main>'
+            ].join('\n'),
+            'pages/secure/page.load.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.data({ viewer: ctx.env.viewer });',
+                '}'
+            ].join('\n'),
+            'pages/secure/page.action.ts': [
+                'export async function action(ctx) {',
+                '  return ctx.data({ submitted: ctx.method === "POST" });',
+                '}'
+            ].join('\n'),
+            'pages/api/session.resource.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.json({ hasSession: Boolean(await ctx.auth.getSession()) });',
+                '}'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node", basePath: "/docs" };\n'
+        });
+
+        await cli(['build'], projectRoot);
+
+        const manifest = await readJson(join(projectRoot, '.zenith-output', 'server', 'manifest.json'));
+        const routeJson = await readJson(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route.json'));
+        const clientManifest = await readJson(join(projectRoot, '.zenith-output', 'static', 'manifest.json'));
+
+        const normalizedManifest = {
+            base_path: manifest.base_path,
+            routes: manifest.routes.map((route) => normalizeServerRoute(projectRoot, route))
+        };
+        const normalizedRouteJson = normalizeServerRoute(projectRoot, routeJson);
+
+        expect(normalizedManifest).toEqual({
+            base_path: '/docs',
+            routes: [
+                {
+                    name: 'secure',
+                    path: '/secure',
+                    route_kind: 'page',
+                    output: '/secure/index.html',
+                    base_path: '/docs',
+                    page_asset: null,
+                    page_asset_file: null,
+                    route_id: null,
+                    server_script_path: '<project>/pages/secure/index.zen',
+                    guard_module_ref: null,
+                    load_module_ref: 'pages/secure/page.load.ts',
+                    action_module_ref: 'pages/secure/page.action.ts',
+                    has_guard: true,
+                    has_load: true,
+                    has_action: true,
+                    params: [],
+                    image_manifest_file: null,
+                    image_config: {
+                        formats: ['webp', 'avif'],
+                        quality: 75,
+                        deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+                        imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+                        remotePatterns: [],
+                        allowSvg: false,
+                        maxRemoteBytes: 10485760,
+                        maxPixels: 40000000,
+                        minimumCacheTTL: 60,
+                        dangerouslyAllowLocalNetwork: false
+                    }
+                },
+                {
+                    name: 'api_session',
+                    path: '/api/session',
+                    route_kind: 'resource',
+                    output: null,
+                    base_path: '/docs',
+                    page_asset: null,
+                    page_asset_file: null,
+                    route_id: null,
+                    server_script_path: '<project>/pages/api/session.resource.ts',
+                    guard_module_ref: null,
+                    load_module_ref: null,
+                    action_module_ref: null,
+                    has_guard: false,
+                    has_load: true,
+                    has_action: false,
+                    params: [],
+                    image_manifest_file: null,
+                    image_config: {
+                        formats: ['webp', 'avif'],
+                        quality: 75,
+                        deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+                        imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+                        remotePatterns: [],
+                        allowSvg: false,
+                        maxRemoteBytes: 10485760,
+                        maxPixels: 40000000,
+                        minimumCacheTTL: 60,
+                        dangerouslyAllowLocalNetwork: false
+                    }
+                }
+            ]
+        });
+        expect(normalizedRouteJson).toEqual(normalizedManifest.routes[0]);
+        expect(clientManifest.chunks['/api/session']).toBeUndefined();
+        expect(Array.isArray(clientManifest.server_routes) ? clientManifest.server_routes : []).not.toContain('/api/session');
+
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'runtime', 'route-render.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-contract.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-middleware.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'server-error.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'payload.js'))).toBe(false);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'materialize.js'))).toBe(false);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'remote-fetch.js'))).toBe(false);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'images', 'service.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'entry.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route', 'page.html'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'api_session', 'route', 'entry.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'api_session', 'route', 'page.html'))).toBe(false);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.action.js'))).toBe(true);
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'modules', 'pages', 'secure', 'page.load.js'))).toBe(true);
+    });
+
+    test('server middleware helpers stay server-only and are not importable in client route scripts', async () => {
+        projectRoot = await createProject({
+            'pages/index.zen': [
+                '<script lang="ts">',
+                "import { withMiddleware } from 'zenith:server-contract';",
+                'console.log(withMiddleware);',
+                '</script>',
+                '<main>home</main>'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await expect(cli(['build'], projectRoot)).rejects.toThrow('Bundler failed with exit code 1');
+    });
+
+    test('build discovers src/api resource aliases for src layout projects without changing route kind semantics', async () => {
+        projectRoot = await createProject({
+            'src/pages/index.zen': '<main>home</main>\n',
+            'src/api/ping.resource.ts': [
+                'export async function load(ctx) {',
+                '  return ctx.text("ok");',
+                '}'
+            ].join('\n'),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+
+        await cli(['build'], projectRoot);
+
+        const manifest = await readJson(join(projectRoot, '.zenith-output', 'server', 'manifest.json'));
+        expect(manifest.routes).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    path: '/api/ping',
+                    route_kind: 'resource'
+                })
+            ])
+        );
+        expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'routes', 'api_ping', 'route', 'entry.js'))).toBe(true);
+    });
+});

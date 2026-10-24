@@ -8,6 +8,7 @@ export interface Props {
   rel?: string;
   id?: string;
   title?: string;
+  role?: string;
   surface?: "inline" | "button";
   variant?: string;
   size?: string;
@@ -30,7 +31,14 @@ export interface Props {
   onBlur?: (event: FocusEvent) => void;
 }
 
-const provenSoftNavRouteEntries = ["/", "/about", "/blog", "/changelog", "/docs"];
+const provenSoftNavRouteEntries = [
+  "/",
+  "/about",
+  "/blog",
+  "/blog/building-zenith-0-8",
+  "/docs",
+  "/docs/getting-started",
+];
 const provenRouteEntrySet = new Set<string>(provenSoftNavRouteEntries);
 
 function normalizeRouteEntryHref(href: string | null | undefined): string {
@@ -137,6 +145,7 @@ const siteLinkTarget = typeof siteLinkProps.target === "string" ? siteLinkProps.
 const siteLinkRel = mergeLinkRel(siteLinkTarget, siteLinkProps.rel);
 const siteLinkId = typeof siteLinkProps.id === "string" ? siteLinkProps.id : "";
 const siteLinkTitle = typeof siteLinkProps.title === "string" ? siteLinkProps.title : "";
+const siteLinkRole = typeof siteLinkProps.role === "string" ? siteLinkProps.role : "";
 const siteLinkVariant =
   siteLinkProps.variant === "secondary"
     ? "secondary"
@@ -354,6 +363,7 @@ zenMount((ctx) => {
     rel={siteLinkRel || undefined}
     id={siteLinkShouldRenderAnchor ? siteLinkId || undefined : undefined}
     title={siteLinkTitle || undefined}
+    role={siteLinkRole || undefined}
     aria-label={siteLinkAriaLabel || undefined}
     aria-current={siteLinkAriaCurrent || undefined}
     aria-controls={siteLinkAriaControls || undefined}
@@ -382,6 +392,7 @@ zenMount((ctx) => {
     style={siteLinkShouldUseDisabledState ? undefined : "display: none;"}
     id={siteLinkShouldUseDisabledState ? siteLinkId || undefined : undefined}
     title={siteLinkTitle || undefined}
+    role={siteLinkRole || undefined}
     aria-label={siteLinkAriaLabel || undefined}
     aria-current={siteLinkAriaCurrent || undefined}
     aria-controls={siteLinkAriaControls || undefined}

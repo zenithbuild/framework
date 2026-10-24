@@ -12,11 +12,24 @@ describe('cli package surface', () => {
         expect(Object.keys(PACKAGE_JSON.exports || {})).toEqual(['.']);
     });
 
+    test('package manifest does not claim the public zenith bin', () => {
+        expect(PACKAGE_JSON.bin).toBeUndefined();
+    });
+
     test('build emits dist entry JS and declarations', () => {
         expect(existsSync(join(DIST_ROOT, 'index.js'))).toBe(true);
         expect(existsSync(join(DIST_ROOT, 'index.d.ts'))).toBe(true);
         expect(existsSync(join(DIST_ROOT, 'framework-components', 'Image.zen'))).toBe(true);
+        expect(PACKAGE_JSON.dependencies.sharp).toBeUndefined();
+        expect(PACKAGE_JSON.dependencies['@zenithbuild/image']).toBeUndefined();
+        expect(PACKAGE_JSON.optionalDependencies?.['@zenithbuild/image']).toBeUndefined();
         expect(readFileSync(join(DIST_ROOT, 'index.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
+    });
+
+    test('dependencies include @zenithbuild/bundler for platform binary transit', () => {
+        const deps = PACKAGE_JSON.dependencies || {};
+        expect(deps).toHaveProperty('@zenithbuild/compiler');
+        expect(deps).toHaveProperty('@zenithbuild/bundler');
     });
 
     test('tarball excludes src files', () => {

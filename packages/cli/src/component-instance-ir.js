@@ -6,29 +6,219 @@ function deepClone(value) {
 
 const cloneMetadataCache = new WeakMap();
 
-function escapeIdentifier(identifier) {
-    return identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function replaceIdentifierRefs(input, renamePlan) {
-    let output = String(input || '');
-    for (const entry of renamePlan) {
-        output = output.replace(entry.pattern, entry.to);
+function loadCloneTypeScriptApi() {
+    const ts = loadTypeScriptApi();
+    if (!ts) {
+        throw new Error(
+            '[Zenith:Build] Deterministic component instance cloning requires the TypeScript parser.'
+        );
     }
-    return output;
+    return ts;
 }
 
-function replaceIdentifierRefsInStatementSource(input, renameEntries, renamePlan) {
+function collectBindingNames(ts, name, target) {
+    if (ts.isIdentifier(name)) {
+        target.add(name.text);
+        return;
+    }
+    if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+        for (const element of name.elements) {
+            if (ts.isBindingElement(element)) {
+                collectBindingNames(ts, element.name, target);
+            }
+        }
+    }
+}
+
+function collectDirectBlockBindings(ts, block, target) {
+    const statements = Array.isArray(block?.statements) ? block.statements : [];
+    for (const statement of statements) {
+        if (ts.isVariableStatement(statement)) {
+            for (const declaration of statement.declarationList.declarations) {
+                collectBindingNames(ts, declaration.name, target);
+            }
+            continue;
+        }
+        if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+            target.add(statement.name.text);
+        }
+    }
+}
+
+function isNestedBlockScope(ts, node) {
+    return (ts.isBlock(node) || ts.isModuleBlock(node)) && !ts.isSourceFile(node.parent);
+}
+
+function buildScopedIdentifierTransformer(ts, renameEntries, sourceLabel) {
+    const renameMap = new Map(renameEntries);
+
+    const shouldSkipIdentifier = (node, localBindings) => {
+        if (localBindings.has(node.text)) {
+            return true;
+        }
+
+        const parent = node.parent;
+        if (!parent) {
+            return false;
+        }
+        if (ts.isPropertyAccessExpression(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isPropertyAssignment(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
+            return true;
+        }
+        if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) {
+            return true;
+        }
+        if (ts.isBindingElement(parent) && parent.propertyName === node) {
+            return true;
+        }
+        if (ts.isLabeledStatement(parent) && parent.label === node) {
+            return true;
+        }
+        if ((ts.isBreakStatement(parent) || ts.isContinueStatement(parent)) && parent.label === node) {
+            return true;
+        }
+        return false;
+    };
+
+    const nextScopeBindings = (node, localBindings) => {
+        if (ts.isSourceFile(node)) {
+            return localBindings;
+        }
+        if (ts.isFunctionLike(node)) {
+            const next = new Set(localBindings);
+            if (node.name && ts.isIdentifier(node.name) && !ts.isSourceFile(node.parent)) {
+                next.add(node.name.text);
+            }
+            for (const param of node.parameters) {
+                collectBindingNames(ts, param.name, next);
+            }
+            return next;
+        }
+        if (isNestedBlockScope(ts, node)) {
+            const next = new Set(localBindings);
+            collectDirectBlockBindings(ts, node, next);
+            return next;
+        }
+        if (ts.isCatchClause(node) && node.variableDeclaration) {
+            const next = new Set(localBindings);
+            collectBindingNames(ts, node.variableDeclaration.name, next);
+            return next;
+        }
+        if ((ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node))
+            && node.initializer
+            && ts.isVariableDeclarationList(node.initializer)) {
+            const next = new Set(localBindings);
+            for (const declaration of node.initializer.declarations) {
+                collectBindingNames(ts, declaration.name, next);
+            }
+            return next;
+        }
+        return localBindings;
+    };
+
+    return (context) => {
+        const visit = (node, localBindings) => {
+            const scopeBindings = nextScopeBindings(node, localBindings);
+
+            if (ts.isShorthandPropertyAssignment(node)) {
+                const rewritten = renameMap.get(node.name.text);
+                if (
+                    typeof rewritten === 'string' &&
+                    rewritten.length > 0 &&
+                    rewritten !== node.name.text &&
+                    !scopeBindings.has(node.name.text)
+                ) {
+                    return ts.factory.createPropertyAssignment(
+                        ts.factory.createIdentifier(node.name.text),
+                        ts.factory.createIdentifier(rewritten)
+                    );
+                }
+            }
+
+            if (ts.isIdentifier(node) && !shouldSkipIdentifier(node, scopeBindings)) {
+                const rewritten = renameMap.get(node.text);
+                if (typeof rewritten === 'string' && rewritten.length > 0 && rewritten !== node.text) {
+                    return ts.factory.createIdentifier(rewritten);
+                }
+            }
+
+            return ts.visitEachChild(node, (child) => visit(child, scopeBindings), context);
+        };
+
+        return (node) => ts.visitNode(node, (child) => visit(child, new Set()));
+    };
+}
+
+function rewriteSourceFileWithIdentifiers(sourceFile, renameEntries, sourceLabel) {
+    const ts = loadCloneTypeScriptApi();
+    const transformer = buildScopedIdentifierTransformer(ts, renameEntries, sourceLabel);
+    const result = ts.transform(sourceFile, [transformer]);
+    try {
+        return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+            .printFile(result.transformed[0])
+            .trimEnd();
+    } finally {
+        result.dispose();
+    }
+}
+
+function rewriteIdentifierRefsInExpressionSource(input, renameEntries, sourceLabel) {
     const source = String(input || '');
     if (!source.trim()) {
         return source;
     }
 
-    const ts = loadTypeScriptApi();
-    if (!ts) {
-        return replaceIdentifierRefs(source, renamePlan);
+    const ts = loadCloneTypeScriptApi();
+    let sourceFile;
+    try {
+        sourceFile = ts.createSourceFile(
+            'zenith-instance-clone-expression.ts',
+            `const __zenith_expr__ = (${source});`,
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TS
+        );
+    } catch {
+        throw new Error(
+            `[Zenith:Build] Failed to parse component instance expression for deterministic rewriting in ${sourceLabel}.`
+        );
     }
 
+    const rewritten = rewriteSourceFileWithIdentifiers(sourceFile, renameEntries, sourceLabel);
+    const parsed = ts.createSourceFile(
+        'zenith-instance-clone-expression.js',
+        rewritten,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.JS
+    );
+    const statement = parsed.statements.find(ts.isVariableStatement);
+    const declaration = statement?.declarationList?.declarations?.[0];
+    const initializer = declaration?.initializer;
+    if (!initializer) {
+        throw new Error(
+            `[Zenith:Build] Failed to extract rewritten component instance expression in ${sourceLabel}.`
+        );
+    }
+
+    const root = ts.isParenthesizedExpression(initializer) ? initializer.expression : initializer;
+    return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+        .printNode(ts.EmitHint.Unspecified, root, parsed)
+        .trim();
+}
+
+function rewriteIdentifierRefsInStatementSource(input, renameEntries, sourceLabel) {
+    const source = String(input || '');
+    if (!source.trim()) {
+        return source;
+    }
+
+    const ts = loadCloneTypeScriptApi();
     let sourceFile;
     try {
         sourceFile = ts.createSourceFile(
@@ -39,62 +229,11 @@ function replaceIdentifierRefsInStatementSource(input, renameEntries, renamePlan
             ts.ScriptKind.TS
         );
     } catch {
-        return replaceIdentifierRefs(source, renamePlan);
-    }
-
-    const renameMap = new Map(renameEntries);
-    const shouldRenameIdentifier = (node) => {
-        const parent = node.parent;
-        if (!parent) {
-            return true;
-        }
-        if (ts.isPropertyAccessExpression(parent) && parent.name === node) {
-            return false;
-        }
-        if (ts.isPropertyAssignment(parent) && parent.name === node) {
-            return false;
-        }
-        if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
-            return false;
-        }
-        if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) {
-            return false;
-        }
-        return true;
+        throw new Error(
+            `[Zenith:Build] Failed to parse component instance statement source for deterministic rewriting in ${sourceLabel}.`
+        );
     };
-
-    const transformer = (context) => {
-        const visit = (node) => {
-            if (ts.isShorthandPropertyAssignment(node)) {
-                const rewritten = renameMap.get(node.name.text);
-                if (typeof rewritten === 'string' && rewritten.length > 0) {
-                    return ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier(node.name.text),
-                        ts.factory.createIdentifier(rewritten)
-                    );
-                }
-            }
-            if (ts.isIdentifier(node) && shouldRenameIdentifier(node)) {
-                const rewritten = renameMap.get(node.text);
-                if (typeof rewritten === 'string' && rewritten.length > 0 && rewritten !== node.text) {
-                    return ts.factory.createIdentifier(rewritten);
-                }
-            }
-            return ts.visitEachChild(node, visit, context);
-        };
-        return (node) => ts.visitNode(node, visit);
-    };
-
-    const result = ts.transform(sourceFile, [transformer]);
-    try {
-        return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
-            .printFile(result.transformed[0])
-            .trimEnd();
-    } catch {
-        return replaceIdentifierRefs(source, renamePlan);
-    } finally {
-        result.dispose();
-    }
+    return rewriteSourceFileWithIdentifiers(sourceFile, renameEntries, sourceLabel);
 }
 
 function collectRenameTargets(compIr, extractDeclaredIdentifiers) {
@@ -174,8 +313,11 @@ function addApplyMetric(applyMetrics, key, value) {
     applyMetrics[key] = (applyMetrics[key] || 0) + value;
 }
 
-function findNextExpressionIndex(expressions, raw, startIndex) {
-    for (let index = startIndex; index < expressions.length; index++) {
+function findNextExpressionIndex(expressions, raw, claimed) {
+    for (let index = 0; index < expressions.length; index++) {
+        if (claimed.has(index)) {
+            continue;
+        }
         if (expressions[index] === raw) {
             return index;
         }
@@ -183,8 +325,11 @@ function findNextExpressionIndex(expressions, raw, startIndex) {
     return -1;
 }
 
-function findNextRefIndex(refBindings, raw, startIndex) {
-    for (let index = startIndex; index < refBindings.length; index++) {
+function findNextRefIndex(refBindings, raw, claimed) {
+    for (let index = 0; index < refBindings.length; index++) {
+        if (claimed.has(index)) {
+            continue;
+        }
         if (refBindings[index]?.identifier === raw) {
             return index;
         }
@@ -193,21 +338,19 @@ function findNextRefIndex(refBindings, raw, startIndex) {
 }
 
 export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredIdentifiers, resolveStateKeyFromBindings) {
+    // The only permitted downstream clone rewrite is structural instance isolation of
+    // component-local symbols. No string-based semantic reinterpretation is allowed.
     const suffix = `__inst${instanceId}`;
+    const sourceLabel = `component instance ${instanceId}`;
     const cloned = deepClone(compIr);
     const cloneMetadata = getCloneMetadata(compIr, extractDeclaredIdentifiers, resolveStateKeyFromBindings);
     const renameEntries = cloneMetadata.renameTargets.map((name) => [name, `${name}${suffix}`]);
     const renameMap = new Map(renameEntries);
-    const renamePlan = renameEntries
-        .sort((left, right) => right[0].length - left[0].length)
-        .map(([from, to]) => ({
-            from,
-            pattern: new RegExp(`\\b${escapeIdentifier(from)}\\b`, 'g'),
-            to
-        }));
 
     if (Array.isArray(cloned?.expressions)) {
-        cloned.expressions = cloned.expressions.map((expr) => replaceIdentifierRefs(expr, renamePlan));
+        cloned.expressions = cloned.expressions.map((expr) =>
+            rewriteIdentifierRefsInExpressionSource(expr, renameEntries, sourceLabel)
+        );
     }
 
     if (Array.isArray(cloned?.expression_bindings)) {
@@ -217,15 +360,17 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
             }
             return {
                 ...binding,
-                literal: typeof binding.literal === 'string' ? replaceIdentifierRefs(binding.literal, renamePlan) : binding.literal,
+                literal: typeof binding.literal === 'string'
+                    ? rewriteIdentifierRefsInExpressionSource(binding.literal, renameEntries, sourceLabel)
+                    : binding.literal,
                 compiled_expr: typeof binding.compiled_expr === 'string'
-                    ? replaceIdentifierRefs(binding.compiled_expr, renamePlan)
+                    ? rewriteIdentifierRefsInExpressionSource(binding.compiled_expr, renameEntries, sourceLabel)
                     : binding.compiled_expr,
                 component_instance: typeof binding.component_instance === 'string'
-                    ? replaceIdentifierRefs(binding.component_instance, renamePlan)
+                    ? rewriteIdentifierRefsInExpressionSource(binding.component_instance, renameEntries, sourceLabel)
                     : binding.component_instance,
                 component_binding: typeof binding.component_binding === 'string'
-                    ? replaceIdentifierRefs(binding.component_binding, renamePlan)
+                    ? rewriteIdentifierRefsInExpressionSource(binding.component_binding, renameEntries, sourceLabel)
                     : binding.component_binding
             };
         });
@@ -233,7 +378,9 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
 
     if (cloned?.hoisted) {
         if (Array.isArray(cloned.hoisted.declarations)) {
-            cloned.hoisted.declarations = cloned.hoisted.declarations.map((line) => replaceIdentifierRefsInStatementSource(line, renameEntries, renamePlan));
+            cloned.hoisted.declarations = cloned.hoisted.declarations.map((line) =>
+                rewriteIdentifierRefsInStatementSource(line, renameEntries, sourceLabel)
+            );
         }
         if (Array.isArray(cloned.hoisted.functions)) {
             cloned.hoisted.functions = cloned.hoisted.functions.map((name) => renameMap.get(name) || name);
@@ -247,12 +394,16 @@ export function cloneComponentIrForInstance(compIr, instanceId, extractDeclaredI
                     return entry;
                 }
                 const key = typeof entry.key === 'string' ? (renameMap.get(entry.key) || entry.key) : entry.key;
-                const value = typeof entry.value === 'string' ? replaceIdentifierRefs(entry.value, renamePlan) : entry.value;
+                const value = typeof entry.value === 'string'
+                    ? rewriteIdentifierRefsInExpressionSource(entry.value, renameEntries, sourceLabel)
+                    : entry.value;
                 return { ...entry, key, value };
             });
         }
         if (Array.isArray(cloned.hoisted.code)) {
-            cloned.hoisted.code = cloned.hoisted.code.map((line) => replaceIdentifierRefsInStatementSource(line, renameEntries, renamePlan));
+            cloned.hoisted.code = cloned.hoisted.code.map((line) =>
+                rewriteIdentifierRefsInStatementSource(line, renameEntries, sourceLabel)
+            );
         }
     }
 
@@ -283,8 +434,8 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
     const bindings = Array.isArray(pageIr?.expression_bindings) ? pageIr.expression_bindings : [];
     const refBindings = Array.isArray(pageIr?.ref_bindings) ? pageIr.ref_bindings : [];
 
-    let exprCursor = 0;
-    let refCursor = 0;
+    const claimedExpressions = new Set();
+    const claimedRefs = new Set();
 
     for (const plan of occurrencePlans) {
         const sequence = Array.isArray(plan?.expressionSequence) ? plan.expressionSequence : [];
@@ -293,11 +444,12 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 continue;
             }
             const expressionLookupStartedAt = performance.now();
-            const found = findNextExpressionIndex(expressions, item.raw, exprCursor);
+            const found = findNextExpressionIndex(expressions, item.raw, claimedExpressions);
             addApplyMetric(applyMetrics, 'expressionLookupMs', performance.now() - expressionLookupStartedAt);
             if (found === -1) {
                 continue;
             }
+            claimedExpressions.add(found);
             const rewritten = typeof item.rewritten === 'string' && item.rewritten.length > 0
                 ? item.rewritten
                 : item.raw;
@@ -314,15 +466,19 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 const resolved = resolveBindingMetadata(plan.rewrite, item.binding);
                 addApplyMetric(applyMetrics, 'bindingResolutionMs', performance.now() - bindingResolutionStartedAt);
                 if (resolved) {
-                    binding.compiled_expr = resolved.compiled_expr;
+                    if (resolved.compiled_expr === null) {
+                        binding.compiled_expr = null;
+                    } else if (typeof resolved.compiled_expr === 'string' && resolved.compiled_expr.includes('signalMap.get(')) {
+                        binding.compiled_expr = resolved.compiled_expr;
+                    }
                     binding.signal_index = resolved.signal_index;
                     binding.signal_indices = resolved.signal_indices;
                     binding.state_index = resolved.state_index;
                     binding.component_instance = resolved.component_instance;
                     binding.component_binding = resolved.component_binding;
+                    binding.scoped_data_key = resolved.scoped_data_key;
                 }
             }
-            exprCursor = found + 1;
         }
 
         const refSequence = Array.isArray(plan?.refSequence) ? plan.refSequence : [];
@@ -331,13 +487,13 @@ export function applyOccurrenceRewritePlans(pageIr, occurrencePlans, resolveBind
                 continue;
             }
             const refLookupStartedAt = performance.now();
-            const found = findNextRefIndex(refBindings, refItem.raw, refCursor);
+            const found = findNextRefIndex(refBindings, refItem.raw, claimedRefs);
             addApplyMetric(applyMetrics, 'refLookupMs', performance.now() - refLookupStartedAt);
             if (found === -1) {
                 continue;
             }
+            claimedRefs.add(found);
             refBindings[found].identifier = refItem.rewritten;
-            refCursor = found + 1;
         }
     }
 }

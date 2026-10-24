@@ -12,6 +12,10 @@ describe('core package surface', () => {
         expect(Object.keys(PACKAGE_JSON.exports || {})).toEqual([
             '.',
             './config',
+            './config/node',
+            './config/plugins',
+            './config/base-path',
+            './config/images',
             './path',
             './order',
             './hash',

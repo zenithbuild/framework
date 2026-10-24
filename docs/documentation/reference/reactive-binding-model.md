@@ -5,6 +5,9 @@ version: "0.3"
 status: "canonical"
 last_updated: "2026-02-27"
 tags: ["reference", "runtime", "reactivity"]
+section: "Core Concepts"
+sectionOrder: 2
+order: 10
 ---
 
 # Reactive Binding Model
@@ -19,7 +22,7 @@ Definition of Done:
 - Runtime never resolves identifiers by name.
 - No eval/new Function paths exist.
 
-Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/REACTIVE_BINDING_MODEL.md`.
+Canonical source: `packages/runtime/REACTIVE_BINDING_MODEL.md`.
 
 ## State and Derived Contracts
 
@@ -30,8 +33,8 @@ Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/REACTIVE_
 
 ## Effect Boundaries
 
-- `zeneffect(...)` is the reactive side-effect boundary.
-- `zenMount(...)` is the mount/unmount boundary for setup and teardown.
+- `zeneffect(...)` (alias: `effect`) is the canonical reactive side-effect boundary. By default, it defers execution to a microtask.
+- `zenMount(...)` (alias: `mount`) is the single canonical component bootstrap lifecycle hook boundary for setup and teardown.
 - Animation engines (for example GSAP) should be driven from these boundaries and cleaned up on rerun/unmount.
 
 ## Event Contract
@@ -47,4 +50,5 @@ Canonical source: `/Users/judahsullivan/Personal/zenith/zenith-runtime/REACTIVE_
 ## Global Access Guard
 
 Component scripts must not rely on direct `window.*` / `document.*` access patterns.  
-Use `zenWindow()` and `zenDocument()` for SSR-safe global access.
+Use `zenWindow()` and `zenDocument()` (or existing aliases `window()`/`document()`) imported from `@zenithbuild/runtime` for SSR-safe global access.
+

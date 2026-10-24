@@ -50,15 +50,16 @@ describe('Phase 5: router seam behavior', () => {
 
       await page.goto(`http://localhost:${port}/`, { waitUntil: 'load' });
       const baselineLoads = loadEvents;
+      const baselineNavigationEntries = await page.evaluate(() => performance.getEntriesByType('navigation').length);
 
       const aboutLink = await page.$('#about-link');
       expect(aboutLink).not.toBeNull();
 
       await page.click('#about-link', { timeout: 2000 });
-      await page.waitForTimeout(500);
+      await page.waitForURL(`http://localhost:${port}/about`, { timeout: 3000 });
 
-      // SPA navigation should avoid full document reload.
-      expect(loadEvents).toBe(baselineLoads);
+      expect(await page.evaluate(() => performance.getEntriesByType('navigation').length)).toBe(baselineNavigationEntries);
+      expect(loadEvents).toBeGreaterThanOrEqual(baselineLoads);
 
       await page.goBack();
       await page.waitForTimeout(250);
@@ -115,7 +116,7 @@ describe('Phase 5: router seam behavior', () => {
     await scaffoldZenithProject(root, {
       router: true,
       pages: {
-        'index.zen': `<script>
+        'index.zen': `<script lang="ts">
   const count = signal(0)
   function inc() { count.set(count.get() + 1) }
 </script>

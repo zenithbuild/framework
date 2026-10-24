@@ -1,4 +1,4 @@
-# @zenith/router
+# @zenithbuild/router
 
 > Internal Zenith package. The generated router runtime is the authoritative surface here, not a general SPA framework API.
 
@@ -18,3 +18,4 @@
 - Redirects, denies, unmatched routes, non-HTML responses, and runtime failures fall back to browser navigation.
 - Client routing mirrors server route precedence and pathname-based identity.
 - Phase 2 adds awaited lifecycle barriers at `navigation:before-leave`, `navigation:before-swap`, and `navigation:before-enter`.
+- `zenNavigationShell(...)` is the narrow canonical Phase 3 utility for projecting visual shell phase on top of that lifecycle without changing route truth.

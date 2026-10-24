@@ -1,0 +1,95 @@
+<script setup="ts">
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+interface Props {
+  rootRef: any;
+  targetARef?: any;
+  targetBRef?: any;
+  targetCRef?: any;
+  targetDRef?: any;
+  targetERef?: any;
+  targetFRef?: any;
+  mode?: "page" | "scroll";
+  distance?: number;
+  duration?: number;
+  stagger?: number;
+  start?: string;
+}
+
+const incoming = props as Props;
+const fallbackARef = ref<HTMLElement>();
+const fallbackBRef = ref<HTMLElement>();
+const fallbackCRef = ref<HTMLElement>();
+const fallbackDRef = ref<HTMLElement>();
+const fallbackERef = ref<HTMLElement>();
+const fallbackFRef = ref<HTMLElement>();
+const motionTargetARef = incoming.targetARef || fallbackARef;
+const motionTargetBRef = incoming.targetBRef || fallbackBRef;
+const motionTargetCRef = incoming.targetCRef || fallbackCRef;
+const motionTargetDRef = incoming.targetDRef || fallbackDRef;
+const motionTargetERef = incoming.targetERef || fallbackERef;
+const motionTargetFRef = incoming.targetFRef || fallbackFRef;
+const motionMode = incoming.mode === "page" ? "page" : "scroll";
+const motionDistance = typeof incoming.distance === "number" ? incoming.distance : motionMode === "page" ? 18 : 24;
+const motionDuration = typeof incoming.duration === "number" ? incoming.duration : motionMode === "page" ? 0.68 : 0.72;
+const motionStagger = typeof incoming.stagger === "number" ? incoming.stagger : 0.08;
+const motionStart = typeof incoming.start === "string" ? incoming.start : "top 88%";
+
+zenMount((ctx) => {
+  const win = zenWindow();
+  const root = incoming.rootRef?.current as HTMLElement | null;
+  const targets = collectRefs(motionTargetARef, motionTargetBRef, motionTargetCRef, motionTargetDRef, motionTargetERef, motionTargetFRef) as HTMLElement[];
+  if (!win || !root || !targets.length) return;
+
+  if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    gsap.set(targets, { clearProps: "opacity,visibility,transform,willChange" });
+    ctx.cleanup(() => gsap.set(targets, { clearProps: "opacity,visibility,transform,willChange" }));
+    return;
+  }
+
+  gsap.registerPlugin(ScrollTrigger);
+  const context = gsap.context(() => {
+    if (motionMode === "page") {
+      targets.forEach((t) => t.setAttribute("data-route-entrance", "true"));
+      gsap.fromTo(
+        targets,
+        { autoAlpha: 0, y: motionDistance },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: motionDuration,
+          stagger: motionStagger,
+          ease: "power3.out",
+          clearProps: "willChange",
+        },
+      );
+      return;
+    }
+
+    targets.forEach((target) => {
+      gsap.fromTo(
+        target,
+        { autoAlpha: 0, y: motionDistance, willChange: "transform, opacity" },
+        {
+          autoAlpha: 1,
+          y: 0,
+          duration: motionDuration,
+          ease: "power3.out",
+          clearProps: "willChange",
+          scrollTrigger: {
+            trigger: target,
+            start: motionStart,
+            once: true,
+            invalidateOnRefresh: true,
+          },
+        },
+      );
+    });
+  }, root);
+
+  ctx.cleanup(() => context.revert());
+});
+</script>
+
+<span data-motion-controller={motionMode} class="hidden" aria-hidden="true"></span>

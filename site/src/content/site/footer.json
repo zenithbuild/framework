@@ -1,14 +1,14 @@
 {
   "cta": {
-    "title": "BUILD ZENITH",
-    "description": "Zenith compiles your intent into the smallest possible output. No virtual DOM. No runtime framework. Just your application.",
+    "title": "BUILD WITH ZENITH.",
+    "description": "Start with the canonical docs, inspect the source, and build against the same explicit contracts the compiler enforces.",
     "actions": [
       {
-        "label": "Start building",
+        "label": "Read the docs",
         "href": "/docs"
       },
       {
-        "label": "GitHub",
+        "label": "View on GitHub",
         "href": "https://github.com/zenithbuild/framework"
       }
     ]
@@ -16,11 +16,11 @@
   "nav": {
     "brand": {
       "label": "Zenith.",
-      "description": "Deterministic web tooling with compiler-backed runtime and editor contracts kept on the same public surface."
+      "description": "A compiler-first UI framework with explicit routes, reactive primitives, and server-owned application boundaries."
     },
     "groups": [
       {
-        "title": "Categories",
+        "title": "Explore",
         "links": [
           {
             "label": "Home",
@@ -29,7 +29,12 @@
           {
             "label": "About",
             "href": "/about"
-          },
+          }
+        ]
+      },
+      {
+        "title": "Learn",
+        "links": [
           {
             "label": "Documentation",
             "href": "/docs"
@@ -37,52 +42,15 @@
           {
             "label": "Blog",
             "href": "/blog"
-          },
-          {
-            "label": "Changelog",
-            "href": "/changelog"
-          },
-          {
-            "label": "Editor Contract",
-            "href": "/docs#editor-contract"
           }
         ]
       },
       {
-        "title": "Resources",
+        "title": "Source",
         "links": [
           {
             "label": "GitHub",
             "href": "https://github.com/zenithbuild/framework"
-          },
-          {
-            "label": "Release Notes",
-            "href": "/changelog"
-          },
-          {
-            "label": "Editor Tooling",
-            "href": "/docs#editor-contract"
-          },
-          {
-            "label": "Install Guide",
-            "href": "/docs#install-compatibility"
-          }
-        ]
-      },
-      {
-        "title": "Contact",
-        "links": [
-          {
-            "label": "hi@zenithbuild.dev",
-            "href": "mailto:hi@zenithbuild.dev"
-          },
-          {
-            "label": "Press & Media",
-            "href": "mailto:press@zenithbuild.dev"
-          },
-          {
-            "label": "Partnerships",
-            "href": "mailto:partners@zenithbuild.dev"
           }
         ]
       }
@@ -90,6 +58,6 @@
   },
   "meta": {
     "copyrightPrefix": "Zenith Framework ©",
-    "signature": "Designed & Engineered by Zenithbuild"
+    "signature": "Designed and engineered by Zenithbuild"
   }
 }

@@ -17,3 +17,4 @@ Internal mirror of the canonical routing docs:
 - The router owns history writes, scroll restoration, and focus only after a successful soft-nav commit.
 - `zx-router-scroll` is the internal router-to-scroll-controller coordination event.
 - `navigation:before-leave`, `navigation:before-swap`, and `navigation:before-enter` are awaited lifecycle barriers.
+- `zenNavigationShell(...)` may project visual shell phase on top of those barriers only; it may not own route truth or invent new lifecycle authority.

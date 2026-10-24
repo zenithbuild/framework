@@ -1,55 +1,52 @@
 <script lang="ts">
-import Button from "./Button.zen";
 import Links from "./Links.zen";
-import ZenithLogo from "./ZenithLogo.zen";
+import NavDropdown from "./NavDropdown.zen";
 import ThemeToggle from "./ThemeToggle.zen";
-import { gsap } from "gsap";
-import { SplitText } from "gsap/SplitText";
+import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
+import SearchTrigger from "@/components/search/SearchTrigger.zen";
 
-interface Props {
-  content: any;
+interface NavLink {
+  label: string;
+  href: string;
 }
 
-const isOpen = signal(false);
-let isAnimating = false;
+interface Props {
+  content?: {
+    mainLinks?: NavLink[];
+  };
+  currentPath?: string;
+  shellRef?: any;
+  logoTargetRef?: any;
+  linksRef?: any;
+  actionsRef?: any;
+  introGated?: boolean;
+}
 
-const isHeaderVisible = signal(true);
-let lastScrollY = 0;
+interface NavigationWindow extends Window {
+  __zenithNavigationLogoTarget?: HTMLElement;
+}
 
-const wrapper = ref<HTMLDivElement>();
-const shell = ref<HTMLDivElement>();
-const backdrop = ref<HTMLDivElement>();
-const header = ref<HTMLDivElement>();
-const content = ref<HTMLDivElement>();
-const linksContainer = ref<HTMLDivElement>();
-const toggleBtn = ref<HTMLButtonElement>();
-const toggleLabel = ref<HTMLSpanElement>();
-
-const linkHome = ref<HTMLAnchorElement>();
-const linkAbout = ref<HTMLAnchorElement>();
-const linkDocs = ref<HTMLAnchorElement>();
-const linkBlog = ref<HTMLAnchorElement>();
-const linkChangelog = ref<HTMLAnchorElement>();
-const linkGitHub = ref<HTMLAnchorElement>();
-
-const footerYear = ref<HTMLDivElement>();
-const footerTwitter = ref<HTMLAnchorElement>();
-const footerGitHub = ref<HTMLAnchorElement>();
-const footerContract = ref<HTMLAnchorElement>();
-
-let tl: gsap.core.Timeline | null = null;
-let didSyncClosedState = false;
-let labelSplit: SplitText | null = null;
-let splitLinks: SplitText | null = null;
-let splitFooter: SplitText | null = null;
-
-let linkChars: HTMLElement[] | Element[] = [];
-let footerLines: HTMLElement[] | Element[] = [];
-const navigationContent = (props as Props).content;
+const navigationProps = props as Props;
+const navigationContent = navigationProps.content || {};
 const navigationMainLinks = Array.isArray(navigationContent.mainLinks) ? navigationContent.mainLinks : [];
-const navigationFooterLinks = Array.isArray(navigationContent.footerLinks) ? navigationContent.footerLinks : [];
+const navigationCurrentPath = navigationProps.currentPath || "/";
+const navigationIntroGated = navigationProps.introGated === true;
+const localNavigationShellRef = ref<HTMLElement>();
+const localNavigationLogoTargetRef = ref<HTMLElement>();
+const localNavigationLinksRef = ref<HTMLElement>();
+const localNavigationActionsRef = ref<HTMLElement>();
+const mobileNavigationTriggerRef = ref<HTMLButtonElement>();
+const mobileDocsTriggerRef = ref<HTMLButtonElement>();
+const navigationShellRef = localNavigationShellRef;
+const navigationLogoTargetRef = localNavigationLogoTargetRef;
+const navigationLinksRef = localNavigationLinksRef;
+const navigationActionsRef = localNavigationActionsRef;
+const forwardedNavigationShellRef = navigationProps.shellRef;
+const forwardedNavigationLogoTargetRef = navigationProps.logoTargetRef;
+const forwardedNavigationLinksRef = navigationProps.linksRef;
+const forwardedNavigationActionsRef = navigationProps.actionsRef;
 
-function findLinkByHref(links: any[], href: string, fallbackLabel: string) {
+function findLinkByHref(links: NavLink[], href: string, fallbackLabel: string) {
   const foundLink = links.find((link) => link && link.href === href);
   if (foundLink) {
     return foundLink;
@@ -62,449 +59,193 @@ function findLinkByHref(links: any[], href: string, fallbackLabel: string) {
 }
 
 const navHomeLink = findLinkByHref(navigationMainLinks, "/", "Home");
-const navAboutLink = findLinkByHref(navigationMainLinks, "/about", "About");
 const navDocsLink = findLinkByHref(navigationMainLinks, "/docs", "Docs");
 const navBlogLink = findLinkByHref(navigationMainLinks, "/blog", "Blog");
-const navChangelogLink = findLinkByHref(navigationMainLinks, "/changelog", "Changelog");
+const navAboutLink = findLinkByHref(navigationMainLinks, "/about", "About");
 const navGitHubLink = findLinkByHref(navigationMainLinks, "https://github.com/zenithbuild/framework", "GitHub");
-const navTwitterLink = findLinkByHref(navigationFooterLinks, "https://twitter.com/zenithbuild", "Twitter");
-const navFooterGitHubLink = findLinkByHref(navigationFooterLinks, "https://github.com/zenithbuild/framework", "GitHub");
-const navContractLink = findLinkByHref(navigationFooterLinks, "/docs#editor-contract", "Contract");
 
-function setExpanded(expanded: boolean) {
-  const btn = toggleBtn.current || (toggleLabel.current ? (toggleLabel.current.closest("button") as HTMLButtonElement) : null);
-  if (!btn) return;
-  toggleBtn.current = btn;
-  btn.setAttribute("aria-label", "Toggle menu");
-  btn.setAttribute("aria-controls", "site-menu-panel");
-  btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+const navLinkBase = "border-b py-1 font-mono text-[11px] uppercase tracking-[0.18em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
+const mobileLinkBase = "border-b border-border py-4 font-heading text-2xl font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
+
+function normalizePath(pathname: string) {
+  if (pathname === "/") return "/";
+  return pathname.replace(/\/+$/, "") || "/";
 }
 
-function clearToggleSplit() {
-  if (labelSplit) {
-    labelSplit.revert();
-    labelSplit = null;
-  }
+function isActivePath(href: string) {
+  const current = normalizePath(navigationCurrentPath);
+  const target = normalizePath(href);
+  return target === "/" ? current === "/" : current === target || current.startsWith(`${target}/`);
 }
 
-function syncToggleLabel(nextText: string, immediate = false) {
-  const label = toggleLabel.current;
-  if (!label) return;
+function navLinkClass(href: string) {
+  return isActivePath(href)
+    ? `${navLinkBase} border-primary text-foreground`
+    : `${navLinkBase} border-transparent text-muted-foreground hover:border-border hover:text-foreground`;
+}
 
-  const applyFreshSplit = () => {
-    clearToggleSplit();
-    label.textContent = nextText;
-    labelSplit = new SplitText(label, { type: "chars" });
-    return labelSplit.chars;
-  };
+state mobileOpen = false;
+state mobileDocsOpen = false;
 
-  if (immediate) {
-    const chars = applyFreshSplit();
-    gsap.set(chars, { yPercent: 0, opacity: 1 });
+function toggleMobileMenu() {
+  mobileOpen = !mobileOpen;
+  if (!mobileOpen) mobileDocsOpen = false;
+}
+
+function closeMobileMenu() {
+  mobileOpen = false;
+  mobileDocsOpen = false;
+}
+
+function toggleMobileDocs() {
+  mobileDocsOpen = !mobileDocsOpen;
+}
+
+function handleNavigationKeydown(event: KeyboardEvent) {
+  if (event.key !== "Escape") return;
+  if (mobileDocsOpen) {
+    event.preventDefault();
+    mobileDocsOpen = false;
+    mobileDocsTriggerRef.current?.focus();
     return;
   }
-
-  const previousChars = labelSplit?.chars || [];
-  if (previousChars.length > 0) {
-    gsap.killTweensOf(previousChars);
-    gsap.to(previousChars, {
-      yPercent: -120,
-      opacity: 0,
-      duration: 0.18,
-      stagger: 0.01,
-      ease: "power2.in",
-      onComplete: () => {
-        const chars = applyFreshSplit();
-        gsap.set(chars, { yPercent: 120, opacity: 0 });
-        gsap.to(chars, {
-          yPercent: 0,
-          opacity: 1,
-          duration: 0.24,
-          stagger: 0.012,
-          ease: "power2.out"
-        });
-      }
-    });
-    return;
-  }
-
-  const chars = applyFreshSplit();
-  gsap.set(chars, { yPercent: 120, opacity: 0 });
-  gsap.to(chars, {
-    yPercent: 0,
-    opacity: 1,
-    duration: 0.24,
-    stagger: 0.012,
-    ease: "power2.out"
-  });
-}
-
-function measure() {
-  const win = zenWindow();
-  if (!win) return { closed: { width: "50%", height: 64, top: 24, r: 32 }, open: { width: 400, height: 400, top: 24, r: 24 } };
-  const vw = win.innerWidth;
-  const vh = win.innerHeight;
-  const inset = vw < 768 ? 16 : 24;
-  return {
-    closed: { width: "50%", height: 64, top: 24, r: 32 },
-    open: { width: vw - inset * 2, height: vh - inset * 2, top: inset, r: 24 },
-  };
-}
-
-function applyClosed(immediate = true) {
-  if (!shell.current || !backdrop.current || !content.current) return;
-  const doc = zenDocument();
-  const m = measure();
-
-  gsap.killTweensOf([
-    shell.current,
-    backdrop.current,
-    content.current,
-    ...linkChars,
-    ...footerLines
-  ]);
-
-  if (immediate) {
-    splitLinks?.revert();
-    splitFooter?.revert();
-    linkChars = [];
-    footerLines = [];
-    splitLinks = null;
-    splitFooter = null;
-  }
-
-  gsap.set(backdrop.current, { opacity: 0, pointerEvents: "none" });
-  gsap.set(content.current, { display: "none", pointerEvents: "none" });
-
-  const setter = immediate ? gsap.set : gsap.to;
-  setter(shell.current, {
-    width: m.closed.width,
-    height: m.closed.height,
-    top: m.closed.top,
-    borderRadius: m.closed.r,
-    duration: immediate ? 0 : 0.8,
-    ease: "expo.inOut",
-    overwrite: true
-  });
-
-  if (doc?.body) doc.body.style.overflow = "";
-  setExpanded(false);
-}
-
-function applyOpenPrep() {
-  if (!backdrop.current || !content.current) return;
-  const doc = zenDocument();
-  gsap.set(backdrop.current, { pointerEvents: "auto" });
-  gsap.set(content.current, { display: "flex", pointerEvents: "auto" });
-  if (doc?.body) doc.body.style.overflow = "hidden";
-  setExpanded(true);
-}
-
-function animateOpen() {
-  isAnimating = true;
-  if (!shell.current || !backdrop.current || !content.current) {
-    isAnimating = false;
-    return;
-  }
-
-  const m = measure();
-  
-  // Set to flex and shell to full size BEFORE splitting so lines measure correctly
-  applyOpenPrep();
-  gsap.set(shell.current, {
-    width: m.open.width,
-    height: m.open.height,
-    top: m.open.top,
-    borderRadius: m.open.r,
-  });
-
-  const links = collectRefs(linkHome, linkAbout, linkDocs, linkBlog, linkChangelog, linkGitHub);
-  const footer = collectRefs(footerTwitter, footerGitHub, footerContract, footerYear);
-
-  splitLinks?.revert();
-  splitFooter?.revert();
-
-  splitLinks = new SplitText(links, { type: "chars" });
-  splitFooter = new SplitText(footer, { type: "lines,words" });
-  linkChars = splitLinks.chars;
-  footerLines = splitFooter.lines;
-
-  // Reset shell back to closed state instantly for the animation start
-  gsap.set(shell.current, {
-    width: m.closed.width,
-    height: m.closed.height,
-    top: m.closed.top,
-    borderRadius: m.closed.r
-  });
-
-  tl?.kill();
-  gsap.killTweensOf([
-    shell.current,
-    backdrop.current,
-    content.current,
-    ...linkChars,
-    ...footerLines,
-  ]);
-
-  gsap.set(backdrop.current, { opacity: 0 });
-  gsap.set(linkChars, { opacity: 0, yPercent: 40, rotationX: -20 });
-  gsap.set(footerLines, { opacity: 0, y: 15 });
-
-  tl = gsap.timeline({
-    onComplete: () => {
-      isAnimating = false;
-      tl = null;
-    }
-  });
-
-  tl.set(shell.current, {
-    width: m.closed.width,
-    height: m.closed.height,
-    top: m.closed.top,
-    borderRadius: m.closed.r
-  }, 0)
-    .to(backdrop.current, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0)
-    // Slower, smoother easing for menu shell
-    .to(shell.current, {
-      width: m.open.width,
-      height: m.open.height,
-      top: m.open.top,
-      borderRadius: m.open.r,
-      duration: 1.0,
-      ease: "expo.inOut"
-    }, 0)
-    .to(linkChars, { 
-       opacity: 1, 
-       yPercent: 0, 
-       rotationX: 0, 
-       duration: 0.8, 
-       stagger: 0.015, 
-       ease: "expo.out" 
-    }, 0.35)
-    .to(footerLines, { 
-       opacity: 1, 
-       y: 0, 
-       duration: 0.7, 
-       stagger: 0.03, 
-       ease: "expo.out" 
-    }, 0.5);
-}
-
-function animateClose() {
-  isAnimating = true;
-  if (!shell.current || !backdrop.current || !content.current) {
-    isAnimating = false;
-    return;
-  }
-
-  const m = measure();
-
-  tl?.kill();
-  gsap.killTweensOf([
-    shell.current,
-    backdrop.current,
-    content.current,
-    ...linkChars,
-    ...footerLines,
-  ]);
-
-  setExpanded(false);
-  tl = gsap.timeline({
-    onComplete: () => {
-      isAnimating = false;
-      applyClosed(true);
-      splitLinks?.revert();
-      splitFooter?.revert();
-      linkChars = [];
-      footerLines = [];
-      splitLinks = null;
-      splitFooter = null;
-      tl = null;
-    }
-  });
-
-  tl.to(linkChars, { opacity: 0, yPercent: -20, duration: 0.35, stagger: 0.005, ease: "power3.in" }, 0)
-    .to(footerLines, { opacity: 0, y: -10, duration: 0.3, stagger: 0.01, ease: "power3.in" }, 0)
-    .to(backdrop.current, { opacity: 0, duration: 0.4, ease: "power2.in" }, 0.1)
-    .to(shell.current, {
-      width: m.closed.width,
-      height: m.closed.height,
-      top: m.closed.top,
-      borderRadius: m.closed.r,
-      duration: 0.9,
-      ease: "expo.inOut"
-    }, 0.1);
-}
-
-function toggleMenu() {
-  isOpen.set(!isOpen.get());
-}
-
-function handleEscape() {
-  if (!isOpen.get()) return;
-  isOpen.set(false);
-}
-
-function handleMenuLinkPress() {
-  if (!isOpen.get()) return;
-  isOpen.set(false);
+  if (!mobileOpen) return;
+  event.preventDefault();
+  mobileOpen = false;
+  mobileNavigationTriggerRef.current?.focus();
 }
 
 zenMount((ctx) => {
-  gsap.registerPlugin(SplitText);
-  if (!shell.current || !backdrop.current || !content.current) return;
+  const win = zenWindow() as NavigationWindow | null;
+  const logoTarget = navigationLogoTargetRef.current || null;
+  if (!win || !logoTarget) return;
+  if (forwardedNavigationShellRef) forwardedNavigationShellRef.current = navigationShellRef.current || null;
+  if (forwardedNavigationLogoTargetRef) forwardedNavigationLogoTargetRef.current = logoTarget;
+  if (forwardedNavigationLinksRef) forwardedNavigationLinksRef.current = navigationLinksRef.current || null;
+  if (forwardedNavigationActionsRef) forwardedNavigationActionsRef.current = navigationActionsRef.current || null;
+  logoTarget.setAttribute("data-navigation-logo-runtime", "true");
+  win.__zenithNavigationLogoTarget = logoTarget;
 
-  setExpanded(false);
-  applyClosed(true);
-  syncToggleLabel("menu", true);
-
-  const win = zenWindow();
-  const doc = zenDocument();
-  if (!win || !doc) return;
-
-  lastScrollY = win.scrollY;
-
-  const offResize = zenResize(() => {
-    if (!isOpen.get() && shell.current) {
-      const m = measure();
-      gsap.set(shell.current, {
-        width: m.closed.width,
-        height: m.closed.height,
-        top: m.closed.top,
-        borderRadius: m.closed.r
-      });
-    }
-  });
-
-  const offScroll = zenOn(win, "scroll", () => {
-    if (isOpen.get()) return;
-    const currentScrollY = Math.max(0, win.scrollY || doc.documentElement.scrollTop);
-    const scrollDelta = currentScrollY - lastScrollY;
-
-    // Only hide if we've scrolled down past a reasonable threshold
-    if (scrollDelta > 10 && currentScrollY > 100) {
-      if (isHeaderVisible.get()) isHeaderVisible.set(false);
-    } else if (scrollDelta < -20 || currentScrollY < 20) {
-      // Show immediately on significant scroll up or if we're at the very top
-      if (!isHeaderVisible.get()) isHeaderVisible.set(true);
-    }
-
-    lastScrollY = currentScrollY;
-  }, { passive: true });
-
-  ctx.cleanup(offResize);
-  ctx.cleanup(offScroll);
   ctx.cleanup(() => {
-    tl?.kill();
-    if (shell.current) gsap.killTweensOf(shell.current);
-    if (backdrop.current) gsap.killTweensOf(backdrop.current);
-    clearToggleSplit();
-    splitLinks?.revert();
-    splitFooter?.revert();
-    const doc = zenDocument();
-    if (doc?.body) doc.body.style.overflow = "";
+    logoTarget.removeAttribute("data-navigation-logo-runtime");
+    if (forwardedNavigationShellRef) forwardedNavigationShellRef.current = null;
+    if (forwardedNavigationLogoTargetRef) forwardedNavigationLogoTargetRef.current = null;
+    if (forwardedNavigationLinksRef) forwardedNavigationLinksRef.current = null;
+    if (forwardedNavigationActionsRef) forwardedNavigationActionsRef.current = null;
+    if (win.__zenithNavigationLogoTarget === logoTarget) delete win.__zenithNavigationLogoTarget;
   });
 });
 
-zeneffect([isOpen], () => {
-  if (!didSyncClosedState) {
-    didSyncClosedState = true;
-    syncToggleLabel("menu", true);
-    applyClosed(true);
-    return;
+const documentationDropdownItems = [
+  {
+    label: "Documentation",
+    href: "/docs",
+    description: "Browse the framework concepts and reference map."
+  },
+  {
+    label: "Getting started",
+    href: "/docs/getting-started",
+    description: "Install Zenith and build a first explicit component."
+  },
+  {
+    label: "Events and refs",
+    href: "/docs/getting-started#events-and-refs",
+    description: "Use canonical bindings and DOM ownership patterns."
   }
-  if (!isOpen.get()) {
-    syncToggleLabel("menu");
-    animateClose();
-    return;
-  }
-
-  syncToggleLabel("close");
-  isHeaderVisible.set(true); // Ensure visible when opening
-  animateOpen();
-});
-
-zeneffect([isHeaderVisible, isOpen], () => {
-  if (!shell.current) return;
-
-  // When menu is open, it MUST be visible
-  const shouldShow = isOpen.get() || isHeaderVisible.get();
-
-  gsap.to(shell.current, {
-    y: shouldShow ? 0 : -100,
-    xPercent: -50,
-    duration: 0.45,
-    ease: "power2.out",
-    overwrite: "auto"
-  });
-});
+];
 </script>
 
-<div ref={wrapper} class="fixed inset-0 z-50 pointer-events-none" on:esc={handleEscape}>
-  <div
-    ref={backdrop}
-    data-testid="nav-backdrop"
-    class="absolute inset-0 bg-foreground/40 backdrop-blur-sm opacity-0 pointer-events-none"
-    on:click={toggleMenu}
-  ></div>
-
-  <div
-    ref={shell}
-    data-testid="nav-shell"
-    class="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-auto bg-background/95 border border-border shadow-2xl backdrop-blur-3xl overflow-hidden"
-    style="top: 24px; width: 50%; height: 64px; border-radius: 32px;"
-  >
-    <div ref={header} class="absolute top-0 left-0 flex h-16 w-full items-center justify-between px-6 z-20">
-      <Links href="/" class="flex flex-shrink-0 items-center drop-shadow-sm transition-transform hover:scale-105" ariaLabel="Home">
-        <div class="h-7 w-7 text-foreground">
-          <ZenithLogo />
-        </div>
+<header
+  ref={localNavigationShellRef}
+  data-intro-gated="true"
+  data-nav-shell="true"
+  style={navigationIntroGated ? "opacity:0;visibility:hidden;pointer-events:none;" : undefined}
+  class="fixed inset-x-0 top-0 z-50 border-b border-border/70 bg-background/95 text-foreground backdrop-blur-xl"
+  on:keydown={handleNavigationKeydown}
+>
+  <nav class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="Primary">
+    <span
+      ref={localNavigationLogoTargetRef}
+      data-nav-logo-target="true"
+      class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+    >
+      <Links
+        href={navHomeLink.href}
+        ariaLabel="Zenith home"
+        class="group grid h-10 w-10 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+      >
+        <ZenithNavigationMark />
       </Links>
+    </span>
 
-      <div class="flex items-center gap-2">
-        <Button
-          elementRef={toggleBtn}
-          type="button"
-          variant="ghost"
-          ariaLabel="Toggle menu"
-          ariaControls="site-menu-panel"
-          onPress={toggleMenu}
-          class="min-w-[88px] border-transparent bg-muted/50 px-4 py-2 text-foreground hover:bg-secondary disabled:opacity-70"
-        >
-          <span
-            ref={toggleLabel}
-            data-testid="nav-toggle-label"
-            class="relative z-10 block overflow-hidden font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-foreground"
-          >menu</span>
-        </Button>
+    <div ref={localNavigationLinksRef} class="hidden items-center gap-7 lg:flex">
+      <Links href={navHomeLink.href} ariaCurrent={isActivePath(navHomeLink.href) ? "page" : undefined} class={navLinkClass(navHomeLink.href)}>{navHomeLink.label}</Links>
+      <NavDropdown label="Docs" items={documentationDropdownItems} active={isActivePath(navDocsLink.href)} />
+      <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={navLinkClass(navBlogLink.href)}>{navBlogLink.label}</Links>
+      <Links href={navAboutLink.href} ariaCurrent={isActivePath(navAboutLink.href) ? "page" : undefined} class={navLinkClass(navAboutLink.href)}>{navAboutLink.label}</Links>
+    </div>
 
+    <div ref={localNavigationActionsRef} class="flex items-center justify-end gap-3" data-nav-actions="true">
+      <SearchTrigger scope="global" label="Search" />
+      <Links
+        href={navGitHubLink.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hidden rounded-full border border-border bg-card px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:inline-flex"
+      >
+        {navGitHubLink.label}
+      </Links>
+      <span data-nav-theme-toggle="true" class="inline-flex">
         <ThemeToggle />
-      </div>
+      </span>
+      <button
+        ref={mobileNavigationTriggerRef}
+        type="button"
+        data-mobile-nav-trigger="true"
+        aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={mobileOpen ? "true" : "false"}
+        aria-controls="mobile-navigation"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring lg:hidden"
+        on:click={toggleMobileMenu}
+      >
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d={mobileOpen ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"} />
+        </svg>
+      </button>
     </div>
+  </nav>
 
-    <div id="site-menu-panel" ref={content} class="absolute inset-0 pt-32 px-8 md:px-16 flex flex-col pointer-events-none" style="display: none;">
-      <div ref={linksContainer} class="pointer-events-auto flex-1 flex flex-col justify-center">
-        <nav class="flex flex-col space-y-4 md:space-y-6">
-          <Links elementRef={linkHome} href={navHomeLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navHomeLink.label}<span class="text-primary">.</span></Links>
-          <Links elementRef={linkAbout} href={navAboutLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navAboutLink.label}<span class="text-primary">.</span></Links>
-          <Links elementRef={linkDocs} href={navDocsLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navDocsLink.label}<span class="text-primary">.</span></Links>
-          <Links elementRef={linkBlog} href={navBlogLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navBlogLink.label}<span class="text-primary">.</span></Links>
-          <Links elementRef={linkChangelog} href={navChangelogLink.href} onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navChangelogLink.label}<span class="text-primary">.</span></Links>
-          <Links elementRef={linkGitHub} href={navGitHubLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="block w-max px-2 py-1 text-6xl md:text-8xl font-[var(--zen-font-heading)] font-medium tracking-tight text-foreground">{navGitHubLink.label}<span class="text-primary">.</span></Links>
-        </nav>
-      </div>
-
-      <div class="pb-10 md:pb-16 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
-        <div class="flex flex-wrap gap-x-8 gap-y-4">
-          <Links elementRef={footerTwitter} href={navTwitterLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navTwitterLink.label}</Links>
-          <Links elementRef={footerGitHub} href={navFooterGitHubLink.href} target="_blank" rel="noopener" onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navFooterGitHubLink.label}</Links>
-          <Links elementRef={footerContract} href={navContractLink.href} onClick={handleMenuLinkPress} class="px-2 py-1 text-xs tracking-[0.15em] uppercase font-mono text-muted-foreground">{navContractLink.label}</Links>
+  <div
+    id="mobile-navigation"
+    aria-hidden={mobileOpen ? "false" : "true"}
+    inert={mobileOpen ? undefined : true}
+    class={mobileOpen ? "border-t border-border bg-background px-4 pb-6 pt-2 sm:px-6 lg:hidden" : "hidden"}
+  >
+    <nav class="mx-auto grid w-full max-w-7xl" aria-label="Mobile primary">
+      <Links href={navHomeLink.href} ariaCurrent={isActivePath(navHomeLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navHomeLink.label}</Links>
+      <div class="border-b border-border">
+        <button
+          ref={mobileDocsTriggerRef}
+          type="button"
+          data-mobile-nav-disclosure="docs"
+          aria-expanded={mobileDocsOpen ? "true" : "false"}
+          aria-controls="mobile-docs-navigation"
+          class="flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left font-heading text-2xl font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+          on:click={toggleMobileDocs}
+        >
+          <span>{navDocsLink.label}</span>
+          <svg class={mobileDocsOpen ? "h-4 w-4 rotate-180" : "h-4 w-4"} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+          </svg>
+        </button>
+        <div id="mobile-docs-navigation" data-mobile-nav-panel="docs" aria-hidden={mobileDocsOpen ? "false" : "true"} inert={mobileDocsOpen ? undefined : true} class={mobileDocsOpen ? "grid pb-4" : "hidden"}>
+          <Links href={documentationDropdownItems[0].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[0].label}</Links>
+          <Links href={documentationDropdownItems[1].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[1].label}</Links>
+          <Links href={documentationDropdownItems[2].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[2].label}</Links>
         </div>
-
-        <div ref={footerYear} class="text-[10px] md:text-xs font-mono text-muted-foreground uppercase tracking-[0.15em]">
-          Zenith Framework © {new Date().getFullYear()}
-        </div>
       </div>
-    </div>
+      <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navBlogLink.label}</Links>
+      <Links href={navAboutLink.href} ariaCurrent={isActivePath(navAboutLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navAboutLink.label}</Links>
+    </nav>
   </div>
-</div>
+</header>

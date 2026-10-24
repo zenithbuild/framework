@@ -1,21 +1,24 @@
 //! Utility functions for the bundler.
 //!
 //! - Virtual module ID construction and parsing
-//! - JS string escaping (injection-safe)
+//! - JS literal serialization through compiler-owned helpers
 //! - Post-build validation helpers
 
 use regex::Regex;
 
 use crate::{BundleError, CompilerOutput, Diagnostic, DiagnosticLevel};
-use std::collections::BTreeMap;
 use zenith_compiler::deterministic::sha256_hex;
+use zenith_compiler::js_serialize::{serialize_js_string_literal, serialize_js_template_literal};
 use zenith_compiler::script::ExtractedStyleBlock;
 
 use oxc_allocator::Allocator;
-use oxc_ast::{ast, VisitMut};
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::Parser;
 use oxc_span::SourceType;
+
+#[path = "utils_import_rewrite.rs"]
+mod import_rewrite;
+pub use self::import_rewrite::rewrite_js_imports_ast;
 
 // ---------------------------------------------------------------------------
 // Virtual Module IDs
@@ -101,55 +104,6 @@ pub fn reject_external_zenith_import(specifier: &str) -> Result<(), BundleError>
 /// determinism guarantees may be invalidated.
 pub const EXPECTED_ROLLDOWN_COMMIT: &str = "67a1f58";
 
-// ---------------------------------------------------------------------------
-// JS String Escaping
-// ---------------------------------------------------------------------------
-
-/// Escape a string for safe embedding inside a JS template literal (backtick string).
-/// Prevents injection by escaping backticks, backslashes, and `${`.
-pub fn escape_js_template_literal(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 16);
-    let chars: Vec<char> = s.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        match chars[i] {
-            '\\' => {
-                out.push_str("\\\\");
-            }
-            '`' => {
-                out.push_str("\\`");
-            }
-            '$' if i + 1 < len && chars[i + 1] == '{' => {
-                out.push_str("\\${");
-                i += 1; // skip the '{'
-            }
-            c => {
-                out.push(c);
-            }
-        }
-        i += 1;
-    }
-    out
-}
-
-/// Escape a string for safe embedding inside a JS double-quoted string literal.
-pub fn escape_js_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 16);
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c => out.push(c),
-        }
-    }
-    out
-}
-
 /// Clean a path string by resolving . and .. components purely textually.
 /// Does NOT touch the filesystem.
 pub fn clean_path(path: &str) -> String {
@@ -186,25 +140,107 @@ pub fn clean_path(path: &str) -> String {
 /// - `__zenith_expr` — the expression table
 /// - A default export function (hydration stub)
 pub fn generate_virtual_entry(output: &CompilerOutput) -> String {
-    let html_escaped = escape_js_template_literal(&output.html);
+    let html_literal = serialize_js_template_literal(&output.html);
 
     let expr_items: Vec<String> = output
         .expressions
         .iter()
-        .map(|e| format!("\"{}\"", escape_js_string(e)))
+        .map(|e| serialize_js_string_literal(e))
         .collect();
 
     let expr_array = expr_items.join(", ");
 
     format!(
-        r#"export const __zenith_html = `{}`;
+        r#"export const __zenith_html = {};
 export const __zenith_expr = [{}];
 export const __zenith_contract = "v0";
 export default function __zenith_page() {{
   return {{ html: __zenith_html, expressions: __zenith_expr, contract: __zenith_contract }};
 }}"#,
-        html_escaped, expr_array
+        html_literal, expr_array
     )
+}
+
+/// Emit a runtime expression function through AST parse/codegen instead of
+/// splicing compiler output directly into generated JS.
+pub fn emit_runtime_expression_function(compiled_expr: &str) -> Result<String, String> {
+    let uses_signal_map = expression_references_identifier(compiled_expr, "signalMap");
+    let uses_params = expression_references_identifier(compiled_expr, "params");
+    let uses_props = expression_references_identifier(compiled_expr, "props");
+    let uses_data = expression_references_identifier(compiled_expr, "data");
+    let uses_ssr = expression_references_identifier(compiled_expr, "ssr");
+    let uses_ssr_data = expression_references_identifier(compiled_expr, "ssrData");
+    let uses_component_bindings =
+        expression_references_identifier(compiled_expr, "componentBindings");
+    let needs_ssr_data = uses_ssr_data || uses_data || uses_ssr;
+
+    let mut source = String::new();
+    source.push_str("const __zenith_expr_fn = function(__ctx) {\n");
+    if uses_signal_map {
+        source.push_str("  const signalMap = __ctx.signalMap;\n");
+    }
+    if uses_params {
+        source.push_str("  const params = __ctx.params;\n");
+    }
+    if uses_props {
+        source.push_str("  const props = __ctx.props;\n");
+    }
+    if needs_ssr_data {
+        source.push_str("  const ssrData = __ctx.ssrData;\n");
+    }
+    if uses_data {
+        source.push_str("  const data = ssrData;\n");
+    }
+    if uses_ssr {
+        source.push_str("  const ssr = ssrData;\n");
+    }
+    if uses_component_bindings {
+        source.push_str("  const componentBindings = __ctx.componentBindings;\n");
+    }
+    source.push_str("  return (");
+    source.push_str(compiled_expr);
+    source.push_str(");\n};\n");
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::default().with_module(true);
+    let parser = Parser::new(&allocator, &source, source_type);
+    let parse_result = parser.parse();
+
+    if !parse_result.errors.is_empty() {
+        let errs = parse_result
+            .errors
+            .iter()
+            .map(|error| format!("{error}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(format!(
+            "failed to emit runtime expression function from compiler expression:\n{}",
+            errs
+        ));
+    }
+
+    let codegen = Codegen::<false>::new(&source, CodegenOptions::default());
+    let compiled = codegen.build(&parse_result.program);
+    let rendered = compiled.source_text.trim();
+    let prefix = "const __zenith_expr_fn = ";
+    let initializer = rendered
+        .strip_prefix(prefix)
+        .and_then(|value| value.strip_suffix(';'))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            "failed to extract canonical runtime expression function source".to_string()
+        })?;
+
+    Ok(initializer.to_string())
+}
+
+fn expression_references_identifier(compiled_expr: &str, identifier: &str) -> bool {
+    let pattern = format!(r"\b{}\b", regex::escape(identifier));
+    match Regex::new(&pattern) {
+        Ok(re) => re.is_match(compiled_expr),
+        Err(_) => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -400,245 +436,6 @@ pub fn stable_hash_8(content: &str) -> String {
     format!("{normalized:08x}")
 }
 
-// ---------------------------------------------------------------------------
-// AST Rewriting
-// ---------------------------------------------------------------------------
-
-/// Parse JS source and rewrite import specifiers based on a replacement map.
-///
-/// Use `oxc` for robust AST-based transformation.
-/// - Rewrites static `ImportDeclaration` sources.
-/// - Rewrites dynamic `import('...')` sources if they are string literals.
-/// - Preserves everything else (comments, formatting as much as codegen allows).
-struct ImportRewriter<'a> {
-    replacements: &'a BTreeMap<String, String>,
-}
-
-impl<'a> VisitMut<'a> for ImportRewriter<'a> {
-    fn visit_import_declaration(&mut self, decl: &mut ast::ImportDeclaration<'a>) {
-        let spec = decl.source.value.as_str();
-        if let Some(replacement) = self.replacements.get(spec) {
-            decl.source.value = oxc_span::Atom::from(replacement.as_str());
-        }
-    }
-
-    fn visit_export_named_declaration(&mut self, decl: &mut ast::ExportNamedDeclaration<'a>) {
-        if let Some(inner_decl) = &mut decl.declaration {
-            self.visit_declaration(inner_decl);
-        }
-        if let Some(source_lit) = &mut decl.source {
-            let spec = source_lit.value.as_str();
-            if let Some(replacement) = self.replacements.get(spec) {
-                source_lit.value = oxc_span::Atom::from(replacement.as_str());
-            }
-        }
-    }
-
-    fn visit_export_all_declaration(&mut self, decl: &mut ast::ExportAllDeclaration<'a>) {
-        let spec = decl.source.value.as_str();
-        if let Some(replacement) = self.replacements.get(spec) {
-            decl.source.value = oxc_span::Atom::from(replacement.as_str());
-        }
-    }
-
-    fn visit_import_expression(&mut self, expr: &mut ast::ImportExpression<'a>) {
-        if let ast::Expression::StringLiteral(lit) = &mut expr.source {
-            let spec = lit.value.as_str();
-            if let Some(replacement) = self.replacements.get(spec) {
-                lit.value = oxc_span::Atom::from(replacement.as_str());
-            }
-        }
-        self.visit_expression(&mut expr.source);
-        for argument in expr.arguments.iter_mut() {
-            self.visit_expression(argument);
-        }
-    }
-}
-
-pub fn rewrite_js_imports_ast(
-    source: &str,
-    replacements: &BTreeMap<String, String>,
-) -> Result<String, String> {
-    if replacements.is_empty() {
-        return Ok(source.to_string());
-    }
-
-    let allocator = Allocator::default();
-    let source_type = SourceType::default().with_module(true);
-
-    let parser = Parser::new(&allocator, source, source_type);
-    let parse_result = parser.parse();
-
-    if !parse_result.errors.is_empty() {
-        let errs = parse_result
-            .errors
-            .iter()
-            .map(|e| format!("{e}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(format!("Failed to parse JS for rewriting:\n{}", errs));
-    }
-
-    let mut program = parse_result.program;
-
-    let mut rewriter = ImportRewriter { replacements };
-    rewriter.visit_program(&mut program);
-
-    let codegen = Codegen::<false>::new(source, CodegenOptions::default());
-    let compiled = codegen.build(&program);
-
-    Ok(compiled.source_text)
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_virtual_entry_id() {
-        assert_eq!(virtual_entry_id("home"), "\0zenith:entry:home");
-    }
-
-    #[test]
-    fn test_virtual_css_id() {
-        assert_eq!(virtual_css_id("home"), "\0zenith:css:home");
-    }
-
-    #[test]
-    fn test_extract_page_id() {
-        assert_eq!(extract_page_id("\0zenith:entry:home"), Some("home"));
-        assert_eq!(extract_page_id("\0zenith:css:about"), Some("about"));
-        assert_eq!(extract_page_id("other"), None);
-    }
-
-    #[test]
-    fn test_is_zen_file() {
-        assert!(is_zen_file("page.zen"));
-        assert!(is_zen_file("/foo/bar.zen"));
-        assert!(!is_zen_file("page.tsx"));
-    }
-
-    #[test]
-    fn test_escape_js_template_literal() {
-        assert_eq!(escape_js_template_literal("hello"), "hello");
-        assert_eq!(escape_js_template_literal("a`b"), "a\\`b");
-        assert_eq!(escape_js_template_literal("${x}"), "\\${x}");
-        assert_eq!(escape_js_template_literal("a\\b"), "a\\\\b");
-    }
-
-    #[test]
-    fn test_escape_js_string() {
-        assert_eq!(escape_js_string(r#"he said "hi""#), r#"he said \"hi\""#);
-        assert_eq!(escape_js_string("line1\nline2"), "line1\\nline2");
-    }
-
-    #[test]
-    fn test_canonicalize_page_id() {
-        assert_eq!(canonicalize_page_id("index.zen"), "index");
-        assert_eq!(canonicalize_page_id("/pages/About.zen"), "about");
-    }
-
-    #[test]
-    fn test_validate_expressions_match() {
-        let compiled = vec!["a".into(), "b".into()];
-        let metadata = vec!["a".into(), "b".into()];
-        assert!(validate_expressions(&compiled, &metadata).is_ok());
-    }
-
-    #[test]
-    fn test_validate_expressions_length_mismatch() {
-        let compiled = vec!["a".into()];
-        let metadata = vec!["a".into(), "b".into()];
-        assert!(validate_expressions(&compiled, &metadata).is_err());
-    }
-
-    #[test]
-    fn test_validate_expressions_content_mismatch() {
-        let compiled = vec!["a".into(), "c".into()];
-        let metadata = vec!["a".into(), "b".into()];
-        let err = validate_expressions(&compiled, &metadata).unwrap_err();
-        match err {
-            BundleError::ExpressionContentMismatch { index, .. } => assert_eq!(index, 1),
-            _ => panic!("Expected ExpressionContentMismatch"),
-        }
-    }
-
-    #[test]
-    fn test_generate_virtual_entry() {
-        let output = CompilerOutput {
-            ir_version: 1,
-            graph_hash: String::new(),
-            graph_edges: Vec::new(),
-            graph_nodes: Vec::new(),
-            html: "<div data-zx-e=\"0\"></div>".into(),
-            expressions: vec!["title".into()],
-            imports: Default::default(),
-            server_script: Default::default(),
-            prerender: false,
-            ssr_data: Default::default(),
-            hoisted: Default::default(),
-            components_scripts: Default::default(),
-            component_instances: Default::default(),
-            signals: Default::default(),
-            expression_bindings: Default::default(),
-            marker_bindings: Default::default(),
-            event_bindings: Default::default(),
-            ref_bindings: Default::default(),
-            style_blocks: Default::default(),
-        };
-        let entry = generate_virtual_entry(&output);
-        assert!(entry.contains("__zenith_html"));
-        assert!(entry.contains("__zenith_expr"));
-        assert!(entry.contains("\"title\""));
-        // Inside a JS template literal, double quotes are NOT escaped
-        assert!(entry.contains("data-zx-e=\"0\""));
-    }
-
-    #[test]
-    fn test_validate_placeholders_all_present() {
-        let html = r#"<div data-zx-e="0"><span data-zx-e="1"></span></div>"#;
-        assert!(validate_placeholders(html, 2).is_ok());
-    }
-
-    #[test]
-    fn test_validate_placeholders_with_events() {
-        let html = r#"<button data-zx-on-click="0"></button>"#;
-        assert!(validate_placeholders(html, 1).is_ok());
-    }
-
-    #[test]
-    fn test_validate_placeholders_with_comment_markers() {
-        let html =
-            r#"<option>Prefix <!--zx-e:0--></option><button data-zx-on-click="1">Save</button>"#;
-        assert!(validate_placeholders(html, 2).is_ok());
-    }
-
-    #[test]
-    fn test_validate_placeholders_missing() {
-        let html = r#"<div data-zx-e="0"></div>"#;
-        let result = validate_placeholders(html, 2);
-        assert!(result.is_err());
-        let diagnostics = result.unwrap_err();
-        assert_eq!(diagnostics.len(), 1);
-        assert!(diagnostics[0].message.contains("index 1"));
-    }
-
-    #[test]
-    fn test_rewrite_js_imports_ast_rewrites_static_export_and_dynamic() {
-        let source = "import { gsap } from 'gsap'; export { format } from 'date-fns'; export async function load() { return import('gsap'); }";
-        let mut replacements = BTreeMap::new();
-        replacements.insert("gsap".to_string(), "/assets/vendor.mock.js".to_string());
-        replacements.insert("date-fns".to_string(), "/assets/vendor.mock.js".to_string());
-
-        let rewritten = rewrite_js_imports_ast(source, &replacements).expect("rewrite source");
-        assert!(rewritten.contains("/assets/vendor.mock.js"));
-        assert!(!rewritten.contains("'gsap'"));
-        assert!(!rewritten.contains("\"gsap\""));
-        assert!(!rewritten.contains("'date-fns'"));
-        assert!(!rewritten.contains("\"date-fns\""));
-    }
-}
+#[path = "utils_tests.rs"]
+mod tests;

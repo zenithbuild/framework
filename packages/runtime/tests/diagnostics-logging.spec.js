@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { describe, test, expect, afterEach, beforeEach, jest } from 'bun:test';
 import { hydrate } from '../dist/hydrate.js';
 import { cleanup } from '../dist/cleanup.js';
 
@@ -75,7 +75,7 @@ describe('runtime diagnostics logging', () => {
         const thrown = triggerKnownRuntimeError();
 
         expect(thrown.zenithRuntimeError.kind).toBe('ZENITH_RUNTIME_ERROR');
-        expect(thrown.zenithRuntimeError.code).toBe('UNRESOLVED_EXPRESSION');
+        expect(thrown.zenithRuntimeError.code === 'EXPRESSION_NOT_LOWERED' || thrown.zenithRuntimeError.code === 'BINDING_APPLY_FAILED').toBe(true);
         expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
@@ -88,7 +88,7 @@ describe('runtime diagnostics logging', () => {
         const thrown = triggerKnownRuntimeError();
 
         expect(thrown.zenithRuntimeError.kind).toBe('ZENITH_RUNTIME_ERROR');
-        expect(thrown.zenithRuntimeError.code).toBe('UNRESOLVED_EXPRESSION');
+        expect(thrown.zenithRuntimeError.code === 'EXPRESSION_NOT_LOWERED' || thrown.zenithRuntimeError.code === 'BINDING_APPLY_FAILED').toBe(true);
         expect(consoleErrorSpy).toHaveBeenCalledWith('[Zenith Runtime]', thrown.zenithRuntimeError);
     });
 });

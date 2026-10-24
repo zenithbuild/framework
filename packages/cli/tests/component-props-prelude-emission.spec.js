@@ -57,7 +57,7 @@ function extractScopedIdentifier(asset, scopeFragment, rawName) {
 
 function extractPropsObject(asset, className) {
     const pattern = new RegExp(
-        String.raw`var props = \{[^}]*class:\s*['"]${escapeRegex(className)}['"][^}]*\};`
+        String.raw`(?:var|const|let)\s+props\s*=\s*\{[^}]*class:\s*['"]${escapeRegex(className)}['"][^}]*\};?`
     );
     const match = asset.match(pattern);
     expect(match).toBeTruthy();
@@ -196,8 +196,8 @@ describe('component props prelude emission', () => {
         const directProps = extractPropsObject(pageAsset, 'direct-heading');
         const wrappedProps = extractPropsObject(pageAsset, 'wrapped-heading');
 
-        expect(directProps).toContain(`elementRef: ${directAssetRef}`);
-        expect(wrappedProps).toContain(`elementRef: ${wrappedAssetRef}`);
+        expect(directProps).toMatch(new RegExp(String.raw`elementRef:\s*${escapeRegex(directAssetRef)}\b`));
+        expect(wrappedProps).toMatch(new RegExp(String.raw`elementRef:\s*${escapeRegex(wrappedAssetRef)}\b`));
 
         expect(directProps).not.toContain('elementRef:headingTextRef');
         expect(wrappedProps).not.toContain('elementRef:headingTextRef');

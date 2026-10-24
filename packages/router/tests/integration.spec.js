@@ -3,9 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { createRouter } from '../dist/router.js';
-import { navigate, getCurrentPath } from '../dist/navigate.js';
+import { navigate, refreshCurrentRoute, getCurrentPath } from '../dist/navigate.js';
 import { onRouteChange, _clearSubscribers } from '../dist/events.js';
+import { replace as replaceSourceHistory } from '../dist/history.js';
 import * as routerApi from '../dist/index.js';
+import { jest } from '@jest/globals';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +29,8 @@ describe('Integration: createRouter + lifecycle', () => {
     beforeEach(() => {
         container = document.createElement('div');
         document.body.appendChild(container);
+        history.replaceState({}, '', '/');
+        replaceSourceHistory('/');
         mounted = [];
         cleaned = 0;
     });
@@ -34,6 +38,8 @@ describe('Integration: createRouter + lifecycle', () => {
     afterEach(() => {
         document.body.removeChild(container);
         _clearSubscribers();
+        history.replaceState({}, '', '/');
+        replaceSourceHistory('/');
     });
 
     test('start() resolves initial route by pathname', async () => {
@@ -221,6 +227,49 @@ describe('Integration: createRouter + lifecycle', () => {
 
         router.destroy();
     });
+
+    test('refreshCurrentRoute reruns the current matched route without pushing history', async () => {
+        history.pushState({}, '', '/about');
+        const pushes = jest.spyOn(history, 'pushState');
+
+        const routes = [
+            {
+                path: '/about',
+                load: async () => ({ __html: `<h1>About ${mounted.length}</h1>` })
+            }
+        ];
+
+        const router = createRouter({ routes, container, mount: mockMount, cleanup: mockCleanup });
+        await router.start();
+        const beforePath = window.location.pathname;
+
+        await refreshCurrentRoute();
+
+        expect(window.location.pathname).toBe(beforePath);
+        expect(pushes).not.toHaveBeenCalled();
+        expect(mounted.length).toBe(2);
+        expect(mounted[1].__html).toBe('<h1>About 1</h1>');
+
+        pushes.mockRestore();
+        router.destroy();
+    });
+
+    test('refreshCurrentRoute fails clearly when the current path is unmatched', async () => {
+        const routes = [
+            { path: '/', load: async () => ({}) }
+        ];
+
+        const router = createRouter({ routes, container, mount: mockMount, cleanup: mockCleanup });
+        history.pushState({}, '', '/');
+        await router.start();
+        history.pushState({}, '', '/missing');
+
+        await expect(refreshCurrentRoute()).rejects.toThrow(
+            '[Zenith Router] refreshCurrentRoute() requires a current matched Zenith page route'
+        );
+
+        router.destroy();
+    });
 });
 
 describe('Contract Guardrails', () => {
@@ -228,6 +277,7 @@ describe('Contract Guardrails', () => {
         const exports = Object.keys(routerApi).sort();
         expect(exports).toEqual([
             '_dispatchRouteEvent',
+            '_getAdvisoryRoutePolicy',
             '_getRouteProtectionPolicy',
             'back',
             'createRouter',
@@ -238,7 +288,10 @@ describe('Contract Guardrails', () => {
             'off',
             'on',
             'onRouteChange',
-            'setRouteProtectionPolicy'
+            'refreshCurrentRoute',
+            'setAdvisoryRoutePolicy',
+            'setRouteProtectionPolicy',
+            'zenNavigationShell'
         ]);
     });
 

@@ -1,0 +1,11 @@
+# llms.txt for Zenith Docs
+Project: Zenith (compiler-first UI)
+Docs: /docs
+
+Start here (ordered):
+
+Machine-readable:
+- /ai/docs.manifest.json
+- /ai/docs.index.jsonl
+- /ai/docs.sitemap.json
+- /ai/docs.nav.json
