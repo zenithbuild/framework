@@ -1,0 +1,2935 @@
+{
+  "record": "JUD-11 render-utils benchmark record. Numbers below were measured on this VM. Do not replace them with the historical 13.9% figure.",
+  "baselineCommit": "39c325b566ce167565940614e924263948c2be3c",
+  "happyDom": {
+    "harness": "packages/runtime/scripts/render-utils-bench.js",
+    "dom": "happy-dom 21.0.4 via bun-test-setup",
+    "runtime": "Bun 1.4.0",
+    "timer": "Bun.nanoseconds",
+    "cpuPin": "taskset -c 0",
+    "protocol": "1 discarded warmup process, then 5 processes. Each process discards 3 in-process warmups and keeps 21 samples. Reported comparison uses the median of the 5 per-run medians.",
+    "note": "Measured against the extracted helpers. The later temp-file rmSync runs after the emitted module is imported and is outside the timed section.",
+    "beforeRuns": [
+      {
+        "environment": {
+          "label": "before-1",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 20363342,
+                "minNs": 16612863,
+                "p95Ns": 38948536,
+                "meanNs": 22507147
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24246811,
+                "minNs": 23949622,
+                "p95Ns": 24424124,
+                "meanNs": 24220254
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15435524,
+                "minNs": 15276840,
+                "p95Ns": 25999093,
+                "meanNs": 17430574
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16630727,
+                "minNs": 15928937,
+                "p95Ns": 36093684,
+                "meanNs": 21841911
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15000726,
+                "minNs": 14076893,
+                "p95Ns": 31915966,
+                "meanNs": 17163978
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16042710,
+                "minNs": 15943215,
+                "p95Ns": 16222238,
+                "meanNs": 16055732
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 16079915,
+                "minNs": 15563547,
+                "p95Ns": 20584961,
+                "meanNs": 16801515
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118461,
+            "contributorBytes": {
+              "render.js": 11601,
+              "fragment-patch.js": 3940
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23422305,
+                "minNs": 23189056,
+                "p95Ns": 29424453,
+                "meanNs": 24284955
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 28441049,
+                "minNs": 28021074,
+                "p95Ns": 29260922,
+                "meanNs": 28458438
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19448722,
+                "minNs": 19231951,
+                "p95Ns": 20157303,
+                "meanNs": 19536027
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16438392,
+                "minNs": 15796816,
+                "p95Ns": 24881624,
+                "meanNs": 18365165
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14562526,
+                "minNs": 14025345,
+                "p95Ns": 30760225,
+                "meanNs": 16713146
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16160045,
+                "minNs": 16006970,
+                "p95Ns": 16360860,
+                "meanNs": 16177443
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 16196219,
+                "minNs": 15494804,
+                "p95Ns": 16456507,
+                "meanNs": 16207512
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "before-2",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16832731,
+                "minNs": 16503004,
+                "p95Ns": 33134103,
+                "meanNs": 18687824
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24136938,
+                "minNs": 23782459,
+                "p95Ns": 24341998,
+                "meanNs": 24123750
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 14952201,
+                "minNs": 14833403,
+                "p95Ns": 18015754,
+                "meanNs": 15584697
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16816624,
+                "minNs": 15958016,
+                "p95Ns": 27206989,
+                "meanNs": 21299628
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15239158,
+                "minNs": 14014060,
+                "p95Ns": 32627739,
+                "meanNs": 17323204
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15862695,
+                "minNs": 15496628,
+                "p95Ns": 16042432,
+                "meanNs": 15878872
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15963143,
+                "minNs": 15471504,
+                "p95Ns": 20170341,
+                "meanNs": 16754757
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118461,
+            "contributorBytes": {
+              "render.js": 11601,
+              "fragment-patch.js": 3940
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23261244,
+                "minNs": 22886605,
+                "p95Ns": 23574247,
+                "meanNs": 23310817
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 28234658,
+                "minNs": 27931854,
+                "p95Ns": 28417833,
+                "meanNs": 28219806
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19682247,
+                "minNs": 19405457,
+                "p95Ns": 19959242,
+                "meanNs": 19731379
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16539327,
+                "minNs": 15857063,
+                "p95Ns": 29616535,
+                "meanNs": 18796711
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15091317,
+                "minNs": 14599235,
+                "p95Ns": 29859150,
+                "meanNs": 16827105
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16128804,
+                "minNs": 16037434,
+                "p95Ns": 16295149,
+                "meanNs": 16151933
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 16059741,
+                "minNs": 15425572,
+                "p95Ns": 16331325,
+                "meanNs": 16111686
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "before-3",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16804586,
+                "minNs": 16553791,
+                "p95Ns": 33452536,
+                "meanNs": 20257488
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24628509,
+                "minNs": 24346267,
+                "p95Ns": 30937476,
+                "meanNs": 25704557
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 16251999,
+                "minNs": 15049133,
+                "p95Ns": 26927434,
+                "meanNs": 19977165
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16571242,
+                "minNs": 15311620,
+                "p95Ns": 33146604,
+                "meanNs": 21175989
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14373503,
+                "minNs": 13847804,
+                "p95Ns": 24779018,
+                "meanNs": 16043541
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16073343,
+                "minNs": 15924487,
+                "p95Ns": 16671051,
+                "meanNs": 16166094
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15413921,
+                "minNs": 14974759,
+                "p95Ns": 17487461,
+                "meanNs": 15855398
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118461,
+            "contributorBytes": {
+              "render.js": 11601,
+              "fragment-patch.js": 3940
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 22894109,
+                "minNs": 22408125,
+                "p95Ns": 29259816,
+                "meanNs": 23691938
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27492641,
+                "minNs": 27088545,
+                "p95Ns": 27745185,
+                "meanNs": 27490083
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19056809,
+                "minNs": 18945298,
+                "p95Ns": 19611127,
+                "meanNs": 19158999
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 17285884,
+                "minNs": 16734002,
+                "p95Ns": 25652369,
+                "meanNs": 18636974
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15304146,
+                "minNs": 14809056,
+                "p95Ns": 31414799,
+                "meanNs": 16788262
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16161338,
+                "minNs": 16006666,
+                "p95Ns": 16423811,
+                "meanNs": 16185510
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 14845067,
+                "minNs": 14354186,
+                "p95Ns": 15169254,
+                "meanNs": 14937820
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "before-4",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 17354200,
+                "minNs": 16926849,
+                "p95Ns": 34894229,
+                "meanNs": 21069601
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24315270,
+                "minNs": 24050143,
+                "p95Ns": 24577843,
+                "meanNs": 24802512
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15688893,
+                "minNs": 14976977,
+                "p95Ns": 38247705,
+                "meanNs": 19145613
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16171277,
+                "minNs": 15279616,
+                "p95Ns": 30886133,
+                "meanNs": 22481720
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14750898,
+                "minNs": 13759005,
+                "p95Ns": 29167920,
+                "meanNs": 17118055
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16123963,
+                "minNs": 15900879,
+                "p95Ns": 16431929,
+                "meanNs": 16145873
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15416118,
+                "minNs": 14995400,
+                "p95Ns": 19950900,
+                "meanNs": 16151961
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118461,
+            "contributorBytes": {
+              "render.js": 11601,
+              "fragment-patch.js": 3940
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23043911,
+                "minNs": 22611886,
+                "p95Ns": 29529342,
+                "meanNs": 24069597
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27900781,
+                "minNs": 27603540,
+                "p95Ns": 28167034,
+                "meanNs": 27951040
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19139184,
+                "minNs": 19044836,
+                "p95Ns": 19756748,
+                "meanNs": 19253660
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 17098314,
+                "minNs": 16595037,
+                "p95Ns": 28465986,
+                "meanNs": 18562705
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15334268,
+                "minNs": 14756345,
+                "p95Ns": 31696020,
+                "meanNs": 17103104
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16079499,
+                "minNs": 15797053,
+                "p95Ns": 16310256,
+                "meanNs": 16498217
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15018057,
+                "minNs": 14575151,
+                "p95Ns": 15348053,
+                "meanNs": 15049434
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "before-5",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16768450,
+                "minNs": 16506165,
+                "p95Ns": 37498798,
+                "meanNs": 19406223
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 23989456,
+                "minNs": 23591503,
+                "p95Ns": 26829087,
+                "meanNs": 24755369
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15342536,
+                "minNs": 14910482,
+                "p95Ns": 28426928,
+                "meanNs": 19234989
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16162721,
+                "minNs": 15312164,
+                "p95Ns": 48451722,
+                "meanNs": 23120519
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14778558,
+                "minNs": 13822062,
+                "p95Ns": 27882765,
+                "meanNs": 16708452
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16059204,
+                "minNs": 15895143,
+                "p95Ns": 16203629,
+                "meanNs": 16059794
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15928033,
+                "minNs": 15468689,
+                "p95Ns": 19835956,
+                "meanNs": 16602773
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118461,
+            "contributorBytes": {
+              "render.js": 11601,
+              "fragment-patch.js": 3940
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23531044,
+                "minNs": 23141212,
+                "p95Ns": 26098594,
+                "meanNs": 24190183
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27677842,
+                "minNs": 27382512,
+                "p95Ns": 28022191,
+                "meanNs": 27717745
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19084878,
+                "minNs": 18823115,
+                "p95Ns": 19356741,
+                "meanNs": 19123592
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16937349,
+                "minNs": 15269166,
+                "p95Ns": 28161425,
+                "meanNs": 19046330
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14406415,
+                "minNs": 13870951,
+                "p95Ns": 30838130,
+                "meanNs": 16893391
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15949977,
+                "minNs": 15821027,
+                "p95Ns": 16267068,
+                "meanNs": 15983536
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15205551,
+                "minNs": 14803941,
+                "p95Ns": 16107780,
+                "meanNs": 15296371
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "afterRuns": [
+      {
+        "environment": {
+          "label": "after-1",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16323083,
+                "minNs": 16007396,
+                "p95Ns": 42496397,
+                "meanNs": 20027080
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24408893,
+                "minNs": 24122908,
+                "p95Ns": 25477390,
+                "meanNs": 25025912
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15183725,
+                "minNs": 14829536,
+                "p95Ns": 25918871,
+                "meanNs": 16802844
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16077175,
+                "minNs": 15100563,
+                "p95Ns": 30318290,
+                "meanNs": 20888732
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14559744,
+                "minNs": 13671532,
+                "p95Ns": 30781693,
+                "meanNs": 16582598
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16094115,
+                "minNs": 15814302,
+                "p95Ns": 16227795,
+                "meanNs": 16067092
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15072228,
+                "minNs": 14668919,
+                "p95Ns": 19301416,
+                "meanNs": 15833981
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118460,
+            "contributorBytes": {
+              "render.js": 10198,
+              "fragment-patch.js": 3940,
+              "render-utils.js": 1402
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 22580194,
+                "minNs": 22144556,
+                "p95Ns": 23763546,
+                "meanNs": 22829324
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27778014,
+                "minNs": 27258982,
+                "p95Ns": 28077205,
+                "meanNs": 27920998
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19034685,
+                "minNs": 18661842,
+                "p95Ns": 19813895,
+                "meanNs": 19161005
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 17116441,
+                "minNs": 16497655,
+                "p95Ns": 27322330,
+                "meanNs": 18580283
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 15236024,
+                "minNs": 14706880,
+                "p95Ns": 28869799,
+                "meanNs": 17091062
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16148749,
+                "minNs": 15916817,
+                "p95Ns": 16621965,
+                "meanNs": 16769435
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15083961,
+                "minNs": 14569723,
+                "p95Ns": 15375724,
+                "meanNs": 15096044
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "after-2",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16314074,
+                "minNs": 16042860,
+                "p95Ns": 33853712,
+                "meanNs": 20147865
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24511773,
+                "minNs": 24212554,
+                "p95Ns": 24684123,
+                "meanNs": 24485976
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15634131,
+                "minNs": 15396954,
+                "p95Ns": 18584537,
+                "meanNs": 16695083
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 17695701,
+                "minNs": 16645426,
+                "p95Ns": 45711712,
+                "meanNs": 23312639
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14616382,
+                "minNs": 13982598,
+                "p95Ns": 31830266,
+                "meanNs": 17118151
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15830874,
+                "minNs": 15646739,
+                "p95Ns": 16132885,
+                "meanNs": 15857987
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15480982,
+                "minNs": 15116766,
+                "p95Ns": 17043207,
+                "meanNs": 15976788
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118460,
+            "contributorBytes": {
+              "render.js": 10198,
+              "fragment-patch.js": 3940,
+              "render-utils.js": 1402
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 24633507,
+                "minNs": 24458241,
+                "p95Ns": 25064688,
+                "meanNs": 24793697
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27988227,
+                "minNs": 27615904,
+                "p95Ns": 28224642,
+                "meanNs": 28004520
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 20026928,
+                "minNs": 19842156,
+                "p95Ns": 20149048,
+                "meanNs": 20051197
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 17241101,
+                "minNs": 15877680,
+                "p95Ns": 26146492,
+                "meanNs": 19004026
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14843524,
+                "minNs": 14281064,
+                "p95Ns": 25707078,
+                "meanNs": 16469498
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15987123,
+                "minNs": 15844887,
+                "p95Ns": 16144430,
+                "meanNs": 16002812
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15559505,
+                "minNs": 15103393,
+                "p95Ns": 15896516,
+                "meanNs": 15598332
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "after-3",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 15976541,
+                "minNs": 15718112,
+                "p95Ns": 21095881,
+                "meanNs": 17478409
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 23625382,
+                "minNs": 23339138,
+                "p95Ns": 23761827,
+                "meanNs": 23580033
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15221936,
+                "minNs": 14925101,
+                "p95Ns": 28330125,
+                "meanNs": 18062438
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16149688,
+                "minNs": 15115977,
+                "p95Ns": 35286062,
+                "meanNs": 21216402
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14622094,
+                "minNs": 13528199,
+                "p95Ns": 30521833,
+                "meanNs": 16781991
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15888583,
+                "minNs": 15507651,
+                "p95Ns": 16003544,
+                "meanNs": 15852915
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 14894498,
+                "minNs": 14409642,
+                "p95Ns": 18897900,
+                "meanNs": 15323405
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118460,
+            "contributorBytes": {
+              "render.js": 10198,
+              "fragment-patch.js": 3940,
+              "render-utils.js": 1402
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 22577985,
+                "minNs": 22289021,
+                "p95Ns": 22894923,
+                "meanNs": 22609990
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27100509,
+                "minNs": 26721967,
+                "p95Ns": 27235924,
+                "meanNs": 27123408
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19210941,
+                "minNs": 19127561,
+                "p95Ns": 19458167,
+                "meanNs": 19278581
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 15729982,
+                "minNs": 15142967,
+                "p95Ns": 27968343,
+                "meanNs": 17813639
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14145341,
+                "minNs": 13652934,
+                "p95Ns": 30166513,
+                "meanNs": 15665494
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 16063933,
+                "minNs": 15907696,
+                "p95Ns": 16254337,
+                "meanNs": 16075445
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 14849278,
+                "minNs": 14301398,
+                "p95Ns": 15125945,
+                "meanNs": 14846965
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "after-4",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 16532519,
+                "minNs": 16260901,
+                "p95Ns": 34159870,
+                "meanNs": 19438185
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 23634185,
+                "minNs": 23414453,
+                "p95Ns": 23737919,
+                "meanNs": 23685235
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 16054330,
+                "minNs": 14931727,
+                "p95Ns": 37470114,
+                "meanNs": 19335276
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 15777572,
+                "minNs": 14922567,
+                "p95Ns": 40256413,
+                "meanNs": 20662983
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14083831,
+                "minNs": 13270786,
+                "p95Ns": 41909837,
+                "meanNs": 17140543
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15895782,
+                "minNs": 15612154,
+                "p95Ns": 16330380,
+                "meanNs": 15978956
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15184874,
+                "minNs": 14690018,
+                "p95Ns": 18995148,
+                "meanNs": 15848369
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118460,
+            "contributorBytes": {
+              "render.js": 10198,
+              "fragment-patch.js": 3940,
+              "render-utils.js": 1402
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23085797,
+                "minNs": 22803429,
+                "p95Ns": 29245945,
+                "meanNs": 24094820
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27529281,
+                "minNs": 27217967,
+                "p95Ns": 28739761,
+                "meanNs": 27636438
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 18911329,
+                "minNs": 18637415,
+                "p95Ns": 19747225,
+                "meanNs": 19090016
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16791785,
+                "minNs": 15320464,
+                "p95Ns": 28324770,
+                "meanNs": 18346219
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14468020,
+                "minNs": 13855428,
+                "p95Ns": 25521955,
+                "meanNs": 15848740
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15779622,
+                "minNs": 15660423,
+                "p95Ns": 15986757,
+                "meanNs": 15797520
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15226154,
+                "minNs": 14785099,
+                "p95Ns": 15952298,
+                "meanNs": 15528843
+              }
+            }
+          }
+        ]
+      },
+      {
+        "environment": {
+          "label": "after-5",
+          "hostname": "cursor",
+          "platform": "linux",
+          "arch": "x64",
+          "release": "6.12.94+",
+          "cpuModel": "Intel(R) Xeon(R) Processor",
+          "cpuSpeedMHz": 0,
+          "cpuCount": 4,
+          "bun": "1.4.0",
+          "node": "v26.3.0",
+          "samples": 21,
+          "warmupSamplesDiscarded": 3,
+          "timer": "Bun.nanoseconds",
+          "dom": "happy-dom via bun-test-setup GlobalRegistrator",
+          "iterationsPerSample": {
+            "textMarker": 50000,
+            "attrMarker": 50000,
+            "fragmentTextUpdate": 30000,
+            "fragmentHtmlUpdate": 2500,
+            "commentHtmlMarker": 5000,
+            "coerceTextDirect": 600000,
+            "contextualFragmentDirect": 8000
+          }
+        },
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": null,
+            "contributorBytes": null,
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 17209092,
+                "minNs": 16917166,
+                "p95Ns": 22197194,
+                "meanNs": 19906714
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 24029698,
+                "minNs": 23749190,
+                "p95Ns": 24265008,
+                "meanNs": 23994816
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 15196479,
+                "minNs": 14679584,
+                "p95Ns": 33161185,
+                "meanNs": 19419555
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 15799540,
+                "minNs": 15096585,
+                "p95Ns": 56904391,
+                "meanNs": 22462191
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14096658,
+                "minNs": 13354924,
+                "p95Ns": 26759582,
+                "meanNs": 16648787
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15792174,
+                "minNs": 15376171,
+                "p95Ns": 16038949,
+                "meanNs": 15801206
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15101496,
+                "minNs": 14670986,
+                "p95Ns": 19008562,
+                "meanNs": 15721995
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "sameCoerceIdentity": true,
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "coverageBytes": 118460,
+            "contributorBytes": {
+              "render.js": 10198,
+              "fragment-patch.js": 3940,
+              "render-utils.js": 1402
+            },
+            "cases": {
+              "textMarker": {
+                "samples": 21,
+                "medianNs": 23315416,
+                "minNs": 23115970,
+                "p95Ns": 23620927,
+                "meanNs": 23374339
+              },
+              "attrMarker": {
+                "samples": 21,
+                "medianNs": 27371802,
+                "minNs": 27045999,
+                "p95Ns": 29285987,
+                "meanNs": 27604101
+              },
+              "fragmentTextUpdate": {
+                "samples": 21,
+                "medianNs": 19063932,
+                "minNs": 18826146,
+                "p95Ns": 19816051,
+                "meanNs": 19127499
+              },
+              "fragmentHtmlUpdate": {
+                "samples": 21,
+                "medianNs": 16315615,
+                "minNs": 15268412,
+                "p95Ns": 27255907,
+                "meanNs": 18110711
+              },
+              "commentHtmlMarker": {
+                "samples": 21,
+                "medianNs": 14776865,
+                "minNs": 14450303,
+                "p95Ns": 29992555,
+                "meanNs": 16536408
+              },
+              "coerceTextDirect": {
+                "samples": 21,
+                "medianNs": 15986210,
+                "minNs": 15882567,
+                "p95Ns": 16180824,
+                "meanNs": 16014844
+              },
+              "contextualFragmentDirect": {
+                "samples": 21,
+                "medianNs": 15091545,
+                "minNs": 14597935,
+                "p95Ns": 17141242,
+                "meanNs": 15405089
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "browser": {
+    "environment": {
+      "hostname": "cursor",
+      "platform": "linux",
+      "arch": "x64",
+      "release": "6.12.94+",
+      "cpuModel": "Intel(R) Xeon(R) Processor",
+      "cpuSpeedMHz": 0,
+      "cpuCount": 4,
+      "bun": "1.4.0",
+      "browser": "156.0.8078.47",
+      "channel": "chrome",
+      "samplesPerPage": 21,
+      "pageLoadsPerGraph": 5,
+      "warmupIterationsDiscardedPerMeasure": 3,
+      "timer": "performance.now() converted to nanoseconds",
+      "iterationsPerSample": {
+        "textMarker": 50000,
+        "attrMarker": 50000,
+        "fragmentTextUpdate": 30000,
+        "fragmentHtmlUpdate": 2500,
+        "commentHtmlMarker": 5000,
+        "coerceTextDirect": 600000,
+        "contextualFragmentDirect": 8000
+      }
+    },
+    "variants": [
+      {
+        "label": "train-baseline",
+        "distDir": "/tmp/zenith-train-baseline/packages/runtime/dist",
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "sameCoerceIdentity": true,
+            "runs": [
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10900000,
+                    "minNs": 9400000,
+                    "p95Ns": 28200000,
+                    "meanNs": 15495238
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4500000,
+                    "minNs": 4400000,
+                    "p95Ns": 5100000,
+                    "meanNs": 4552381
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 14200000,
+                    "minNs": 13100000,
+                    "p95Ns": 17100000,
+                    "meanNs": 14771429
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 141900000,
+                    "minNs": 117200000,
+                    "p95Ns": 803600000,
+                    "meanNs": 307071429
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 144400000,
+                    "minNs": 118900000,
+                    "p95Ns": 546100000,
+                    "meanNs": 227719048
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8300000,
+                    "p95Ns": 10500000,
+                    "meanNs": 8819048
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 26100000,
+                    "minNs": 21900000,
+                    "p95Ns": 31300000,
+                    "meanNs": 26957143
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11200000,
+                    "minNs": 9000000,
+                    "p95Ns": 29600000,
+                    "meanNs": 14685714
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4600000,
+                    "minNs": 4400000,
+                    "p95Ns": 5000000,
+                    "meanNs": 4661905
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 14200000,
+                    "minNs": 13700000,
+                    "p95Ns": 15500000,
+                    "meanNs": 14947619
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 144600000,
+                    "minNs": 118100000,
+                    "p95Ns": 803400000,
+                    "meanNs": 304319048
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 194600000,
+                    "minNs": 116400000,
+                    "p95Ns": 602200000,
+                    "meanNs": 288185714
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8200000,
+                    "p95Ns": 9600000,
+                    "meanNs": 8738095
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 27200000,
+                    "minNs": 21200000,
+                    "p95Ns": 34800000,
+                    "meanNs": 27309524
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11000000,
+                    "minNs": 9200000,
+                    "p95Ns": 29200000,
+                    "meanNs": 14495238
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4300000,
+                    "p95Ns": 4500000,
+                    "meanNs": 4457143
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 13000000,
+                    "p95Ns": 15200000,
+                    "meanNs": 14147619
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 131400000,
+                    "minNs": 116000000,
+                    "p95Ns": 777000000,
+                    "meanNs": 303828571
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 152100000,
+                    "minNs": 115100000,
+                    "p95Ns": 542200000,
+                    "meanNs": 225480952
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8700000,
+                    "minNs": 8200000,
+                    "p95Ns": 9600000,
+                    "meanNs": 8833333
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25300000,
+                    "minNs": 19500000,
+                    "p95Ns": 31500000,
+                    "meanNs": 25942857
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11300000,
+                    "minNs": 9200000,
+                    "p95Ns": 28300000,
+                    "meanNs": 15385714
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4200000,
+                    "p95Ns": 4500000,
+                    "meanNs": 4400000
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 13100000,
+                    "p95Ns": 14300000,
+                    "meanNs": 14109524
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 141500000,
+                    "minNs": 116300000,
+                    "p95Ns": 782900000,
+                    "meanNs": 302400000
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 152400000,
+                    "minNs": 117800000,
+                    "p95Ns": 526500000,
+                    "meanNs": 252661905
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8700000,
+                    "minNs": 8400000,
+                    "p95Ns": 9900000,
+                    "meanNs": 8809524
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 26300000,
+                    "minNs": 21100000,
+                    "p95Ns": 32500000,
+                    "meanNs": 26971429
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10800000,
+                    "minNs": 9100000,
+                    "p95Ns": 27200000,
+                    "meanNs": 14909524
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4200000,
+                    "p95Ns": 4700000,
+                    "meanNs": 4438095
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13500000,
+                    "minNs": 13200000,
+                    "p95Ns": 14700000,
+                    "meanNs": 14304762
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 134300000,
+                    "minNs": 114300000,
+                    "p95Ns": 779300000,
+                    "meanNs": 304519048
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 392400000,
+                    "minNs": 127000000,
+                    "p95Ns": 554600000,
+                    "meanNs": 370352381
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8200000,
+                    "p95Ns": 9700000,
+                    "meanNs": 8704762
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25500000,
+                    "minNs": 19300000,
+                    "p95Ns": 29800000,
+                    "meanNs": 25490476
+                  }
+                }
+              }
+            ],
+            "cases": {
+              "textMarker": {
+                "runMedianNs": [
+                  10900000,
+                  11200000,
+                  11000000,
+                  11300000,
+                  10800000
+                ]
+              },
+              "attrMarker": {
+                "runMedianNs": [
+                  4500000,
+                  4600000,
+                  4400000,
+                  4400000,
+                  4400000
+                ]
+              },
+              "fragmentTextUpdate": {
+                "runMedianNs": [
+                  14200000,
+                  14200000,
+                  13300000,
+                  13300000,
+                  13500000
+                ]
+              },
+              "fragmentHtmlUpdate": {
+                "runMedianNs": [
+                  141900000,
+                  144600000,
+                  131400000,
+                  141500000,
+                  134300000
+                ]
+              },
+              "commentHtmlMarker": {
+                "runMedianNs": [
+                  144400000,
+                  194600000,
+                  152100000,
+                  152400000,
+                  392400000
+                ]
+              },
+              "coerceTextDirect": {
+                "runMedianNs": [
+                  8600000,
+                  8600000,
+                  8700000,
+                  8700000,
+                  8600000
+                ]
+              },
+              "contextualFragmentDirect": {
+                "runMedianNs": [
+                  26100000,
+                  27200000,
+                  25300000,
+                  26300000,
+                  25500000
+                ]
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "sameCoerceIdentity": true,
+            "runs": [
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11100000,
+                    "minNs": 8900000,
+                    "p95Ns": 24300000,
+                    "meanNs": 14485714
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4200000,
+                    "p95Ns": 4500000,
+                    "meanNs": 4423810
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13200000,
+                    "minNs": 12900000,
+                    "p95Ns": 14100000,
+                    "meanNs": 13895238
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 134800000,
+                    "minNs": 111900000,
+                    "p95Ns": 786800000,
+                    "meanNs": 303866667
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 132500000,
+                    "minNs": 115200000,
+                    "p95Ns": 259000000,
+                    "meanNs": 150709524
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8200000,
+                    "p95Ns": 9700000,
+                    "meanNs": 8738095
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24600000,
+                    "minNs": 16800000,
+                    "p95Ns": 29500000,
+                    "meanNs": 24800000
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10400000,
+                    "minNs": 8900000,
+                    "p95Ns": 24900000,
+                    "meanNs": 13828571
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4100000,
+                    "minNs": 3900000,
+                    "p95Ns": 4200000,
+                    "meanNs": 4138095
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13500000,
+                    "minNs": 13300000,
+                    "p95Ns": 14300000,
+                    "meanNs": 14171429
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 148100000,
+                    "minNs": 113400000,
+                    "p95Ns": 772100000,
+                    "meanNs": 309085714
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 262900000,
+                    "minNs": 124800000,
+                    "p95Ns": 509900000,
+                    "meanNs": 269633333
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8300000,
+                    "p95Ns": 11100000,
+                    "meanNs": 8895238
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24500000,
+                    "minNs": 19600000,
+                    "p95Ns": 35300000,
+                    "meanNs": 25747619
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 12100000,
+                    "minNs": 8800000,
+                    "p95Ns": 26800000,
+                    "meanNs": 15228571
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4700000,
+                    "minNs": 4600000,
+                    "p95Ns": 4800000,
+                    "meanNs": 4714286
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13600000,
+                    "minNs": 13200000,
+                    "p95Ns": 17800000,
+                    "meanNs": 14395238
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 119000000,
+                    "minNs": 109300000,
+                    "p95Ns": 768200000,
+                    "meanNs": 297333333
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 134600000,
+                    "minNs": 114700000,
+                    "p95Ns": 353600000,
+                    "meanNs": 184447619
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8200000,
+                    "p95Ns": 9400000,
+                    "meanNs": 8723810
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24300000,
+                    "minNs": 18900000,
+                    "p95Ns": 29500000,
+                    "meanNs": 24490476
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11000000,
+                    "minNs": 9000000,
+                    "p95Ns": 24500000,
+                    "meanNs": 13914286
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4600000,
+                    "minNs": 4500000,
+                    "p95Ns": 4700000,
+                    "meanNs": 4576190
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 12900000,
+                    "p95Ns": 15800000,
+                    "meanNs": 14052381
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 176300000,
+                    "minNs": 109700000,
+                    "p95Ns": 765400000,
+                    "meanNs": 316847619
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 198100000,
+                    "minNs": 120300000,
+                    "p95Ns": 406800000,
+                    "meanNs": 217566667
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8700000,
+                    "minNs": 8200000,
+                    "p95Ns": 14800000,
+                    "meanNs": 10085714
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 27100000,
+                    "minNs": 18900000,
+                    "p95Ns": 35000000,
+                    "meanNs": 27819048
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10800000,
+                    "minNs": 8800000,
+                    "p95Ns": 24000000,
+                    "meanNs": 14176190
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4700000,
+                    "minNs": 4600000,
+                    "p95Ns": 4900000,
+                    "meanNs": 4728571
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 12900000,
+                    "p95Ns": 16400000,
+                    "meanNs": 14366667
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 154300000,
+                    "minNs": 115400000,
+                    "p95Ns": 792000000,
+                    "meanNs": 321195238
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 242400000,
+                    "minNs": 126100000,
+                    "p95Ns": 533400000,
+                    "meanNs": 239661905
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8300000,
+                    "p95Ns": 10000000,
+                    "meanNs": 8719048
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24600000,
+                    "minNs": 18400000,
+                    "p95Ns": 30600000,
+                    "meanNs": 25176190
+                  }
+                }
+              }
+            ],
+            "cases": {
+              "textMarker": {
+                "runMedianNs": [
+                  11100000,
+                  10400000,
+                  12100000,
+                  11000000,
+                  10800000
+                ]
+              },
+              "attrMarker": {
+                "runMedianNs": [
+                  4400000,
+                  4100000,
+                  4700000,
+                  4600000,
+                  4700000
+                ]
+              },
+              "fragmentTextUpdate": {
+                "runMedianNs": [
+                  13200000,
+                  13500000,
+                  13600000,
+                  13300000,
+                  13300000
+                ]
+              },
+              "fragmentHtmlUpdate": {
+                "runMedianNs": [
+                  134800000,
+                  148100000,
+                  119000000,
+                  176300000,
+                  154300000
+                ]
+              },
+              "commentHtmlMarker": {
+                "runMedianNs": [
+                  132500000,
+                  262900000,
+                  134600000,
+                  198100000,
+                  242400000
+                ]
+              },
+              "coerceTextDirect": {
+                "runMedianNs": [
+                  8600000,
+                  8600000,
+                  8600000,
+                  8700000,
+                  8600000
+                ]
+              },
+              "contextualFragmentDirect": {
+                "runMedianNs": [
+                  24600000,
+                  24500000,
+                  24300000,
+                  27100000,
+                  24600000
+                ]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "label": "render-utils",
+        "distDir": "/workspace/packages/runtime/dist",
+        "graphs": [
+          {
+            "graph": "unbundled-esm",
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "sameCoerceIdentity": true,
+            "runs": [
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10700000,
+                    "minNs": 9100000,
+                    "p95Ns": 24500000,
+                    "meanNs": 13642857
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4100000,
+                    "minNs": 3900000,
+                    "p95Ns": 4300000,
+                    "meanNs": 4090476
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13600000,
+                    "minNs": 13300000,
+                    "p95Ns": 14600000,
+                    "meanNs": 14219048
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 152900000,
+                    "minNs": 118900000,
+                    "p95Ns": 785000000,
+                    "meanNs": 310552381
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 289200000,
+                    "minNs": 124700000,
+                    "p95Ns": 537500000,
+                    "meanNs": 310380952
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8300000,
+                    "p95Ns": 9800000,
+                    "meanNs": 8757143
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24700000,
+                    "minNs": 15700000,
+                    "p95Ns": 30700000,
+                    "meanNs": 25480952
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11100000,
+                    "minNs": 9200000,
+                    "p95Ns": 28100000,
+                    "meanNs": 14404762
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4200000,
+                    "p95Ns": 4600000,
+                    "meanNs": 4395238
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 12900000,
+                    "p95Ns": 14500000,
+                    "meanNs": 13990476
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 150000000,
+                    "minNs": 119200000,
+                    "p95Ns": 771700000,
+                    "meanNs": 315542857
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 228900000,
+                    "minNs": 124500000,
+                    "p95Ns": 543800000,
+                    "meanNs": 291028571
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8800000,
+                    "minNs": 8400000,
+                    "p95Ns": 10000000,
+                    "meanNs": 8852381
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24100000,
+                    "minNs": 18500000,
+                    "p95Ns": 28400000,
+                    "meanNs": 24695238
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10500000,
+                    "minNs": 9100000,
+                    "p95Ns": 24500000,
+                    "meanNs": 13409524
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4200000,
+                    "p95Ns": 5100000,
+                    "meanNs": 4500000
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13100000,
+                    "minNs": 12800000,
+                    "p95Ns": 14300000,
+                    "meanNs": 13900000
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 154000000,
+                    "minNs": 109700000,
+                    "p95Ns": 778200000,
+                    "meanNs": 305461905
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 215800000,
+                    "minNs": 121400000,
+                    "p95Ns": 550400000,
+                    "meanNs": 287723810
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8300000,
+                    "p95Ns": 9900000,
+                    "meanNs": 8823810
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24700000,
+                    "minNs": 14900000,
+                    "p95Ns": 32400000,
+                    "meanNs": 25076190
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10400000,
+                    "minNs": 9000000,
+                    "p95Ns": 23700000,
+                    "meanNs": 13923810
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4400000,
+                    "minNs": 4300000,
+                    "p95Ns": 4500000,
+                    "meanNs": 4447619
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13700000,
+                    "minNs": 13000000,
+                    "p95Ns": 14300000,
+                    "meanNs": 14233333
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 145100000,
+                    "minNs": 114600000,
+                    "p95Ns": 788700000,
+                    "meanNs": 306128571
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 323000000,
+                    "minNs": 122100000,
+                    "p95Ns": 500600000,
+                    "meanNs": 313328571
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8600000,
+                    "minNs": 8200000,
+                    "p95Ns": 9800000,
+                    "meanNs": 8676190
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25800000,
+                    "minNs": 17700000,
+                    "p95Ns": 30600000,
+                    "meanNs": 25604762
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11000000,
+                    "minNs": 9000000,
+                    "p95Ns": 29300000,
+                    "meanNs": 14914286
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4700000,
+                    "minNs": 4500000,
+                    "p95Ns": 5000000,
+                    "meanNs": 4761905
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13800000,
+                    "minNs": 13200000,
+                    "p95Ns": 15900000,
+                    "meanNs": 14652381
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 146400000,
+                    "minNs": 120500000,
+                    "p95Ns": 793800000,
+                    "meanNs": 307342857
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 137800000,
+                    "minNs": 119600000,
+                    "p95Ns": 480100000,
+                    "meanNs": 232152381
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 9000000,
+                    "minNs": 8400000,
+                    "p95Ns": 10300000,
+                    "meanNs": 9180952
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 26700000,
+                    "minNs": 22200000,
+                    "p95Ns": 30200000,
+                    "meanNs": 26504762
+                  }
+                }
+              }
+            ],
+            "cases": {
+              "textMarker": {
+                "runMedianNs": [
+                  10700000,
+                  11100000,
+                  10500000,
+                  10400000,
+                  11000000
+                ]
+              },
+              "attrMarker": {
+                "runMedianNs": [
+                  4100000,
+                  4400000,
+                  4400000,
+                  4400000,
+                  4700000
+                ]
+              },
+              "fragmentTextUpdate": {
+                "runMedianNs": [
+                  13600000,
+                  13300000,
+                  13100000,
+                  13700000,
+                  13800000
+                ]
+              },
+              "fragmentHtmlUpdate": {
+                "runMedianNs": [
+                  152900000,
+                  150000000,
+                  154000000,
+                  145100000,
+                  146400000
+                ]
+              },
+              "commentHtmlMarker": {
+                "runMedianNs": [
+                  289200000,
+                  228900000,
+                  215800000,
+                  323000000,
+                  137800000
+                ]
+              },
+              "coerceTextDirect": {
+                "runMedianNs": [
+                  8600000,
+                  8800000,
+                  8600000,
+                  8600000,
+                  9000000
+                ]
+              },
+              "contextualFragmentDirect": {
+                "runMedianNs": [
+                  24700000,
+                  24100000,
+                  24700000,
+                  25800000,
+                  26700000
+                ]
+              }
+            }
+          },
+          {
+            "graph": "emitted-production-template",
+            "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+            "sameCoerceIdentity": true,
+            "runs": [
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 12100000,
+                    "minNs": 9500000,
+                    "p95Ns": 29100000,
+                    "meanNs": 16128571
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4500000,
+                    "minNs": 4300000,
+                    "p95Ns": 5100000,
+                    "meanNs": 4609524
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 14400000,
+                    "minNs": 13400000,
+                    "p95Ns": 26200000,
+                    "meanNs": 15661905
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 175800000,
+                    "minNs": 113600000,
+                    "p95Ns": 801400000,
+                    "meanNs": 309371429
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 156500000,
+                    "minNs": 121000000,
+                    "p95Ns": 356000000,
+                    "meanNs": 216352381
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8500000,
+                    "minNs": 8300000,
+                    "p95Ns": 10000000,
+                    "meanNs": 8680952
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25500000,
+                    "minNs": 18400000,
+                    "p95Ns": 28800000,
+                    "meanNs": 24985714
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 10700000,
+                    "minNs": 9000000,
+                    "p95Ns": 23800000,
+                    "meanNs": 13619048
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4700000,
+                    "minNs": 4500000,
+                    "p95Ns": 4900000,
+                    "meanNs": 4857143
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13300000,
+                    "minNs": 13100000,
+                    "p95Ns": 14300000,
+                    "meanNs": 13985714
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 202500000,
+                    "minNs": 113200000,
+                    "p95Ns": 785100000,
+                    "meanNs": 329619048
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 221200000,
+                    "minNs": 119100000,
+                    "p95Ns": 354300000,
+                    "meanNs": 226885714
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8700000,
+                    "minNs": 8300000,
+                    "p95Ns": 9600000,
+                    "meanNs": 8723810
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 24900000,
+                    "minNs": 18900000,
+                    "p95Ns": 31300000,
+                    "meanNs": 25009524
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11700000,
+                    "minNs": 9200000,
+                    "p95Ns": 23400000,
+                    "meanNs": 14876190
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4500000,
+                    "minNs": 4300000,
+                    "p95Ns": 5700000,
+                    "meanNs": 4747619
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13800000,
+                    "minNs": 13000000,
+                    "p95Ns": 14500000,
+                    "meanNs": 14414286
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 131700000,
+                    "minNs": 116100000,
+                    "p95Ns": 817700000,
+                    "meanNs": 303633333
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 161200000,
+                    "minNs": 119400000,
+                    "p95Ns": 466600000,
+                    "meanNs": 202842857
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8800000,
+                    "minNs": 8400000,
+                    "p95Ns": 10000000,
+                    "meanNs": 8947619
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25900000,
+                    "minNs": 21300000,
+                    "p95Ns": 30400000,
+                    "meanNs": 26304762
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 11000000,
+                    "minNs": 9200000,
+                    "p95Ns": 28300000,
+                    "meanNs": 14990476
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4600000,
+                    "minNs": 4500000,
+                    "p95Ns": 4900000,
+                    "meanNs": 4704762
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13700000,
+                    "minNs": 13200000,
+                    "p95Ns": 16600000,
+                    "meanNs": 14680952
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 132000000,
+                    "minNs": 115100000,
+                    "p95Ns": 791600000,
+                    "meanNs": 319557143
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 170100000,
+                    "minNs": 115900000,
+                    "p95Ns": 345800000,
+                    "meanNs": 211857143
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8900000,
+                    "minNs": 8500000,
+                    "p95Ns": 9500000,
+                    "meanNs": 9023810
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 26800000,
+                    "minNs": 21600000,
+                    "p95Ns": 31500000,
+                    "meanNs": 27052381
+                  }
+                }
+              },
+              {
+                "fingerprint": "fingerprint::named::true::a<em>c</em>::<!--zx:bind:0--><strong>z</strong><!--/ zx:bind:0-->::||0|ok",
+                "sameCoerceIdentity": true,
+                "cases": {
+                  "textMarker": {
+                    "samples": 21,
+                    "medianNs": 13100000,
+                    "minNs": 9500000,
+                    "p95Ns": 28800000,
+                    "meanNs": 15942857
+                  },
+                  "attrMarker": {
+                    "samples": 21,
+                    "medianNs": 4600000,
+                    "minNs": 4400000,
+                    "p95Ns": 5100000,
+                    "meanNs": 4747619
+                  },
+                  "fragmentTextUpdate": {
+                    "samples": 21,
+                    "medianNs": 13600000,
+                    "minNs": 13200000,
+                    "p95Ns": 16700000,
+                    "meanNs": 14766667
+                  },
+                  "fragmentHtmlUpdate": {
+                    "samples": 21,
+                    "medianNs": 148200000,
+                    "minNs": 127400000,
+                    "p95Ns": 744400000,
+                    "meanNs": 318328571
+                  },
+                  "commentHtmlMarker": {
+                    "samples": 21,
+                    "medianNs": 255000000,
+                    "minNs": 123900000,
+                    "p95Ns": 492600000,
+                    "meanNs": 271009524
+                  },
+                  "coerceTextDirect": {
+                    "samples": 21,
+                    "medianNs": 8500000,
+                    "minNs": 8200000,
+                    "p95Ns": 9700000,
+                    "meanNs": 8657143
+                  },
+                  "contextualFragmentDirect": {
+                    "samples": 21,
+                    "medianNs": 25200000,
+                    "minNs": 20500000,
+                    "p95Ns": 27400000,
+                    "meanNs": 24847619
+                  }
+                }
+              }
+            ],
+            "cases": {
+              "textMarker": {
+                "runMedianNs": [
+                  12100000,
+                  10700000,
+                  11700000,
+                  11000000,
+                  13100000
+                ]
+              },
+              "attrMarker": {
+                "runMedianNs": [
+                  4500000,
+                  4700000,
+                  4500000,
+                  4600000,
+                  4600000
+                ]
+              },
+              "fragmentTextUpdate": {
+                "runMedianNs": [
+                  14400000,
+                  13300000,
+                  13800000,
+                  13700000,
+                  13600000
+                ]
+              },
+              "fragmentHtmlUpdate": {
+                "runMedianNs": [
+                  175800000,
+                  202500000,
+                  131700000,
+                  132000000,
+                  148200000
+                ]
+              },
+              "commentHtmlMarker": {
+                "runMedianNs": [
+                  156500000,
+                  221200000,
+                  161200000,
+                  170100000,
+                  255000000
+                ]
+              },
+              "coerceTextDirect": {
+                "runMedianNs": [
+                  8500000,
+                  8700000,
+                  8800000,
+                  8900000,
+                  8500000
+                ]
+              },
+              "contextualFragmentDirect": {
+                "runMedianNs": [
+                  25500000,
+                  24900000,
+                  25900000,
+                  26800000,
+                  25200000
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "baselineCommit": "39c325b566ce167565940614e924263948c2be3c",
+    "candidate": "packages/runtime dist built from this branch after the render-utils extraction",
+    "playwright": "apps/smoke-test node_modules/playwright, chromium.launch({ channel: 'chrome' })",
+    "cpuPin": "taskset -c 0"
+  }
+}
