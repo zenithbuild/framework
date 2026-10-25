@@ -73,6 +73,15 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 `target` / `adapter` behavior:
 
+- `target` is the shorthand deployment target. Phase 1 defaults loaded config to `target: 'static'`.
+- `adapter` is the explicit adapter object form and is mutually exclusive with `target`.
+- `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes.
+- `vercel-static` emits a Vercel Build Output API layout rooted at `outDir`.
+- `netlify-static` emits a Netlify publish directory rooted at `outDir`, including generated `_redirects` rewrites for dynamic prerendered routes.
+- `vercel` emits a Vercel Build Output API layout with packaged route functions for server-classified routes and static rewrites for prerendered dynamic routes.
+- `netlify` emits a deploy root with `publish/`, `functions/`, `netlify.toml`, and generated `_redirects` that force server-classified routes through packaged functions.
+- `node` emits a standalone Node artifact rooted at `outDir` with `index.js`, `package.json`, `manifest.json`, `static/`, and `server/`.
+
 Supported deployment targets:
 
 - `static`
@@ -82,15 +91,6 @@ Supported deployment targets:
 - `vercel`
 - `netlify`
 - `node`
-
-- `target` is the shorthand deployment target. Phase 1 defaults loaded config to `target: 'static'`.
-- `adapter` is the explicit adapter object form and is mutually exclusive with `target`.
-- `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes.
-- `vercel-static` emits a Vercel Build Output API layout rooted at `outDir`.
-- `netlify-static` emits a Netlify publish directory rooted at `outDir`, including generated `_redirects` rewrites for dynamic prerendered routes.
-- `vercel` emits a Vercel Build Output API layout with packaged route functions for server-classified routes and static rewrites for prerendered dynamic routes.
-- `netlify` emits a deploy root with `publish/`, `functions/`, `netlify.toml`, and generated `_redirects` that force server-classified routes through packaged functions.
-- `node` emits a standalone Node artifact rooted at `outDir` with `index.js`, `package.json`, `manifest.json`, `static/`, and `server/`.
 
 Server-capable target contract:
 

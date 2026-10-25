@@ -29,6 +29,9 @@ function readRepo(rel) {
     return readFileSync(resolve(REPO_ROOT, rel), 'utf8');
 }
 
+// Parse the source array instead of importing the built `ZENITH_TARGETS` export.
+// The file is the canonical list; a dist import would miss an unbuilt source edit.
+// The KNOWN_TARGETS check below still compares the built CLI re-export to this parse.
 function readCanonicalTargets() {
     const source = readRepo(CANONICAL_SOURCE);
     const match = source.match(/export const ZENITH_TARGETS = \[([\s\S]*?)\] as const;/);
@@ -84,6 +87,9 @@ function extractHeadingList(markdown, heading) {
             }
             const match = line.match(/^- `([a-z0-9-]+)`$/);
             if (!match) {
+                if (line.startsWith('- ')) {
+                    throw new Error(`unrecognised target list entry: ${line}`);
+                }
                 break;
             }
             list.push(match[1]);
@@ -152,6 +158,19 @@ describe('public target list drift', () => {
         const adapterTypes = readRepo('packages/cli/src/adapters/adapter-types.ts');
         expect(adapterTypes).toContain('export const KNOWN_TARGETS: readonly string[] = ZENITH_TARGETS;');
         expect([...KNOWN_TARGETS]).toEqual(canonical);
+    });
+
+    test('a non-target bullet inside a public target list fails the gate', () => {
+        const markdown = [
+            'Supported deployment targets:',
+            '',
+            ...canonical.map((name) => `- \`${name}\``),
+            '- `cloudflare` (beta)'
+        ].join('\n');
+
+        expect(() => extractHeadingList(markdown, 'Supported deployment targets:')).toThrow(
+            'unrecognised target list entry: - `cloudflare` (beta)'
+        );
     });
 
     test('documented public target lists match ZENITH_TARGETS exactly', () => {
