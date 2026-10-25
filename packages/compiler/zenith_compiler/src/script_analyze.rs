@@ -31,6 +31,7 @@ pub(super) fn analyze_component_script(
     let bindings = analyzed.bindings;
     let canonical_source = canonicalize_script_source(&source_without_imports);
     let hoist_id = stable_hash_8(&canonical_source);
+    let module_id = component_script_module_id(source_path, id);
     let factory_name = format!("createComponent_{}", sanitize_factory_suffix(&hoist_id));
     if let Some(started_at) = import_work_started_at {
         let elapsed_ms = started_at.elapsed().as_secs_f64() * 1000.0;
@@ -75,7 +76,17 @@ pub(super) fn analyze_component_script(
         functions,
         signals,
         bindings,
+        module_id,
     })
+}
+
+/// File identity for a component script: `{source_path}:script{index}`.
+///
+/// `hoist_id` stays a content hash and may be shared by identical bodies.
+/// `module_id` names the source file that owned this script.
+pub fn component_script_module_id(source_path: &str, script_index: usize) -> String {
+    let normalized = source_path.replace('\\', "/");
+    format!("{normalized}:script{script_index}")
 }
 
 pub(crate) fn stable_hash_8(input: &str) -> String {
@@ -198,4 +209,41 @@ fn generate_factory_code(
     lines.push(format!("export default {factory_name};"));
 
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn module_id_is_source_path_plus_script_index() {
+        assert_eq!(
+            component_script_module_id("src/components/Card.zen", 0),
+            "src/components/Card.zen:script0"
+        );
+        assert_eq!(
+            component_script_module_id("src\\components\\Card.zen", 1),
+            "src/components/Card.zen:script1"
+        );
+    }
+
+    #[test]
+    fn analyzed_script_owns_module_id_distinct_from_hoist_id() {
+        let mut profile = ScriptProfileMetrics::default();
+        let script = analyze_component_script(
+            0,
+            "src/components/Card.zen",
+            "src/components/Card.zen#script0",
+            "const ready = true\n",
+            false,
+            false,
+            &mut profile,
+        )
+        .expect("script should analyze");
+
+        assert_eq!(script.module_id, "src/components/Card.zen:script0");
+        assert!(!script.hoist_id.is_empty());
+        assert_ne!(script.module_id, script.hoist_id);
+        assert!(!script.factory_code.trim().is_empty());
+    }
 }

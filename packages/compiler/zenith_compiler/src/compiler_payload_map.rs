@@ -49,6 +49,17 @@ pub(crate) fn map_hoisted(output: HoistedOutput) -> HoistedPayload {
     }
 }
 
+pub fn component_script_bundler_value(script: &ComponentScriptPayload) -> serde_json::Value {
+    serde_json::json!({
+        "hoist_id": script.hoist_id,
+        "module_id": script.module_id,
+        "factory": script.factory,
+        "imports": script.imports,
+        "deps": [],
+        "code": script.code
+    })
+}
+
 pub(crate) fn map_component_scripts(
     scripts: BTreeMap<String, ComponentScriptAsset>,
 ) -> BTreeMap<String, ComponentScriptPayload> {
@@ -58,6 +69,7 @@ pub(crate) fn map_component_scripts(
             key,
             ComponentScriptPayload {
                 hoist_id: script.hoist_id,
+                module_id: script.module_id,
                 factory: script.factory,
                 imports: script.imports,
                 code: script.code,
@@ -231,4 +243,55 @@ fn slice_columns(line: &str, start_column: usize, end_column: usize) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+    use crate::script::HoistedScript;
+    use crate::transform::transform;
+
+    #[test]
+    fn map_component_scripts_forwards_compiler_module_id() {
+        let module_id = crate::script::component_script_module_id("src/components/Card.zen", 0);
+        let script = HoistedScript {
+            id: 0,
+            component_path: "src/components/Card.zen#script0".to_string(),
+            is_global: false,
+            hoist_id: "hoist_card".to_string(),
+            factory_name: "createComponent_hoist_card".to_string(),
+            factory_code: "export function createComponent_hoist_card(){ return { mount(){}, update(){}, destroy(){}, bindings:Object.freeze({}) }; }".to_string(),
+            renamed_source: String::new(),
+            imports: vec!["import helper from './helper.js';".to_string()],
+            declarations: Vec::new(),
+            functions: Vec::new(),
+            signals: Vec::new(),
+            bindings: Vec::new(),
+            module_id: module_id.clone(),
+        };
+        let mut parser = Parser::new(
+            r#"<div><zenith-script data-zx-script-id="0"></zenith-script><p>Hi</p></div>"#,
+        );
+        let ast = parser.parse();
+        let (_, _, _, _, component_scripts, instances, _, _, _, _) = transform(ast, &[script]);
+        let mapped = map_component_scripts(component_scripts);
+
+        assert_eq!(instances.len(), 1);
+        let payload = mapped.get("hoist_card").expect("component script");
+        assert_eq!(payload.module_id, module_id);
+        assert_eq!(payload.hoist_id, "hoist_card");
+        assert_eq!(payload.factory, "createComponent_hoist_card");
+        assert_eq!(
+            payload.imports,
+            vec!["import helper from './helper.js';".to_string()]
+        );
+        assert!(!payload.code.trim().is_empty());
+
+        let json = component_script_bundler_value(payload);
+        assert_eq!(json["module_id"], module_id);
+        assert_eq!(json["hoist_id"], "hoist_card");
+        assert!(json["deps"].is_array());
+        assert!(!json["code"].as_str().unwrap_or("").trim().is_empty());
+    }
 }

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The compiler now owns component-script `module_id` (`{source_path}:script{index}`) and emits it on `components_scripts`. The CLI forwards that field unchanged, and the bundler still rejects an empty `module_id`. `hoist_id` stays the content hash used for dedup and asset names (JUD-6).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed

@@ -5,8 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 use zenith_compiler::compiler::MarkerPayload;
 use zenith_compiler::compiler::{
-    compile_structured_with_source_options_and_report, CompileDiagnosticSeverity, CompileOptions,
-    CompilerOutput,
+    compile_structured_with_source_options_and_report, component_script_bundler_value,
+    CompileDiagnosticSeverity, CompileOptions, CompilerOutput,
 };
 use zenith_compiler::deterministic::sha256_hex;
 
@@ -242,15 +242,7 @@ fn main() -> Result<()> {
 
     let mut component_scripts = serde_json::Map::new();
     for (hoist_id, script) in &output.components_scripts {
-        component_scripts.insert(
-            hoist_id.clone(),
-            serde_json::json!({
-                "hoist_id": script.hoist_id,
-                "factory": script.factory,
-                "imports": script.imports,
-                "code": script.code
-            }),
-        );
+        component_scripts.insert(hoist_id.clone(), component_script_bundler_value(script));
     }
     let graph_hash = compute_graph_hash(&output);
 

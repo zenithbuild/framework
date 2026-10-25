@@ -3,6 +3,7 @@ use crate::compiler_diagnostics::{diagnostic_from_error_message, map_warning_dia
 use crate::compiler_expression_bindings::map_expression_bindings;
 use crate::compiler_expression_validate::validate_unbound_expressions;
 use crate::compiler_panic::catch_unwind_silent;
+pub use crate::compiler_payload_map::component_script_bundler_value;
 use crate::compiler_payload_map::{
     map_component_instances, map_component_scripts, map_events, map_hoisted, map_markers,
     map_ref_bindings, map_signals, map_warnings, strip_html_comments,

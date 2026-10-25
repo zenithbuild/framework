@@ -3,7 +3,7 @@ title: "Component Script Hoisting Contract"
 description: "Compile-time hoisting, bundler emission, and runtime payload boundaries for component scripts."
 version: "0.3"
 status: "canonical"
-last_updated: "2026-02-25"
+last_updated: "2026-10-25"
 tags: ["contracts", "compiler", "runtime", "components"]
 section: "Advanced"
 sectionOrder: 8
@@ -23,6 +23,7 @@ Banned:
 
 Definition of Done:
 - Compiler emits deterministic `hoist_id` + instance ordering.
+- Compiler owns `components_scripts[].module_id` (`{source_path}:script{index}`). The CLI forwards it unchanged. The bundler rejects an empty value.
 - Bundler deduplicates by `hoist_id`.
 - Runtime mounts factories from payload only.
 

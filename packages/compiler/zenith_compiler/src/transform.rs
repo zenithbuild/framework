@@ -199,6 +199,7 @@ impl Transformer {
                         .entry(script.hoist_id.clone())
                         .or_insert_with(|| ComponentScriptAsset {
                             hoist_id: script.hoist_id.clone(),
+                            module_id: script.module_id.clone(),
                             factory: script.factory_name.clone(),
                             imports: script.imports.clone(),
                             code: script.factory_code.clone(),

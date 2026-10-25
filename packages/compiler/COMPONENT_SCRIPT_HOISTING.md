@@ -10,6 +10,7 @@ Component `<script>` blocks are compile-time artifacts. They are not runtime com
 - Parse component scripts and validate forbidden primitives.
 - Compute deterministic `hoist_id` values from canonicalized script source.
 - Emit `components_scripts` in IR keyed by `hoist_id`.
+- Own `components_scripts[].module_id`. The value is `{source_path}:script{index}`: the source path given to the compiler, with backslashes normalized to `/`, plus the script index in that file. `hoist_id` stays the content hash used for dedup and asset names. The CLI forwards `module_id` unchanged. The bundler rejects an empty `module_id`.
 - Emit `component_instances` in deterministic traversal order.
 - Rewrite template expression identifiers to deterministic instance keys.
 

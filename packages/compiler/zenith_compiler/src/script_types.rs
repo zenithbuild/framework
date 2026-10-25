@@ -86,6 +86,8 @@ pub struct HoistedScript {
     pub functions: Vec<String>,
     pub signals: Vec<String>,
     pub bindings: Vec<HoistedBinding>,
+    /// Compiler-owned import owner. `{source_path}:script{index}`.
+    pub module_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -97,6 +99,8 @@ pub struct HoistedStateBinding {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ComponentScriptAsset {
     pub hoist_id: String,
+    /// Compiler-owned import owner. Distinct from `hoist_id`.
+    pub module_id: String,
     pub factory: String,
     pub imports: Vec<String>,
     pub code: String,

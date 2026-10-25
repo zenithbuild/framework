@@ -75,6 +75,14 @@ export function addMergeMetric(mergeMetrics, key, value) {
     mergeMetrics[key] = (mergeMetrics[key] || 0) + value;
 }
 
+/**
+ * Compiler owns `components_scripts[].module_id`.
+ * Composition forwards the payload object unchanged.
+ */
+export function forwardComponentScript(script) {
+    return script;
+}
+
 export function mergeComponentIr(
     pageIr,
     compIr,
@@ -91,7 +99,7 @@ export function mergeComponentIr(
     if (compIr.components_scripts) {
         for (const [hoistId, script] of Object.entries(compIr.components_scripts)) {
             if (!pageIr.components_scripts[hoistId]) {
-                pageIr.components_scripts[hoistId] = script;
+                pageIr.components_scripts[hoistId] = forwardComponentScript(script);
             }
         }
     }

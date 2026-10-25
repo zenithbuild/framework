@@ -31,6 +31,8 @@ pub struct HoistedState {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ComponentScriptPayload {
     pub hoist_id: String,
+    /// `{source_path}:script{index}`. The compiler owns this identity.
+    pub module_id: String,
     pub factory: String,
     pub imports: Vec<String>,
     pub code: String,

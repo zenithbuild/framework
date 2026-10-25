@@ -9,6 +9,7 @@ mod script_extract;
 #[path = "script_types.rs"]
 mod script_types;
 
+pub use script_analyze::component_script_module_id;
 pub use script_dom_lint::{collect_dom_lint_warnings, ScriptDomLint};
 pub use script_extract::{extract_script_blocks, extract_script_blocks_with_profile};
 pub use script_types::{
