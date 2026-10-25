@@ -73,6 +73,16 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 `target` / `adapter` behavior:
 
+Supported deployment targets:
+
+- `static`
+- `static-export`
+- `vercel-static`
+- `netlify-static`
+- `vercel`
+- `netlify`
+- `node`
+
 - `target` is the shorthand deployment target. Phase 1 defaults loaded config to `target: 'static'`.
 - `adapter` is the explicit adapter object form and is mutually exclusive with `target`.
 - `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes.
@@ -105,7 +115,7 @@ Current limitations:
 - `zenith plugin info <name|alias>` — registry metadata and local `package.json` `zenith` block if installed
 
 ### `zenith adapter`
-- `zenith adapter list` — registry adapters and built-in targets
+- `zenith adapter list` — built-in host targets and deployment target names
 
 ### `zenith dev`
 Starts the development server on `localhost:3000`.
