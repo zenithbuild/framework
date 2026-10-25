@@ -1,6 +1,7 @@
 import { prepareProjectImages, writeImagePackageMarker } from './project-images.js';
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { hostedTargetVerificationNotice } from './adapters/hosted-target-notice.js';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { normalizeBasePath } from './base-path.js';
 import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from './base-path-html.js';
@@ -73,6 +74,10 @@ export async function build(options) {
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const compilerTotals = createCompilerTotals();
     const { target, adapter, mode } = resolveBuildAdapter(config);
+    const hostedNotice = hostedTargetVerificationNotice(target);
+    if (hostedNotice && logger && typeof logger.build === 'function') {
+        logger.build(hostedNotice);
+    }
     const basePath = normalizeBasePath(config.basePath || '/');
     const routeCheckEnabled = supportsTargetRouteCheck(target);
     const routerEnabled = config.router === true;
