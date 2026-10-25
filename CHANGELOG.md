@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Extract `_coerceText` and `_createContextualFragment` into `packages/runtime/src/render-utils.js` so `render.js` and `fragment-patch.js` no longer import each other. `render.js` and `hydrate.js` keep the same exports, and the concatenated runtime template still contains each helper once (JUD-11).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -141,16 +141,20 @@ describe('render utility boundary', () => {
 
         const snapshot = runtimeModuleProfileSnapshot('production-emitted');
         const directory = mkdtempSync(join(tmpdir(), 'zenith-render-utils-'));
-        const file = join(directory, 'runtime.mjs');
-        writeFileSync(file, snapshot.source);
-        const emitted = await import(pathToFileURL(file).href);
-        expect(emitted._coerceText).toBe(emitted.coerceText);
-        expect(typeof emitted._createContextualFragment).toBe('function');
-        expect(typeof emitted._applyMarkerValue).toBe('function');
-        expect(typeof emitted.createFragmentRegion).toBe('function');
+        try {
+            const file = join(directory, 'runtime.mjs');
+            writeFileSync(file, snapshot.source);
+            const emitted = await import(pathToFileURL(file).href);
+            expect(emitted._coerceText).toBe(emitted.coerceText);
+            expect(typeof emitted._createContextualFragment).toBe('function');
+            expect(typeof emitted._applyMarkerValue).toBe('function');
+            expect(typeof emitted.createFragmentRegion).toBe('function');
 
-        const host = document.createElement('div');
-        emitted._applyMarkerValue([host], { kind: 'text', index: 0 }, 'emitted');
-        expect(host.textContent).toBe('emitted');
+            const host = document.createElement('div');
+            emitted._applyMarkerValue([host], { kind: 'text', index: 0 }, 'emitted');
+            expect(host.textContent).toBe('emitted');
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
     });
 });

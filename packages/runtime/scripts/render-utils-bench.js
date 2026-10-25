@@ -14,9 +14,10 @@
  * Env:
  *   RENDER_BENCH_SAMPLES  odd sample count (default 21)
  *   RENDER_BENCH_LABEL    label stored in the JSON result
+ *   RENDER_BENCH_OUT      optional file path; the JSON result is written there
  */
 import { cpus, tmpdir, hostname, platform, arch, release } from 'node:os';
-import { writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -221,29 +222,33 @@ async function loadEmitted() {
     const snapshot = template.runtimeModuleProfileSnapshot('production-emitted');
     const file = join(tmpdir(), `zenith-runtime-template-bench-${process.pid}.mjs`);
     writeFileSync(file, snapshot.source);
-    const emitted = await import(pathToFileURL(file).href);
-    const contributors = {};
-    for (let i = 0; i < snapshot.contributors.length; i++) {
-        const entry = snapshot.contributors[i];
-        if (
-            entry.sourceFile === 'render.js'
-            || entry.sourceFile === 'fragment-patch.js'
-            || entry.sourceFile === 'render-utils.js'
-        ) {
-            contributors[entry.sourceFile] = entry.bytes;
+    try {
+        const emitted = await import(pathToFileURL(file).href);
+        const contributors = {};
+        for (let i = 0; i < snapshot.contributors.length; i++) {
+            const entry = snapshot.contributors[i];
+            if (
+                entry.sourceFile === 'render.js'
+                || entry.sourceFile === 'fragment-patch.js'
+                || entry.sourceFile === 'render-utils.js'
+            ) {
+                contributors[entry.sourceFile] = entry.bytes;
+            }
         }
+        return {
+            graph: 'emitted-production-template',
+            applyMarker: emitted._applyMarkerValue,
+            coerceText: emitted._coerceText,
+            createFragment: emitted._createContextualFragment,
+            createRegion: emitted.createFragmentRegion,
+            sameCoerceIdentity: emitted._coerceText === emitted.coerceText,
+            coverageBytes: snapshot.coverageBytes,
+            contributorBytes: contributors,
+            moduleFile: file
+        };
+    } finally {
+        rmSync(file, { force: true });
     }
-    return {
-        graph: 'emitted-production-template',
-        applyMarker: emitted._applyMarkerValue,
-        coerceText: emitted._coerceText,
-        createFragment: emitted._createContextualFragment,
-        createRegion: emitted.createFragmentRegion,
-        sameCoerceIdentity: emitted._coerceText === emitted.coerceText,
-        coverageBytes: snapshot.coverageBytes,
-        contributorBytes: contributors,
-        moduleFile: file
-    };
 }
 
 function runGraph(api) {
