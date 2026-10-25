@@ -3,7 +3,7 @@ title: "Global Middleware"
 description: "TypeScript-only root middleware for matched server page and resource routes."
 version: "0.1"
 status: "canonical"
-last_updated: "2026-05-25"
+last_updated: "2026-10-24"
 tags: ["routing", "middleware", "server"]
 nav:
   order: 45
@@ -51,7 +51,8 @@ Root global middleware runs:
 - before `guard(ctx)`, `action(ctx)`, and `load(ctx)`
 - for matched server page routes
 - for matched resource routes
-- in dev, preview, packaged `node`, built-in `vercel`, and built-in `netlify` targets
+- in dev, preview, and the packaged `node` artifact
+- in the emitted function bundles for built-in `vercel` and `netlify` (locally conformance-tested, not live-verified on the providers)
 
 Root global middleware does not run for:
 - static assets
@@ -145,4 +146,4 @@ Route-local `withMiddleware(...)` is an imported helper for handler-level compos
 
 ## Hosted Adapter Note
 
-Built-in `vercel` and `netlify` targets support this V1 middleware contract today. Their current hosted support is compatibility for the built-in adapters, not a public adapter plugin API.
+Built-in `vercel` and `netlify` targets include this V1 middleware contract in the emitted function bundles. That behavior is locally conformance-tested adapter compatibility. It is not a live provider verification, and it is not a public adapter plugin API.

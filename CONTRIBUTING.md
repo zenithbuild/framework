@@ -13,6 +13,7 @@ This repository contains the Zenith framework monorepo. Governance and release r
 ## Required For Every PR
 
 - Add a bullet to [CHANGELOG.md](./CHANGELOG.md) under `## [Unreleased]`.
+- When cutting a versioned release section, include the Deployment verification subsection from [docs/changelog/TEMPLATE.md](./docs/changelog/TEMPLATE.md). Day-to-day pull requests do not invent that subsection's provider results.
 - Keep governance, release policy, and contract docs aligned with implementation changes.
 - Preserve package names and the lockstep train version policy unless a repo-level versioning decision changes it.
 - Keep CI unified through the single root gate: `bun run ci`.

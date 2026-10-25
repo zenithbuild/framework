@@ -22,6 +22,8 @@ Defer hosted `ctx.download()` parity into a separate milestone and issue.
 
 Do not claim full live hosted parity in public docs or release notes until one real Vercel deployment smoke test and one real Netlify deployment smoke test pass.
 
+2026-10-24 update (JUD-22 path 2, JUD-95, JUD-99): public docs and `docs/changelog/TEMPLATE.md` qualify hosted targets as conformance-tested and not live-verified. This bar still forbids a live-verified or full hosted-parity claim until the smoke in this folder passes. Live smoke stays deferred.
+
 ## Rationale
 
 #193 confirmed that hosted Vercel and Netlify direct requests already execute server-side `guard(ctx)` / `load(ctx)` through generated hosted functions. The missing route-check endpoint is therefore not a confirmed security bypass. It is a product trust and soft-navigation UX gap: local dev, preview, and packaged `node` expose the advisory preflight, while hosted Vercel and Netlify do not.

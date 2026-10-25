@@ -30,7 +30,7 @@ npx skills add https://github.com/zenithbuild/framework/tree/master/skills/zenit
 ## What Stays Separate
 - Plugins live in separate repositories.
 - `zenith-language` and `zenith-language-server` remain separate repositories.
-- `site` is a separate public deployable app boundary for the marketing site, docs, blog, changelog, and Vercel surface.
+- `site` is a separate public deployable app for the marketing site, docs, blog, and changelog. The host for that app is configured outside this repository.
 - Imported source refs are tracked in [`./MIGRATION_SOURCES.md`](./MIGRATION_SOURCES.md).
 
 ## Repository Settings

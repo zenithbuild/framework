@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- Qualify built-in Vercel and Netlify deployment docs as locally conformance-tested, not live-verified. The target matrix includes `vercel-static` and `netlify-static`, a verification-status column, per-target output directories and deploy commands, and static-host upload recipes. Unsourced provider body-size numbers were removed (JUD-95, JUD-22 path 2).
+- Add a Deployment verification subsection to the release-notes template at `docs/changelog/TEMPLATE.md`, with conformance-tested, locally served, and not live-verified buckets. CI Pipeline Engineer fills those buckets from JUD-94 when that job exists. This note does not record a live provider result (JUD-99).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed
@@ -51,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Adapter and plugin boundary groundwork
 
 - Confirmed the internal adapter contract around `AdapterDriver` and `resolveBuildAdapter(...)` without shipping a public adapter plugin API.
-- Verified built-in Vercel and Netlify adapters already route through the normalized internal adapter contract and shared hosted infrastructure.
+- Checked in-repo that built-in Vercel and Netlify adapters already route through the normalized internal adapter contract and shared hosted infrastructure. That check was not a live Vercel or Netlify deployment.
 - Added the delegated adapter surface RFC as planning material only, keeping `target` as the stable deployment selector and the raw `adapter` object as an advanced surface.
 - Kept extension registry source internal for this train while preserving the read-only plugin and adapter discovery commands in `@zenithbuild/cli`.
 

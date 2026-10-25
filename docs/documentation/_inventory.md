@@ -37,7 +37,7 @@ Definition of Done:
 | reference/markers | Marker Reference | reference | keep | Marker guarantees |
 | reference/server-data-api | Server Data API | reference | keep | Public API summary |
 | guides/cms-unified-site | CMS Unified Site Guide | guide | keep | Unified route view model |
-| guides/deployment-targets | Deployment Targets Guide | guide | keep | Canonical target matrix, preview behavior, and deployment limits |
+| guides/deployment-targets | Deployment Targets Guide | guide | keep | Use-case lead (static site, Node server, serverless layouts), verification column (conformance-tested / not live-verified / docs-only recipes), and static-host upload recipes. JUD-95 / JUD-22 path 2. Live provider smoke stays deferred. |
 | guides/troubleshooting | Troubleshooting Guide | guide | keep | Operational diagnosis |
 | contributing/drift-gates | Drift Gates | contributing | keep | CI + docs integrity checks |
 | routing/navigation-shell | Navigation Shell | routing | keep | Canonical tiny visual shell utility on existing lifecycle |

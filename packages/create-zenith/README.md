@@ -80,16 +80,19 @@ The basic template also keeps `router: false` explicit to preserve the single-pa
 
 Supported deployment targets in the framework today are:
 
-- `static`
+- `static` (default for generated templates)
+- `static-export`
 - `vercel-static`
 - `netlify-static`
 - `vercel`
 - `netlify`
 - `node`
 
+`static` and `static-export` are portable file output. `node` is a portable Node server. `vercel`, `netlify`, `vercel-static`, and `netlify-static` are built-in host layouts. Those hosted layouts are locally conformance-tested and are not live-verified on Vercel or Netlify. Cloudflare is not a built-in target. Static output can still be uploaded to Cloudflare Pages, GitHub Pages, Vercel, or Netlify as a docs-only recipe.
+
 `npm run preview` is target-aware. It previews the built target contract for the generated app instead of always acting like a generic static file server.
 
-For the full target matrix, emitted output shapes, and current limitations, see `../../docs/documentation/guides/deployment-targets.md`.
+For the full target matrix, verification status, output directories, deploy commands, and static-host upload recipes, see `../../docs/documentation/guides/deployment-targets.md`.
 
 ## Development
 
