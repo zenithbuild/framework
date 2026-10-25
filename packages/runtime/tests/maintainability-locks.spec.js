@@ -13,6 +13,7 @@ const HYDRATION_RUNTIME_FILES = [
     'hydrate.js',
     'markup.js',
     'payload.js',
+    'render-utils.js',
     'render.js',
     'scanner.js',
     'template-parser.js',
@@ -51,10 +52,23 @@ describe('Track E maintainability locks', () => {
 
     test('fragment rendering utilities no longer duplicate through hydrate.js', () => {
         const fragmentSource = readSource('fragment-patch.js');
+        const renderSource = readSource('render.js');
+        const utilsSource = readSource('render-utils.js');
 
-        expect(fragmentSource).toContain("from './render.js'");
+        expect(fragmentSource).toContain("from './render-utils.js'");
         expect(fragmentSource).not.toContain("from './hydrate.js'");
+        expect(fragmentSource).not.toContain("from './render.js'");
         expect(fragmentSource).not.toContain('export function coerceText(');
+        expect(fragmentSource).not.toContain('function _coerceText(');
+        expect(fragmentSource).not.toContain('function _createContextualFragment(');
+        expect(renderSource).toContain("from './render-utils.js'");
+        expect(renderSource).toContain("export { _createContextualFragment, _coerceText } from './render-utils.js'");
+        expect(renderSource).not.toContain('function _coerceText(');
+        expect(renderSource).not.toContain('function _createContextualFragment(');
+        expect(utilsSource).toContain('export function _coerceText(');
+        expect(utilsSource).toContain('export function _createContextualFragment(');
+        expect(utilsSource).not.toContain("from './render.js'");
+        expect(utilsSource).not.toContain("from './fragment-patch.js'");
     });
 
     test('runtime template bundle includes extracted hydration modules', () => {

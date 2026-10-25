@@ -1,4 +1,4 @@
-import { _createContextualFragment, _coerceText } from './render.js';
+import { _createContextualFragment, _coerceText } from './render-utils.js';
 import { _isHtmlFragment } from './markup.js';
 
 export function createFragmentRegion() {

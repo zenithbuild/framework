@@ -1,6 +1,8 @@
 import { rethrowZenithRuntimeError, throwZenithRuntimeError, DOCS_LINKS } from './diagnostics.js';
 import { createFragmentRegion } from './fragment-patch.js';
 import { _isHtmlFragment } from './markup.js';
+import { _createContextualFragment, _coerceText } from './render-utils.js';
+export { _createContextualFragment, _coerceText } from './render-utils.js';
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const BOOLEAN_ATTRIBUTES = new Set([
@@ -71,16 +73,6 @@ function _applyCommentMarkerValue(anchor, value, rootPath) {
 
     const textNode = (parent.ownerDocument || document).createTextNode(_coerceText(value, rootPath));
     parent.insertBefore(textNode, end);
-}
-
-export function _createContextualFragment(parent, html) {
-    const doc = parent.ownerDocument || document;
-    if (!doc || typeof doc.createRange !== 'function') {
-        throw new Error('[Zenith Runtime] comment placeholder HTML rendering requires Range#createContextualFragment');
-    }
-    const range = doc.createRange();
-    range.selectNode(parent);
-    return range.createContextualFragment(html);
 }
 
 function _isStructuralFragment(value) {
@@ -171,33 +163,6 @@ function _replaceTextMarkerContent(node, value, rootPath) {
     } else {
         node.textContent = _coerceText(value, rootPath);
     }
-}
-
-export function _coerceText(value, path = 'renderable') {
-    if (value === null || value === undefined || value === false || value === true) {
-        return '';
-    }
-    if (typeof value === 'function') {
-        throwZenithRuntimeError({
-            phase: 'render',
-            code: 'NON_RENDERABLE_VALUE',
-            message: `Zenith Render Error: non-renderable function at ${path}. Use map() to render fields.`,
-            path,
-            hint: 'Convert functions to handlers or text.',
-            docsLink: DOCS_LINKS.expressionScope
-        });
-    }
-    if (value && typeof value === 'object') {
-        throwZenithRuntimeError({
-            phase: 'render',
-            code: 'NON_RENDERABLE_VALUE',
-            message: `Zenith Render Error: non-renderable object at ${path}. Use map() to render fields.`,
-            path,
-            hint: 'Use map() to render object fields.',
-            docsLink: DOCS_LINKS.expressionScope
-        });
-    }
-    return String(value);
 }
 
 function _renderFragmentValue(value, path = 'renderable') {
