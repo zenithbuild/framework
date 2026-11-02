@@ -38,7 +38,7 @@ function printUsage(logger) {
     logger.print('  zenith build                         Build static site to the configured output dir');
     logger.print('  zenith preview [port|--port <port>]  Preview the configured output dir statically');
     logger.print('  zenith plugin list|search|info        List and inspect official plugins');
-    logger.print('  zenith adapter list                   List official adapters and built-in targets');
+    logger.print('  zenith adapter list                   List built-in host targets and deployment targets');
     logger.print('');
     logger.print('Options:');
     logger.print('  -h, --help        Show this help message');

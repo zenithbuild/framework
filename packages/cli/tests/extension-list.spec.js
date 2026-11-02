@@ -50,7 +50,10 @@ describe('extension registry and read-only CLI', () => {
         const code = await runAdapterCommand(['list'], { projectRoot: process.cwd(), logger });
         expect(code).toBe(0);
         const output = lines.join('');
-        expect(output).toContain('@zenithbuild/adapter-vercel');
+        expect(output).toContain('Host targets (built-in):');
+        expect(output).not.toContain('Official adapters');
+        expect(output).toContain('@zenithbuild/adapter-vercel [not-installable');
+        expect(output).toContain('@zenithbuild/adapter-netlify [not-installable');
         expect(output).toContain('Built-in targets');
         expect(output).toContain('node');
     });
