@@ -659,7 +659,7 @@
 
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
 
-    "@types/node": ["@types/node@26.6.5", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg=="],
+    "@types/node": ["@types/node@26.6.6", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog=="],
 
     "@types/stack-utils": ["@types/stack-utils@2.0.3", "", {}, "sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw=="],
 
@@ -1489,7 +1489,11 @@
 
     "@zenithbuild/extension-registry/@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw=="],
 
+    "@zenithbuild/language/@types/node": ["@types/node@26.6.5", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg=="],
+
     "@zenithbuild/language/@zenithbuild/compiler": ["@zenithbuild/compiler@0.8.0", "", { "optionalDependencies": { "@zenithbuild/compiler-darwin-arm64": "0.8.0", "@zenithbuild/compiler-darwin-x64": "0.8.0", "@zenithbuild/compiler-linux-x64": "0.8.0", "@zenithbuild/compiler-win32-x64": "0.8.0" } }, "sha512-F6JPgKVVMn9N4EcYcMbw5S+7oXj+UxrBaPX1ObgrVlydbFti+06ApqGA8B4bcQry8Dq2hGBcGrYoCMZSAq6oUw=="],
+
+    "@zenithbuild/language-server/@types/node": ["@types/node@26.6.5", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg=="],
 
     "@zenithbuild/language-server/@zenithbuild/compiler": ["@zenithbuild/compiler@0.8.0", "", { "optionalDependencies": { "@zenithbuild/compiler-darwin-arm64": "0.8.0", "@zenithbuild/compiler-darwin-x64": "0.8.0", "@zenithbuild/compiler-linux-x64": "0.8.0", "@zenithbuild/compiler-win32-x64": "0.8.0" } }, "sha512-F6JPgKVVMn9N4EcYcMbw5S+7oXj+UxrBaPX1ObgrVlydbFti+06ApqGA8B4bcQry8Dq2hGBcGrYoCMZSAq6oUw=="],
 
