@@ -50,7 +50,9 @@ Zenith uses three protected branches with branch-specific semver lines. Channel 
 - Every pull request into `train` must add at least one bullet to [CHANGELOG.md](../../CHANGELOG.md) under `## [Unreleased]`.
 - `Unreleased` is the source of truth for the next train cut.
 - Before any tagged release, move the relevant `Unreleased` bullets into a versioned section matching `TRAIN_VERSION`.
-- Stable releases must also add or update the matching docs-side markdown entry under [docs/changelog](../changelog/) before the release is considered complete.
+- Every versioned section includes a **Deployment verification** subsection copied from [docs/changelog/TEMPLATE.md](../changelog/TEMPLATE.md). The three buckets are conformance-tested, locally served, and not live-verified. Fill them from CI evidence for that commit. Write `not run` when a job does not exist. Do not mark a provider live-verified without a recorded live smoke (JUD-99, JUD-22 path 2).
+- CI Pipeline Engineer fills conformance-tested and locally served from JUD-94 (the named hosted-adapter conformance suite and the credential-free node/static serve). Until that job exists, conformance-tested describes today's in-process `test:deployment-smoke` and `adapter-hosted-*` specs, and locally served stays `not run`.
+- Stable releases must also add or update the matching docs-side markdown entry under [docs/changelog](../changelog/) before the release is considered complete. That entry includes the same Deployment verification subsection.
 
 ## Release Flow
 

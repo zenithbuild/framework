@@ -25,13 +25,14 @@ This audit classifies reader-facing coverage after the documentation information
 | CLI | Complete | `cli-contract.md` |
 | Build | Complete | `getting-started/build-and-preview.md`, `cli-contract.md` |
 | Preview | Complete | `getting-started/build-and-preview.md`, `guides/deployment-targets.md` |
-| Deployment | Complete for implemented targets | `guides/deployment-targets.md` |
+| Deployment | Guide published. Hosted Vercel/Netlify rows are conformance-tested, not live-verified (JUD-95 / JUD-22 path 2, 2026-10-24). | `guides/deployment-targets.md` |
 | Adapters | Present with explicit limitations | `guides/deployment-targets.md`, `contracts/extension-contract.md` |
 | Configuration | Complete | `contracts/config-contract.md` |
 | Error diagnostics | Complete | `errors/index.md`, `guides/troubleshooting.md` |
 
 ## Remaining review debt
 
-- Adapter coverage intentionally follows only currently implemented targets; provider-specific tutorials remain deferred.
+- 2026-10-24 (JUD-39 deployment gap, JUD-95): the Deployment section matches JUD-22 path 2. Public docs qualify hosted Vercel and Netlify as built and locally conformance-tested, not live-verified. Live dual-host smoke stays deferred. Static-host upload steps for Vercel, Netlify, Cloudflare Pages, and GitHub Pages are docs-only recipes. Cloudflare is not a built-in target. Release notes use `docs/changelog/TEMPLATE.md` (JUD-99).
+- Adapter coverage intentionally follows only currently implemented targets. Static-host upload recipes are documented. Provider live-smoke tutorials remain deferred.
 - Advanced contract pages retain their contract-version metadata and phase terminology. They passed current syntax and snippet gates, but future framework releases should re-review that language against shipped behavior.
 - Search UI work and versioned documentation remain deferred; the generated AI/search index now follows the shared public inclusion and ordering policy.

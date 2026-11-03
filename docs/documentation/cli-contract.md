@@ -3,7 +3,7 @@ title: "CLI Contract"
 description: "Public CLI guarantees for command behavior, exit semantics, and deployment-aware build outputs."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-06-07"
+last_updated: "2026-10-24"
 tags: ["contracts", "cli", "commands"]
 section: "Build and Tooling"
 sectionOrder: 6
@@ -56,6 +56,8 @@ Today the supported target names are:
 - `node`
 
 `zenith preview` is target-aware. It previews the built target contract rather than assuming every build is a plain static site.
+
+Verification status, output directories, and deploy commands for these targets live in the [Deployment Targets Guide](/docs/guides/deployment-targets). `static` and `static-export` are portable file output. `node` is a portable Node server. `vercel`, `netlify`, `vercel-static`, and `netlify-static` are locally conformance-tested host layouts and are not live-verified on the providers.
 
 Canonical source: `packages/cli/CLI_CONTRACT.md`.
 

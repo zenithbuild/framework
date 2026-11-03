@@ -164,7 +164,7 @@ const docsDeliveryRef = ref<HTMLElement>();
             <div id="deployment" class="py-8 md:pl-8">
               <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-brand-blue">Adapters</p>
               <h3 class="mt-4 font-heading text-3xl font-semibold text-foreground">Explicit targets</h3>
-              <p class="mt-4 text-sm leading-7 text-muted-foreground">Select a supported target such as node, Vercel, or Netlify through configuration.</p>
+              <p class="mt-4 text-sm leading-7 text-muted-foreground">Choose static output, a Node server, or a built-in Vercel or Netlify layout. Hosted layouts are locally conformance-tested, not live-verified.</p>
             </div>
           </div>
           <div class="mt-12 flex flex-wrap gap-3">

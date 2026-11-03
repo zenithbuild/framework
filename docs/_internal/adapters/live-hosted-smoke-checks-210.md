@@ -6,6 +6,8 @@ Issue: <https://github.com/zenithbuild/framework/issues/210>
 
 Status: runbook and reusable probe added. Live Vercel and Netlify deployments were not run in this Codex environment because neither provider CLI was available locally. Live execution remains pending.
 
+2026-10-24 (JUD-22 path 2 / JUD-95 / JUD-99): Judah qualified public hosted claims instead of blocking docs on this runbook. The checklist below stays pending. Do not record a live-verified result until a real provider run passes. Public docs and `docs/changelog/TEMPLATE.md` use conformance-tested, locally served, and not live-verified. Locally served waits on JUD-94.
+
 ## Purpose
 
 This runbook is the live-provider verification layer after #211 added hosted advisory route-check parity for `vercel` and `netlify`.
