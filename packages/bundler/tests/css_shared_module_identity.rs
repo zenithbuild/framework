@@ -95,11 +95,14 @@ fn import_order_scoped_styles_and_repeated_builds_stay_stable() {
         css.find(needle)
             .unwrap_or_else(|| panic!("missing {needle}"))
     };
+    // Home requires scope, reset, shared, home. About requires scope, shared,
+    // about. The shared module waits until about's scoped block, which must
+    // precede it, has been placed.
     assert!(pos("/* SCOPE_HOME */") < pos("/* RESET */"));
-    assert!(pos("/* RESET */") < pos("/* SHARED_MARKER */"));
+    assert!(pos("/* RESET */") < pos("/* SCOPE_ABOUT */"));
+    assert!(pos("/* SCOPE_ABOUT */") < pos("/* SHARED_MARKER */"));
     assert!(pos("/* SHARED_MARKER */") < pos("/* HOME */"));
-    assert!(pos("/* HOME */") < pos("/* SCOPE_ABOUT */"));
-    assert!(pos("/* SCOPE_ABOUT */") < pos("/* ABOUT */"));
+    assert!(pos("/* HOME */") < pos("/* ABOUT */"));
     assert_asset_references(
         &first,
         &[
@@ -125,4 +128,129 @@ fn import_order_scoped_styles_and_repeated_builds_stay_stable() {
             },
         ],
     );
+}
+
+#[test]
+fn later_route_base_precedes_override_first_seen_on_an_earlier_route() {
+    let tmp = tempfile::tempdir().expect("temp");
+    let root = tmp.path();
+    let pages = root.join("pages");
+    let styles = pages.join("styles");
+    std::fs::create_dir_all(&styles).expect("styles");
+    std::fs::write(pages.join("early.zen"), "<main>early</main>\n").expect("early");
+    std::fs::write(pages.join("later.zen"), "<main>later</main>\n").expect("later");
+    std::fs::write(
+        styles.join("z-override.css"),
+        "/* OVERRIDE */\n.cascade { color: red; }\n",
+    )
+    .expect("override");
+    std::fs::write(
+        styles.join("a-base.css"),
+        "/* BASE */\n.cascade { color: blue; }\n",
+    )
+    .expect("base");
+
+    let early = named_page(
+        root,
+        "/",
+        "early.zen",
+        &["import \"./styles/z-override.css\";"],
+        &["early.zen->styles/z-override.css"],
+        "/* SCOPE_EARLY */\n.scope-early { color: #111; }\n",
+    );
+    let later = named_page(
+        root,
+        "/later",
+        "later.zen",
+        &[
+            "import \"./styles/a-base.css\";",
+            "import \"./styles/z-override.css\";",
+        ],
+        &[
+            "later.zen->styles/a-base.css",
+            "later.zen->styles/z-override.css",
+        ],
+        "/* SCOPE_LATER */\n.scope-later { color: #222; }\n",
+    );
+
+    let first = build_payload(root, json!([early.clone(), later.clone()]), "dist-a");
+    let second = build_payload(root, json!([later, early]), "dist-b");
+    assert_eq!(first.css, second.css);
+    assert_eq!(first.css_public_path, second.css_public_path);
+
+    let css = &first.css;
+    assert_eq!(count_occurrences(css, "/* BASE */"), 1);
+    assert_eq!(count_occurrences(css, "/* OVERRIDE */"), 1);
+    assert_eq!(count_occurrences(css, "/* SCOPE_EARLY */"), 1);
+    assert_eq!(count_occurrences(css, "/* SCOPE_LATER */"), 1);
+    let pos = |needle: &str| {
+        css.find(needle)
+            .unwrap_or_else(|| panic!("missing {needle}"))
+    };
+    assert!(pos("/* SCOPE_EARLY */") < pos("/* SCOPE_LATER */"));
+    assert!(pos("/* SCOPE_LATER */") < pos("/* BASE */"));
+    assert!(pos("/* BASE */") < pos("/* OVERRIDE */"));
+    assert!(pos(".cascade { color: blue; }") < pos(".cascade { color: red; }"));
+}
+
+#[test]
+fn conflicting_import_order_keeps_the_earlier_route_constraint() {
+    let tmp = tempfile::tempdir().expect("temp");
+    let root = tmp.path();
+    let pages = root.join("pages");
+    let styles = pages.join("styles");
+    std::fs::create_dir_all(&styles).expect("styles");
+    std::fs::write(pages.join("home.zen"), "<main>home</main>\n").expect("home");
+    std::fs::write(pages.join("later.zen"), "<main>later</main>\n").expect("later");
+    std::fs::write(
+        styles.join("a-base.css"),
+        "/* BASE */\n.cascade { color: blue; }\n",
+    )
+    .expect("base");
+    std::fs::write(
+        styles.join("z-override.css"),
+        "/* OVERRIDE */\n.cascade { color: red; }\n",
+    )
+    .expect("override");
+
+    let home = named_page(
+        root,
+        "/",
+        "home.zen",
+        &[
+            "import \"./styles/a-base.css\";",
+            "import \"./styles/z-override.css\";",
+        ],
+        &[
+            "home.zen->styles/a-base.css",
+            "home.zen->styles/z-override.css",
+        ],
+        "/* SCOPE_HOME */\n.scope-home { color: #111; }\n",
+    );
+    let later = named_page(
+        root,
+        "/later",
+        "later.zen",
+        &[
+            "import \"./styles/z-override.css\";",
+            "import \"./styles/a-base.css\";",
+        ],
+        &[
+            "later.zen->styles/z-override.css",
+            "later.zen->styles/a-base.css",
+        ],
+        "/* SCOPE_LATER */\n.scope-later { color: #222; }\n",
+    );
+
+    let built = build_payload(root, json!([later, home]), "dist");
+    let css = &built.css;
+    assert_eq!(count_occurrences(css, "/* BASE */"), 1);
+    assert_eq!(count_occurrences(css, "/* OVERRIDE */"), 1);
+    let pos = |needle: &str| {
+        css.find(needle)
+            .unwrap_or_else(|| panic!("missing {needle}"))
+    };
+    assert!(pos("/* SCOPE_HOME */") < pos("/* BASE */"));
+    assert!(pos("/* BASE */") < pos("/* SCOPE_LATER */"));
+    assert!(pos("/* SCOPE_LATER */") < pos("/* OVERRIDE */"));
 }
