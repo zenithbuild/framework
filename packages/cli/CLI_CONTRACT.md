@@ -191,6 +191,21 @@ Each stage is a discrete function call. No implicit chaining.
 - `node` boots the built Node artifact
 - Honors `basePath` for public app routes, asset URLs, and framework endpoints that the selected target exposes
 - Verifies build output is independent of dev mode
+- Preview static files and the standalone Node server share one delivery helper
+- That helper negotiates `Accept-Encoding` for html, css, js, mjs, json, svg, xml, txt, map, and webmanifest bodies of at least 1024 bytes
+- Preference among accepted codings is `br`, then `gzip`, then identity. `q=0` excludes a coding. `*` fills in codings that are not listed
+- `Content-Encoding` is set only for `br` or `gzip`. Identity omits it
+- Eligible responses send `Vary: Accept-Encoding`, including when the selected coding is identity
+- Text types html, css, js, mjs, json, svg, xml, txt, and map advertise `charset=utf-8`. webmanifest stays `application/manifest+json`
+- `Content-Length` is the number of bytes actually sent
+- `HEAD` returns those headers and an empty body
+- `Range` is unsupported. The full representation is returned with status 200
+- Compression runs on request and is stored in a bounded in-memory cache keyed by path, mtime, size, and encoding. Build output does not contain `.br` or `.gz` sidecars
+- Brotli quality 11 is a local preview and Node choice. It is not a byte-identical Vercel emulation
+- Resource routes, route-check, the image endpoint, and SSR or other dynamic responses are not compressed. Rewritten preview HTML (image runtime injection or SSR) is dynamic and stays uncompressed. Prerendered files served as static bytes, including `static-export` HTML and Node prerendered HTML, are in scope
+- Images, fonts, wasm, and archives are not compressed
+- Vercel and Netlify adapters do not set `Content-Encoding` or compress. Those CDNs own compression
+- Dev server responses do not negotiate content encoding
 
 ---
 

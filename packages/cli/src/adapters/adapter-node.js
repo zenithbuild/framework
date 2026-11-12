@@ -7,6 +7,14 @@ const NODE_RUNTIME_FILES = [
         to: 'runtime/node-server.js'
     },
     {
+        from: new URL('../static-delivery.js', import.meta.url),
+        to: 'static-delivery.js'
+    },
+    {
+        from: new URL('../static-mime.js', import.meta.url),
+        to: 'static-mime.js'
+    },
+    {
         from: new URL('../server/resolve-request-route.js', import.meta.url),
         to: 'runtime/resolve-request-route.js'
     },

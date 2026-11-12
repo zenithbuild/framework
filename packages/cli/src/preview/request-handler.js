@@ -7,7 +7,7 @@ import { readRequestBodyBuffer } from '../request-body.js';
 import { buildResourceResponseDescriptor } from '../resource-response.js';
 import { clientFacingRouteMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
-import { STATIC_MIME_TYPES } from '../static-mime.js';
+import { sendStaticFile } from '../static-delivery.js';
 import { loadPreviewGlobalMiddlewareSource } from '../global-middleware-runtime-source.js';
 import { loadRouteSurfaceState } from './manifest.js';
 import { injectSsrPayload } from './payload.js';
@@ -220,19 +220,14 @@ export function createPreviewRequestHandler(options) {
           if (!staticPath || !(await fileExists(staticPath))) {
             throw new Error('not found');
           }
-          const content = await readFile(staticPath);
-          const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
-          res.writeHead(200, { 'Content-Type': mime });
-          res.end(content);
+          await sendStaticFile(req, res, staticPath);
           return;
         }
         const directHtmlPath = toStaticFilePath(distDir, url.pathname);
         if (!directHtmlPath || !(await fileExists(directHtmlPath))) {
           throw new Error('not found');
         }
-        const html = await readFile(directHtmlPath, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(html);
+        await sendStaticFile(req, res, directHtmlPath);
         return;
       }
 
@@ -280,10 +275,7 @@ export function createPreviewRequestHandler(options) {
         if (!staticPath || !(await fileExists(staticPath))) {
           throw new Error('not found');
         }
-        const content = await readFile(staticPath);
-        const mime = STATIC_MIME_TYPES[extname(staticPath)] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': mime });
-        res.end(content);
+        await sendStaticFile(req, res, staticPath);
         return;
       }
 
