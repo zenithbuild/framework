@@ -115,7 +115,8 @@ fn unescape_attr(value: &str) -> String {
 }
 
 /// Byte index of a real `<name` or `</name` tag. Quoted attributes, comments,
-/// and script/style raw text do not count.
+/// and raw text in `script`, `style`, `title`, `textarea`, `template`, and
+/// `noscript` do not count.
 fn find_tag_start(html: &str, name: &[u8], end_tag: bool) -> Option<usize> {
     let bytes = html.as_bytes();
     let mut i = 0;
@@ -194,13 +195,18 @@ fn tag_name_matches(tag: &[u8], name: &[u8], end_tag: bool) -> bool {
 }
 
 fn rawtext_name(tag: &[u8]) -> Option<&'static [u8]> {
-    if tag_name_matches(tag, b"script", false) {
-        Some(b"script")
-    } else if tag_name_matches(tag, b"style", false) {
-        Some(b"style")
-    } else {
-        None
-    }
+    const NAMES: &[&[u8]] = &[
+        b"script",
+        b"style",
+        b"title",
+        b"textarea",
+        b"template",
+        b"noscript",
+    ];
+    NAMES
+        .iter()
+        .copied()
+        .find(|name| tag_name_matches(tag, name, false))
 }
 
 fn comment_end(bytes: &[u8], from: usize) -> usize {
@@ -375,6 +381,21 @@ mod tests {
             "<meta name=\"description\" content=\"Learn about </head>\"><!-- </head> --><script>const marker = \"</head>\";</script><style>.x::before{content:\"</head>\"}</style>"
         ));
         assert!(updated.contains(&format!("{hint}\n</HEAD>")));
+        assert_eq!(updated.matches(hint).count(), 1);
+        ensure_unique_modulepreload_hrefs(&updated, &hrefs, "/").unwrap();
+    }
+
+    #[test]
+    fn modulepreload_hints_skip_head_close_inside_title_textarea_template_and_noscript() {
+        let html = "<!DOCTYPE html><html><head><title>about </head> here</title><textarea></head></textarea><template><div></head></div></template><noscript></head></noscript></head><body></body></html>";
+        let hrefs = vec!["/assets/runtime.abc.js".to_string()];
+        let updated = inject_modulepreload_hints(html, &hrefs);
+        let hint = "<link rel=\"modulepreload\" href=\"/assets/runtime.abc.js\">";
+        assert!(updated.contains("<title>about </head> here</title>"));
+        assert!(updated.contains("<textarea></head></textarea>"));
+        assert!(updated.contains("<template><div></head></div></template>"));
+        assert!(updated.contains("<noscript></head></noscript>"));
+        assert!(updated.contains(&format!("{hint}\n</head><body>")));
         assert_eq!(updated.matches(hint).count(), 1);
         ensure_unique_modulepreload_hrefs(&updated, &hrefs, "/").unwrap();
     }
