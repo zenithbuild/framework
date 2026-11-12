@@ -140,14 +140,20 @@ describe('platform static adapters', () => {
     });
 
     test('static and static-export emit no generated cache policy', async () => {
-        projectRoot = await createProject({
-            'pages/index.zen': '<main>home</main>\n',
-            'public/_headers': '# user only\n/custom\n  X-Zenith-Test: keep\n',
-            'zenith.config.js': 'module.exports = { target: "static" };\n'
-        });
-        await cli(['build'], projectRoot);
-        const headers = await readFile(join(projectRoot, 'dist', '_headers'), 'utf8');
-        expect(headers).toBe('# user only\n/custom\n  X-Zenith-Test: keep\n');
-        expect(headers).not.toContain('immutable');
+        const userHeaders = '# user only\n/custom\n  X-Zenith-Test: keep\n';
+        for (const target of ['static', 'static-export']) {
+            if (projectRoot) {
+                await rm(projectRoot, { recursive: true, force: true });
+            }
+            projectRoot = await createProject({
+                'pages/index.zen': '<main>home</main>\n',
+                'public/_headers': userHeaders,
+                'zenith.config.js': `module.exports = { target: "${target}" };\n`
+            });
+            await cli(['build'], projectRoot);
+            const headers = await readFile(join(projectRoot, 'dist', '_headers'), 'utf8');
+            expect(headers).toBe(userHeaders);
+            expect(headers).not.toContain('immutable');
+        }
     });
 });
