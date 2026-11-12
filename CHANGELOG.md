@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Emit each shared imported CSS module once across routes, preserving scoped styles and a later route's base-before-override order when the routes agree. When two routes import the same files in opposite orders, the earlier route wins and the build warns with the routes and files involved (JUD-128).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed

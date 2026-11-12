@@ -32,7 +32,7 @@ pub(crate) fn build_css_bundle(
     // by N routes is stored once. Scoped style blocks stay page-scoped.
     let mut shared_imported_modules = BTreeSet::<String>::new();
     let mut cascade_order = 0usize;
-    let mut route_sequences = Vec::<Vec<String>>::new();
+    let mut route_sequences = Vec::<super::bundler_css_order::CssRouteSequence>::new();
     for input in ordered_inputs {
         let mut route_sequence = Vec::<String>::new();
         let page_fragments = collect_css_fragments_for_input(
@@ -50,18 +50,27 @@ pub(crate) fn build_css_bundle(
                 ));
             }
         }
-        route_sequences.push(route_sequence);
+        route_sequences.push(super::bundler_css_order::CssRouteSequence {
+            route: input.route.clone(),
+            source_file: css_page_label(project_root, &input.file),
+            module_ids: route_sequence,
+        });
     }
 
     // Precedence comes from every route's source order, not from the first
     // route that happened to import a shared file. Compatible constraints
     // (a later page's base-then-override) are kept. An edge that would cycle
-    // is dropped; routes are walked in sorted order, so the earlier route wins.
+    // is dropped and reported; routes are walked in sorted order, so the
+    // earlier route wins. The warning does not change the stylesheet bytes.
     let first_seen = fragments_by_id
         .iter()
         .map(|(id, fragment)| (id.clone(), fragment.order))
         .collect::<BTreeMap<_, _>>();
-    let ordered_ids = super::bundler_css_order::order_css_modules(&route_sequences, &first_seen)?;
+    let ordered = super::bundler_css_order::order_css_modules(&route_sequences, &first_seen)?;
+    for warning in &ordered.warnings {
+        eprintln!("{warning}");
+    }
+    let ordered_ids = ordered.ids;
     let mut fragments = Vec::with_capacity(ordered_ids.len());
     for id in ordered_ids {
         let Some(fragment) = fragments_by_id.remove(&id) else {
@@ -401,6 +410,13 @@ fn resolve_css_import_path(
 
 fn is_css_bare_import(specifier: &str) -> bool {
     !is_relative_or_absolute_specifier(specifier) && is_css_package_specifier(specifier)
+}
+
+fn css_page_label(project_root: &Path, file: &str) -> String {
+    let path = Path::new(file);
+    path.strip_prefix(project_root)
+        .map(normalize_path_for_contract)
+        .unwrap_or_else(|_| normalize_path_for_contract(path))
 }
 
 fn is_css_package_specifier(specifier: &str) -> bool {

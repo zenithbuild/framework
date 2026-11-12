@@ -16,9 +16,7 @@ fn shared_imported_css_emitted_once_for_one_three_and_thirty_routes() {
             .collect::<Vec<_>>();
         let built = build_specs(tmp.path(), &specs, "dist");
         assert_shared_once(&built.css, count);
-        if count == 3 {
-            assert_asset_references(&built, &specs);
-        }
+        assert_asset_references(&built, &specs);
     }
 }
 
@@ -177,6 +175,11 @@ fn later_route_base_precedes_override_first_seen_on_an_earlier_route() {
     let second = build_payload(root, json!([later, early]), "dist-b");
     assert_eq!(first.css, second.css);
     assert_eq!(first.css_public_path, second.css_public_path);
+    assert!(
+        !first.stderr.contains("CSS import order conflict"),
+        "compatible import order must not warn: {}",
+        first.stderr
+    );
 
     let css = &first.css;
     assert_eq!(count_occurrences(css, "/* BASE */"), 1);
@@ -253,4 +256,11 @@ fn conflicting_import_order_keeps_the_earlier_route_constraint() {
     assert!(pos("/* SCOPE_HOME */") < pos("/* BASE */"));
     assert!(pos("/* BASE */") < pos("/* SCOPE_LATER */"));
     assert!(pos("/* SCOPE_LATER */") < pos("/* OVERRIDE */"));
+    let warning = "[zenith-bundler] WARNING: CSS import order conflict: route \"/later\" (pages/later.zen) imports \"pages/styles/z-override.css\" before \"pages/styles/a-base.css\", which conflicts with route \"/\" (pages/home.zen). Keeping the earlier route's order.";
+    assert_eq!(
+        count_occurrences(&built.stderr, warning),
+        1,
+        "expected one cascade warning, stderr:\n{}",
+        built.stderr
+    );
 }

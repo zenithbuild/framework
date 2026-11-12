@@ -256,6 +256,7 @@ pub(crate) struct BuiltCss {
     pub(crate) css_public_path: String,
     pub(crate) css: String,
     pub(crate) out_dir: PathBuf,
+    pub(crate) stderr: String,
 }
 
 pub(crate) fn build_specs(root: &Path, specs: &[RouteSpec], out_name: &str) -> BuiltCss {
@@ -298,6 +299,7 @@ pub(crate) fn build_specs(root: &Path, specs: &[RouteSpec], out_name: &str) -> B
         css_public_path,
         css,
         out_dir,
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
 
@@ -487,5 +489,6 @@ pub(crate) fn build_payload(root: &Path, payload: Value, out_name: &str) -> Buil
         css_public_path,
         css,
         out_dir,
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
