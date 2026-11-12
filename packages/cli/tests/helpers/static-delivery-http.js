@@ -96,6 +96,21 @@ export async function expectNegotiatedStatic(url, fileBytes, typeFragment) {
     expect(ranged.headers['content-range']).toBeUndefined();
     expect(ranged.body.equals(fileBytes)).toBe(true);
     expect(Number(ranged.headers['content-length'])).toBe(fileBytes.length);
+
+    for (const encoding of ['gzip', 'br']) {
+        const encodedRange = await rawHttp(url, {
+            headers: {
+                'accept-encoding': encoding,
+                range: 'bytes=0-8'
+            }
+        });
+        expect(encodedRange.status).toBe(200);
+        expect(encodedRange.headers['content-encoding']).toBe(encoding);
+        expect(encodedRange.headers['content-range']).toBeUndefined();
+        expect(encodedRange.headers.vary).toBe('Accept-Encoding');
+        expect(Number(encodedRange.headers['content-length'])).toBe(encodedRange.body.length);
+        expect(decodeEncoded(encodedRange.body, encoding).equals(fileBytes)).toBe(true);
+    }
 }
 
 export async function expectSkippedStatic(url, fileBytes, { charset = false } = {}) {

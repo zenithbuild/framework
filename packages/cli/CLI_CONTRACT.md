@@ -201,7 +201,7 @@ Each stage is a discrete function call. No implicit chaining.
 - `HEAD` returns those headers and an empty body
 - `Range` is unsupported. The full representation is returned with status 200
 - Compression runs on request and is stored in a bounded in-memory cache keyed by path, mtime, size, and encoding. Build output does not contain `.br` or `.gz` sidecars
-- Brotli quality 11 is a local preview and Node choice. It is not a byte-identical Vercel emulation
+- Brotli quality 4 is the on-request preview and Node choice. Quality 11 delays the first route-module fetch past the document `load` event. It is not a byte-identical Vercel emulation
 - Resource routes, route-check, the image endpoint, and SSR or other dynamic responses are not compressed. Rewritten preview HTML (image runtime injection or SSR) is dynamic and stays uncompressed. Prerendered files served as static bytes, including `static-export` HTML and Node prerendered HTML, are in scope
 - Images, fonts, wasm, and archives are not compressed
 - Vercel and Netlify adapters do not set `Content-Encoding` or compress. Those CDNs own compression

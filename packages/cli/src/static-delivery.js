@@ -7,9 +7,14 @@ import { STATIC_MIME_TYPES } from './static-mime.js';
 const brotliCompressAsync = promisify(brotliCompress);
 const gzipAsync = promisify(gzip);
 
-// Local preview and standalone Node choice. This is not a byte-identical
-// Vercel emulation; Vercel and Netlify keep owning CDN compression.
-const BROTLI_QUALITY = 11;
+// On-request Brotli for preview and standalone Node. Quality 11 is Node's
+// default and the usual precompress setting, but the first fetch of a route
+// module then outlives the page load event: the router starts its dynamic
+// import() during module evaluation, load fires before that import returns,
+// and client-rendered text is still empty. Quality 4 stays in the same
+// latency band as an identity read. This is not a byte-identical Vercel
+// emulation; Vercel and Netlify keep owning CDN compression.
+const BROTLI_QUALITY = 4;
 const MIN_COMPRESS_BYTES = 1024;
 const CACHE_MAX_ENTRIES = 64;
 const CACHE_MAX_BYTES = 32 * 1024 * 1024;
