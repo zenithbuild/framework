@@ -15,6 +15,7 @@ import {
     expectNegotiatedStatic,
     expectPlainContains,
     expectSkippedStatic,
+    expectStaticCacheSplit,
     rawHttp
 } from './helpers/static-delivery-http.js';
 
@@ -117,8 +118,17 @@ describe('preview static delivery', () => {
 
         const home = await rawHttp(`${origin}/`, { headers: { 'accept-encoding': 'br, gzip' } });
         expect(home.headers['content-encoding']).toBeUndefined();
+        expect(String(home.headers['cache-control'] || '')).not.toContain('immutable');
         expect(home.body.length).toBeGreaterThanOrEqual(1024);
         expect(home.body.includes(Buffer.from(PAD))).toBe(true);
+        await expectStaticCacheSplit({
+            origin,
+            manifestPath: join(project.root, '.zenith-output', 'manifest.json'),
+            staticRoot: project.outDir,
+            publicPath: '/app.js',
+            routeCheckPath: `/__zenith/route-check?path=${encodeURIComponent('/')}`,
+            imagePath: '/_zenith/image'
+        });
 
         const updated = Buffer.from(`/* ${'Q'.repeat(2048)} */\n`);
         await writeFile(join(project.outDir, 'app.js'), updated);
@@ -157,6 +167,14 @@ describe('preview static delivery', () => {
             await readFile(join(project.outDir, 'app.js')),
             'javascript'
         );
+        await expectStaticCacheSplit({
+            origin,
+            manifestPath: join(project.root, '.zenith-output', 'manifest.json'),
+            staticRoot: project.outDir,
+            publicPath: '/app.js',
+            htmlPath: '/',
+            htmlRevalidates: true
+        });
     });
 
     test.each(['vercel', 'netlify'])('%s output does not set Content-Encoding', async (target) => {
@@ -169,5 +187,40 @@ describe('preview static delivery', () => {
         );
         await cli(['build'], project.root);
         await assertNoContentEncodingConfig(project.outDir);
+    });
+
+    test('honors basePath for hashed assets and leaves html, public files, and router manifest revalidated', async () => {
+        project = await createTestProject(['index.zen']);
+        await writeFile(join(project.pagesDir, 'index.zen'), `<main>${PAD}</main>\n`, 'utf8');
+        await mkdir(join(project.root, 'public'), { recursive: true });
+        await writeFile(join(project.root, 'public', 'app.js'), `/* ${PAD} */\n`, 'utf8');
+        await writeFile(
+            join(project.root, 'zenith.config.js'),
+            'module.exports = { target: "static", basePath: "/docs" };\n',
+            'utf8'
+        );
+        await build({
+            pagesDir: project.pagesDir,
+            outDir: project.outDir,
+            config: { target: 'static', basePath: '/docs' }
+        });
+        preview = await createPreviewServer({
+            distDir: project.outDir,
+            port: 0,
+            projectRoot: project.root,
+            config: { target: 'static', basePath: '/docs' }
+        });
+        const origin = localOrigin(preview.port);
+        await expectStaticCacheSplit({
+            origin,
+            manifestPath: join(project.root, '.zenith-output', 'manifest.json'),
+            staticRoot: project.outDir,
+            basePath: '/docs',
+            publicPath: '/docs/app.js',
+            htmlPath: '/docs/',
+            htmlRevalidates: false
+        });
+        const direct = await rawHttp(`${origin}/assets/router-manifest.json`);
+        expect(direct.status).toBe(404);
     });
 });

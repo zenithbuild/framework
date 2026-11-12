@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { normalizeBasePath } from '../base-path.js';
 import { resolveBuildAdapter } from '../adapters/resolve-adapter.js';
 import { isConfigKeyExplicit, isLoadedConfig, loadConfig, validateConfig } from '../config.js';
+import { loadImmutableAssetSet } from '../immutable-assets.js';
 import { createTrustedOriginResolver } from '../request-origin.js';
 import { supportsTargetRouteCheck } from '../route-check-support.js';
 import { createSilentLogger } from '../ui/logger.js';
@@ -45,6 +46,10 @@ export async function createPreviewServer(options) {
   const resolvedTarget = resolveBuildAdapter(config).target;
   const routeCheckEnabled = supportsTargetRouteCheck(resolvedTarget);
   const isStaticExportTarget = resolvedTarget === 'static-export';
+  const immutableAssets = await loadImmutableAssetSet({
+    projectRoot,
+    distDir
+  });
   let actualPort = port;
   const resolveServerOrigin = createTrustedOriginResolver({
     host,
@@ -61,6 +66,7 @@ export async function createPreviewServer(options) {
     configuredBasePath,
     routeCheckEnabled,
     isStaticExportTarget,
+    immutableAssets,
     serverOrigin: resolveServerOrigin
   }));
 

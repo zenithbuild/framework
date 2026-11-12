@@ -3,6 +3,11 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { cli } from '../dist/index.js';
+import {
+    assertNetlifyImmutableHeaders,
+    assertVercelImmutableRoutes,
+    readOutputManifest
+} from './helpers/immutable-cache-config.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
@@ -48,12 +53,16 @@ describe('platform static adapters', () => {
         });
         expect(existsSync(join(projectRoot, 'dist', 'static', 'index.html'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'static', 'users', '__param_id', 'index.html'))).toBe(true);
+        const manifest = await readOutputManifest(projectRoot);
+        assertVercelImmutableRoutes(config.routes, manifest.assets.immutable);
     });
 
     test('netlify-static emits a publish directory with rewrite rules', async () => {
         projectRoot = await createProject({
             'pages/index.zen': '<main>home</main>\n',
             'pages/docs/[...slug].zen': '<main>{params.slug}</main>\n',
+            'public/_headers': '# keep me\n/custom\n  X-Zenith-Test: keep\n',
+            'public/app.js': 'console.log("public")\n',
             'zenith.config.js': 'module.exports = { target: "netlify-static" };\n'
         });
 
@@ -64,6 +73,12 @@ describe('platform static adapters', () => {
         expect(redirects).toContain('/docs/* /docs/__splat_slug/index.html 200');
         expect(existsSync(join(projectRoot, 'dist', 'docs', '__splat_slug', 'index.html'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'index.html'))).toBe(true);
+        const manifest = await readOutputManifest(projectRoot);
+        const headers = await readFile(join(projectRoot, 'dist', '_headers'), 'utf8');
+        assertNetlifyImmutableHeaders(headers, manifest.assets.immutable, {
+            userLines: ['# keep me', '/custom', '  X-Zenith-Test: keep']
+        });
+        expect(headers).not.toContain('/app.js\n  Cache-Control: public, max-age=31536000, immutable');
     });
 
     test('static deployment adapters still reject server render_mode routes', async () => {
@@ -100,6 +115,8 @@ describe('platform static adapters', () => {
         ]));
         expect(existsSync(join(projectRoot, 'dist', 'static', 'index.html'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'static', 'guides', '__param_slug', 'index.html'))).toBe(true);
+        const manifest = await readOutputManifest(projectRoot);
+        assertVercelImmutableRoutes(config.routes, manifest.assets.immutable, '/docs');
     });
 
     test('netlify-static applies basePath to public rewrites while keeping asset files flat', async () => {
@@ -117,5 +134,20 @@ describe('platform static adapters', () => {
         expect(redirects).toContain('/docs/guides/* /guides/__splat_slug/index.html 200');
         expect(existsSync(join(projectRoot, 'dist', 'guides', '__splat_slug', 'index.html'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'index.html'))).toBe(true);
+        const manifest = await readOutputManifest(projectRoot);
+        const headers = await readFile(join(projectRoot, 'dist', '_headers'), 'utf8');
+        assertNetlifyImmutableHeaders(headers, manifest.assets.immutable, { basePath: '/docs' });
+    });
+
+    test('static and static-export emit no generated cache policy', async () => {
+        projectRoot = await createProject({
+            'pages/index.zen': '<main>home</main>\n',
+            'public/_headers': '# user only\n/custom\n  X-Zenith-Test: keep\n',
+            'zenith.config.js': 'module.exports = { target: "static" };\n'
+        });
+        await cli(['build'], projectRoot);
+        const headers = await readFile(join(projectRoot, 'dist', '_headers'), 'utf8');
+        expect(headers).toBe('# user only\n/custom\n  X-Zenith-Test: keep\n');
+        expect(headers).not.toContain('immutable');
     });
 });

@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { prependBasePath } from '../base-path.js';
+import { writeNetlifyCacheHeaders } from '../immutable-assets.js';
 import { compareRouteSpecificity } from '../server/resolve-request-route.js';
 import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
 import { createHostedAdapterContext } from './hosted-adapter-context.js';
@@ -237,6 +238,7 @@ export const netlifyAdapter: AdapterDriver = {
         }
 
         await writeFile(join(publishDir, '_redirects'), buildRedirectsFile(hostedContext.buildManifest, serverRoutes), 'utf8');
+        await writeNetlifyCacheHeaders(publishDir, hostedContext.buildManifest);
         await writeFile(
             join(hostedContext.outDir, 'netlify.toml'),
             [

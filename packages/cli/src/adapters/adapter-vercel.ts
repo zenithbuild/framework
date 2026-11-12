@@ -4,6 +4,7 @@ import { compareRouteSpecificity } from '../server/resolve-request-route.js';
 import { copyHostedGlobalMiddlewareRuntime, copyHostedPageRuntime } from './copy-hosted-page-runtime.js';
 import { createHostedAdapterContext } from './hosted-adapter-context.js';
 import { createHostedRouteCheckSource } from './hosted-route-check-source.js';
+import { createVercelImmutableAssetRoutes } from '../immutable-assets.js';
 import { createVercelBasePathAssetRoutes, createVercelImageEndpointRoute, createVercelRouteCheckRoute, createVercelRouteSource } from './route-rules.js';
 import { validateHostedResourceRoutes } from './validate-hosted-resource-routes.js';
 import type { AdapterDriver, BuildManifest } from './adapter-types.js';
@@ -17,6 +18,8 @@ interface VercelConfigRoute {
     src?: string;
     dest?: string;
     handle?: 'filesystem';
+    headers?: Record<string, string>;
+    continue?: boolean;
 }
 
 function buildVercelServerDest(route: HostedServerManifestRoute) {
@@ -29,7 +32,10 @@ function buildVercelServerDest(route: HostedServerManifestRoute) {
 }
 
 function buildVercelConfig(buildManifest: BuildManifest, serverRoutes: HostedServerManifestRoute[]) {
-    const routes: VercelConfigRoute[] = [...createVercelBasePathAssetRoutes(buildManifest.base_path)];
+    const routes: VercelConfigRoute[] = [
+        ...createVercelImmutableAssetRoutes(buildManifest),
+        ...createVercelBasePathAssetRoutes(buildManifest.base_path)
+    ];
     routes.push(createVercelRouteCheckRoute(buildManifest.base_path));
     for (const route of [...serverRoutes].sort((left, right) => compareRouteSpecificity(left.path, right.path))) {
         routes.push({
