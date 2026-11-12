@@ -1,8 +1,15 @@
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CssFragmentKind {
+    ScopedPage,
+    ImportedModule,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CssFragment {
     pub(crate) source_module_id: String,
+    kind: CssFragmentKind,
     pub(crate) order: usize,
     pub(crate) content: String,
 }
@@ -20,16 +27,26 @@ pub(crate) fn build_css_bundle(
     });
 
     let mut fragments = Vec::<CssFragment>::new();
+    // Imported CSS identity is the canonical project-relative module path.
+    // The importing route is not part of that identity, so one module shared
+    // by N routes is emitted once. Scoped style blocks are not recorded here.
+    let mut shared_imported_modules = BTreeSet::<String>::new();
+    let mut cascade_order = 0usize;
     for input in ordered_inputs {
-        let page_fragments = collect_css_fragments_for_input(input, project_root)?;
+        let page_fragments = collect_css_fragments_for_input(
+            input,
+            project_root,
+            &mut shared_imported_modules,
+            &mut cascade_order,
+        )?;
         fragments.extend(page_fragments);
     }
 
-    fragments.sort_by(|a, b| {
-        a.source_module_id
-            .cmp(&b.source_module_id)
-            .then_with(|| a.order.cmp(&b.order))
-    });
+    // Emission order is the deterministic route walk plus source import order.
+    // A route-prefixed module id compared the same file as a different fragment
+    // on every route and sorted those copies by that id instead of import order.
+    fragments.sort_by_key(|fragment| fragment.order);
+    reject_duplicate_imported_modules(&fragments)?;
 
     let merged = fragments
         .iter()
@@ -50,11 +67,12 @@ pub(crate) fn build_css_bundle(
 fn collect_css_fragments_for_input(
     input: &BundlerInput,
     project_root: &Path,
+    shared_imported_modules: &mut BTreeSet<String>,
+    cascade_order: &mut usize,
 ) -> Result<Vec<CssFragment>, String> {
     let mut fragments = Vec::<CssFragment>::new();
     let mut known_css_module_ids = BTreeSet::<String>::new();
     let mut known_css_paths = BTreeSet::<String>::new();
-    let mut import_order = 0usize;
 
     let page_key = format!(
         "{}::{}",
@@ -69,9 +87,11 @@ fn collect_css_fragments_for_input(
     if let Some(css) = processed_css {
         fragments.push(CssFragment {
             source_module_id: format!("{}::__compiler_style_blocks", page_key),
-            order: 0,
+            kind: CssFragmentKind::ScopedPage,
+            order: *cascade_order,
             content: normalize_text_newlines(&css.content),
         });
+        *cascade_order += 1;
     }
 
     let page_root = Path::new(&input.file)
@@ -101,8 +121,8 @@ fn collect_css_fragments_for_input(
             &module.id,
             project_root,
             page_root,
-            &page_key,
-            &mut import_order,
+            shared_imported_modules,
+            cascade_order,
             &mut known_css_module_ids,
             &mut known_css_paths,
             &mut fragments,
@@ -115,8 +135,8 @@ fn collect_css_fragments_for_input(
             &page_module_id,
             project_root,
             page_root,
-            &page_key,
-            &mut import_order,
+            shared_imported_modules,
+            cascade_order,
             &mut known_css_module_ids,
             &mut known_css_paths,
             &mut fragments,
@@ -129,8 +149,8 @@ fn collect_css_fragments_for_input(
             &page_module_id,
             project_root,
             page_root,
-            &page_key,
-            &mut import_order,
+            shared_imported_modules,
+            cascade_order,
             &mut known_css_module_ids,
             &mut known_css_paths,
             &mut fragments,
@@ -145,8 +165,8 @@ fn collect_css_fragments_for_input(
                 &owner_module_id,
                 project_root,
                 page_root,
-                &page_key,
-                &mut import_order,
+                shared_imported_modules,
+                cascade_order,
                 &mut known_css_module_ids,
                 &mut known_css_paths,
                 &mut fragments,
@@ -157,8 +177,8 @@ fn collect_css_fragments_for_input(
             &owner_module_id,
             project_root,
             page_root,
-            &page_key,
-            &mut import_order,
+            shared_imported_modules,
+            cascade_order,
             &mut known_css_module_ids,
             &mut known_css_paths,
             &mut fragments,
@@ -190,8 +210,8 @@ fn collect_css_imports_from_source(
     owner_module_id: &str,
     project_root: &Path,
     page_root: &Path,
-    page_key: &str,
-    import_order: &mut usize,
+    shared_imported_modules: &mut BTreeSet<String>,
+    cascade_order: &mut usize,
     known_css_module_ids: &mut BTreeSet<String>,
     known_css_paths: &mut BTreeSet<String>,
     fragments: &mut Vec<CssFragment>,
@@ -256,7 +276,10 @@ fn collect_css_imports_from_source(
                     project_root.display()
                 )
             })?;
-        if known_css_module_ids.contains(&resolved_module_id) {
+        if known_css_module_ids.contains(&resolved_module_id)
+            || shared_imported_modules.contains(&resolved_module_id)
+        {
+            known_css_module_ids.insert(resolved_module_id);
             known_css_paths.insert(canonical_key);
             continue;
         }
@@ -283,15 +306,35 @@ fn collect_css_imports_from_source(
                 })?;
 
         fragments.push(CssFragment {
-            source_module_id: format!("{}::{}", page_key, resolved_module_id.clone()),
-            order: *import_order,
+            source_module_id: resolved_module_id.clone(),
+            kind: CssFragmentKind::ImportedModule,
+            order: *cascade_order,
             content: normalize_text_newlines(&content),
         });
+        shared_imported_modules.insert(resolved_module_id.clone());
         known_css_module_ids.insert(resolved_module_id);
         known_css_paths.insert(canonical_key);
-        *import_order += 1;
+        *cascade_order += 1;
     }
 
+    Ok(())
+}
+
+fn reject_duplicate_imported_modules(fragments: &[CssFragment]) -> Result<(), String> {
+    let mut seen = BTreeSet::<&str>::new();
+    for fragment in fragments {
+        match fragment.kind {
+            CssFragmentKind::ScopedPage => {}
+            CssFragmentKind::ImportedModule => {
+                if !seen.insert(fragment.source_module_id.as_str()) {
+                    return Err(format!(
+                        "CSS module identity collision: imported module '{}' was emitted more than once",
+                        fragment.source_module_id
+                    ));
+                }
+            }
+        }
+    }
     Ok(())
 }
 
