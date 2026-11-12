@@ -31,6 +31,95 @@ pub(crate) fn ensure_document_html(fragment_or_doc: &str) -> String {
     )
 }
 
+pub(crate) fn inject_modulepreload_hints(html: &str, hrefs: &[String]) -> String {
+    let existing = modulepreload_hrefs(html);
+    let mut block = String::new();
+    for href in hrefs {
+        if existing.iter().any(|found| found == href) {
+            continue;
+        }
+        block.push_str("<link rel=\"modulepreload\" href=\"");
+        block.push_str(&escape_attr(href));
+        block.push_str("\">\n");
+    }
+    if block.is_empty() {
+        return html.to_string();
+    }
+    if let Some(index) = find_ascii_ci(html, "</head>") {
+        let mut updated = String::with_capacity(html.len() + block.len());
+        updated.push_str(&html[..index]);
+        updated.push_str(&block);
+        updated.push_str(&html[index..]);
+        return updated;
+    }
+    if let Some(index) = find_ascii_ci(html, "<head>") {
+        let insert_at = index + "<head>".len();
+        let mut updated = String::with_capacity(html.len() + block.len() + 1);
+        updated.push_str(&html[..insert_at]);
+        updated.push('\n');
+        updated.push_str(&block);
+        updated.push_str(&html[insert_at..]);
+        return updated;
+    }
+    format!("{block}{html}")
+}
+
+pub(crate) fn ensure_unique_modulepreload_hrefs(
+    html: &str,
+    hrefs: &[String],
+    route: &str,
+) -> Result<(), String> {
+    let found = modulepreload_hrefs(html);
+    for href in hrefs {
+        let count = found.iter().filter(|item| *item == href).count();
+        if count != 1 {
+            return Err(format!(
+                "Route '{route}' must contain exactly one modulepreload hint for '{href}', found {count}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn modulepreload_hrefs(html: &str) -> Vec<String> {
+    let Ok(tag_re) = Regex::new(r#"(?i)<link\b[^>]*\brel\s*=\s*['"]modulepreload['"][^>]*>"#)
+    else {
+        return Vec::new();
+    };
+    let Ok(href_re) = Regex::new(r#"(?i)\bhref\s*=\s*['"]([^'"]+)['"]"#) else {
+        return Vec::new();
+    };
+    let mut hrefs = Vec::new();
+    for tag in tag_re.find_iter(html) {
+        if let Some(captures) = href_re.captures(tag.as_str()) {
+            if let Some(href) = captures.get(1) {
+                hrefs.push(unescape_attr(href.as_str()));
+            }
+        }
+    }
+    hrefs
+}
+
+fn escape_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+}
+
+fn unescape_attr(value: &str) -> String {
+    value
+        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&amp;", "&")
+}
+
+fn find_ascii_ci(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
+        .to_ascii_lowercase()
+        .find(&needle.to_ascii_lowercase())
+}
+
 pub(crate) fn inject_script_once(html: &str, script_src: &str, marker_attr: &str) -> String {
     if html.contains(script_src) {
         return html.to_string();
@@ -135,4 +224,31 @@ fn replace_single_stylesheet_link(html: &str, replacement: &str) -> Result<Strin
         return Err("expected existing stylesheet link to rewrite".to_string());
     }
     Ok(rewritten)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn modulepreload_hints_keep_existing_workaround_and_skip_duplicates() {
+        let html = "<!DOCTYPE html><html><head><link rel=\"modulepreload\" href=\"https://cdn.example/site-workaround.js\"></head><body></body></html>";
+        let hrefs = vec![
+            "https://cdn.example/site-workaround.js".to_string(),
+            "/app/assets/runtime.abc.js".to_string(),
+        ];
+        let updated = inject_modulepreload_hints(html, &hrefs);
+        assert_eq!(
+            updated
+                .matches("https://cdn.example/site-workaround.js")
+                .count(),
+            1
+        );
+        assert_eq!(updated.matches("/app/assets/runtime.abc.js").count(), 1);
+        assert!(
+            updated.contains("<link rel=\"modulepreload\" href=\"/app/assets/runtime.abc.js\">")
+        );
+        assert!(!updated.contains("crossorigin"));
+        ensure_unique_modulepreload_hrefs(&updated, &hrefs, "/").unwrap();
+    }
 }
