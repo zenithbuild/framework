@@ -200,5 +200,86 @@ export async function expectNodeDeliveryArtifacts(distDir) {
     const serverDir = join(distDir, 'server');
     expect(await readFile(join(serverDir, 'static-delivery.js'), 'utf8')).toContain("from './static-mime.js'");
     expect(await readFile(join(serverDir, 'static-mime.js'), 'utf8')).toContain('text/html; charset=utf-8');
-    expect(await readFile(join(serverDir, 'runtime', 'node-server.js'), 'utf8')).toContain("from '../static-delivery.js'");
+    const serverSource = await readFile(join(serverDir, 'runtime', 'node-server.js'), 'utf8');
+    expect(serverSource).toContain("from '../static-delivery.js'");
+    expect(serverSource).toContain('immutableAssets');
+}
+
+const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+const REVALIDATE_CACHE = 'public, max-age=0, must-revalidate';
+
+export async function expectStaticCacheSplit({
+    origin,
+    manifestPath,
+    staticRoot,
+    basePath = '/',
+    publicPath = null,
+    htmlPath = null,
+    htmlRevalidates = false,
+    routeCheckPath = null,
+    imagePath = null
+}) {
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const immutable = manifest.assets.immutable;
+    const prefix = basePath === '/' ? '/assets/' : `${basePath}/assets/`;
+    expect(Array.isArray(immutable)).toBe(true);
+    expect(immutable.length).toBeGreaterThan(0);
+    expect(immutable.every((path) => path.startsWith(prefix))).toBe(true);
+    expect(immutable.some((path) => path.endsWith('router-manifest.json') || path.endsWith('.html'))).toBe(false);
+
+    let chosen = null;
+    for (const requestPath of immutable) {
+        const relative = (basePath === '/' ? requestPath : requestPath.slice(basePath.length)).replace(/^\/+/, '');
+        const bytes = await readFile(join(staticRoot, relative));
+        const compressible = requestPath.endsWith('.js') || requestPath.endsWith('.css');
+        if (!chosen || (compressible && bytes.length >= 1024 && (!chosen.large))) {
+            chosen = { requestPath, large: compressible && bytes.length >= 1024 };
+        }
+        if (chosen.large) {
+            break;
+        }
+    }
+    const asset = await rawHttp(`${origin}${chosen.requestPath}`, { headers: { 'accept-encoding': 'gzip' } });
+    expect(asset.status).toBe(200);
+    expect(asset.headers['cache-control']).toBe(IMMUTABLE_CACHE);
+    if (chosen.large) {
+        expect(asset.headers['content-encoding']).toBe('gzip');
+        expect(asset.headers.vary).toBe('Accept-Encoding');
+    }
+
+    const router = await rawHttp(`${origin}${prefix}router-manifest.json`);
+    expect(router.status).toBe(200);
+    expect(router.headers['cache-control']).toBe(REVALIDATE_CACHE);
+
+    if (publicPath) {
+        const pub = await rawHttp(`${origin}${publicPath}`, { headers: { 'accept-encoding': 'gzip' } });
+        expect(pub.status).toBe(200);
+        expect(pub.headers['cache-control']).toBe(REVALIDATE_CACHE);
+        expect(pub.headers.vary).toBe('Accept-Encoding');
+        expect(pub.headers['content-encoding']).toBe('gzip');
+    }
+    if (htmlPath) {
+        const html = await rawHttp(`${origin}${htmlPath}`, { headers: { 'accept-encoding': 'gzip' } });
+        expect(html.status).toBe(200);
+        expect(String(html.headers['cache-control'] || '')).not.toContain('immutable');
+        if (htmlRevalidates) {
+            expect(html.headers['cache-control']).toBe(REVALIDATE_CACHE);
+            if (html.headers.vary || html.headers['content-encoding']) {
+                expect(html.headers.vary).toBe('Accept-Encoding');
+            }
+        }
+    }
+    if (routeCheckPath) {
+        const check = await rawHttp(`${origin}${routeCheckPath}`, {
+            headers: { 'x-zenith-route-check': '1', 'accept-encoding': 'gzip' }
+        });
+        expect(String(check.headers['cache-control'] || '')).toContain('no-store');
+        expect(String(check.headers['cache-control'] || '')).not.toContain('immutable');
+        expect(check.headers['content-encoding']).toBeUndefined();
+    }
+    if (imagePath) {
+        const image = await rawHttp(`${origin}${imagePath}`, { headers: { 'accept-encoding': 'gzip' } });
+        expect(String(image.headers['cache-control'] || '')).not.toContain('immutable');
+        expect(image.headers['content-encoding']).toBeUndefined();
+    }
 }

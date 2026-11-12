@@ -41,6 +41,7 @@ export interface BuildManifest {
         js: string[];
         css: string[];
         vendor: string | null;
+        immutable?: string[];
     };
 }
 

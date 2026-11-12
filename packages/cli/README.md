@@ -75,12 +75,13 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 
 - `target` is the shorthand deployment target. Phase 1 defaults loaded config to `target: 'static'`.
 - `adapter` is the explicit adapter object form and is mutually exclusive with `target`.
-- `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes.
-- `vercel-static` emits a Vercel Build Output API layout rooted at `outDir`.
-- `netlify-static` emits a Netlify publish directory rooted at `outDir`, including generated `_redirects` rewrites for dynamic prerendered routes.
-- `vercel` emits a Vercel Build Output API layout with packaged route functions for server-classified routes and static rewrites for prerendered dynamic routes.
-- `netlify` emits a deploy root with `publish/`, `functions/`, `netlify.toml`, and generated `_redirects` that force server-classified routes through packaged functions.
-- `node` emits a standalone Node artifact rooted at `outDir` with `index.js`, `package.json`, `manifest.json`, `static/`, and `server/`.
+- `static` emits the built files and no cache policy. It cannot set `Cache-Control` on an external server.
+- `static-export` emits rewrite-free concrete public files rooted at `outDir` and requires `exportPaths` for dynamic prerender routes. It also emits no cache policy.
+- `vercel-static` emits a Vercel Build Output API layout rooted at `outDir`. `config.json` sets `Cache-Control: public, max-age=31536000, immutable` on proven content-hashed assets only, before `handle: filesystem`.
+- `netlify-static` emits a Netlify publish directory rooted at `outDir`, including generated `_redirects` rewrites for dynamic prerendered routes and a merged `_headers` file for that same immutable asset policy.
+- `vercel` emits a Vercel Build Output API layout with packaged route functions for server-classified routes and static rewrites for prerendered dynamic routes. Hashed-asset cache routes are the same shape as `vercel-static`. An authorized Vercel deployment is required to verify the live CDN headers; `config.json` is what the build checks.
+- `netlify` emits a deploy root with `publish/`, `functions/`, `netlify.toml`, and generated `_redirects` that force server-classified routes through packaged functions. `publish/_headers` carries the immutable asset policy and keeps a user `_headers` file from `public/`.
+- `node` emits a standalone Node artifact rooted at `outDir` with `index.js`, `package.json`, `manifest.json`, `static/`, and `server/`. The server sets immutable `Cache-Control` for manifest-listed hashed assets and `public, max-age=0, must-revalidate` for other static files.
 
 Supported deployment targets:
 
@@ -106,6 +107,7 @@ Current limitations:
 - Hosted `vercel` and `netlify` targets expose advisory `/__zenith/route-check` for guarded soft navigation; direct HTML requests remain the server-side route boundary.
 - Image materialization is route-artifact-driven. Bundler owns final build/static HTML image materialization, while preview and server render still materialize at runtime from structured `image_materialization` metadata. No path executes page assets, and dynamic image props are currently unsupported until the compiler emits a dedicated image-props artifact.
 - Extension discovery commands are read-only; they do not install packages or mutate `zenith.config`.
+- Immutable caching covers manifest-proven content hashes only. Helper modules under `assets/modules/`, component assets, and extra vendor chunks are included when a listed asset imports them. Unreachable hashed files stay non-immutable. `static` and `static-export` emit no cache headers. Live Vercel headers require an authorized deployment to verify.
 
 ## Commands
 
@@ -127,6 +129,8 @@ Compiles and bundles your application for production.
 
 ### `zenith preview`
 Previews the locally built target contract for verification. Static targets serve built files; `target: 'node'` boots the built Node artifact.
+
+Preview and the standalone Node server use the same static cache policy: `public, max-age=31536000, immutable` for proven content-hashed assets on the build manifest `assets.immutable`, and `public, max-age=0, must-revalidate` for other static files. Preview loads `.zenith-output/manifest.json` at startup. The Node artifact loads the packaged copy of that manifest. HTML rewritten by preview, route-check, resource routes, SSR, and the image endpoint are unchanged. `Vary` and `Content-Encoding` stay beside `Cache-Control`. `static` and `static-export` emit no cache headers. Hashed `assets/modules/` and vendor chunk files are immutable only when a listed asset imports them; anything the manifest walk cannot see stays revalidated.
 
 Preview and the standalone Node server negotiate `Accept-Encoding` for compressible static text (html, css, js, mjs, json, svg, xml, txt, map, and webmanifest) of at least 1024 bytes. Accepted codings are preferred as Brotli, then gzip, then identity. `q=0` excludes a coding. Responses that can vary send `Vary: Accept-Encoding`, including identity. `Content-Encoding` is omitted for identity. `Content-Length` is the size of the bytes on the wire, and `HEAD` repeats those headers with an empty body. `Range` is not implemented; the full file is returned with status 200. Text types include `charset=utf-8`. Small files, images, fonts, wasm, archives, resource routes, route-check, the image endpoint, and dynamic SSR or rewritten HTML responses are not compressed. Prerendered HTML that is served as a static file is compressed. Encoding is cached in memory for the process. Builds do not emit `.br` or `.gz` files. Brotli quality 11 is a local choice and is not a byte-for-byte Vercel match. Vercel and Netlify adapters leave compression to the CDN.
 

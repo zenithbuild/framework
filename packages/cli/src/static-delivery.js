@@ -11,6 +11,8 @@ const gzipAsync = promisify(gzip);
 // Vercel emulation; Vercel and Netlify keep owning CDN compression.
 const BROTLI_QUALITY = 11;
 const MIN_COMPRESS_BYTES = 1024;
+export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+export const REVALIDATE_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const CACHE_MAX_ENTRIES = 64;
 const CACHE_MAX_BYTES = 32 * 1024 * 1024;
 const PREFERRED_CODINGS = ['br', 'gzip', 'identity'];
@@ -180,17 +182,42 @@ async function compressedBody(filePath, fileStat, encoding) {
     }
 }
 
+function requestPathname(req) {
+    try {
+        return new URL(req?.url || '/', 'http://127.0.0.1').pathname;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Immutable only when the request path is on the manifest allowlist loaded
+ * at server start. Every other static file this helper sends revalidates.
+ * Dynamic responses do not come through here.
+ *
+ * @param {string | null} pathname
+ * @param {Set<string> | undefined} immutableAssets
+ */
+export function cacheControlForPath(pathname, immutableAssets) {
+    if (pathname && immutableAssets && immutableAssets.has(pathname)) {
+        return IMMUTABLE_CACHE_CONTROL;
+    }
+    return REVALIDATE_CACHE_CONTROL;
+}
+
 /**
  * Send a static file with Accept-Encoding negotiation.
  * Range is unsupported: the full representation is returned with status 200.
  * Content-Encoding is omitted for identity. Vary is set for every response
- * that is eligible to negotiate, including identity.
+ * that is eligible to negotiate, including identity. Cache-Control is set
+ * alongside those headers.
  *
  * @param {import('node:http').IncomingMessage} req
  * @param {import('node:http').ServerResponse} res
  * @param {string} filePath
+ * @param {{ immutableAssets?: Set<string> }} [options]
  */
-export async function sendStaticFile(req, res, filePath) {
+export async function sendStaticFile(req, res, filePath, options = {}) {
     const fileStat = await stat(filePath);
     const extension = extname(filePath).toLowerCase();
     const contentType = STATIC_MIME_TYPES[extension] || 'application/octet-stream';
@@ -203,7 +230,8 @@ export async function sendStaticFile(req, res, filePath) {
         : await compressedBody(filePath, fileStat, encoding);
     const headers = {
         'Content-Type': contentType,
-        'Content-Length': body.length
+        'Content-Length': body.length,
+        'Cache-Control': cacheControlForPath(requestPathname(req), options.immutableAssets)
     };
     if (negotiable) {
         headers.Vary = 'Accept-Encoding';

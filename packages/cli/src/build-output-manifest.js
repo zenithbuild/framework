@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { collectImmutableAssetPaths } from './immutable-assets.js';
 import { normalizeGlobalMiddlewareMetadata } from './global-middleware.js';
 
 const CLI_VERSION = (() => {
@@ -107,6 +108,11 @@ export async function writeBuildOutputManifest({
         ].filter((value) => typeof value === 'string' && value.endsWith('.css'))
     );
     const globalMiddlewareMetadata = normalizeGlobalMiddlewareMetadata(globalMiddleware);
+    const immutable = await collectImmutableAssetPaths({
+        staticDir,
+        bundlerManifest,
+        basePath
+    });
 
     const buildManifest = {
         schema_version: 1,
@@ -119,7 +125,8 @@ export async function writeBuildOutputManifest({
         assets: {
             js: [...jsAssets].sort(),
             css: [...cssAssets].sort(),
-            vendor: typeof bundlerManifest.vendor === 'string' ? bundlerManifest.vendor : null
+            vendor: typeof bundlerManifest.vendor === 'string' ? bundlerManifest.vendor : null,
+            immutable
         }
     };
 

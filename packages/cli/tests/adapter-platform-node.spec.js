@@ -20,6 +20,7 @@ import {
     expectNodeDeliveryArtifacts,
     expectPlainContains,
     expectSkippedStatic,
+    expectStaticCacheSplit,
     rawHttp
 } from './helpers/static-delivery-http.js';
 
@@ -88,6 +89,8 @@ describe('node adapter', () => {
         const homeHtml = await home.text();
         expect(home.status).toBe(200);
         expect(homeHtml).toContain('src="/docs/assets/');
+        expect(String(home.headers.get('cache-control') || '')).not.toContain('immutable');
+        await expectStaticCacheSplit({ origin, manifestPath: join(projectRoot, 'dist', 'manifest.json'), staticRoot: join(projectRoot, 'dist', 'static'), basePath: '/docs', htmlPath: '/docs/', htmlRevalidates: true, routeCheckPath: '/docs/__zenith/route-check?path=%2Fdocs%2F', imagePath: '/docs/_zenith/image' });
 
         const prerendered = await fetch(`${origin}/docs/guides/guide`);
         expect(prerendered.status).toBe(200);
@@ -475,6 +478,7 @@ describe('node adapter', () => {
         expect(html.length).toBeGreaterThanOrEqual(1024);
         await expectNegotiatedStatic(`${origin}/app.js`, await readFile(join(staticDir, 'app.js')), 'javascript');
         await expectNegotiatedStatic(`${origin}/`, html, 'html');
+        await expectStaticCacheSplit({ origin, manifestPath: join(projectRoot, 'dist', 'manifest.json'), staticRoot: staticDir, publicPath: '/app.js', htmlPath: '/', htmlRevalidates: true, routeCheckPath: `/__zenith/route-check?path=${encodeURIComponent('/')}`, imagePath: '/_zenith/image' });
         await expectSkippedStatic(`${origin}/tiny.txt`, await readFile(join(staticDir, 'tiny.txt')), { charset: true });
         await expectSkippedStatic(`${origin}/pixel.png`, await readFile(join(staticDir, 'pixel.png')));
         await expectExactPlain(`${origin}/api/blob`, pad);

@@ -1,5 +1,6 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createVercelImmutableAssetRoutes } from '../immutable-assets.js';
 import { createVercelBasePathAssetRoutes, createVercelRouteSource } from './route-rules.js';
 import type { AdapterDriver, BuildManifest } from './adapter-types.js';
 
@@ -7,6 +8,7 @@ function createConfig(manifest: BuildManifest) {
     return {
         version: 3,
         routes: [
+            ...createVercelImmutableAssetRoutes(manifest),
             ...createVercelBasePathAssetRoutes(manifest.base_path),
             { handle: 'filesystem' },
             ...manifest.routes.map((route) => ({

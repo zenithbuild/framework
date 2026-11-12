@@ -5,6 +5,11 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
 import { cli } from '../dist/index.js';
+import {
+    assertNetlifyImmutableHeaders,
+    assertVercelImmutableRoutes,
+    readOutputManifest
+} from './helpers/immutable-cache-config.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
@@ -71,6 +76,8 @@ describe('platform server adapters', () => {
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'route-check.func', 'index.js'))).toBe(true);
         expect(existsSync(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'routes', 'account', 'route', 'entry.js'))).toBe(true);
         expect(existsSync(join(projectRoot, '.zenith-output', 'server', 'manifest.json'))).toBe(true);
+        const manifest = await readOutputManifest(projectRoot);
+        assertVercelImmutableRoutes(config.routes, manifest.assets.immutable);
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'index.js')).href);
         const response = await mod.default.fetch(new Request('https://example.com/__zenith/account'));
@@ -219,6 +226,8 @@ describe('platform server adapters', () => {
             { handle: 'filesystem' },
             { src: '^/docs/guides/([^/]+)/?$', dest: '/guides/__param_slug/index.html' }
         ]));
+        const baseManifest = await readOutputManifest(projectRoot);
+        assertVercelImmutableRoutes(vercelConfig.routes, baseManifest.assets.immutable, '/docs');
 
         const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'functions', '__zenith', 'account.func', 'index.js')).href);
         const denied = await mod.default.fetch(new Request('https://example.com/__zenith/account?auth=no'));
@@ -244,6 +253,9 @@ describe('platform server adapters', () => {
         expect(redirects).toContain('/docs/__zenith/route-check /.netlify/functions/__zenith_route_check 200!');
         expect(redirects).toContain('/docs/account /.netlify/functions/__zenith_account 200!');
         expect(redirects).toContain('/docs/guides/:slug /guides/__param_slug/index.html 200');
+        const netlifyManifest = await readOutputManifest(projectRoot);
+        const headers = await readFile(join(projectRoot, 'dist', 'publish', '_headers'), 'utf8');
+        assertNetlifyImmutableHeaders(headers, netlifyManifest.assets.immutable, { basePath: '/docs' });
 
         const netlifyMod = await import(pathToFileURL(join(projectRoot, 'dist', 'functions', '__zenith_account.mjs')).href);
         const netlifyDenied = await netlifyMod.default(new Request('https://example.com/.netlify/functions/__zenith_account?auth=no'));

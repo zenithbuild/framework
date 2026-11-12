@@ -79,6 +79,7 @@ export function createPreviewRequestHandler(options) {
     configuredBasePath,
     routeCheckEnabled,
     isStaticExportTarget,
+    immutableAssets,
     serverOrigin
   } = options;
 
@@ -220,14 +221,14 @@ export function createPreviewRequestHandler(options) {
           if (!staticPath || !(await fileExists(staticPath))) {
             throw new Error('not found');
           }
-          await sendStaticFile(req, res, staticPath);
+          await sendStaticFile(req, res, staticPath, { immutableAssets });
           return;
         }
         const directHtmlPath = toStaticFilePath(distDir, url.pathname);
         if (!directHtmlPath || !(await fileExists(directHtmlPath))) {
           throw new Error('not found');
         }
-        await sendStaticFile(req, res, directHtmlPath);
+        await sendStaticFile(req, res, directHtmlPath, { immutableAssets });
         return;
       }
 
@@ -275,7 +276,7 @@ export function createPreviewRequestHandler(options) {
         if (!staticPath || !(await fileExists(staticPath))) {
           throw new Error('not found');
         }
-        await sendStaticFile(req, res, staticPath);
+        await sendStaticFile(req, res, staticPath, { immutableAssets });
         return;
       }
 

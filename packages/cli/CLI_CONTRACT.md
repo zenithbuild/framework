@@ -207,6 +207,33 @@ Each stage is a discrete function call. No implicit chaining.
 - Vercel and Netlify adapters do not set `Content-Encoding` or compress. Those CDNs own compression
 - Dev server responses do not negotiate content encoding
 
+### Static Cache-Control
+
+`Cache-Control: public, max-age=31536000, immutable` is applied only to proven content-hashed build assets.
+
+The allowlist is `assets.immutable` on `.zenith-output/manifest.json`. It is built from the bundler manifest fields the CLI already reads (`entry`, `core`, `router`, `css`, `vendor`, and `chunks`) plus files reached by a static import, `@import`, or `url()` from those assets when the target exists under `assets/` and its filename contains a content hash. Dev-stable names such as `runtime.dev.js` are not immutable. A hash-shaped name in `public/` is not immutable unless that same URL is on this list.
+
+These responses are not immutable:
+
+- HTML
+- files copied from `public/`
+- `assets/router-manifest.json`
+- error responses
+- route-check
+- resource routes
+- SSR and other dynamic or private responses
+- the image endpoint
+
+`node` and `zenith preview` set `Cache-Control` in the shared static delivery helper. The server loads `assets.immutable` at startup. Static files that are not on the list get `Cache-Control: public, max-age=0, must-revalidate`. `Vary: Accept-Encoding` and `Content-Encoding` stay in place for negotiated responses. Preview HTML that is rewritten for image runtime or SSR is dynamic and keeps its existing headers. `static-export` HTML served as a file is a static response and revalidates.
+
+`vercel` and `vercel-static` write one `headers` route per immutable path in `config.json` before `handle: filesystem`, with `continue: true`. The route `src` is an exact path and includes `basePath`. When `basePath` is not `/`, the unprefixed `/assets/...` path is listed too, because the build output also exposes that file. Live Vercel header behavior still needs an authorized deployment to verify. `config.json` is the local contract.
+
+`netlify` and `netlify-static` write `_headers` in the publish directory. Exact immutable paths come first. A `public/_headers` file is copied with the rest of `public/` and kept verbatim; generated rules are merged around it and are not a replacement. When that file does not already define `/*`, Zenith appends `Cache-Control: public, max-age=0, must-revalidate` for other static files. Netlify does not apply `_headers` to function responses, so route-check, the image endpoint, resource routes, and SSR keep the headers those functions already set.
+
+`static` and `static-export` cannot set response headers on an arbitrary external server. They emit no cache policy. A `public/_headers` file is copied like any other public file and is not rewritten.
+
+Hashed files the bundler emits but does not list, and that this walk cannot see, stay non-immutable. That includes a helper module, component asset, or vendor chunk with no static import from a listed asset, and non-literal dynamic imports. The bundler manifest does not list `assets/modules/` or `vendor-chunks/` on its own; those files become immutable only when the import walk reaches them.
+
 ---
 
 ## 10. Router Integration (Conditional)

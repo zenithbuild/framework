@@ -1,5 +1,6 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { writeNetlifyCacheHeaders } from '../immutable-assets.js';
 import { createNetlifyBasePathAssetRules, createNetlifyRewriteRules } from './route-rules.js';
 import type { AdapterDriver, BuildManifest } from './adapter-types.js';
 
@@ -47,5 +48,6 @@ export const netlifyStaticAdapter: AdapterDriver = {
             createRedirectsFile(options.manifest),
             'utf8'
         );
+        await writeNetlifyCacheHeaders(options.outDir, options.manifest);
     }
 };

@@ -160,6 +160,14 @@ async function sendFetchResponse(res, response, method) {
     }
 }
 
+function immutableAssetSet(buildManifest) {
+    const list = buildManifest?.assets?.immutable;
+    if (!Array.isArray(list)) {
+        return new Set();
+    }
+    return new Set(list.filter((entry) => typeof entry === 'string' && entry.startsWith('/')));
+}
+
 function normalizeRouteCheckResult(result, targetUrl, basePath) {
     if (!result || result.kind !== 'redirect') {
         return result;
@@ -212,7 +220,8 @@ async function loadRuntimeContext(options = {}) {
             resourceServerRoutes: allServerRoutes.filter((route) => route?.route_kind === 'resource'),
             globalMiddlewareModulePath,
             images: config.images || {},
-            basePath: normalizeBasePath(config.base_path || '/')
+            basePath: normalizeBasePath(config.base_path || '/'),
+            immutableAssets: immutableAssetSet(buildManifest)
         };
     };
 
@@ -350,7 +359,7 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             res.end('404 Not Found');
             return;
         }
-        await sendStaticFile(req, res, assetPath);
+        await sendStaticFile(req, res, assetPath, { immutableAssets: context.immutableAssets });
         return;
     }
 
@@ -378,14 +387,14 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
     if (buildResolved.matched && buildResolved.route) {
         const htmlPath = resolveWithinRoot(context.staticDir, buildResolved.route.html);
         if (htmlPath && await fileExists(htmlPath)) {
-            await sendStaticFile(req, res, htmlPath);
+            await sendStaticFile(req, res, htmlPath, { immutableAssets: context.immutableAssets });
             return;
         }
     }
 
     const fallbackHtmlPath = toStaticFilePath(context.staticDir, canonicalPath);
     if (fallbackHtmlPath && await fileExists(fallbackHtmlPath)) {
-        await sendStaticFile(req, res, fallbackHtmlPath);
+        await sendStaticFile(req, res, fallbackHtmlPath, { immutableAssets: context.immutableAssets });
         return;
     }
 
