@@ -5,6 +5,9 @@ scalar Reference
 """"""
 scalar JSON
 
+"""A rich-text document, renderable by TinaMarkdown"""
+scalar RichText
+
 type SystemInfo {
   filename: String!
   title: String
@@ -190,7 +193,7 @@ type Blog implements Node & Document {
   seoDescription: String
   canonicalPath: String
   relatedSlugs: [String]
-  body: JSON!
+  body: RichText!
   id: ID!
   _sys: SystemInfo!
   _values: JSON!
@@ -729,7 +732,7 @@ input BlogMutation {
   seoDescription: String
   canonicalPath: String
   relatedSlugs: [String]
-  body: JSON
+  body: RichText
 }
 
 input AboutSectionsHeroActionsMutation {
