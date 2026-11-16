@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Updated the bundler's transitive `xxhash-rust` dependency to 0.8.16 to validate short custom secrets in release builds (GHSA-6g2r-675j-hx59).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
