@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Updated TinaCMS to 3.14.0 and `@tinacms/cli` to 3.0.0 to fix preview-origin trust and generated-client code injection (GHSA-x34j-47hf-4xg7 and GHSA-pwhx-cvv3-qj5c).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
