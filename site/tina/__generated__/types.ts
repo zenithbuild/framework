@@ -7,13 +7,13 @@
     })
     return str
   }
-  export type Maybe<T> = T | null;
-export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
+  import type { TinaMarkdownContent } from 'tinacms/dist/rich-text';
+/** Internal type. DO NOT USE DIRECTLY. */
+type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
+/** Internal type. DO NOT USE DIRECTLY. */
 export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
+export type Maybe<T> = T | null;
+export type InputMaybe<T> = Maybe<T>;
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
   ID: { input: string; output: string; }
@@ -24,6 +24,8 @@ export type Scalars = {
   /** References another document, used as a foreign key */
   Reference: { input: any; output: any; }
   JSON: { input: any; output: any; }
+  /** A rich-text document, renderable by TinaMarkdown */
+  RichText: { input: TinaMarkdownContent; output: TinaMarkdownContent; }
 };
 
 export type SystemInfo = {
@@ -348,7 +350,7 @@ export type Blog = Node & Document & {
   seoDescription?: Maybe<Scalars['String']['output']>;
   canonicalPath?: Maybe<Scalars['String']['output']>;
   relatedSlugs?: Maybe<Array<Maybe<Scalars['String']['output']>>>;
-  body: Scalars['JSON']['output'];
+  body: Scalars['RichText']['output'];
   id: Scalars['ID']['output'];
   _sys: SystemInfo;
   _values: Scalars['JSON']['output'];
@@ -1025,7 +1027,7 @@ export type BlogMutation = {
   seoDescription?: InputMaybe<Scalars['String']['input']>;
   canonicalPath?: InputMaybe<Scalars['String']['input']>;
   relatedSlugs?: InputMaybe<Array<InputMaybe<Scalars['String']['input']>>>;
-  body?: InputMaybe<Scalars['JSON']['input']>;
+  body?: InputMaybe<Scalars['RichText']['input']>;
 };
 
 export type AboutSectionsHeroActionsMutation = {
@@ -1194,131 +1196,386 @@ export type SiteSettingsMutation = {
   contactUrl?: InputMaybe<Scalars['String']['input']>;
 };
 
-export type DocsPartsFragment = { __typename: 'Docs', title: string, description?: string | null, section: string, sectionOrder: number, order: number, sidebarLabel?: string | null, status: string, last_updated?: string | null, version?: string | null, tags?: Array<string | null> | null, seoTitle?: string | null, seoDescription?: string | null, body?: string | null };
+export type StringFilter = {
+  startsWith?: string | null | undefined;
+  eq?: string | null | undefined;
+  exists?: boolean | null | undefined;
+  in?: Array<string | null | undefined> | null | undefined;
+};
 
-export type BlogPartsFragment = { __typename: 'Blog', title: string, description: string, published: boolean, publishedAt?: string | null, updatedAt?: string | null, category?: string | null, tags?: Array<string | null> | null, featured?: boolean | null, seoTitle?: string | null, seoDescription?: string | null, canonicalPath?: string | null, relatedSlugs?: Array<string | null> | null, body: any, author?: { __typename: 'People', name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, id: string, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage?: { __typename: 'BlogFeaturedImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null };
+export type NumberFilter = {
+  lt?: number | null | undefined;
+  lte?: number | null | undefined;
+  gte?: number | null | undefined;
+  gt?: number | null | undefined;
+  eq?: number | null | undefined;
+  exists?: boolean | null | undefined;
+  in?: Array<number | null | undefined> | null | undefined;
+};
 
-export type AboutPartsFragment = { __typename: 'About', pageTitle: string, description: string, seoTitle?: string | null, seoDescription?: string | null, sections?: { __typename: 'AboutSections', hero?: { __typename: 'AboutSectionsHero', eyebrow?: string | null, title: string, description?: string | null, actions?: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant?: string | null } | null> | null } | null, why?: { __typename: 'AboutSectionsWhy', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsWhyItems', number?: string | null, title: string, description: string } | null> | null } | null, principles?: { __typename: 'AboutSectionsPrinciples', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsPrinciplesItems', number?: string | null, title: string, description: string } | null> | null } | null, built?: { __typename: 'AboutSectionsBuilt', eyebrow?: string | null, title: string, description?: string | null, parts?: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem?: { __typename: 'AboutSectionsEcosystem', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder?: { __typename: 'AboutSectionsBuilder', eyebrow?: string | null, title: string, text: string, signature?: string | null, role?: string | null } | null, cta?: { __typename: 'AboutSectionsCta', eyebrow?: string | null, title: string, text?: string | null, actions?: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant?: string | null } | null> | null } | null } | null };
+export type DocsFilter = {
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  section?: StringFilter | null | undefined;
+  sectionOrder?: NumberFilter | null | undefined;
+  order?: NumberFilter | null | undefined;
+  sidebarLabel?: StringFilter | null | undefined;
+  status?: StringFilter | null | undefined;
+  last_updated?: StringFilter | null | undefined;
+  version?: StringFilter | null | undefined;
+  tags?: StringFilter | null | undefined;
+  seoTitle?: StringFilter | null | undefined;
+  seoDescription?: StringFilter | null | undefined;
+  body?: StringFilter | null | undefined;
+};
 
-export type SponsorsPartsFragment = { __typename: 'Sponsors', kind: string, name: string, url?: string | null, title?: string | null, description?: string | null, recognitionText?: string | null, ctaLabel?: string | null, ctaUrl?: string | null, supportingStatements?: Array<string | null> | null, active?: boolean | null, featured?: boolean | null, startsAt?: string | null, endsAt?: string | null, logo?: { __typename: 'SponsorsLogo', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null };
+export type BooleanFilter = {
+  eq?: boolean | null | undefined;
+  exists?: boolean | null | undefined;
+};
 
-export type PeoplePartsFragment = { __typename: 'People', name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null };
+export type DatetimeFilter = {
+  after?: string | null | undefined;
+  before?: string | null | undefined;
+  eq?: string | null | undefined;
+  exists?: boolean | null | undefined;
+  in?: Array<string | null | undefined> | null | undefined;
+};
 
-export type SiteSettingsPartsFragment = { __typename: 'SiteSettings', defaultSeoTitle: string, defaultSeoDescription: string, siteUrl?: string | null, contactUrl?: string | null, socialImage?: { __typename: 'SiteSettingsSocialImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null } | null, socialLinks?: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null };
+export type BlogAuthorFilter = {
+  people?: PeopleFilter | null | undefined;
+};
+
+export type ImageFilter = {
+  startsWith?: string | null | undefined;
+  eq?: string | null | undefined;
+  exists?: boolean | null | undefined;
+  in?: Array<string | null | undefined> | null | undefined;
+};
+
+export type BlogFeaturedImageFilter = {
+  src?: ImageFilter | null | undefined;
+  width?: NumberFilter | null | undefined;
+  height?: NumberFilter | null | undefined;
+  alt?: StringFilter | null | undefined;
+  focalPosition?: StringFilter | null | undefined;
+};
+
+export type RichTextFilter = {
+  startsWith?: string | null | undefined;
+  eq?: string | null | undefined;
+  exists?: boolean | null | undefined;
+};
+
+export type BlogFilter = {
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  published?: BooleanFilter | null | undefined;
+  publishedAt?: DatetimeFilter | null | undefined;
+  updatedAt?: DatetimeFilter | null | undefined;
+  author?: BlogAuthorFilter | null | undefined;
+  category?: StringFilter | null | undefined;
+  tags?: StringFilter | null | undefined;
+  featured?: BooleanFilter | null | undefined;
+  featuredImage?: BlogFeaturedImageFilter | null | undefined;
+  seoTitle?: StringFilter | null | undefined;
+  seoDescription?: StringFilter | null | undefined;
+  canonicalPath?: StringFilter | null | undefined;
+  relatedSlugs?: StringFilter | null | undefined;
+  body?: RichTextFilter | null | undefined;
+};
+
+export type AboutSectionsHeroActionsFilter = {
+  label?: StringFilter | null | undefined;
+  href?: StringFilter | null | undefined;
+  variant?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsHeroFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  actions?: AboutSectionsHeroActionsFilter | null | undefined;
+};
+
+export type AboutSectionsWhyItemsFilter = {
+  number?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsWhyFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  items?: AboutSectionsWhyItemsFilter | null | undefined;
+};
+
+export type AboutSectionsPrinciplesItemsFilter = {
+  number?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsPrinciplesFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  items?: AboutSectionsPrinciplesItemsFilter | null | undefined;
+};
+
+export type AboutSectionsBuiltPartsFilter = {
+  name?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsBuiltFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  parts?: AboutSectionsBuiltPartsFilter | null | undefined;
+};
+
+export type AboutSectionsEcosystemItemsFilter = {
+  name?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsEcosystemFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  items?: AboutSectionsEcosystemItemsFilter | null | undefined;
+};
+
+export type AboutSectionsBuilderFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  text?: StringFilter | null | undefined;
+  signature?: StringFilter | null | undefined;
+  role?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsCtaActionsFilter = {
+  label?: StringFilter | null | undefined;
+  href?: StringFilter | null | undefined;
+  variant?: StringFilter | null | undefined;
+};
+
+export type AboutSectionsCtaFilter = {
+  eyebrow?: StringFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  text?: StringFilter | null | undefined;
+  actions?: AboutSectionsCtaActionsFilter | null | undefined;
+};
+
+export type AboutSectionsFilter = {
+  hero?: AboutSectionsHeroFilter | null | undefined;
+  why?: AboutSectionsWhyFilter | null | undefined;
+  principles?: AboutSectionsPrinciplesFilter | null | undefined;
+  built?: AboutSectionsBuiltFilter | null | undefined;
+  ecosystem?: AboutSectionsEcosystemFilter | null | undefined;
+  builder?: AboutSectionsBuilderFilter | null | undefined;
+  cta?: AboutSectionsCtaFilter | null | undefined;
+};
+
+export type AboutFilter = {
+  pageTitle?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  seoTitle?: StringFilter | null | undefined;
+  seoDescription?: StringFilter | null | undefined;
+  sections?: AboutSectionsFilter | null | undefined;
+};
+
+export type SponsorsLogoFilter = {
+  src?: ImageFilter | null | undefined;
+  width?: NumberFilter | null | undefined;
+  height?: NumberFilter | null | undefined;
+  alt?: StringFilter | null | undefined;
+  focalPosition?: StringFilter | null | undefined;
+};
+
+export type SponsorsFilter = {
+  kind?: StringFilter | null | undefined;
+  name?: StringFilter | null | undefined;
+  url?: StringFilter | null | undefined;
+  logo?: SponsorsLogoFilter | null | undefined;
+  title?: StringFilter | null | undefined;
+  description?: StringFilter | null | undefined;
+  recognitionText?: StringFilter | null | undefined;
+  ctaLabel?: StringFilter | null | undefined;
+  ctaUrl?: StringFilter | null | undefined;
+  supportingStatements?: StringFilter | null | undefined;
+  active?: BooleanFilter | null | undefined;
+  featured?: BooleanFilter | null | undefined;
+  startsAt?: DatetimeFilter | null | undefined;
+  endsAt?: DatetimeFilter | null | undefined;
+};
+
+export type PeopleAvatarFilter = {
+  src?: ImageFilter | null | undefined;
+  width?: NumberFilter | null | undefined;
+  height?: NumberFilter | null | undefined;
+  alt?: StringFilter | null | undefined;
+  focalPosition?: StringFilter | null | undefined;
+};
+
+export type PeopleFilter = {
+  name?: StringFilter | null | undefined;
+  profileUrl?: StringFilter | null | undefined;
+  avatar?: PeopleAvatarFilter | null | undefined;
+  member?: BooleanFilter | null | undefined;
+  contributor?: BooleanFilter | null | undefined;
+  active?: BooleanFilter | null | undefined;
+  sortOrder?: NumberFilter | null | undefined;
+};
+
+export type SiteSettingsSocialImageFilter = {
+  src?: ImageFilter | null | undefined;
+  width?: NumberFilter | null | undefined;
+  height?: NumberFilter | null | undefined;
+  alt?: StringFilter | null | undefined;
+};
+
+export type SiteSettingsSocialLinksFilter = {
+  label?: StringFilter | null | undefined;
+  url?: StringFilter | null | undefined;
+};
+
+export type SiteSettingsFilter = {
+  defaultSeoTitle?: StringFilter | null | undefined;
+  defaultSeoDescription?: StringFilter | null | undefined;
+  siteUrl?: StringFilter | null | undefined;
+  socialImage?: SiteSettingsSocialImageFilter | null | undefined;
+  socialLinks?: SiteSettingsSocialLinksFilter | null | undefined;
+  contactUrl?: StringFilter | null | undefined;
+};
+
+export type DocsPartsFragment = { __typename: 'Docs', title: string, description: string | null, section: string, sectionOrder: number, order: number, sidebarLabel: string | null, status: string, last_updated: string | null, version: string | null, tags: Array<string | null> | null, seoTitle: string | null, seoDescription: string | null, body: string | null };
+
+export type BlogPartsFragment = { __typename: 'Blog', title: string, description: string, published: boolean, publishedAt: string | null, updatedAt: string | null, category: string | null, tags: Array<string | null> | null, featured: boolean | null, seoTitle: string | null, seoDescription: string | null, canonicalPath: string | null, relatedSlugs: Array<string | null> | null, body: TinaMarkdownContent, author: { __typename: 'People', name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, id: string, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage: { __typename: 'BlogFeaturedImage', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null };
+
+export type AboutPartsFragment = { __typename: 'About', pageTitle: string, description: string, seoTitle: string | null, seoDescription: string | null, sections: { __typename: 'AboutSections', hero: { __typename: 'AboutSectionsHero', eyebrow: string | null, title: string, description: string | null, actions: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant: string | null } | null> | null } | null, why: { __typename: 'AboutSectionsWhy', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsWhyItems', number: string | null, title: string, description: string } | null> | null } | null, principles: { __typename: 'AboutSectionsPrinciples', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsPrinciplesItems', number: string | null, title: string, description: string } | null> | null } | null, built: { __typename: 'AboutSectionsBuilt', eyebrow: string | null, title: string, description: string | null, parts: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem: { __typename: 'AboutSectionsEcosystem', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder: { __typename: 'AboutSectionsBuilder', eyebrow: string | null, title: string, text: string, signature: string | null, role: string | null } | null, cta: { __typename: 'AboutSectionsCta', eyebrow: string | null, title: string, text: string | null, actions: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant: string | null } | null> | null } | null } | null };
+
+export type SponsorsPartsFragment = { __typename: 'Sponsors', kind: string, name: string, url: string | null, title: string | null, description: string | null, recognitionText: string | null, ctaLabel: string | null, ctaUrl: string | null, supportingStatements: Array<string | null> | null, active: boolean | null, featured: boolean | null, startsAt: string | null, endsAt: string | null, logo: { __typename: 'SponsorsLogo', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null };
+
+export type PeoplePartsFragment = { __typename: 'People', name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null };
+
+export type SiteSettingsPartsFragment = { __typename: 'SiteSettings', defaultSeoTitle: string, defaultSeoDescription: string, siteUrl: string | null, contactUrl: string | null, socialImage: { __typename: 'SiteSettingsSocialImage', src: string | null, width: number | null, height: number | null, alt: string | null } | null, socialLinks: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null };
 
 export type DocsQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type DocsQuery = { __typename?: 'Query', docs: { __typename: 'Docs', id: string, title: string, description?: string | null, section: string, sectionOrder: number, order: number, sidebarLabel?: string | null, status: string, last_updated?: string | null, version?: string | null, tags?: Array<string | null> | null, seoTitle?: string | null, seoDescription?: string | null, body?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } };
+export type DocsQuery = { docs: { __typename: 'Docs', id: string, title: string, description: string | null, section: string, sectionOrder: number, order: number, sidebarLabel: string | null, status: string, last_updated: string | null, version: string | null, tags: Array<string | null> | null, seoTitle: string | null, seoDescription: string | null, body: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } };
 
 export type DocsConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<DocsFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: DocsFilter | null | undefined;
 }>;
 
 
-export type DocsConnectionQuery = { __typename?: 'Query', docsConnection: { __typename?: 'DocsConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'DocsConnectionEdges', cursor: string, node?: { __typename: 'Docs', id: string, title: string, description?: string | null, section: string, sectionOrder: number, order: number, sidebarLabel?: string | null, status: string, last_updated?: string | null, version?: string | null, tags?: Array<string | null> | null, seoTitle?: string | null, seoDescription?: string | null, body?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null } | null> | null } };
+export type DocsConnectionQuery = { docsConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'Docs', id: string, title: string, description: string | null, section: string, sectionOrder: number, order: number, sidebarLabel: string | null, status: string, last_updated: string | null, version: string | null, tags: Array<string | null> | null, seoTitle: string | null, seoDescription: string | null, body: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null } | null> | null } };
 
 export type BlogQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type BlogQuery = { __typename?: 'Query', blog: { __typename: 'Blog', id: string, title: string, description: string, published: boolean, publishedAt?: string | null, updatedAt?: string | null, category?: string | null, tags?: Array<string | null> | null, featured?: boolean | null, seoTitle?: string | null, seoDescription?: string | null, canonicalPath?: string | null, relatedSlugs?: Array<string | null> | null, body: any, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, author?: { __typename: 'People', name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, id: string, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage?: { __typename: 'BlogFeaturedImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } };
+export type BlogQuery = { blog: { __typename: 'Blog', id: string, title: string, description: string, published: boolean, publishedAt: string | null, updatedAt: string | null, category: string | null, tags: Array<string | null> | null, featured: boolean | null, seoTitle: string | null, seoDescription: string | null, canonicalPath: string | null, relatedSlugs: Array<string | null> | null, body: TinaMarkdownContent, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, author: { __typename: 'People', name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, id: string, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage: { __typename: 'BlogFeaturedImage', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } };
 
 export type BlogConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<BlogFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: BlogFilter | null | undefined;
 }>;
 
 
-export type BlogConnectionQuery = { __typename?: 'Query', blogConnection: { __typename?: 'BlogConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'BlogConnectionEdges', cursor: string, node?: { __typename: 'Blog', id: string, title: string, description: string, published: boolean, publishedAt?: string | null, updatedAt?: string | null, category?: string | null, tags?: Array<string | null> | null, featured?: boolean | null, seoTitle?: string | null, seoDescription?: string | null, canonicalPath?: string | null, relatedSlugs?: Array<string | null> | null, body: any, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, author?: { __typename: 'People', name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, id: string, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage?: { __typename: 'BlogFeaturedImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } | null } | null> | null } };
+export type BlogConnectionQuery = { blogConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'Blog', id: string, title: string, description: string, published: boolean, publishedAt: string | null, updatedAt: string | null, category: string | null, tags: Array<string | null> | null, featured: boolean | null, seoTitle: string | null, seoDescription: string | null, canonicalPath: string | null, relatedSlugs: Array<string | null> | null, body: TinaMarkdownContent, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, author: { __typename: 'People', name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, id: string, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string } } | null, featuredImage: { __typename: 'BlogFeaturedImage', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } | null } | null> | null } };
 
 export type AboutQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type AboutQuery = { __typename?: 'Query', about: { __typename: 'About', id: string, pageTitle: string, description: string, seoTitle?: string | null, seoDescription?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, sections?: { __typename: 'AboutSections', hero?: { __typename: 'AboutSectionsHero', eyebrow?: string | null, title: string, description?: string | null, actions?: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant?: string | null } | null> | null } | null, why?: { __typename: 'AboutSectionsWhy', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsWhyItems', number?: string | null, title: string, description: string } | null> | null } | null, principles?: { __typename: 'AboutSectionsPrinciples', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsPrinciplesItems', number?: string | null, title: string, description: string } | null> | null } | null, built?: { __typename: 'AboutSectionsBuilt', eyebrow?: string | null, title: string, description?: string | null, parts?: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem?: { __typename: 'AboutSectionsEcosystem', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder?: { __typename: 'AboutSectionsBuilder', eyebrow?: string | null, title: string, text: string, signature?: string | null, role?: string | null } | null, cta?: { __typename: 'AboutSectionsCta', eyebrow?: string | null, title: string, text?: string | null, actions?: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant?: string | null } | null> | null } | null } | null } };
+export type AboutQuery = { about: { __typename: 'About', id: string, pageTitle: string, description: string, seoTitle: string | null, seoDescription: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, sections: { __typename: 'AboutSections', hero: { __typename: 'AboutSectionsHero', eyebrow: string | null, title: string, description: string | null, actions: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant: string | null } | null> | null } | null, why: { __typename: 'AboutSectionsWhy', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsWhyItems', number: string | null, title: string, description: string } | null> | null } | null, principles: { __typename: 'AboutSectionsPrinciples', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsPrinciplesItems', number: string | null, title: string, description: string } | null> | null } | null, built: { __typename: 'AboutSectionsBuilt', eyebrow: string | null, title: string, description: string | null, parts: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem: { __typename: 'AboutSectionsEcosystem', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder: { __typename: 'AboutSectionsBuilder', eyebrow: string | null, title: string, text: string, signature: string | null, role: string | null } | null, cta: { __typename: 'AboutSectionsCta', eyebrow: string | null, title: string, text: string | null, actions: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant: string | null } | null> | null } | null } | null } };
 
 export type AboutConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<AboutFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: AboutFilter | null | undefined;
 }>;
 
 
-export type AboutConnectionQuery = { __typename?: 'Query', aboutConnection: { __typename?: 'AboutConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'AboutConnectionEdges', cursor: string, node?: { __typename: 'About', id: string, pageTitle: string, description: string, seoTitle?: string | null, seoDescription?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, sections?: { __typename: 'AboutSections', hero?: { __typename: 'AboutSectionsHero', eyebrow?: string | null, title: string, description?: string | null, actions?: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant?: string | null } | null> | null } | null, why?: { __typename: 'AboutSectionsWhy', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsWhyItems', number?: string | null, title: string, description: string } | null> | null } | null, principles?: { __typename: 'AboutSectionsPrinciples', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsPrinciplesItems', number?: string | null, title: string, description: string } | null> | null } | null, built?: { __typename: 'AboutSectionsBuilt', eyebrow?: string | null, title: string, description?: string | null, parts?: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem?: { __typename: 'AboutSectionsEcosystem', eyebrow?: string | null, title: string, description?: string | null, items?: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder?: { __typename: 'AboutSectionsBuilder', eyebrow?: string | null, title: string, text: string, signature?: string | null, role?: string | null } | null, cta?: { __typename: 'AboutSectionsCta', eyebrow?: string | null, title: string, text?: string | null, actions?: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant?: string | null } | null> | null } | null } | null } | null } | null> | null } };
+export type AboutConnectionQuery = { aboutConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'About', id: string, pageTitle: string, description: string, seoTitle: string | null, seoDescription: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, sections: { __typename: 'AboutSections', hero: { __typename: 'AboutSectionsHero', eyebrow: string | null, title: string, description: string | null, actions: Array<{ __typename: 'AboutSectionsHeroActions', label: string, href: string, variant: string | null } | null> | null } | null, why: { __typename: 'AboutSectionsWhy', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsWhyItems', number: string | null, title: string, description: string } | null> | null } | null, principles: { __typename: 'AboutSectionsPrinciples', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsPrinciplesItems', number: string | null, title: string, description: string } | null> | null } | null, built: { __typename: 'AboutSectionsBuilt', eyebrow: string | null, title: string, description: string | null, parts: Array<{ __typename: 'AboutSectionsBuiltParts', name: string, description: string } | null> | null } | null, ecosystem: { __typename: 'AboutSectionsEcosystem', eyebrow: string | null, title: string, description: string | null, items: Array<{ __typename: 'AboutSectionsEcosystemItems', name: string, description: string } | null> | null } | null, builder: { __typename: 'AboutSectionsBuilder', eyebrow: string | null, title: string, text: string, signature: string | null, role: string | null } | null, cta: { __typename: 'AboutSectionsCta', eyebrow: string | null, title: string, text: string | null, actions: Array<{ __typename: 'AboutSectionsCtaActions', label: string, href: string, variant: string | null } | null> | null } | null } | null } | null } | null> | null } };
 
 export type SponsorsQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type SponsorsQuery = { __typename?: 'Query', sponsors: { __typename: 'Sponsors', id: string, kind: string, name: string, url?: string | null, title?: string | null, description?: string | null, recognitionText?: string | null, ctaLabel?: string | null, ctaUrl?: string | null, supportingStatements?: Array<string | null> | null, active?: boolean | null, featured?: boolean | null, startsAt?: string | null, endsAt?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, logo?: { __typename: 'SponsorsLogo', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } };
+export type SponsorsQuery = { sponsors: { __typename: 'Sponsors', id: string, kind: string, name: string, url: string | null, title: string | null, description: string | null, recognitionText: string | null, ctaLabel: string | null, ctaUrl: string | null, supportingStatements: Array<string | null> | null, active: boolean | null, featured: boolean | null, startsAt: string | null, endsAt: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, logo: { __typename: 'SponsorsLogo', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } };
 
 export type SponsorsConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<SponsorsFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: SponsorsFilter | null | undefined;
 }>;
 
 
-export type SponsorsConnectionQuery = { __typename?: 'Query', sponsorsConnection: { __typename?: 'SponsorsConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'SponsorsConnectionEdges', cursor: string, node?: { __typename: 'Sponsors', id: string, kind: string, name: string, url?: string | null, title?: string | null, description?: string | null, recognitionText?: string | null, ctaLabel?: string | null, ctaUrl?: string | null, supportingStatements?: Array<string | null> | null, active?: boolean | null, featured?: boolean | null, startsAt?: string | null, endsAt?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, logo?: { __typename: 'SponsorsLogo', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } | null } | null> | null } };
+export type SponsorsConnectionQuery = { sponsorsConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'Sponsors', id: string, kind: string, name: string, url: string | null, title: string | null, description: string | null, recognitionText: string | null, ctaLabel: string | null, ctaUrl: string | null, supportingStatements: Array<string | null> | null, active: boolean | null, featured: boolean | null, startsAt: string | null, endsAt: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, logo: { __typename: 'SponsorsLogo', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } | null } | null> | null } };
 
 export type PeopleQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type PeopleQuery = { __typename?: 'Query', people: { __typename: 'People', id: string, name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } };
+export type PeopleQuery = { people: { __typename: 'People', id: string, name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } };
 
 export type PeopleConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<PeopleFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: PeopleFilter | null | undefined;
 }>;
 
 
-export type PeopleConnectionQuery = { __typename?: 'Query', peopleConnection: { __typename?: 'PeopleConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'PeopleConnectionEdges', cursor: string, node?: { __typename: 'People', id: string, name: string, profileUrl: string, member?: boolean | null, contributor?: boolean | null, active?: boolean | null, sortOrder?: number | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, avatar?: { __typename: 'PeopleAvatar', src?: string | null, width?: number | null, height?: number | null, alt?: string | null, focalPosition?: string | null } | null } | null } | null> | null } };
+export type PeopleConnectionQuery = { peopleConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'People', id: string, name: string, profileUrl: string, member: boolean | null, contributor: boolean | null, active: boolean | null, sortOrder: number | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, avatar: { __typename: 'PeopleAvatar', src: string | null, width: number | null, height: number | null, alt: string | null, focalPosition: string | null } | null } | null } | null> | null } };
 
 export type SiteSettingsQueryVariables = Exact<{
-  relativePath: Scalars['String']['input'];
+  relativePath: string;
 }>;
 
 
-export type SiteSettingsQuery = { __typename?: 'Query', siteSettings: { __typename: 'SiteSettings', id: string, defaultSeoTitle: string, defaultSeoDescription: string, siteUrl?: string | null, contactUrl?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, socialImage?: { __typename: 'SiteSettingsSocialImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null } | null, socialLinks?: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null } };
+export type SiteSettingsQuery = { siteSettings: { __typename: 'SiteSettings', id: string, defaultSeoTitle: string, defaultSeoDescription: string, siteUrl: string | null, contactUrl: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, socialImage: { __typename: 'SiteSettingsSocialImage', src: string | null, width: number | null, height: number | null, alt: string | null } | null, socialLinks: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null } };
 
 export type SiteSettingsConnectionQueryVariables = Exact<{
-  before?: InputMaybe<Scalars['String']['input']>;
-  after?: InputMaybe<Scalars['String']['input']>;
-  first?: InputMaybe<Scalars['Float']['input']>;
-  last?: InputMaybe<Scalars['Float']['input']>;
-  sort?: InputMaybe<Scalars['String']['input']>;
-  filter?: InputMaybe<SiteSettingsFilter>;
+  before?: string | null | undefined;
+  after?: string | null | undefined;
+  first?: number | null | undefined;
+  last?: number | null | undefined;
+  sort?: string | null | undefined;
+  filter?: SiteSettingsFilter | null | undefined;
 }>;
 
 
-export type SiteSettingsConnectionQuery = { __typename?: 'Query', siteSettingsConnection: { __typename?: 'SiteSettingsConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges?: Array<{ __typename?: 'SiteSettingsConnectionEdges', cursor: string, node?: { __typename: 'SiteSettings', id: string, defaultSeoTitle: string, defaultSeoDescription: string, siteUrl?: string | null, contactUrl?: string | null, _sys: { __typename?: 'SystemInfo', filename: string, basename: string, hasReferences?: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, socialImage?: { __typename: 'SiteSettingsSocialImage', src?: string | null, width?: number | null, height?: number | null, alt?: string | null } | null, socialLinks?: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null } | null } | null> | null } };
+export type SiteSettingsConnectionQuery = { siteSettingsConnection: { totalCount: number, pageInfo: { hasPreviousPage: boolean, hasNextPage: boolean, startCursor: string, endCursor: string }, edges: Array<{ cursor: string, node: { __typename: 'SiteSettings', id: string, defaultSeoTitle: string, defaultSeoDescription: string, siteUrl: string | null, contactUrl: string | null, _sys: { filename: string, basename: string, hasReferences: boolean | null, breadcrumbs: Array<string>, path: string, relativePath: string, extension: string }, socialImage: { __typename: 'SiteSettingsSocialImage', src: string | null, width: number | null, height: number | null, alt: string | null } | null, socialLinks: Array<{ __typename: 'SiteSettingsSocialLinks', label: string, url: string } | null> | null } | null } | null> | null } };
 
 export const DocsPartsFragmentDoc = gql`
     fragment DocsParts on Docs {
@@ -1991,3 +2248,7 @@ export const queries = (
   const requester = generateRequester(client)
   return getSdk(requester)
 }
+
+export type { Exact };
+
+  
