@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Removed the hardcoded npm esbuild gate for withdrawn advisory GHSA-gv7w-rqvm-qjhr. The advisory concerns the Deno distribution, not the npm package used by this repository; build and test failures remain blocking.
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
