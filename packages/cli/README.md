@@ -118,6 +118,10 @@ Compiles and bundles your application for production.
 ### `zenith preview`
 Previews the locally built target contract for verification. Static targets serve built files; `target: 'node'` boots the built Node artifact.
 
+## Runtime Requirements
+
+When running under Node.js, the CLI and its image service require **Node.js 20.9.0 or newer**. The `sharp` 0.35 dependency no longer supports Node.js 18 or Node.js 20 versions before 20.9.0.
+
 ## Installation
 
 Typically installed as a dev dependency in your Zenith project:
