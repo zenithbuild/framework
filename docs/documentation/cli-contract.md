@@ -3,7 +3,7 @@ title: "CLI Contract"
 description: "Public CLI guarantees for command behavior, exit semantics, and deployment-aware build outputs."
 version: "0.5"
 status: "canonical"
-last_updated: "2026-06-07"
+last_updated: "2026-11-16"
 tags: ["contracts", "cli", "commands"]
 section: "Build and Tooling"
 sectionOrder: 6
@@ -17,6 +17,10 @@ order: 1
 Contract: the CLI owns deterministic build/dev/preview orchestration only.
 
 Invariant: CLI must not implement compiler semantics, runtime behavior, or hidden navigation logic.
+
+## Runtime Requirements
+
+Node.js execution of the CLI and its image service requires **Node.js 20.9.0 or newer**, matching the CLI package's `engines.node` declaration and its `sharp` 0.35 dependency. This includes Node.js deployments that use the packaged image service. Node.js 18 and Node.js 20 versions before 20.9.0 are not supported by this Sharp version.
 
 ## Command Guarantees
 

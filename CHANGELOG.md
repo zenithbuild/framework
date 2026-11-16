@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Updated `sharp` to 0.35.5 in the CLI and site to fix libvips, libheif, and librsvg advisories (GHSA-f88m-g3jw-g9cj, GHSA-rgj7-g3m4-5g8c, and GHSA-wq5f-xc86-pv6w). Node.js execution of the CLI and its image service now requires Node.js 20.9.0 or newer; Node.js 18 is no longer supported by this Sharp version.
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
