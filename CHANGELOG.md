@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Updated the bundler's transitive `rand` dependency to 0.8.6 to fix custom-logger unsoundness (GHSA-cq8v-f236-94qc).
+
 ## [0.8.0] - 2026-07-01
 
 ### Changed
