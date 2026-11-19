@@ -379,15 +379,17 @@ zenMount((ctx) => {
   >
     <span
       ref={siteLinkAnchorOverlayRef}
+      data-zen-link-overlay="true"
       aria-hidden="true"
       class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
       style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
     ></span>
-    <div class={siteLinkContentClass}><slot /></div>
+    <div data-zen-link-content="true" class={siteLinkContentClass}><slot /></div>
   </a>
 
   <span
     ref={siteLinkDisabledRef}
+    data-zen-link-disabled="true"
     class={siteLinkResolvedClass}
     style={siteLinkShouldUseDisabledState ? undefined : "display: none;"}
     id={siteLinkShouldUseDisabledState ? siteLinkId || undefined : undefined}
@@ -403,10 +405,11 @@ zenMount((ctx) => {
   >
     <span
       ref={siteLinkDisabledOverlayRef}
+      data-zen-link-overlay="true"
       aria-hidden="true"
       class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
       style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
     ></span>
-    <div class={siteLinkContentClass}><slot /></div>
+    <div data-zen-link-content="true" class={siteLinkContentClass}><slot /></div>
   </span>
 </span>

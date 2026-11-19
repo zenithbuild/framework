@@ -1,0 +1,116 @@
+/* Zenith v1 shared primitives (handoff §3 components). Hover for nav links and tags is not drawn in
+   Figma: these use a minimal token-based hover (surface-2 / underline) and are flagged for UI review. */
+@layer components {
+  .v1-eyebrow {
+    font-family: var(--zen-font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 18px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .v1-h2 {
+    font-family: var(--zen-font-heading);
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 36px;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+  }
+  @media (min-width: 768px) {
+    .v1-h2 { font-size: 48px; line-height: 52px; letter-spacing: -0.02em; }
+  }
+  .v1-h3 {
+    font-family: var(--zen-font-heading);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 26px;
+    color: var(--foreground);
+  }
+  .v1-button {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    padding: 0 20px;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 20px;
+    white-space: nowrap;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+  .v1-button-primary { background: var(--primary); color: var(--primary-foreground); }
+  .v1-button-primary:hover { background: var(--primary-hover-bg); color: var(--primary-hover-fg); }
+  .v1-button-secondary, .v1-button-outline { border-color: var(--border-strong); color: var(--foreground); background: transparent; }
+  .v1-button-secondary:hover, .v1-button-outline:hover { background: var(--surface-2); }
+  .v1-focus:focus-visible, .v1-button:focus-visible, .v1-link:focus-visible, .v1-tab:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .v1-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--primary);
+    text-underline-offset: 3px;
+  }
+  .v1-link:hover { text-decoration: underline; }
+  .v1-inline-code {
+    border-radius: 4px;
+    background: var(--surface-2);
+    padding: 1px 4px;
+    font-family: var(--zen-font-mono);
+    font-size: 0.88em;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+  .v1-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-family: var(--zen-font-mono);
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--foreground);
+  }
+  .v1-tag::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: var(--tag-accent); }
+  .v1-tag-blue { background: var(--brand-blue-soft); --tag-accent: var(--brand-blue); }
+  .v1-tag-gold { background: var(--brand-gold-soft); --tag-accent: var(--gold-text); }
+  .v1-tag-purple { background: var(--brand-purple-soft); --tag-accent: var(--primary); }
+  .v1-tag-magenta { background: var(--brand-magenta-soft); --tag-accent: var(--brand-magenta); }
+  .v1-tag-red { background: var(--brand-red-soft); --tag-accent: var(--destructive); }
+  .v1-code-panel {
+    border-radius: 12px;
+    background: var(--code-bg);
+    color: var(--code-fg);
+    font-family: var(--zen-font-mono);
+  }
+
+  /* Copy "Copied" reset clock: not motion (opacity 0 → 0), so it also runs under reduced motion. */
+  .copy-reset-clock { position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+  .copy-reset-clock[data-copy-clock="copied"] { animation: zen-copy-reset-clock 2s linear 1 !important; }
+  @keyframes zen-copy-reset-clock { from { opacity: 0; } to { opacity: 0; } }
+}
+
+.perf-tab {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.perf-tab[aria-selected="true"] { border-color: var(--border); background: var(--background); color: var(--foreground); }
+.v1-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

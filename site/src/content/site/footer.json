@@ -1,18 +1,4 @@
 {
-  "cta": {
-    "title": "BUILD WITH ZENITH.",
-    "description": "Start with the canonical docs, inspect the source, and build against the same explicit contracts the compiler enforces.",
-    "actions": [
-      {
-        "label": "Read the docs",
-        "href": "/docs"
-      },
-      {
-        "label": "View on GitHub",
-        "href": "https://github.com/zenithbuild/framework"
-      }
-    ]
-  },
   "nav": {
     "brand": {
       "label": "Zenith.",
@@ -20,15 +6,19 @@
     },
     "groups": [
       {
-        "title": "Explore",
+        "title": "Product",
         "links": [
           {
-            "label": "Home",
-            "href": "/"
+            "label": "How it works",
+            "href": "/#how-it-works"
           },
           {
-            "label": "About",
-            "href": "/about"
+            "label": "Performance",
+            "href": "/performance"
+          },
+          {
+            "label": "Why Zenith",
+            "href": "/#why-zenith"
           }
         ]
       },
@@ -36,12 +26,20 @@
         "title": "Learn",
         "links": [
           {
-            "label": "Documentation",
+            "label": "Docs",
             "href": "/docs"
           },
           {
             "label": "Blog",
             "href": "/blog"
+          },
+          {
+            "label": "Changelog",
+            "href": "https://github.com/zenithbuild/framework/blob/master/CHANGELOG.md"
+          },
+          {
+            "label": "Roadmap",
+            "href": "https://github.com/zenithbuild/framework/milestones"
           }
         ]
       },
@@ -51,13 +49,26 @@
           {
             "label": "GitHub",
             "href": "https://github.com/zenithbuild/framework"
+          },
+          {
+            "label": "MIT License",
+            "href": "https://github.com/zenithbuild/framework/blob/master/LICENSE"
+          }
+        ]
+      },
+      {
+        "title": "Community",
+        "links": [
+          {
+            "label": "X",
+            "href": "https://x.com/zenithbuild"
           }
         ]
       }
     ]
   },
   "meta": {
-    "copyrightPrefix": "Zenith Framework ©",
-    "signature": "Designed and engineered by Zenithbuild"
+    "copyrightPrefix": "Zenith Framework \u00a9",
+    "signature": "Designed and engineered by ZenithBuild"
   }
 }

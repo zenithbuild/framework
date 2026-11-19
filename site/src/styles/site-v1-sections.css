@@ -1,0 +1,113 @@
+/* §2 pipeline (JUD-139), §3 Why Zenith (JUD-140), §4 CTA terminal (JUD-141). */
+[data-stage-accent="build"] { --stage-accent: var(--primary); --stage-soft: var(--brand-purple-soft); }
+[data-stage-accent="compile"] { --stage-accent: var(--brand-blue); --stage-soft: var(--brand-blue-soft); }
+[data-stage-accent="bundle"] { --stage-accent: var(--gold-text); --stage-soft: var(--brand-gold-soft); }
+[data-stage-accent="run"] { --stage-accent: var(--brand-magenta); --stage-soft: var(--brand-magenta-soft); }
+
+.pipeline-root .pipeline-desktop { display: none; }
+.pipeline-root .pipeline-accordion { display: flex; }
+@media (min-width: 768px) {
+  .pipeline-root .pipeline-desktop { display: flex; align-items: flex-start; }
+  .pipeline-root .pipeline-accordion { display: none; }
+}
+.pipeline-tablist { position: relative; display: flex; width: 264px; flex-shrink: 0; flex-direction: column; gap: 8px; }
+.pipeline-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 68px;
+  width: 264px;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px;
+}
+.pipeline-tab[aria-selected="true"] { border-color: transparent; }
+.pipeline-tab-name { font-size: 17px; font-weight: 500; line-height: 22px; color: var(--muted-foreground); }
+.pipeline-tab[aria-selected="true"] .pipeline-tab-name, .pipeline-acc-item[data-open="true"] .pipeline-tab-name { color: var(--foreground); }
+.pipeline-tab:hover .pipeline-tab-name { color: var(--foreground); }
+.pipeline-num {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--background);
+  font-family: var(--zen-font-mono);
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--muted-foreground);
+}
+.pipeline-tab[aria-selected="true"] .pipeline-num, .pipeline-acc-item[data-open="true"] .pipeline-num {
+  border: 2px solid var(--stage-accent);
+  background: var(--stage-soft);
+  color: var(--foreground);
+}
+/* The rail highlight moves by transform only (stageSwitchTl S3). 68px tab + 8px gap = 76px pitch. */
+.pipeline-highlight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 68px;
+  width: 264px;
+  border: 2px solid var(--stage-accent);
+  border-radius: 12px;
+  background: var(--card);
+  pointer-events: none;
+}
+[data-active-stage="compile"] .pipeline-highlight { transform: translateY(76px); }
+[data-active-stage="bundle"] .pipeline-highlight { transform: translateY(152px); }
+[data-active-stage="run"] .pipeline-highlight { transform: translateY(228px); }
+
+.pipeline-panels { display: grid; min-width: 0; flex: 1 1 0%; }
+.pipeline-panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  border: 1.5px solid var(--stage-accent);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 28px;
+  visibility: hidden;
+  opacity: 0;
+}
+[data-active-stage="build"] [data-stage-panel="build"],
+[data-active-stage="compile"] [data-stage-panel="compile"],
+[data-active-stage="bundle"] [data-stage-panel="bundle"],
+[data-active-stage="run"] [data-stage-panel="run"],
+[data-pipeline-root]:not([data-active-stage]) [data-stage-panel="build"] { visibility: visible; opacity: 1; }
+.pipeline-stage-link { color: var(--stage-accent); }
+
+.pipeline-acc-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.pipeline-acc-item[data-open="true"] { border: 1.5px solid var(--stage-accent); background: var(--card); }
+.pipeline-acc-button { display: flex; min-height: 44px; width: 100%; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border-radius: 8px; }
+.pipeline-acc-panel { padding-top: 12px; }
+.pipeline-acc-panel[hidden] { display: none; }
+
+.pipeline-code { font-family: var(--zen-font-mono); color: var(--code-fg); }
+.pipeline-code-line { display: block; }
+.tone-fg { color: var(--code-fg); }
+.tone-muted { color: var(--code-muted); }
+.tone-purple { color: var(--code-purple); }
+.tone-blue { color: var(--code-blue); }
+.tone-gold { color: var(--code-gold); }
+.tone-magenta { color: var(--code-magenta); }
+.tone-success { color: var(--code-success); }
+
+/* CTA terminal: collapsed shows the last 6 lines; the full log is the same <pre>, so no reflow above it. */
+.cta-terminal [data-log-extra] { display: none; }
+.cta-terminal[data-log-expanded="true"] [data-log-extra] { display: block; }
+
+/* Compiler page (JUD-142) featured CompilerOutput fields: hero colour coding. */
+.compiler-field-card { display: flex; flex-direction: column; gap: 6px; border: 1.5px solid var(--field-accent); border-radius: 12px; background: var(--card); padding: 12px 14px; }
+.compiler-field-dot { width: 6px; height: 6px; border-radius: 9999px; background: var(--field-accent); }
+.compiler-field-type { background: var(--field-soft); padding: 0 6px; }
+.compiler-field-type::before { display: none; }
+.compiler-field-purple { --field-accent: var(--primary); --field-soft: var(--brand-purple-soft); }
+.compiler-field-blue { --field-accent: var(--brand-blue); --field-soft: var(--brand-blue-soft); }
+.compiler-field-gold { --field-accent: var(--brand-gold, #e5ae00); --field-soft: var(--brand-gold-soft); }
+@media (min-width: 1024px) {
+  .compiler-toc { position: sticky; top: 97px; }
+}
