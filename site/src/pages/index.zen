@@ -1,7 +1,6 @@
 <script server lang="ts">
 import { pageContent, siteContent } from "../content/index";
 import { createPageMetadata } from "../content/site/metadata";
-import { loadEditorialContentSnapshot } from "../server/editorialContentSource";
 import { loadSearchIndex } from "../server/searchIndexLoader";
 
 export const load = async (ctx) => {
@@ -9,7 +8,6 @@ export const load = async (ctx) => {
     return ctx.data({
         page: pageContent.index,
         metadata: createPageMetadata("/"),
-        editorial: loadEditorialContentSnapshot(),
         searchIndex,
         site: {
             navigation: siteContent.navigation,
@@ -20,35 +18,24 @@ export const load = async (ctx) => {
 </script>
 
 <script setup="ts">
+// Zenith v1 home (Round 4 + 4.1, handoff site-build-handoff.md §4). No preloader: the hero H1 is the
+// LCP element and paints with the first frame (build gate 3).
 import DefaultLayout from "@/layouts/DefaultLayout.zen";
-import Hero from "@/components/Hero.zen";
-import AboutSection from "@/components/AboutSection.zen";
-import PrecisionRail from "@/components/PrecisionRail.zen";
-import FeatureShowcase from "@/components/FeatureShowcase.zen";
-import ContributorsSection from "@/components/ContributorsSection.zen";
+import HomeHero from "@/components/site-v1/HomeHero.zen";
+import PipelineSection from "@/components/site-v1/PipelineSection.zen";
+import WhyZenithSection from "@/components/site-v1/WhyZenithSection.zen";
+import ClosingCta from "@/components/site-v1/ClosingCta.zen";
 
-const heroEyebrowRef = ref<HTMLElement>();
-const heroTitleRef = ref<HTMLElement>();
-const heroDescriptionRef = ref<HTMLElement>();
-const heroActionsRef = ref<HTMLElement>();
-const heroSupportRef = ref<HTMLElement>();
+// One polite live region shared by every Copy control on the page (handoff §5).
+const homeCopyLiveRef = ref<HTMLElement>();
 </script>
 
-<DefaultLayout title={data.page.title} description={data.page.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/" introEnabled={true} searchIndex={data.searchIndex} heroEyebrowRef={heroEyebrowRef} heroTitleRef={heroTitleRef} heroDescriptionRef={heroDescriptionRef} heroActionsRef={heroActionsRef} heroSupportRef={heroSupportRef}>
-    <style>
-        html[data-zenith-intro-state="pending"] [data-nav-shell],
-        html[data-zenith-intro-state="pending"] main,
-        html[data-zenith-intro-state="pending"] footer {
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-        }
-    </style>
-    <div data-home-content-shell="true" class="relative z-10 bg-background text-foreground">
-        <Hero eyebrowRef={heroEyebrowRef} titleRef={heroTitleRef} descriptionRef={heroDescriptionRef} actionsRef={heroActionsRef} supportRef={heroSupportRef} />
-        <AboutSection />
-        <PrecisionRail />
-        <FeatureShowcase sponsorship={data.editorial.sponsorship} />
-        <ContributorsSection people={data.editorial.people} />
+<DefaultLayout title={data.page.title} description={data.page.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/" introEnabled={false} searchIndex={data.searchIndex}>
+    <div data-home-content-shell="true" data-v1-home="true" class="relative bg-background pt-16 text-foreground md:pt-[73px]">
+        <HomeHero copyLiveRef={homeCopyLiveRef} />
+        <PipelineSection />
+        <WhyZenithSection />
+        <ClosingCta copyLiveRef={homeCopyLiveRef} />
+        <p ref={homeCopyLiveRef} data-copy-live="true" aria-live="polite" class="sr-only"></p>
     </div>
 </DefaultLayout>

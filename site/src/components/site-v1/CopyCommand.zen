@@ -1,0 +1,70 @@
+<script lang="ts">
+// Install row / CTA step with its own Copy control (JUD-147, copy-install board 155:11732).
+// Feedback goes to ONE shared polite live region owned by the page (liveRef).
+
+interface Props { command: string; variant?: "install" | "step"; step?: string; liveRef?: any; }
+const copyProps = props as Props;
+const copyCommandText = copyProps.command;
+const copyVariant = copyProps.variant || "install";
+const copyStep = copyProps.step || "";
+// Every class below is a static literal: Zenith applies attribute and text expressions on hydrate
+// (they are not server-rendered), so expression classes would shift layout on first paint (CLS).
+// The step variant is styled by the static .copy-step class on the caller's wrapper (site-v1-copy.css).
+const copyCmdLiveRef = copyProps.liveRef;
+const COPIED_TEXT = "Copied";
+const FAILED_TEXT = "Couldn't copy. Select the command and copy it yourself.";
+
+state copyStatus = "idle";
+
+function announce(message: string) {
+  const region = copyCmdLiveRef?.current as HTMLElement | null | undefined;
+  if (!region) return;
+  // Clear first so the same message is announced again on a repeat copy.
+  region.textContent = "";
+  const win = zenWindow();
+  if (win) win.requestAnimationFrame(() => { region.textContent = message; });
+  else region.textContent = message;
+}
+
+function settle(nextStatus: "copied" | "failed") {
+  copyStatus = nextStatus;
+  announce(nextStatus === "copied" ? COPIED_TEXT : FAILED_TEXT);
+  // "Copied" returns to idle after ~2s (handoff §5). Component scripts may not schedule timers, so the
+  // reset is driven by a 2s CSS clock on [data-copy-clock] whose animationend sets idle.
+}
+
+function copyCommand() {
+  const clipboard = zenWindow()?.navigator?.clipboard;
+  if (!clipboard || typeof clipboard.writeText !== "function") { settle("failed"); return; }
+  clipboard.writeText(copyCommandText).then(() => settle("copied"), () => settle("failed"));
+}
+
+function resetCopyStatus() {
+  if (copyStatus === "copied") copyStatus = "idle";
+}
+</script>
+
+<div data-copy-command={copyVariant} data-copy-status={copyStatus} class="copy-command relative flex w-full min-w-0 flex-col gap-2">
+  <span aria-hidden="true" class="copy-reset-clock" data-copy-clock={copyStatus} on:animationend={resetCopyStatus}></span>
+  <div class="flex w-full min-w-0 items-center gap-[10px] md:gap-[14px]">
+    <span aria-hidden="true" class="copy-num">{copyStep}</span>
+    <div class="copy-box flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-full border border-border-strong bg-card py-1.5 pl-5 pr-1.5">
+      <code class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-[13px] leading-[18px] text-foreground md:text-sm md:leading-6">
+        <span aria-hidden="true" class="copy-dollar text-muted-foreground">$</span>
+        <span data-copy-text="true" class="truncate">{copyCommandText}</span>
+      </code>
+      <button
+        type="button"
+        data-copy-trigger="true"
+        aria-label={copyVariant === "step" ? "Copy command" : undefined}
+        class="copy-button relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border-strong bg-secondary px-3.5 py-[7px] text-sm font-medium leading-[18px] text-secondary-foreground transition-colors after:absolute after:-inset-y-[5px] after:inset-x-0 after:content-[''] hover:bg-primary-hover-bg hover:text-primary-hover-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        on:click={copyCommand}
+      >
+        <span data-copy-label="true" class="copy-label"><span class="copy-when-idle">Copy</span><span class="copy-when-copied text-success">Copied</span></span>
+        <span class="copy-when-idle inline-flex"><svg class="copy-icon h-4 w-4" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M13.3333 5.33334H6.66659C5.93021 5.33334 5.33325 5.93029 5.33325 6.66667V13.3333C5.33325 14.0697 5.93021 14.6667 6.66659 14.6667H13.3333C14.0696 14.6667 14.6666 14.0697 14.6666 13.3333V6.66667C14.6666 5.93029 14.0696 5.33334 13.3333 5.33334Z M2.66659 10.6667C1.93325 10.6667 1.33325 10.0667 1.33325 9.33334V2.66667C1.33325 1.93334 1.93325 1.33334 2.66659 1.33334H9.33325C10.0666 1.33334 10.6666 1.93334 10.6666 2.66667" /></svg></span>
+        <span class="copy-when-copied inline-flex text-success"><svg class="copy-icon h-4 w-4" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M13.3334 4L6.00008 11.3333L2.66675 8" /></svg></span>
+      </button>
+    </div>
+  </div>
+  <p data-copy-failure="true" class="text-[13px] leading-5 text-foreground" hidden={copyStatus === "failed" ? undefined : true}>{FAILED_TEXT}</p>
+</div>

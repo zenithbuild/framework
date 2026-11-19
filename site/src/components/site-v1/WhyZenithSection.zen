@@ -1,0 +1,60 @@
+<script lang="ts">
+// §3 Why Zenith (JUD-140): problem → fix rows (copy.md §2; Round 4 home frames). Desktop ≥768 is the
+// two-column argument table; mobile stacks each row compactly (before chip, then the answer).
+import Links from "@/components/ui/Links.zen";
+
+const WHY_SOURCE = "https://github.com/zenithbuild/framework/blob/dea39f22";
+</script>
+
+<section id="why-zenith" data-v1-why="true" aria-labelledby="why-zenith-title" class="border-t border-border bg-background px-4 py-10 md:px-10 md:py-[72px] lg:px-20">
+  <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-6 md:gap-10">
+    <div class="flex flex-col gap-[10px]">
+      <p class="v1-eyebrow">Why Zenith</p>
+      <h2 id="why-zenith-title" class="v1-h2">No hidden behavior.</h2>
+    </div>
+    <div class="flex flex-col" role="list">
+      <div aria-hidden="true" class="hidden gap-12 pb-3 md:flex">
+        <p class="v1-eyebrow w-[360px] shrink-0">The problem</p>
+        <p class="v1-eyebrow">What Zenith does</p>
+      </div>
+      <div role="listitem" data-why-row="1" class="flex flex-col gap-3 border-t border-border py-5 md:flex-row md:items-start md:gap-12">
+        <p class="flex gap-[10px] rounded-xl bg-muted px-3 py-[10px] text-muted-foreground md:w-[360px] md:shrink-0 lg:w-[360px]"><span class="font-mono text-[12px] uppercase leading-5 tracking-[0.04em]">before</span><span class="text-[15px] leading-[22px]">Raw expression source appears in rendered DOM text.</span></p>
+        <div class="flex min-w-0 flex-col gap-2 md:max-w-[520px]">
+          <h3 class="v1-h3">The compiler writes the page</h3>
+          <p class="text-[16px] leading-[26px] text-muted-foreground md:text-[18px] md:leading-7">A <code class="v1-inline-code">.zen</code> file becomes HTML and a set of tables for signals, expressions, markers, events, and refs.</p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-[6px]"><span class="v1-tag v1-tag-blue">signals</span><span class="v1-tag v1-tag-gold">expression_bindings</span><Links href={WHY_SOURCE + "/packages/compiler/zenith_compiler/src/compiler_types.rs"} target="_blank" rel="noopener noreferrer" class="v1-link">compiler_types.rs →</Links></div>
+        </div>
+      </div>
+      <div role="listitem" data-why-row="2" class="flex flex-col gap-3 border-t border-border py-5 md:flex-row md:items-start md:gap-12">
+        <p class="flex gap-[10px] rounded-xl bg-muted px-3 py-[10px] text-muted-foreground md:w-[360px] md:shrink-0 lg:w-[360px]"><span class="font-mono text-[12px] uppercase leading-5 tracking-[0.04em]">before</span><span class="text-[15px] leading-[22px]">Route behavior changes based on implicit global variables.</span></p>
+        <div class="flex min-w-0 flex-col gap-2 md:max-w-[520px]">
+          <h3 class="v1-h3">A page file is a route</h3>
+          <p class="text-[16px] leading-[26px] text-muted-foreground md:text-[18px] md:leading-7"><code class="v1-inline-code">index.zen</code> is <code class="v1-inline-code">/</code>. <code class="v1-inline-code">about.zen</code> is <code class="v1-inline-code">/about</code>.</p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-[6px]"><span class="v1-tag v1-tag-purple">manifest.json</span><Links href={WHY_SOURCE + "/packages/cli/src/manifest.js"} target="_blank" rel="noopener noreferrer" class="v1-link">manifest.js →</Links></div>
+        </div>
+      </div>
+      <div role="listitem" data-why-row="3" class="flex flex-col gap-3 border-t border-border py-5 md:flex-row md:items-start md:gap-12">
+        <p class="flex gap-[10px] rounded-xl bg-muted px-3 py-[10px] text-muted-foreground md:w-[360px] md:shrink-0 lg:w-[360px]"><span class="font-mono text-[12px] uppercase leading-5 tracking-[0.04em]">before</span><span class="text-[15px] leading-[22px]">A check that runs in the browser can hide a page, but it can’t protect it.</span></p>
+        <div class="flex min-w-0 flex-col gap-2 md:max-w-[520px]">
+          <h3 class="v1-h3">The server answers before the HTML</h3>
+          <p class="text-[16px] leading-[26px] text-muted-foreground md:text-[18px] md:leading-7">On a page route, <code class="v1-inline-code">guard</code> runs first and may only allow, redirect, or deny.</p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-[6px]"><span class="v1-tag v1-tag-magenta">guard → load</span><Links href={WHY_SOURCE + "/packages/cli/src/server-contract/resolve.js"} target="_blank" rel="noopener noreferrer" class="v1-link">resolve.js →</Links></div>
+        </div>
+      </div>
+      <div role="listitem" data-why-row="4" class="flex flex-col gap-3 border-t border-border py-5 md:flex-row md:items-start md:gap-12">
+        <p class="flex gap-[10px] rounded-xl bg-muted px-3 py-[10px] text-muted-foreground md:w-[360px] md:shrink-0 lg:w-[360px]"><span class="font-mono text-[12px] uppercase leading-5 tracking-[0.04em]">before</span><span class="text-[15px] leading-[22px]">String-like event attributes are used as handler payloads.</span></p>
+        <div class="flex min-w-0 flex-col gap-2 md:max-w-[520px]">
+          <h3 class="v1-h3">A click handler has to be a function</h3>
+          <p class="text-[16px] leading-[26px] text-muted-foreground md:text-[18px] md:leading-7"><code class="v1-inline-code">{"on:click={handler}"}</code> is checked while the file compiles.</p>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-[6px]"><span class="v1-tag v1-tag-gold">event_bindings</span><Links href={WHY_SOURCE + "/packages/compiler/zenith_compiler/src/parser_elements.rs"} target="_blank" rel="noopener noreferrer" class="v1-link">parser_elements.rs →</Links></div>
+        </div>
+      </div>
+      <div data-why-tradeoff="true" class="flex flex-col items-start gap-3 border-t border-border pt-4 md:flex-row md:items-center md:gap-4">
+        <span class="rounded-full bg-brand-gold-soft px-[10px] py-1 font-mono text-[12px] uppercase leading-4 tracking-[0.16em] text-foreground">Tradeoff</span>
+        <p class="text-[16px] leading-[26px] text-foreground md:max-w-[520px]">Plain <code class="v1-inline-code">&lt;a href&gt;</code> remains browser-native hard navigation.</p>
+        <Links href="/docs/contracts/navigation" class="v1-link">Navigation Contract →</Links>
+      </div>
+    </div>
+    <Links href="/about" class="v1-link">Read the full argument → Why Zenith</Links>
+  </div>
+</section>

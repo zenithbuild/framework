@@ -1,0 +1,144 @@
+<script lang="ts">
+// Hero compile panel (JUD-138): Round 4 node 155:4668 (desktop), 155:5121 (mobile tabs).
+// Content first: this renders the rest state (S3, compiled output, connectors drawn) with no JS.
+// Behaviour here is state + a11y only; GSAP choreography attaches through the data-hero-* hooks
+// and the `hero:statechange` / `hero:layout` events (see docs in site-v1/README.md).
+import HeroSourceCode from "./HeroSourceCode.zen";
+import HeroOutputWell from "./HeroOutputWell.zen";
+import { layoutHeroConnectors } from "./heroConnectors";
+
+const hpERROR_ANNOUNCEMENT = "ZEN-EVT-STRING-HANDLER. Event attributes do not accept string handlers.";
+const hpPanelRef = ref<HTMLElement>();
+const hpBodyRef = ref<HTMLElement>();
+const hpSourceRef = ref<HTMLElement>();
+const hpWellRef = ref<HTMLElement>();
+const hpTriggerRef = ref<HTMLButtonElement>();
+const hpLiveRef = ref<HTMLElement>();
+const hpTabSourceRef = ref<HTMLButtonElement>();
+const hpTabOutputRef = ref<HTMLButtonElement>();
+const hpTabFailingRef = ref<HTMLButtonElement>();
+const hpPinSignalRef = ref<HTMLElement>(); const hpPinEventRef = ref<HTMLElement>(); const hpPinExprRef = ref<HTMLElement>();
+const hpHeadSignalRef = ref<HTMLElement>(); const hpHeadEventRef = ref<HTMLElement>(); const hpHeadExprRef = ref<HTMLElement>();
+const hpPathSignalRef = ref<SVGPathElement>(); const hpPathEventRef = ref<SVGPathElement>(); const hpPathExprRef = ref<SVGPathElement>();
+const hpDotSignalRef = ref<SVGCircleElement>(); const hpDotEventRef = ref<SVGCircleElement>(); const hpDotExprRef = ref<SVGCircleElement>();
+const hpErrorPathRef = ref<SVGPathElement>(); const hpErrorMarkRef = ref<SVGTextElement>();
+
+state heroState = "compiled";
+state heroTab = "source";
+state heroLiveText = "";
+
+function hpEmit(name: string, detail: Record<string, unknown>) {
+  const panel = hpPanelRef.current;
+  const win = zenWindow();
+  if (!panel || !win) return;
+  panel.dispatchEvent(new win.CustomEvent(name, { bubbles: true, detail }));
+}
+
+function hpShowFailingBuild(origin: "trigger" | "tab") {
+  if (heroState === "failed") { if (origin === "tab") heroTab = "failing"; return; }
+  heroState = "failed";
+  heroTab = "failing";
+  // Set once per trigger (F5). Cleared on Reset so the next trigger is announced once again.
+  heroLiveText = hpERROR_ANNOUNCEMENT;
+  hpEmit("hero:statechange", { state: "failed", previous: "compiled", origin });
+}
+
+function hpPressTrigger() {
+  // aria-disabled (not disabled) in the fail state, so focus stays on the trigger and this is a no-op.
+  if (heroState === "failed") return;
+  hpShowFailingBuild("trigger");
+}
+
+function hpPressReset() {
+  if (heroState !== "failed") return;
+  heroState = "compiled";
+  heroTab = "output";
+  heroLiveText = "";
+  hpEmit("hero:statechange", { state: "compiled", previous: "failed", origin: "reset" });
+  hpTriggerRef.current?.focus();
+}
+
+function hpSelectTab(tab: "source" | "output" | "failing") {
+  if (tab === "failing") { hpShowFailingBuild("tab"); return; }
+  heroTab = tab;
+}
+
+function hpTabKeys(event: KeyboardEvent, current: "source" | "output" | "failing") {
+  const order: Array<"source" | "output" | "failing"> = ["source", "output", "failing"];
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const index = order.indexOf(current);
+  const next = event.key === "Home" ? order[0] : event.key === "End" ? order[2] : order[(index + (event.key === "ArrowRight" ? 1 : 2)) % 3];
+  hpSelectTab(next);
+  [hpTabSourceRef, hpTabOutputRef, hpTabFailingRef][order.indexOf(next)].current?.focus();
+}
+
+function hpLayoutConnectors() {
+  const body = hpBodyRef.current; const source = hpSourceRef.current; const well = hpWellRef.current;
+  if (!body || !source || !well) return;
+  const placed = layoutHeroConnectors({
+    body, source, well,
+    pins: [hpPinSignalRef.current, hpPinEventRef.current, hpPinExprRef.current],
+    heads: [hpHeadSignalRef.current, hpHeadEventRef.current, hpHeadExprRef.current],
+    paths: [hpPathSignalRef.current, hpPathEventRef.current, hpPathExprRef.current],
+    dots: [hpDotSignalRef.current, hpDotEventRef.current, hpDotExprRef.current],
+    errorPath: hpErrorPathRef.current, errorMark: hpErrorMarkRef.current,
+  });
+  if (!placed) return;
+  hpPanelRef.current?.setAttribute("data-hero-connectors", "ready");
+  hpEmit("hero:layout", {});
+}
+
+zenMount((ctx) => {
+  hpLayoutConnectors();
+  const doc = zenDocument() as (Document & { fonts?: FontFaceSet }) | null;
+  let active = true;
+  doc?.fonts?.ready.then(() => { if (active) hpLayoutConnectors(); });
+  ctx.cleanup(zenResize(() => hpLayoutConnectors()));
+  ctx.cleanup(() => { active = false; });
+});
+</script>
+
+<div ref={hpPanelRef} data-hero-panel="true" data-hero-state={heroState} data-hero-tab={heroTab} class="hero-panel w-full min-w-0 overflow-hidden rounded-lg bg-code-bg text-code-fg">
+  <p data-hero-caption="true" class="hero-panel-caption truncate px-5 text-sm font-medium leading-[50px]">Compile each page into HTML and tables.</p>
+
+  <div class="hero-panel-tabs flex border-b border-code-border px-2" role="tablist" aria-label="Compile example">
+    <button ref={hpTabSourceRef} id="hero-tab-source" type="button" role="tab" aria-controls="hero-panel-source" aria-selected={heroTab === "source" ? "true" : "false"} tabindex={heroTab === "source" ? "0" : "-1"} class="hero-tab" on:click={() => hpSelectTab("source")} on:keydown={(event) => hpTabKeys(event, "source")}>Source</button>
+    <button ref={hpTabOutputRef} id="hero-tab-output" type="button" role="tab" aria-controls="hero-panel-output" aria-selected={heroTab === "output" ? "true" : "false"} tabindex={heroTab === "output" ? "0" : "-1"} class="hero-tab" on:click={() => hpSelectTab("output")} on:keydown={(event) => hpTabKeys(event, "output")}>Output</button>
+    <button ref={hpTabFailingRef} id="hero-tab-failing" type="button" role="tab" aria-controls="hero-panel-output" aria-selected={heroTab === "failing" ? "true" : "false"} tabindex={heroTab === "failing" ? "0" : "-1"} class="hero-tab" on:click={() => hpSelectTab("failing")} on:keydown={(event) => hpTabKeys(event, "failing")}><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-error"></span>Failing build</button>
+  </div>
+
+  <div ref={hpBodyRef} data-hero-body="true" class="hero-panel-body relative min-h-0">
+    <div ref={hpSourceRef} id="hero-panel-source" role="tabpanel" aria-labelledby="hero-tab-source" data-hero-source-panel="true" class="hero-source overflow-hidden">
+      <HeroSourceCode pinSignalRef={hpPinSignalRef} pinEventRef={hpPinEventRef} pinExprRef={hpPinExprRef} />
+    </div>
+    <div ref={hpWellRef} id="hero-panel-output" role="tabpanel" aria-labelledby={heroTab === "failing" ? "hero-tab-failing" : "hero-tab-output"} data-hero-output-panel="true" class="hero-well overflow-hidden bg-code-inline-bg">
+      <HeroOutputWell headSignalRef={hpHeadSignalRef} headEventRef={hpHeadEventRef} headExprRef={hpHeadExprRef} />
+    </div>
+    <svg data-hero-connectors-layer="true" class="hero-connectors pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true" focusable="false">
+      <path ref={hpPathSignalRef} data-hero-connector="signal" data-hero-rest-only="true" d="M293.2 82H346C370 82 370 57 394 57H410" fill="none" stroke="var(--code-blue)" stroke-width="1.5" stroke-linecap="round" />
+      <circle ref={hpDotSignalRef} data-hero-connector-dot="signal" data-hero-rest-only="true" cx="293.2" cy="82" r="3.5" fill="var(--code-blue)" />
+      <path ref={hpPathEventRef} data-hero-connector="event" data-hero-rest-only="true" d="M325.2 264H346C370 264 370 159 394 159H410" fill="none" stroke="var(--code-gold)" stroke-width="1.5" stroke-linecap="round" />
+      <circle ref={hpDotEventRef} data-hero-connector-dot="event" cx="325.2" cy="264" r="3.5" class="hero-dot-event" />
+      <path ref={hpPathExprRef} data-hero-connector="expr" data-hero-rest-only="true" d="M225.2 316H346C370 316 370 243 394 243H410" fill="none" stroke="var(--code-gold)" stroke-width="1.5" stroke-linecap="round" />
+      <circle ref={hpDotExprRef} data-hero-connector-dot="expr" data-hero-rest-only="true" cx="225.2" cy="316" r="3.5" fill="var(--code-gold)" />
+      <path ref={hpErrorPathRef} data-hero-connector-error="true" data-hero-fail-only="true" d="M325.2 264H370" fill="none" stroke="var(--code-error)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3.7 3.7" />
+      <text ref={hpErrorMarkRef} data-hero-connector-error-mark="true" data-hero-fail-only="true" x="372" y="269" fill="var(--code-error)" font-size="14" font-family="var(--zen-font-mono)">×</text>
+    </svg>
+  </div>
+
+  <div data-hero-legend="true" class="hero-panel-legend hero-stack border-t border-code-border px-5 py-3 font-mono text-[14px] leading-6" aria-label="Mapping legend" role="group">
+    <ul data-hero-rest-only="true" class="flex flex-wrap content-center items-center gap-x-5 gap-y-2">
+      <li data-hero-legend-row="1" class="flex items-center gap-[6px]"><span aria-hidden="true" class="hero-legend-pin border-code-blue text-code-blue">1</span><span class="text-code-blue">signal(0)</span><span class="font-sans text-[13px] text-code-muted">→</span><span>signals</span></li>
+      <li data-hero-legend-row="2" class="flex items-center gap-[6px]"><span aria-hidden="true" class="hero-legend-pin border-code-gold text-code-gold">2</span><span class="text-code-gold">on:click=&#123;increment&#125;</span><span class="font-sans text-[13px] text-code-muted">→</span><span>event_bindings</span></li>
+      <li data-hero-legend-row="3" class="flex items-center gap-[6px]"><span aria-hidden="true" class="hero-legend-pin border-code-gold text-code-gold">3</span><span class="text-code-gold">&#123;count&#125;</span><span class="font-sans text-[13px] text-code-muted">→</span><span>expression_bindings</span></li>
+    </ul>
+    <p data-hero-legend-error="true" data-hero-fail-only="true" class="flex items-center gap-[6px] text-code-error"><span aria-hidden="true" class="hero-legend-pin border-code-error">2</span><span>{'on:click="doThing"'}</span><span class="font-sans text-[13px]">→</span><span>ZEN-EVT-STRING-HANDLER</span></p>
+  </div>
+
+  <div data-hero-controls="true" class="hero-panel-controls flex items-center gap-2">
+    <button ref={hpTriggerRef} type="button" data-hero-trigger="true" aria-disabled={heroState === "failed" ? "true" : "false"} class="hero-control hero-trigger" on:click={hpPressTrigger}><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-error"></span>Show the string-handler error</button>
+    <button type="button" data-hero-reset="true" aria-disabled={heroState === "failed" ? "false" : "true"} class="hero-control hero-reset" on:click={hpPressReset}>Reset</button>
+  </div>
+  <p ref={hpLiveRef} data-hero-live="true" aria-live="polite" class="sr-only">{heroLiveText}</p>
+</div>

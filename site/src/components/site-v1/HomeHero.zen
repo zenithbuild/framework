@@ -1,0 +1,31 @@
+<script lang="ts">
+// §1 Hero (JUD-138 / JUD-143 / JUD-147). Round 4 frames 155:4654 (desktop) and 155:5121 (mobile).
+// The H1 is the LCP element: plain HTML, never tweened, three fixed lines so a font swap cannot reflow it.
+// Lines break with <br> (inline spans) so LCP measures the whole H1, not three separate block lines.
+import CopyCommand from "./CopyCommand.zen";
+import HeroCompilePanel from "./HeroCompilePanel.zen";
+
+interface Props { copyLiveRef?: any; }
+const heroCopyLiveRef = (props as Props).copyLiveRef;
+</script>
+
+<section id="top" data-v1-hero="true" aria-labelledby="hero-title" class="bg-background px-4 pb-10 pt-7 text-foreground md:px-10 md:pb-16 md:pt-12 lg:px-20">
+  <div class="mx-auto grid w-full max-w-[1280px] gap-5 md:gap-10 lg:grid-cols-[440px_minmax(0,1fr)] lg:items-start lg:gap-12">
+    <div data-hero-text="true" class="flex flex-col gap-4 md:gap-6 lg:pt-[34px]">
+      <div class="flex flex-col gap-[14px] md:gap-4">
+        <p class="v1-eyebrow">Build closer to the platform.</p>
+        <h1 id="hero-title" data-hero-h1="true" class="font-heading text-[52px] font-semibold leading-[52px] tracking-[-0.03em] text-foreground md:text-[64px] md:leading-[64px]">
+          <span class="whitespace-nowrap">Ship interfaces</span> <br /><span class="whitespace-nowrap">the compiler</span> <br /><span class="whitespace-nowrap">can trust.</span>
+        </h1>
+      </div>
+      <div class="flex flex-col gap-4 md:gap-5">
+        <p class="max-w-[440px] text-[18px] font-medium leading-[26px] text-foreground md:text-[20px] md:leading-[30px]">One command gives you a four-page site, ready to run.</p>
+        <div data-hero-start="true" class="flex max-w-[440px] flex-col items-start gap-3">
+          <CopyCommand command="bun create zenith@latest" variant="install" liveRef={heroCopyLiveRef} />
+          <a href="/docs" class="v1-button v1-button-secondary">Read the docs</a>
+        </div>
+      </div>
+    </div>
+    <HeroCompilePanel />
+  </div>
+</section>

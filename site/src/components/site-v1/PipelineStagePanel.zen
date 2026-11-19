@@ -1,0 +1,38 @@
+<script lang="ts">
+// One pipeline stage body (JUD-139). Rendered once per stage for the desktop tabpanels and once per
+// stage inside the mobile accordion; content comes from pipelineStages.ts (copy.md §3).
+// Plain <a href> (hard navigation): this renders 8 times, and Links props derived from instance
+// consts do not survive instancing in the current compiler.
+import { stageAsideHtml, stageByKey, stageCodeHtml, stageTagsHtml } from "./pipelineStages";
+
+interface Props { stage: string; variant?: "desktop" | "mobile"; }
+const stagePanelProps = props as Props;
+const stagePanelData = stageByKey(stagePanelProps.stage);
+const stagePanelMobile = stagePanelProps.variant === "mobile";
+const stagePanelTitle = `${stagePanelData.number} · ${stagePanelData.name}`;
+const stagePanelCode = stageCodeHtml(stagePanelData, stagePanelMobile);
+const stagePanelAside = stageAsideHtml(stagePanelData);
+const stagePanelTags = stageTagsHtml(stagePanelData);
+const stagePanelHasTags = stagePanelData.tags.length > 0;
+</script>
+
+<div data-stage-body={stagePanelData.key} class={stagePanelMobile ? "flex flex-col gap-4 pb-2" : "flex h-full flex-col gap-5"}>
+  <div class={stagePanelMobile ? "hidden" : "flex flex-wrap items-center justify-between gap-3"}>
+    <div class="flex items-center gap-3">
+      <span aria-hidden="true" class="h-7 w-1 rounded-[2px] bg-[var(--stage-accent)]"></span>
+      <h3 class="font-heading text-[24px] font-semibold leading-7 tracking-[-0.01em] text-foreground">{stagePanelTitle}</h3>
+    </div>
+    <p class={stagePanelHasTags ? "flex flex-wrap gap-2" : "font-mono text-[13px] leading-4 text-muted-foreground"} unsafeHTML={stagePanelHasTags ? stagePanelTags : stagePanelData.subtitle}></p>
+  </div>
+  <div class={stagePanelMobile ? "flex flex-col gap-4" : "flex flex-col gap-5 lg:flex-row lg:gap-7"}>
+    <p class={stagePanelMobile ? "text-[16px] leading-[26px] text-foreground" : "hidden"} unsafeHTML={stagePanelAside}></p>
+    <figure class={stagePanelMobile ? "v1-code-panel flex flex-col gap-[6px] px-[14px] py-4" : "v1-code-panel flex min-w-0 flex-1 flex-col gap-[6px] px-6 py-[22px] lg:h-[236px] lg:self-start"}>
+      <figcaption class="text-[12px] leading-4 text-code-muted">{stagePanelData.codeLabel}</figcaption>
+      <pre class={stagePanelMobile ? "pipeline-code whitespace-pre-wrap pt-2 text-[13px] leading-[22px]" : "pipeline-code overflow-x-auto pt-2 text-[14px] leading-6"}><code unsafeHTML={stagePanelCode}></code></pre>
+    </figure>
+    <div class={stagePanelMobile ? "flex" : "flex flex-col gap-[14px] lg:w-[300px] lg:shrink-0"}>
+      <p class={stagePanelMobile ? "hidden" : "text-[17px] leading-7 text-foreground"} unsafeHTML={stagePanelAside}></p>
+      <a href={stagePanelData.link.href} class="v1-link pipeline-stage-link">{stagePanelData.link.label}</a>
+    </div>
+  </div>
+</div>
