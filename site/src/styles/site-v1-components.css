@@ -44,9 +44,14 @@
     transition: background-color 150ms ease, color 150ms ease;
   }
   .v1-button-primary { background: var(--primary); color: var(--primary-foreground); }
-  .v1-button-primary:hover { background: var(--primary-hover-bg); color: var(--primary-hover-fg); }
+  /* Hover is pointer-only (@media (hover: hover)); touch gets the same look on :active. PLACEHOLDER
+     for UI review where Figma draws no hover (nav links, v1-link, pipeline tabs). Tags are static labels
+     (spans), so they get no hover. */
+  .v1-button-primary:active { background: var(--primary-hover-bg); color: var(--primary-hover-fg); }
+  @media (hover: hover) { .v1-button-primary:hover { background: var(--primary-hover-bg); color: var(--primary-hover-fg); } }
   .v1-button-secondary, .v1-button-outline { border-color: var(--border-strong); color: var(--foreground); background: transparent; }
-  .v1-button-secondary:hover, .v1-button-outline:hover { background: var(--surface-2); }
+  .v1-button-secondary:active, .v1-button-outline:active { background: var(--surface-2); }
+  @media (hover: hover) { .v1-button-secondary:hover, .v1-button-outline:hover { background: var(--surface-2); } }
   .v1-focus:focus-visible, .v1-button:focus-visible, .v1-link:focus-visible, .v1-tab:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
@@ -61,7 +66,8 @@
     color: var(--primary);
     text-underline-offset: 3px;
   }
-  .v1-link:hover { text-decoration: underline; }
+  .v1-link:active { text-decoration: underline; }
+  @media (hover: hover) { .v1-link:hover { text-decoration: underline; } }
   .v1-inline-code {
     border-radius: 4px;
     background: var(--surface-2);

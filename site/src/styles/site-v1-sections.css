@@ -26,7 +26,8 @@
 .pipeline-tab[aria-selected="true"] { border-color: transparent; }
 .pipeline-tab-name { font-size: 17px; font-weight: 500; line-height: 22px; color: var(--muted-foreground); }
 .pipeline-tab[aria-selected="true"] .pipeline-tab-name, .pipeline-acc-item[data-open="true"] .pipeline-tab-name { color: var(--foreground); }
-.pipeline-tab:hover .pipeline-tab-name { color: var(--foreground); }
+/* PLACEHOLDER hover (not drawn in Figma), pointer-only. */
+@media (hover: hover) { .pipeline-tab:hover .pipeline-tab-name { color: var(--foreground); } }
 .pipeline-num {
   display: grid;
   width: 32px;
