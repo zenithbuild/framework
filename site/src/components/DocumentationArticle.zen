@@ -44,7 +44,8 @@ function docsArticleClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
   const button = target?.closest ? (target.closest("[data-docs-copy]") as HTMLElement | null) : null;
   if (!button) return;
-  const code = button.closest("[data-docs-code]")?.querySelector("pre")?.textContent || "";
+  // The panel is <figure><figcaption/><pre/></figure>, so the code is the figure's last child.
+  const code = button.closest("[data-docs-code]")?.lastElementChild?.textContent || "";
   const clipboard = zenWindow()?.navigator?.clipboard;
   const done = (ok: boolean) => {
     button.setAttribute("data-copy-state", ok ? "copied" : "failed");
