@@ -10,7 +10,7 @@ async function startDevServer() {
 }
 
 describe("committed content routes", () => {
-  test("renders Blog, Docs, About, sponsorship, and people through direct loads and browser history", async () => {
+  test("renders Blog, Docs, About, and the v1 Home through direct loads and browser history", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
     const browser = await chromium.launch({ headless: true });
@@ -49,10 +49,12 @@ describe("committed content routes", () => {
       expect(await page.textContent("body")).toContain("Direct web development again.");
 
       await page.goto(`${origin}/`, { waitUntil: "networkidle" });
-      expect(await page.locator("[data-sponsorship-section='true']").textContent()).toContain("Become Zenith’s first sponsor.");
-      const contributors = page.locator("[data-contributor-avatar-group='true']");
-      expect(await contributors.locator("a").count()).toBe(3);
-      expect(await contributors.locator('a[aria-label="View Jonathan Streetman\'s profile"]').count()).toBe(1);
+      // v1 Home (handoff §4): hero, pipeline, Why Zenith, closing CTA. Sponsorship and contributors left Home.
+      expect(await page.getByRole("heading", { level: 1 }).textContent()).toContain("Ship interfaces");
+      for (const id of ["how-it-works", "why-zenith", "get-started"]) {
+        expect(await page.locator(`#${id}`).count()).toBe(1);
+      }
+      expect(await page.locator("[data-sponsorship-section='true']").count()).toBe(0);
       expect(errors).toEqual([]);
     } finally {
       await browser.close();

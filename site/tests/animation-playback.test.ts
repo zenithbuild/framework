@@ -151,8 +151,10 @@ describe("route transition playback", () => {
   }, 660_000);
 });
 
-describe("intro label flash regression", () => {
-  test("final phrase never reappears after its exit", async () => {
+describe("v1 home without a preloader", () => {
+  // Build gate 3 (handoff §6): no preloader on Home. The intro label phases never run, so the old
+  // label-flash regression cannot occur; this asserts the replacement contract instead.
+  test("never enters the branded intro phases and shows the hero H1 immediately", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
     try {
@@ -160,81 +162,28 @@ describe("intro label flash regression", () => {
       const page = await browser.newPage();
       const errors: string[] = [];
       page.on("pageerror", (err) => errors.push(err.message));
-
+      await page.addInitScript(() => {
+        const seen: string[] = [];
+        (window as unknown as { __introStates: string[] }).__introStates = seen;
+        // Init scripts run before <html> exists, so observe the document subtree.
+        new MutationObserver(() => {
+          const value = document.documentElement?.getAttribute("data-zenith-intro-state");
+          if (value && seen[seen.length - 1] !== value) seen.push(value);
+        }).observe(document, { attributes: true, subtree: true, childList: true, attributeFilter: ["data-zenith-intro-state"] });
+      });
       await page.goto(`http://localhost:${PORT}/`, { waitUntil: "networkidle" });
-
-      // Wait for markRevealed (phrases start)
-      await page.waitForFunction(
-        () => document.documentElement.getAttribute("data-zenith-intro-state") === "markRevealed",
-        undefined,
-        { timeout: 15000 },
-      );
-
-      // Sample label state every 200ms to catch any flash
-      const samples: Array<{ text: string; opacity: number; visible: boolean }> = [];
-      let sampling = true;
-      const sampleInterval = setInterval(async () => {
-        if (!sampling) return;
-        try {
-          const state = await page.evaluate(() => {
-            const label = document.querySelector("[data-transition-label='true']");
-            if (!label) return null;
-            const s = window.getComputedStyle(label);
-            return {
-              text: (label.textContent || "").slice(0, 30),
-              opacity: parseFloat(s.opacity),
-              visible: s.visibility === "visible",
-            };
-          });
-          if (state) samples.push(state);
-        } catch {}
-      }, 200);
-
-      // Wait for intro completion
       await page.waitForFunction(
         () => document.documentElement.getAttribute("data-zenith-intro-state") === "complete",
         undefined,
         { timeout: 30000 },
       );
-      sampling = false;
-      clearInterval(sampleInterval);
-
-      // Find the last sample with non-empty text and visible
-      let lastVisibleTextIdx = -1;
-      for (let i = samples.length - 1; i >= 0; i--) {
-        if (samples[i].text.length > 0 && samples[i].opacity > 0 && samples[i].visible) {
-          lastVisibleTextIdx = i;
-          break;
-        }
-      }
-
-      // After the last visible text, there should be no further visible text
-      let flashDetected = false;
-      if (lastVisibleTextIdx >= 0) {
-        for (let i = lastVisibleTextIdx + 1; i < samples.length; i++) {
-          if (samples[i].text.length > 0 && samples[i].opacity > 0 && samples[i].visible) {
-            flashDetected = true;
-            break;
-          }
-        }
-      }
-
-      expect(flashDetected).toBe(false);
-
-      // Verify the label is empty and hidden at the end
-      const finalLabel = await page.evaluate(() => {
-        const label = document.querySelector("[data-transition-label='true']");
-        if (!label) return null;
-        const s = window.getComputedStyle(label);
-        return { text: label.textContent, opacity: s.opacity, visibility: s.visibility };
-      });
-      expect(finalLabel).toBeTruthy();
-      expect(finalLabel!.text).toBe("");
-      expect(finalLabel!.opacity).toBe("0");
-
-      // Verify no page errors
-      expect(errors.length).toBe(0);
-
+      const states = await page.evaluate(() => (window as unknown as { __introStates: string[] }).__introStates);
+      expect(states.includes("markRevealed")).toBe(false);
+      expect(states.includes("movingLogo")).toBe(false);
+      const heading = page.locator("[data-hero-h1='true']");
+      expect(await heading.isVisible()).toBe(true);
+      expect(await heading.getAttribute("data-route-title")).toBe(null);
+      expect(errors).toEqual([]);
       await browser.close();
     } finally {
       await server.stop();
@@ -262,7 +211,8 @@ describe("destination entrance replay", () => {
 
       // Navigate to /about: its PageHeader tags [data-route-entrance] targets.
       // /blog uses scroll-mode motion and exposes no entrance targets by design.
-      await page.click('[data-nav-shell="true"] a[href="/about"]');
+      // v1: /about is linked from Why Zenith ("Read the full argument"), not from the nav.
+      await page.click('[data-v1-why="true"] a[href="/about"]');
 
       // Wait for transition to start
       await page.waitForTimeout(500);

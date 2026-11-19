@@ -17,8 +17,10 @@ const scrollbarSource = readSource("src/components/route-transition/scrollbarCom
 
 describe("navigation geometry stability", () => {
   test("nav container has fixed height and max width", () => {
+    // v1 nav (handoff §4): 64px mobile / 72px (+1px border) desktop, fluid to the 1440 container.
     expect(navigationSource.includes("h-16")).toBe(true);
-    expect(navigationSource.includes("max-w-7xl")).toBe(true);
+    expect(navigationSource.includes("md:h-[72px]")).toBe(true);
+    expect(navigationSource.includes("max-w-[1440px]")).toBe(true);
   });
 
   test("logo slot has fixed dimensions and does not shrink", () => {
@@ -26,8 +28,8 @@ describe("navigation geometry stability", () => {
   });
 
   test("link group and actions group have fixed gap spacing", () => {
-    expect(navigationSource.includes("gap-7")).toBe(true);
-    expect(navigationSource.includes("gap-3")).toBe(true);
+    expect(navigationSource.includes("lg:gap-7")).toBe(true);
+    expect(navigationSource.includes("lg:gap-[10px]")).toBe(true);
     expect(navigationSource.includes("gap-4")).toBe(true);
   });
 

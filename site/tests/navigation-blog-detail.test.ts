@@ -29,14 +29,17 @@ describe("shared navigation interaction contract", () => {
     expect(dropdown).not.toContain("addEventListener");
   });
 
-  test("provides an independent tap disclosure for mobile navigation", () => {
+  test("provides a tap-driven mobile menu that returns focus on Escape", () => {
+    // v1 nav (handoff §4): the Docs dropdown is gone; the mobile menu lists Docs, How it works,
+    // Performance, Blog, GitHub and Get started directly.
     const navigation = source("src/components/ui/Navigation.zen");
 
-    expect(navigation).toContain("state mobileDocsOpen");
-    expect(navigation).toContain("on:click={toggleMobileDocs}");
-    expect(navigation).toContain('data-mobile-nav-disclosure="docs"');
-    expect(navigation).toContain('data-mobile-nav-panel="docs"');
-    expect(navigation).toContain("mobileDocsTriggerRef.current?.focus()");
+    expect(navigation).toContain("state mobileOpen");
+    expect(navigation).toContain('aria-controls="mobile-navigation"');
+    expect(navigation).toContain('aria-expanded={mobileOpen ? "true" : "false"}');
+    expect(navigation).toContain("mobileNavigationTriggerRef.current?.focus()");
+    expect(navigation).toContain("href={navPerformanceLink.href}");
+    expect(navigation).not.toContain("NavDropdown");
     expect(navigation).not.toContain("on:pointerleave");
   });
 });

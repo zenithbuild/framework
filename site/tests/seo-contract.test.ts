@@ -15,6 +15,9 @@ const publicRoutes = [
   "/docs",
   "/docs/getting-started",
   "/about",
+  "/performance",
+  "/how-it-works/compiler",
+  "/showcase",
 ];
 
 function readSource(path: string) {
@@ -29,6 +32,9 @@ const pageFiles = [
   "src/pages/docs/index.zen",
   "src/pages/docs/getting-started/index.zen",
   "src/pages/about/index.zen",
+  "src/pages/performance/index.zen",
+  "src/pages/how-it-works/compiler/index.zen",
+  "src/pages/showcase/index.zen",
 ];
 
 describe("public metadata contract", () => {

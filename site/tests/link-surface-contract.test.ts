@@ -83,13 +83,15 @@ const navigationFixtureContent = {
     );
 
     expect(navigationSource.includes('data-nav-logo-target="true"')).toBe(true);
-    expect(navigationSource.includes('NavDropdown label="Docs"')).toBe(true);
+    expect(navigationSource.includes("NavDropdown")).toBe(false);
+    expect(navigationSource.includes("href={navDocsLink.href}")).toBe(true);
+    expect(navigationSource.includes("href={navHowLink.href}")).toBe(true);
+    expect(navigationSource.includes("href={navPerformanceLink.href}")).toBe(true);
     expect(navigationSource.includes('NavDropdown label="Framework"')).toBe(false);
     expect(navigationSource.includes('NavDropdown label="Resources"')).toBe(false);
     expect(navigationSource.includes("href={navHomeLink.href}")).toBe(true);
     expect(navigationSource.includes("href={navBlogLink.href}")).toBe(true);
-    expect(navigationSource.includes("href={navAboutLink.href}")).toBe(true);
-    expect(navigationSource.includes("documentationDropdownItems[0].href")).toBe(true);
+    expect(navigationSource.includes("href={navStartLink.href}")).toBe(true);
     expect(navigationSource.includes("href={navChangelogLink.href}")).toBe(false);
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
