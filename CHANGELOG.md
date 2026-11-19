@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Rebuild the site to the approved v1 design: new nav and footer, a Home with the compile-panel hero, a four-stage pipeline, Why Zenith and a closing CTA, plus `/performance` (launch card only, no scores yet), `/how-it-works/compiler`, and a parked `/showcase` that is noindex and left out of nav, footer and search. The Home has no preloader. The hero H1 is the LCP element, and first-paint styles stay static so layout does not shift before hydration (JUD-138, JUD-139, JUD-140, JUD-141, JUD-142, JUD-143, JUD-144, JUD-145, JUD-146, JUD-147, JUD-148, JUD-149).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed
