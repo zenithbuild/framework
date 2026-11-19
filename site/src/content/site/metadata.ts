@@ -8,6 +8,8 @@ export interface PublicRouteMetadata {
   updated?: string;
   author?: string;
   breadcrumbs?: Array<{ name: string; path: string }>;
+  /** Parked routes (v1: /showcase) render noindex and stay out of nav, footer, search and sitemaps. */
+  noindex?: boolean;
 }
 
 export interface PageMetadata extends PublicRouteMetadata {
@@ -63,7 +65,38 @@ export const PUBLIC_ROUTE_METADATA: Record<string, PublicRouteMetadata> = {
     label: "About",
     kind: "about",
   },
+  "/performance": {
+    path: "/performance",
+    title: "Zenith performance",
+    description: "Zenith publishes page-load and build-speed numbers here only after the first recorded PageSpeed Insights run on this site.",
+    label: "Performance",
+    kind: "website",
+  },
+  "/how-it-works/compiler": {
+    path: "/how-it-works/compiler",
+    title: "How the Zenith compiler works",
+    description: "What the Zenith compiler returns for each page, the tables the bundler checks, and the source it refuses to compile.",
+    label: "Compiler",
+    kind: "tech-article",
+    breadcrumbs: [
+      { name: "How it works", path: "/#how-it-works" },
+      { name: "Compiler", path: "/how-it-works/compiler" },
+    ],
+  },
+  "/showcase": {
+    path: "/showcase",
+    title: "Zenith showcase",
+    description: "The Zenith showcase stays empty until a checked-in list names real sites built with the framework.",
+    label: "Showcase",
+    kind: "website",
+    noindex: true,
+  },
 };
+
+/** Routes that may appear in navigation, search and any sitemap. */
+export function indexablePublicRoutes(): PublicRouteMetadata[] {
+  return Object.values(PUBLIC_ROUTE_METADATA).filter((route) => route.noindex !== true);
+}
 
 export function normalizeSiteOrigin(value: string | null | undefined) {
   const raw = typeof value === "string" ? value.trim() : "";
@@ -163,7 +196,7 @@ export function createContentMetadata(route: PublicRouteMetadata, originValue = 
     canonicalUrl,
     socialImageUrl,
     ogType: route.kind === "blog-posting" || route.kind === "tech-article" ? "article" : "website",
-    robots: "index,follow",
+    robots: route.noindex === true ? "noindex,nofollow" : "index,follow",
     structuredData: structuredDataFor(route, origin, canonicalUrl, socialImageUrl),
   };
 }

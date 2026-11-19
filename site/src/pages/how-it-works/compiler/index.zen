@@ -1,0 +1,106 @@
+<script server lang="ts">
+import { siteContent } from "../../../content/index";
+import { createPageMetadata } from "../../../content/site/metadata";
+import { loadSearchIndex } from "../../../server/searchIndexLoader";
+
+export const load = async (ctx) => {
+  const searchIndex = await loadSearchIndex();
+  return ctx.data({
+    metadata: createPageMetadata("/how-it-works/compiler"),
+    searchIndex,
+    site: { navigation: siteContent.navigation, footer: siteContent.footer },
+  });
+};
+</script>
+
+<script setup="ts">
+// Compiler pillar (JUD-142): Figma 155:9096 (desktop) / 155:9599 (mobile). Intro = copy.md §4 verbatim.
+// TOC: sticky at ≥1024px, inline (not sticky) at 768–1023px, inline on mobile.
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import Links from "@/components/ui/Links.zen";
+import Icon from "@/components/site-v1/Icon.zen";
+import HeroSourceCode from "@/components/site-v1/HeroSourceCode.zen";
+import CompilerFieldTable from "@/components/site-v1/CompilerFieldTable.zen";
+import CompilerCodePanels from "@/components/site-v1/CompilerCodePanels.zen";
+
+const compilerEditHref = "https://github.com/zenithbuild/framework/blob/master/site/src/pages/how-it-works/compiler/index.zen";
+</script>
+
+<DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/how-it-works/compiler" searchIndex={data.searchIndex}>
+  <div data-v1-compiler="true" class="bg-background pt-16 text-foreground md:pt-[73px]">
+    <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 pb-16 pt-8 md:px-10 md:pb-24 md:pt-14 lg:px-20">
+      <nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-3">
+        <ol class="flex items-center gap-1 text-[14px] leading-5 text-muted-foreground">
+          <li><Links href="/#how-it-works" class="v1-focus hover:text-foreground">How it works</Links></li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page" class="text-foreground">Compiler</li>
+        </ol>
+        <span class="rounded-full bg-brand-blue-soft px-[10px] py-[2px] font-mono text-[12px] uppercase leading-[18px] tracking-[0.16em] text-foreground">Stage 2 of 4<span class="sr-only"> Compiler</span></span>
+      </nav>
+      <h1 class="font-heading text-[44px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[64px] md:leading-[64px]">Compiler</h1>
+
+      <figure id="before-and-after" aria-label="Before and after output" data-hero-state="compiled" class="v1-code-panel grid scroll-mt-28 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div class="overflow-x-auto px-4 py-4 md:px-5 md:py-[18px]"><HeroSourceCode /></div>
+        <div class="flex flex-col gap-3 bg-code-inline-bg px-4 py-4 md:px-5 md:py-[18px]">
+          <p class="font-mono text-[12px] leading-4">CompilerOutput</p>
+          <ul class="flex flex-col gap-2">
+            <li class="flex items-center gap-2 font-mono text-[14px] leading-6"><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-purple"></span><span class="text-code-purple">html</span><span class="text-[12px] text-code-muted">String</span></li>
+            <li class="flex items-center gap-2 font-mono text-[14px] leading-6"><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-blue"></span><span class="rounded-[4px] bg-code-blue-soft px-[3px] text-code-blue">signals</span><span class="text-[12px] text-code-muted">Vec&lt;SignalPayload&gt;</span></li>
+            <li class="flex items-center gap-2 font-mono text-[14px] leading-6"><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-gold"></span><span class="rounded-[4px] bg-code-gold-soft px-[3px] text-code-gold">expression_bindings</span><span class="truncate text-[12px] text-code-muted">Vec&lt;ExpressionBindingPayload&gt;</span></li>
+            <li class="flex items-center gap-2 font-mono text-[14px] leading-6"><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-gold"></span><span class="text-code-gold">event_bindings</span><span class="text-[12px] text-code-muted">Vec&lt;EventPayload&gt;</span></li>
+            <li class="flex items-center gap-2 font-mono text-[14px] leading-6"><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-gold"></span><span class="rounded-[4px] bg-code-gold-soft px-[3px] text-code-gold">marker_bindings</span><span class="text-[12px] text-code-muted">Vec&lt;MarkerPayload&gt;</span></li>
+          </ul>
+          <p class="font-mono text-[12px] leading-4 text-code-muted">…plus 15 more fields, grouped below</p>
+        </div>
+      </figure>
+
+      <div class="grid gap-8 pt-4 lg:grid-cols-[220px_minmax(0,720px)] lg:gap-12 xl:gap-16">
+        <aside aria-label="On this page" class="compiler-toc flex flex-col gap-3 self-start">
+          <p class="v1-eyebrow text-[12px]!">On this page</p>
+          <nav aria-label="On this page" class="flex flex-col border-l border-border md:flex-row md:flex-wrap md:border-l-0 lg:flex-col lg:border-l">
+            <a href="#before-and-after" class="flex min-h-11 items-center border-l-2 border-transparent pl-3 text-[14px] leading-5 text-muted-foreground hover:text-foreground v1-focus lg:min-h-8">Before and after output</a>
+            <a href="#what-the-compiler-returns" class="flex min-h-11 items-center border-l-2 border-transparent pl-3 text-[14px] leading-5 text-muted-foreground hover:text-foreground v1-focus lg:min-h-8">What the compiler returns</a>
+            <a href="#what-it-refuses" class="flex min-h-11 items-center border-l-2 border-transparent pl-3 text-[14px] leading-5 text-muted-foreground hover:text-foreground v1-focus lg:min-h-8">What it refuses</a>
+            <a href="#read-the-docs" class="flex min-h-11 items-center border-l-2 border-transparent pl-3 text-[14px] leading-5 text-muted-foreground hover:text-foreground v1-focus lg:min-h-8">Read the docs</a>
+          </nav>
+          <div class="flex flex-wrap gap-2 border-t border-border pt-3 lg:flex-col lg:items-start">
+            <Links href="/docs/contracts/compiler-boundary" class="v1-button min-h-11 bg-secondary px-4 text-[14px] text-secondary-foreground border-border-strong">Read the docs</Links>
+            <Links href={compilerEditHref} target="_blank" rel="noopener noreferrer" class="v1-button v1-button-outline min-h-11 px-4 text-[14px]">Edit on GitHub <Icon name="github" /></Links>
+          </div>
+        </aside>
+
+        <article class="flex min-w-0 flex-col gap-12">
+          <div class="flex flex-col gap-4">
+            <p class="text-[16px] leading-[26px] text-foreground md:text-[17px] md:leading-7">Zenith’s compiler reads a <code class="v1-inline-code">.zen</code> file and returns one structured result. That result is IR version 1. It contains the HTML for the page and separate tables for signals, expressions, markers, events, and refs.</p>
+            <p class="text-[16px] leading-[26px] text-foreground md:text-[17px] md:leading-7">The tables are ordered. The runtime uses the index in the table, not the name of the variable, when it updates a text node or an attribute. The compiler type that carries this result says the bundler may not open the AST or change those indexes.</p>
+            <p class="text-[16px] leading-[26px] text-foreground md:text-[17px] md:leading-7">A string event handler and a handler that calls a function immediately are compile errors. The messages are <code class="v1-inline-code">Event attributes do not accept string handlers.</code> and <code class="v1-inline-code">Event handlers must not be direct call expressions.</code> A function reference, or a function written inline, is the form the parser accepts.</p>
+          </div>
+
+          <section id="what-the-compiler-returns" aria-labelledby="what-the-compiler-returns-title" class="flex scroll-mt-28 flex-col gap-5">
+            <h2 id="what-the-compiler-returns-title" class="font-heading text-[28px] font-semibold leading-8 tracking-[-0.01em] text-foreground md:text-[36px] md:leading-10">What the compiler returns</h2>
+            <p class="text-[16px] leading-[26px] text-foreground md:text-[17px] md:leading-7">Each compiled file returns one <code class="v1-inline-code">CompilerOutput</code>. Its version is <code class="v1-inline-code">ir_version</code>, and the page body is the <code class="v1-inline-code">html</code> string. Beside that string are ordered tables, including <code class="v1-inline-code">signals</code>, <code class="v1-inline-code">expression_bindings</code>, <code class="v1-inline-code">marker_bindings</code>, <code class="v1-inline-code">event_bindings</code>, and <code class="v1-inline-code">ref_bindings</code>. The comment on the type says this is the only surface the bundler sees, and the bundler must not open the AST or change those indexes.</p>
+            <CompilerFieldTable />
+            <CompilerCodePanels part="intake" />
+          </section>
+
+          <section id="what-it-refuses" aria-labelledby="what-it-refuses-title" class="flex scroll-mt-28 flex-col gap-5">
+            <h2 id="what-it-refuses-title" class="font-heading text-[28px] font-semibold leading-8 tracking-[-0.01em] text-foreground md:text-[36px] md:leading-10">What it refuses</h2>
+            <CompilerCodePanels part="refuses" />
+          </section>
+
+          <section id="read-the-docs" aria-labelledby="read-the-docs-title" class="flex scroll-mt-28 flex-col gap-2">
+            <h2 id="read-the-docs-title" class="font-heading text-[28px] font-semibold leading-8 tracking-[-0.01em] text-foreground md:text-[36px] md:leading-10">Read the docs</h2>
+            <Links href="/docs/contracts/compiler-boundary" class="v1-link">Compiler Boundary Contract →</Links>
+            <Links href="/docs/contracts/dsl-syntax" class="v1-link">DSL Syntax Contract →</Links>
+            <Links href="/docs/contracts/ir-envelope" class="v1-link">IR Envelope Contract →</Links>
+          </section>
+
+          <nav aria-label="Pipeline stages" class="grid gap-2 md:grid-cols-2">
+            <Links href="/docs/cli-contract" class="flex min-h-14 items-center rounded-xl border border-border-strong px-4 text-[15px] font-medium text-foreground hover:bg-muted v1-focus">← Previous stage: Build (CLI)</Links>
+            <Links href="/docs/contracts/bundler-contract" class="flex min-h-14 items-center justify-end rounded-xl border border-border-strong px-4 text-[15px] font-medium text-foreground hover:bg-muted v1-focus">Next stage: Bundle →</Links>
+          </nav>
+        </article>
+      </div>
+    </div>
+  </div>
+</DefaultLayout>

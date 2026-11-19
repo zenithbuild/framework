@@ -1,6 +1,6 @@
 import type { BlogPost } from "./postSource";
 import type { DocumentationDetail } from "./documentationSource";
-import { PUBLIC_ROUTE_METADATA } from "../content/site/metadata";
+import { indexablePublicRoutes } from "../content/site/metadata";
 import { stripHtmlTags } from "./postSourceSupport";
 import type {
   BlogSearchFilters,
@@ -59,7 +59,7 @@ function mapDocToRecord(doc: DocumentationDetail): SearchRecord {
 }
 
 function mapPageRouteRecords(): SearchRecord[] {
-  return Object.values(PUBLIC_ROUTE_METADATA)
+  return indexablePublicRoutes()
     .filter((route) => route.path !== "/blog/building-zenith-0-8")
     .map((route) => ({
       id: `page:${route.path}`,
