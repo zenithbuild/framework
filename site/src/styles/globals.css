@@ -6,6 +6,7 @@
 @import "./site-v1-sections.css";
 @import "./site-v1-copy.css";
 @import "./site-v1-nav.css";
+@import "./site-v1-docs.css";
 @custom-variant dark (&:where(.dark, .dark *));
 @source "../**/*.{zen,ts,js}";
 

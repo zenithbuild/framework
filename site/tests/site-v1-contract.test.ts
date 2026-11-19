@@ -128,3 +128,19 @@ describe("v1 file size", () => {
     expect(oversized).toEqual([]);
   });
 });
+
+describe("v1 Docs article", () => {
+  test("wraps rendered code in a dark panel with a Copy button and links the source file", async () => {
+    const { decorateDocumentationCode } = await import("../src/server/documentationViewModel");
+    const html = decorateDocumentationCode('<p>x</p><pre data-language="text"><code class="language-text">a -&gt; b</code></pre>');
+    expect(html).toContain('<figure class="docs-code" data-docs-code="true">');
+    expect(html).toContain('data-docs-copy="true"');
+    expect(html).toContain('<pre data-language="text"><code class="language-text">a -&gt; b</code></pre></figure>');
+    const article = read("src/components/DocumentationArticle.zen");
+    expect(article).toContain('aria-controls="docs-toc-panel"');
+    expect(article).toContain('aria-controls="docs-sections"');
+    expect(article).toContain("Edit this page on GitHub");
+    expect(article).toContain('data-docs-next-step="true"');
+    expect(read("src/server/documentationViewModel.ts")).toContain("https://github.com/zenithbuild/framework/blob/master/");
+  });
+});

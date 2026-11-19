@@ -174,7 +174,19 @@ describe("documentation reader path", () => {
 
       await page.setViewportSize({ width: 375, height: 812 });
       expect(await page.locator("[data-docs-sidebar]").isVisible()).toBe(false);
+      // v1 mobile: "On this page" and the Sections bar are aria-expanded disclosures.
+      const tocToggle = page.locator("[data-docs-toc-toggle='true']");
+      expect(await page.locator("[data-reader-toc='docs']").isVisible()).toBe(false);
+      await tocToggle.click();
+      expect(await tocToggle.getAttribute("aria-expanded")).toBe("true");
       expect(await page.locator("[data-reader-toc='docs']").isVisible()).toBe(true);
+      const sectionsToggle = page.locator("[data-docs-sections-toggle='true']");
+      await sectionsToggle.focus();
+      await page.keyboard.press("Enter");
+      expect(await sectionsToggle.getAttribute("aria-expanded")).toBe("true");
+      expect(await page.locator("[data-docs-sidebar]").isVisible()).toBe(true);
+      await page.keyboard.press("Enter");
+      expect(await page.locator("[data-docs-sidebar]").isVisible()).toBe(false);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 
       await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
