@@ -148,7 +148,7 @@ zenMount((ctx) => {
         <Links
           href={navHomeLink.href}
           ariaLabel="Zenith home"
-          class="group flex items-center gap-2 rounded-full v1-focus"
+          class="group flex min-h-11 items-center gap-2 rounded-full v1-focus"
         >
           <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full"><ZenithNavigationMark /></span>
           <span class="font-heading text-[20px] font-semibold leading-6 text-foreground md:hidden lg:inline lg:text-[22px]">Zenith</span>

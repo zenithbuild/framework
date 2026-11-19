@@ -6,7 +6,7 @@
      button overlay, and let the content wrapper flow inline. Once classes land these stop matching. */
   [data-zen-link-disabled]:not([class]), [data-zen-link-overlay]:not([class]) { display: none; }
   [data-zen-link-content]:not([class]) { display: contents; }
-  .nav-logo-slot a { display: flex; align-items: center; gap: 8px; border-radius: 9999px; }
+  .nav-logo-slot a { display: flex; min-height: 44px; align-items: center; gap: 8px; border-radius: 9999px; }
   .nav-links-slot a {
     display: inline-flex; min-height: 44px; align-items: center;
     border-bottom: 2px solid transparent; font-size: 15px; font-weight: 500; line-height: 20px;
@@ -41,5 +41,8 @@
 }
 
 /* 44px hit area for the 40px theme toggle (handoff §3); the visible circle stays 40px. */
-[data-nav-theme-toggle] [data-zen-theme-toggle] { position: relative; }
+[data-nav-theme-toggle] [data-zen-theme-toggle] { position: relative; border-color: var(--border-strong); }
 [data-nav-theme-toggle] [data-zen-theme-toggle]::after { content: ""; position: absolute; inset: -2px; border-radius: 9999px; }
+/* ThemeToggle before hydrate: neither icon has its display style yet, so show only the first (light)
+   icon. Without this both icons sit side by side for a frame and the search pill shifts 8px. */
+[data-zen-theme-toggle] > svg:not([style]) + svg:not([style]) { display: none; }

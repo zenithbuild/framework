@@ -46,6 +46,12 @@ describe("v1 tokens", () => {
     expect(read("src/styles/site-v1-components.css")).toContain("min-height: 44px");
     expect(read("src/styles/site-v1-hero.css")).toContain("min-height: 44px");
   });
+  test("outlines interactive controls with border-strong (build gate 8)", () => {
+    const sections = read("src/styles/site-v1-sections.css");
+    expect(sections).toContain("border: 1px solid var(--border-strong);");
+    expect(sections).toContain(".pipeline-acc-item { border: 1px solid var(--border-strong);");
+    expect(read("src/styles/site-v1-nav.css")).toContain("[data-zen-theme-toggle] { position: relative; border-color: var(--border-strong); }");
+  });
   test("honours reduced motion in the hero and section styles", () => {
     expect(read("src/styles/site-v1-hero.css")).toContain("prefers-reduced-motion: reduce");
   });

@@ -19,7 +19,8 @@
   width: 264px;
   align-items: center;
   gap: 14px;
-  border: 1px solid var(--border);
+  /* Interactive outline: border-strong (>=3:1, build gate 8); plain border is for dividers only. */
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 0 16px;
 }
@@ -81,7 +82,7 @@
 [data-pipeline-root]:not([data-active-stage]) [data-stage-panel="build"] { visibility: visible; opacity: 1; }
 .pipeline-stage-link { color: var(--stage-accent); }
 
-.pipeline-acc-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.pipeline-acc-item { border: 1px solid var(--border-strong); border-radius: 12px; padding: 12px 14px; }
 .pipeline-acc-item[data-open="true"] { border: 1.5px solid var(--stage-accent); background: var(--card); }
 .pipeline-acc-button { display: flex; min-height: 44px; width: 100%; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border-radius: 8px; }
 .pipeline-acc-panel { padding-top: 12px; }
