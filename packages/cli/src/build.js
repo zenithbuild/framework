@@ -16,7 +16,7 @@ import {
 } from './build/compiler-runtime.js';
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
-import { injectImageMaterializationIntoRouterManifest } from './router-server-metadata.js';
+import { writeProductionPageManifests, writePublicResourceManifest } from './production-route-manifests.js';
 import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
@@ -68,6 +68,7 @@ export async function build(options) {
     const { buildImageArtifacts, createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } = imagePackage.api;
     const coreOutputDir = join(projectRoot, '.zenith-output');
     const staticOutputDir = join(coreOutputDir, 'static');
+    const routeMetadataDir = join(coreOutputDir, 'route-metadata');
     const imageStageDir = join(coreOutputDir, 'image-materialization-stage');
     const srcDir = resolve(pagesDir, '..');
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
@@ -180,15 +181,21 @@ export async function build(options) {
         await startupProfile.measureAsync(
             'inject_image_materialization_manifest',
             async () => {
-                await injectImageMaterializationIntoRouterManifest(staticOutputDir, envelopes);
-                await writeSsrBindingPlans(staticOutputDir, envelopes);
+                await writeProductionPageManifests(staticOutputDir, routeMetadataDir, envelopes);
+                await writeSsrBindingPlans(routeMetadataDir, envelopes);
             },
             { envelopes: envelopes.length }
         );
     }
     await startupProfile.measureAsync(
         'write_resource_manifest',
-        () => writeResourceRouteManifest(staticOutputDir, manifest, basePath)
+        async () => {
+            const routes = await writeResourceRouteManifest(routeMetadataDir, manifest, basePath);
+            const hasServerPages = envelopes.some(({ ir }) =>
+                !ir.prerender && (ir.server_script || ir.has_scoped_server_data)
+            );
+            await writePublicResourceManifest(staticOutputDir, basePath, routes, hasServerPages);
+        }
     );
     await startupProfile.measureAsync(
         'rewrite_soft_navigation_base_path',
@@ -236,6 +243,7 @@ export async function build(options) {
         () => writeServerOutput({
             coreOutputDir,
             staticDir: staticOutputDir,
+            routeMetadataDir,
             imagePackage,
             projectRoot,
             config,

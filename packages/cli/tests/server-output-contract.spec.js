@@ -86,6 +86,24 @@ describe('server output contract', () => {
         const routeJson = await readJson(join(projectRoot, '.zenith-output', 'server', 'routes', 'secure', 'route.json'));
         const clientManifest = await readJson(join(projectRoot, '.zenith-output', 'static', 'manifest.json'));
 
+        const staticDir = join(projectRoot, 'dist', 'static');
+        const router = await readJson(join(staticDir, 'assets', 'router-manifest.json'));
+        const resources = await readJson(join(staticDir, 'assets', 'resource-manifest.json'));
+        expect(router.routes.find((route) => route.path === '/secure')).toMatchObject({ has_guard: true, has_load: true });
+        expect(resources.routes.find((route) => route.path === '/api/session')).toMatchObject({ route_kind: 'resource' });
+        for (const route of [...router.routes, ...resources.routes]) {
+            for (const key of ['server_script', 'server_script_path', 'guard_module_ref', 'load_module_ref', 'action_module_ref', 'scoped_server_data', 'ssr_data', 'expressions']) {
+                expect(route).not.toHaveProperty(key);
+            }
+        }
+        expect(JSON.stringify([router, resources])).not.toContain(projectRoot);
+        expect(existsSync(join(staticDir, '_zenith', 'ssr-bindings.json'))).toBe(false);
+        const previewDir = join(projectRoot, 'dist', 'server', 'preview', 'assets');
+        const privateRouter = await readJson(join(previewDir, 'router-manifest.json'));
+        const privateResources = await readJson(join(previewDir, 'resource-manifest.json'));
+        expect(privateRouter.routes.find((route) => route.path === '/secure').server_script).toContain('ctx.allow()');
+        expect(privateResources.routes.find((route) => route.path === '/api/session').server_script).toContain('ctx.json');
+
         const normalizedManifest = {
             base_path: manifest.base_path,
             routes: manifest.routes.map((route) => normalizeServerRoute(projectRoot, route))
