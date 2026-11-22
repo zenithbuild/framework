@@ -266,9 +266,7 @@
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) [data-intro-gated],
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) [data-intro-gated],
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) [data-intro-gated],
-  html[data-zenith-intro-state="movingLogo"]:has([data-home-intro-root]) [data-intro-gated],
-  html[data-zenith-intro-state="logoSettled"]:has([data-home-intro-root]) [data-intro-gated],
-  html[data-zenith-intro-state="svgExit"]:has([data-home-intro-root]) [data-intro-gated] {
+  html[data-zenith-intro-state="artworkExit"]:has([data-home-intro-root]) [data-intro-gated] {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -277,9 +275,7 @@
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) body,
-  html[data-zenith-intro-state="movingLogo"]:has([data-home-intro-root]) body,
-  html[data-zenith-intro-state="logoSettled"]:has([data-home-intro-root]) body,
-  html[data-zenith-intro-state="svgExit"]:has([data-home-intro-root]) body,
+  html[data-zenith-intro-state="artworkExit"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="revealingContent"]:has([data-home-intro-root]) body {
     overflow: hidden;
     padding-right: var(--zenith-scrollbar-width, 0px);
@@ -292,9 +288,7 @@
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) [data-intro-loader],
-  html[data-zenith-intro-state="movingLogo"]:has([data-home-intro-root]) [data-intro-loader],
-  html[data-zenith-intro-state="logoSettled"]:has([data-home-intro-root]) [data-intro-loader],
-  html[data-zenith-intro-state="svgExit"]:has([data-home-intro-root]) [data-intro-loader],
+  html[data-zenith-intro-state="artworkExit"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="revealingContent"]:has([data-home-intro-root]) [data-intro-loader] {
     display: grid;
     visibility: visible;
