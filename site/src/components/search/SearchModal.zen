@@ -45,7 +45,7 @@ let modalPreviouslyFocused: HTMLElement | null = null;
 let modalSavedOverflow = "";
 
 function modalFilteredRecords(payload: SearchIndexPayload | null): SearchRecord[] { return applySearchFilters(payload?.records || [], modalScope, { section: modalFilterSection, category: modalFilterCategory, tag: modalFilterTag, author: modalFilterAuthor, sort: modalFilterSort }); }
-function modalResults(payload = modalPayload, value = modalQuery): SearchResult[] {
+function modalResults(payload: SearchIndexPayload | null, value: string): SearchResult[] {
   const query = value.trim();
   if (query.length === 1) return [];
   const records = modalFilteredRecords(payload);
@@ -56,11 +56,11 @@ function modalResults(payload = modalPayload, value = modalQuery): SearchResult[
     .filter((record): record is SearchRecord => Boolean(record)).map((record) => ({ record, score: 0, snippets: [] }));
 }
 function modalCurrentResult(): SearchResult | null {
-  const r = modalResults();
+  const r = modalResults(modalPayload, modalQuery);
   const idx = modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex;
   return r[idx] || null;
 }
-function modalResultCount(): number { return modalResults().length; }
+function modalResultCount(): number { return modalResults(modalPayload, modalQuery).length; }
 
 async function loadModalRecords() {
   if (modalPayload || modalLoading) return;
