@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Emit automatic modulepreload hints for initial-route dependencies (JUD-129).
+
 ### Changed
 
 - Rebuild the site to the approved v1 design: new nav and footer, a Home with the compile-panel hero, a four-stage pipeline, Why Zenith and a closing CTA, plus `/performance` (launch card only, no scores yet), `/how-it-works/compiler`, and a parked `/showcase` that is noindex and left out of nav, footer and search. The Home has no preloader. The hero H1 is the LCP element, and first-paint styles stay static so layout does not shift before hydration (JUD-138, JUD-139, JUD-140, JUD-141, JUD-142, JUD-143, JUD-144, JUD-145, JUD-146, JUD-147, JUD-148, JUD-149).
+
+### Fixed
+
+- Emit each shared imported CSS module once across routes, preserving scoped styles and a later route's base-before-override order when the routes agree. When two routes import the same files in opposite orders, the earlier route wins and the build warns with the routes and files involved (JUD-128).
 
 ## [0.9.0-rc.0] - TBD
 

@@ -360,6 +360,9 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
     }
 
     // 7. Write HTML Files (Injecting Manifest Paths)
+    // Hints are resolved from the emitted graph so hashed names and basePath
+    // match the URLs the browser will request.
+    let mut modulepreload_cache = crate::bundler_modulepreload::ModulePreloadCache::new();
     for (
         route,
         html_tpl,
@@ -397,6 +400,16 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
             // Non-router mode: page module is the single module entry point.
             html = inject_script_once(&html, &public_asset_path(base_path, rel), "data-zx-page");
         }
+
+        let preload_hrefs = crate::bundler_modulepreload::modulepreload_hrefs_for_page(
+            emitted_root,
+            base_path,
+            router_rel_path.as_deref(),
+            js_rel.as_deref(),
+            &mut modulepreload_cache,
+        )?;
+        html = inject_modulepreload_hints(&html, &preload_hrefs);
+        ensure_unique_modulepreload_hrefs(&html, &preload_hrefs, &route)?;
 
         let module_script_count = html.matches("<script type=\"module\"").count();
         let expected_module_scripts = if js_rel.is_some() || router_rel_path.is_some() {

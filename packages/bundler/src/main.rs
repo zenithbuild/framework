@@ -20,6 +20,7 @@ use zenith_compiler::script::ExtractedStyleBlock;
 mod bundler_cli;
 mod bundler_contracts;
 mod bundler_css;
+mod bundler_css_order;
 mod bundler_emit_assets;
 mod bundler_emit_assets_helpers;
 mod bundler_emit_assets_imports;
@@ -30,6 +31,7 @@ mod bundler_hash;
 mod bundler_html_emit;
 mod bundler_input;
 mod bundler_minify;
+mod bundler_modulepreload;
 mod bundler_output_phase;
 mod bundler_page_entry;
 mod bundler_paths;
@@ -64,7 +66,8 @@ use bundler_graph::{
 };
 use bundler_hash::{compute_manifest_hash, stable_hash_8};
 use bundler_html_emit::{
-    ensure_document_html, inject_script_once, inject_stylesheet_link_once, write_file,
+    ensure_document_html, ensure_unique_modulepreload_hrefs, inject_modulepreload_hints,
+    inject_script_once, inject_stylesheet_link_once, write_file,
 };
 use bundler_input::read_bundler_inputs_from_stdin;
 use bundler_minify::{
