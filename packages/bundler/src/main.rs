@@ -20,6 +20,7 @@ use zenith_compiler::script::ExtractedStyleBlock;
 mod bundler_cli;
 mod bundler_contracts;
 mod bundler_css;
+mod bundler_css_order;
 mod bundler_emit_assets;
 mod bundler_emit_assets_helpers;
 mod bundler_emit_assets_imports;
