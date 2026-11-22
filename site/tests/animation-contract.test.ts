@@ -81,8 +81,8 @@ describe("Zenith animation contract", () => {
   });
 
   test("keeps replay and HMR initialization idempotent", () => {
-    expect(introSource.includes("sessionStorage")).toBe(false);
-    expect(introSource.includes("introStorageKey")).toBe(false);
+    expect(introSource.includes("sessionStorage")).toBe(true);
+    expect(introSource.includes("introStorageKey")).toBe(true);
     expect(introSource.includes("__zenithIntroCommitted")).toBe(true);
     expect(introSource.includes("__zenithIntroComplete")).toBe(true);
     expect(introSource.includes("__zenithIntroTimelineActive")).toBe(true);

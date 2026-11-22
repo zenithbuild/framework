@@ -61,7 +61,7 @@ zenMount(() => {
   data-zen-theme-toggle="true"
   aria-label={currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
   aria-pressed={currentTheme === "dark" ? "true" : "false"}
-  class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-foreground transition-colors duration-200 hover:border-ring hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+  class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted text-foreground transition-colors duration-200 hover:border-ring hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
   on:click={handleToggleClick}
 >
   <svg style={currentTheme === "dark" ? "display: none;" : undefined} class="pointer-events-none h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">

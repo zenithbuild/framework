@@ -35,7 +35,7 @@
           },
           {
             "label": "Changelog",
-            "href": "https://github.com/zenithbuild/framework/blob/master/CHANGELOG.md"
+            "href": "https://github.com/zenithbuild/framework/blob/integration/v1/CHANGELOG.md"
           },
           {
             "label": "Roadmap",
@@ -52,7 +52,7 @@
           },
           {
             "label": "MIT License",
-            "href": "https://github.com/zenithbuild/framework/blob/master/LICENSE"
+            "href": "https://github.com/zenithbuild/framework/blob/integration/v1/LICENSE"
           }
         ]
       },

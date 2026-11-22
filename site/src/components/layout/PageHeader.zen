@@ -30,7 +30,7 @@ const pageHeaderAsideRef = ref<HTMLElement>();
       <EyebrowLabel tone="muted" class="font-medium tracking-[0.18em] text-xs">{pageHeaderEyebrow}</EyebrowLabel>
     </div>
 
-    <h1 ref={pageHeaderTitleRef} data-route-title="true" class="col-span-4 max-w-5xl text-balance font-heading text-6xl font-semibold leading-[0.88] tracking-normal text-foreground sm:text-7xl md:col-span-9 md:col-start-4 lg:text-8xl xl:text-9xl">
+    <h1 ref={pageHeaderTitleRef} data-route-title="true" class="col-span-4 max-w-5xl text-balance font-heading text-6xl font-semibold leading-[0.88] tracking-normal text-foreground sm:text-7xl min-w-0 md:col-span-9 md:col-start-4 lg:text-8xl xl:text-9xl">
       {pageHeaderTitle}
     </h1>
 

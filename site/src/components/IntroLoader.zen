@@ -6,12 +6,12 @@ import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
 import TransitionIdentity from "@/components/transition/TransitionIdentity.zen";
 
 const transitionTiming = {
-  artworkIn: 0.42, ringStagger: 0.07, markStagger: 0.06, logoReveal: 0.72,
-  labelEntrance: 0.72, labelHoldShort: 1.0, labelHoldMedium: 1.3, labelHoldLong: 1.6,
-  labelExit: 0.72, labelWordStagger: 0.06,
+  artworkIn: 0.42, ringStagger: 0.07, markStagger: 0.06, logoReveal: 0.35,
+  labelEntrance: 0.24,
+  labelExit: 0.16, labelWordStagger: 0.025,
   artworkOut: 0.36, ringExitStagger: 0.04,
   overlayMaskAway: 0.32, destinationEntrance: 0.44, backdropFade: 0.26, overlayFade: 0.12,
-  introPhraseHold: 1.2, introLogoFlip: 1.02, introHeroStagger: 0.08,
+  introPhraseHold: 0.27, introLogoFlip: 0.54, introHeroStagger: 0.08,
   reducedHold: 0.5,
 } as const;
 
@@ -44,6 +44,9 @@ interface IntroWindow extends Window {
 
 const introProps = props as Props;
 const introEnabled = introProps.enabled === true;
+const introStorageKey = "zenith.intro.seen";
+let skipActiveIntro = () => {};
+function skipIntro() { skipActiveIntro(); }
 const phrases = ["Prime trusted runtime", "Compile route graph", "Place Zenith mark"];
 
 const fallbackHeroEyebrowRef = ref<HTMLElement>();
@@ -111,7 +114,17 @@ zenMount((ctx) => {
   const heroElements = collectRefs(heroEyebrowRef, heroDescriptionRef, heroActionsRef, heroSupportRef) as HTMLElement[];
   const heroTitle = heroTitleRef.current || null;
 
-  if (!win || !doc || !loader || !backdrop || !line || !surface || !composition || !markMask || !markTraveler || !handoffLayer) return;
+  if (!win || !doc) return;
+  if (!loader || !backdrop || !line || !surface || !composition || !markMask || !markTraveler || !handoffLayer) {
+    setDocumentState("complete");
+    return;
+  }
+  let seen = false;
+  try { seen = win.sessionStorage.getItem(introStorageKey) === "1"; } catch {}
+  if (!introEnabled || normalizedPath(win) !== "/" || win.location.hash || seen || win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setDocumentState("complete");
+    return;
+  }
 
   // zen-allow:dom-query — query shared composition elements from parent-owned wrapper
   // This is safe because compositionRef is a local ref that exists before zenMount runs.
@@ -129,7 +142,7 @@ zenMount((ctx) => {
   if (label) label.className = 'font-heading text-2xl font-medium tracking-tight text-foreground sm:text-3xl';
   const decorRings = [decorRingOuter, decorRingMid, decorRingInner].filter(Boolean) as HTMLElement[];
 
-  if (!artwork || !glow || !markRing || !markCore || !labelFrame || !label || decorRings.length < 3) return;
+  if (!artwork || !glow || !markRing || !markCore || !labelFrame || !label || decorRings.length < 3) { setDocumentState("complete"); return; }
 
   const scrollbarWidth = Math.max(0, win.innerWidth - doc.documentElement.clientWidth);
   doc.documentElement.style.setProperty("--zenith-scrollbar-width", `${scrollbarWidth}px`);
@@ -224,7 +237,7 @@ zenMount((ctx) => {
       .to(heroSupportRef.current || [], { autoAlpha: 1, y: 0, duration: 0.62 }, 0.74)
       .to(navigationParts, { autoAlpha: 1, y: 0, duration: 0.42, stagger: 0.06 }, 0.84)
       .to(loader, { autoAlpha: 0, duration: 0.2 }, 1.2);
-    revealTimeline.play(0);
+    revealTimeline.timeScale(2).play(0);
   }
 
   function animateSvgExit() {
@@ -257,6 +270,7 @@ zenMount((ctx) => {
     disposePhraseSplit();
     phrase = phrases[2];
     setDocumentState("movingLogo");
+    if (navigationShell) gsap.set(navigationShell, { y: 0 });
     const firstState = Flip.getState(markTraveler, { simple: true });
     handoffLayer.appendChild(markTraveler);
     Flip.fit(markTraveler, logoTarget, { absolute: true, scale: true, simple: true });
@@ -308,12 +322,13 @@ zenMount((ctx) => {
   }
 
   const duplicateTimeline = win.__zenithIntroTimelineActive === true;
-  const shouldSkip = !introEnabled || normalizedPath(win) !== "/" || win.__zenithIntroCommitted === true || win.__zenithIntroComplete === true || win.__zenithIntroPlayed === true || win.__zenithIntroStarted === true;
+  const shouldSkip = win.__zenithIntroCommitted === true || win.__zenithIntroComplete === true || win.__zenithIntroPlayed === true || win.__zenithIntroStarted === true;
 
   if (duplicateTimeline) { gsap.set(loader, { autoAlpha: 0 }); return; }
   if (shouldSkip) { completeImmediately(); return; }
 
   commitIntroRun(win);
+  try { win.sessionStorage.setItem(introStorageKey, "1"); } catch {}
   ownsTimeline = true;
   setDocumentState("loading");
   setGateAccess(allGates, true);
@@ -330,37 +345,23 @@ zenMount((ctx) => {
   gsap.set(glow, { autoAlpha: 0, scale: 0.68, willChange: "transform, opacity" });
   gsap.set(label, { autoAlpha: 0 });
 
-  if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    setDocumentState("revealingMark");
-    gsap.set([markRing, markCore], { autoAlpha: 1, scale: 1 });
-    gsap.set(markMask, { clipPath: "inset(0 0% 0 0)" });
-    gsap.set(markTraveler, { autoAlpha: 1 });
-    gsap.set(glow, { autoAlpha: 1, scale: 1 });
-    gsap.set(label, { autoAlpha: 1 });
-    let rmIdx = 0;
-    function showReducedPhrase() {
-      if (rmIdx >= phrases.length) {
-        completeImmediately();
-        return;
-      }
-      label.textContent = phrases[rmIdx];
-      gsap.set(label, { autoAlpha: 1 });
-      gsap.timeline()
-        .to({}, { duration: transitionTiming.reducedHold })
-        .to(label, { autoAlpha: 0, duration: 0.3, ease: "power3.in" })
-        .call(() => {
-          label.textContent = "";
-          rmIdx++;
-          showReducedPhrase();
-        });
-    }
-    showReducedPhrase();
-  } else {
-    const fontsReady = doc.fonts ? doc.fonts.ready : Promise.resolve();
-    Promise.resolve(fontsReady).then(startIntroSequence);
+  function interruptIntro() {
+    if (!ownsTimeline || cancelled || introPhase === "complete") return;
+    cancelled = true;
+    phraseToken++;
+    if (handoffFrame) win.cancelAnimationFrame(handoffFrame);
+    bootTimeline?.kill(); phraseTimeline?.kill(); flipTimeline?.kill(); revealTimeline?.kill();
+    completeImmediately();
   }
+  skipActiveIntro = interruptIntro;
+  const release = gsap.delayedCall(4.5, interruptIntro);
+  const removeHidden = zenOn(doc, "visibilitychange", () => { if (doc.hidden) interruptIntro(); });
+  const removeResize = zenOn(win, "orientationchange", interruptIntro);
+  startIntroSequence();
 
   ctx.cleanup(() => {
+    release.kill();
+    removeHidden(); removeResize(); skipActiveIntro = () => {};
     cancelled = true;
     if (handoffFrame) win.cancelAnimationFrame(handoffFrame);
     bootTimeline?.kill(); phraseTimeline?.kill(); flipTimeline?.kill(); revealTimeline?.kill();
@@ -378,7 +379,8 @@ zenMount((ctx) => {
   data-home-intro-root={introEnabled ? "true" : undefined}
   data-intro-loader="true"
   data-intro-phase={introPhase}
-  aria-hidden={introPhase === "complete" ? "true" : "false"}
+  aria-hidden={introPhase === "complete" || introPhase === "pending" ? "true" : "false"}
+  on:esc={skipIntro}
   style={introEnabled ? undefined : "display: none;"}
   class="fixed inset-0 z-[80] grid place-items-center overflow-hidden bg-transparent text-foreground"
 >
@@ -386,6 +388,7 @@ zenMount((ctx) => {
   <div ref={lineRef} class="absolute inset-x-0 top-1/2 h-px bg-border/70" aria-hidden="true"></div>
   <div ref={handoffLayerRef} data-intro-handoff-layer="true" class="pointer-events-none fixed inset-0 z-20"></div>
 
+  <button type="button" on:click={skipIntro} class="absolute right-4 top-4 z-30 inline-flex min-h-11 items-center rounded-full border border-border bg-background px-4 text-sm text-foreground v1-focus">Skip intro</button>
   <section ref={surfaceRef} role="status" aria-live="polite" class="relative z-10 w-full max-w-md px-6">
     <div ref={compositionRef} data-intro-composition="true">
       <TransitionIdentity>

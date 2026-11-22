@@ -137,7 +137,18 @@ async function mapGitBlogFile(filename: string): Promise<BlogPost | null> {
   };
 }
 
-export async function loadGitBlogPosts(): Promise<BlogPost[]> {
+let cachedEntries: Promise<BlogPost[]> | undefined;
+
+export function loadGitBlogPosts(): Promise<BlogPost[]> {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) return readEntries();
+  cachedEntries ??= readEntries().catch((error) => {
+    cachedEntries = undefined;
+    throw error;
+  });
+  return cachedEntries;
+}
+
+async function readEntries(): Promise<BlogPost[]> {
   const filenames = (await readdir(BLOG_DIRECTORY)).filter((name) => name.endsWith(".md")).sort();
   const records = (await Promise.all(filenames.map(mapGitBlogFile))).filter((record): record is BlogPost => Boolean(record));
   return records.sort((left, right) => {

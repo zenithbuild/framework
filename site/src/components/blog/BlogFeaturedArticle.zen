@@ -9,8 +9,6 @@ export interface Props {
 
 const incoming = props as Props;
 const post = incoming.post || null;
-const label = incoming.label || "Featured article";
-const actionLabel = incoming.actionLabel || "Read featured article";
 const image = post ? post.cover?.image || null : null;
 const imageSrc = image?.url || "";
 const imageAlt = image?.alt || (post ? post.title : "");
@@ -23,38 +21,22 @@ const postExcerpt = post?.excerpt || "";
 const postPath = post?.path || "/blog";
 </script>
 
-<section data-blog-featured="true" aria-labelledby="featured-article-title" class="border-b border-border bg-background px-4 py-20 sm:px-6 lg:px-8 lg:py-28" style={post ? undefined : "display: none;"}>
-    <div class="mx-auto w-full max-w-7xl">
-      <div class="grid grid-cols-4 gap-x-6 gap-y-8 md:grid-cols-12 lg:gap-x-12">
-        <p class="col-span-4 font-mono text-[10px] uppercase tracking-[0.2em] text-primary md:col-span-3">{label}</p>
-        <h2 id="featured-article-title" class="col-span-4 max-w-4xl font-heading text-5xl font-semibold leading-[0.9] text-foreground sm:text-6xl md:col-span-8 md:col-start-4 lg:text-7xl">A closer look at what is moving.</h2>
-      </div>
-
-      <article class="mt-14 overflow-hidden rounded-lg border border-border bg-card">
-        <div class="grid lg:grid-cols-12">
-          <div class="lg:col-span-7 lg:p-2" style={imageSrc ? undefined : "display: none;"}>
-            <div class="relative aspect-[16/10] overflow-hidden rounded-md border border-border bg-muted">
-              <img src={imageSrc} alt={imageAlt} loading="eager" fetchpriority="high" decoding="async" class="absolute inset-0 h-full w-full object-cover" />
-            </div>
-          </div>
-
-          <div class={imageSrc ? "flex flex-col justify-between p-6 sm:p-8 lg:col-span-5 lg:p-10" : "flex flex-col justify-between p-6 sm:p-8 lg:col-span-9 lg:col-start-4 lg:p-10"}>
-            <div>
-              <div class="flex flex-wrap gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                <span>{category}</span>
-                <span style={date ? undefined : "display: none;"}>{date}</span>
-                <span style={readingTime ? undefined : "display: none;"}>{readingTime}</span>
-              </div>
-              <h3 class="mt-6 font-heading text-4xl font-semibold leading-none text-foreground sm:text-5xl">{postTitle}</h3>
-              <p class="mt-6 text-base leading-8 text-muted-foreground md:text-lg">{postExcerpt}</p>
-            </div>
-
-            <div class="mt-10 flex flex-wrap items-end justify-between gap-5 border-t border-border pt-6">
-              <p class="text-sm text-muted-foreground" style={author ? undefined : "display: none;"}>By {author}</p>
-              <a href={postPath} class="inline-flex min-h-11 items-center rounded-lg border border-border bg-background px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{actionLabel}</a>
-            </div>
-          </div>
-        </div>
-      </article>
+<section data-blog-featured="true" aria-labelledby="featured-article-title" class="mx-auto w-full max-w-[1440px] px-4 md:px-10 lg:px-20" style={post ? undefined : "display: none;"}>
+  <article class="grid gap-6 rounded-2xl border border-border bg-card p-6 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.34fr)] md:gap-16 md:p-12">
+    <div class="flex min-w-0 flex-col items-start gap-5">
+      <p class="flex flex-wrap items-center gap-2"><span class="v1-eyebrow">Featured</span><span class="rounded-full bg-brand-blue-soft px-3 py-1 text-xs text-foreground">{category}</span></p>
+      <h2 id="featured-article-title" class="max-w-[24ch] text-balance font-heading text-[32px] font-semibold leading-[1.08] tracking-tight md:text-[48px]">{postTitle}</h2>
+      <p class="max-w-[64ch] text-base leading-7 text-muted-foreground md:text-lg">{postExcerpt}</p>
+      <p class="flex flex-wrap gap-x-3 font-mono text-xs leading-5 text-muted-foreground"><span>{date}</span><span>{readingTime}</span><span>{author}</span></p>
+      <a href={postPath} data-zen-link="true" class="v1-button v1-button-primary">Read post <span aria-hidden="true">→</span></a>
     </div>
-  </section>
+    <aside class="flex min-w-0 flex-col items-start gap-3">
+      <p class="v1-eyebrow">Tagged</p>
+      <ul class="flex flex-wrap gap-2">
+        {(post?.tags || []).map((tag) => <li class="rounded-full bg-brand-gold-soft px-3 py-1 font-mono text-xs text-foreground">{tag}</li>)}
+      </ul>
+      <p class="text-sm text-muted-foreground" style={post?.displayUpdatedAt ? undefined : "display: none;"}>Updated {post?.displayUpdatedAt}</p>
+      <img src={imageSrc || undefined} alt={imageAlt} width={image?.width} height={image?.height} class="w-full rounded-lg object-contain" style={imageSrc ? undefined : "display: none;"} />
+    </aside>
+  </article>
+</section>

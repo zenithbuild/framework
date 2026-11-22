@@ -24,13 +24,13 @@ const stagePanelHasTags = stagePanelData.tags.length > 0;
     </div>
     <p class={stagePanelHasTags ? "flex flex-wrap gap-2" : "font-mono text-[13px] leading-4 text-muted-foreground"} unsafeHTML={stagePanelHasTags ? stagePanelTags : stagePanelData.subtitle}></p>
   </div>
-  <div class={stagePanelMobile ? "flex flex-col gap-4" : "flex flex-col gap-5 lg:flex-row lg:gap-7"}>
+  <div class={stagePanelMobile ? "flex flex-col gap-4" : "flex flex-col gap-5 min-[1440px]:flex-row min-[1440px]:gap-6"}>
     <p class={stagePanelMobile ? "text-[16px] leading-[26px] text-foreground" : "hidden"} unsafeHTML={stagePanelAside}></p>
-    <figure class={stagePanelMobile ? "v1-code-panel flex flex-col gap-[6px] px-[14px] py-4" : "v1-code-panel flex min-w-0 flex-1 flex-col gap-[6px] px-6 py-[22px] lg:h-[236px] lg:self-start"}>
+    <figure class={stagePanelMobile ? "v1-code-panel flex flex-col gap-[6px] px-[14px] py-4" : "v1-code-panel flex min-w-0 flex-1 flex-col gap-[6px] px-6 py-[22px] min-[1440px]:min-h-[236px]"}>
       <figcaption class="text-[12px] leading-4 text-code-muted">{stagePanelData.codeLabel}</figcaption>
       <pre class={stagePanelMobile ? "pipeline-code whitespace-pre-wrap pt-2 text-[13px] leading-[22px]" : "pipeline-code overflow-x-auto pt-2 text-[14px] leading-6"}><code unsafeHTML={stagePanelCode}></code></pre>
     </figure>
-    <div class={stagePanelMobile ? "flex" : "flex flex-col gap-[14px] lg:w-[300px] lg:shrink-0"}>
+    <div class={stagePanelMobile ? "flex" : "flex flex-col gap-[14px] min-[1440px]:w-[240px] min-[1440px]:shrink-0"}>
       <p class={stagePanelMobile ? "hidden" : "text-[17px] leading-7 text-foreground"} unsafeHTML={stagePanelAside}></p>
       <a href={stagePanelData.link.href} class="v1-link pipeline-stage-link">{stagePanelData.link.label}</a>
     </div>

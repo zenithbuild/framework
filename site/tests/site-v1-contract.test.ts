@@ -63,13 +63,13 @@ describe("v1 Home contract", () => {
   const pipeline = read("src/components/site-v1/PipelineSection.zen");
   const cta = read("src/components/site-v1/ClosingCta.zen");
 
-  test("renders the approved headline as the single H1 with no preloader", () => {
+  test("renders the approved headline as the single H1 alongside the first-visit intro", () => {
     expect(hero).toContain('id="hero-title"');
     expect(hero).toContain("Ship interfaces");
     expect(hero).toContain("the compiler");
     expect(hero).toContain("can trust.");
     expect((hero.match(/<h1/g) || []).length).toBe(1);
-    expect(read("src/pages/index.zen")).toContain("introEnabled={false}");
+    expect(read("src/pages/index.zen")).toContain("introEnabled={true}");
   });
 
   test("exposes the hero GSAP hook contract without animating anything itself", () => {

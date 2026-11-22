@@ -46,6 +46,6 @@ const articleActionLabel = safeString(labels.postActionLabel) || "Read article";
 
 <div data-page-shell="blog" class="bg-background text-foreground">
   <BlogHeader eyebrow={pageEyebrow} title={pageTitle} description={pageDescription} postCount={browseModel.articles.length} />
-  <BlogArchiveBrowser posts={browseModel.articles} categories={browseModel.categories} tags={browseModel.tags} description={archiveDescription} actionLabel={articleActionLabel} />
   <BlogFeaturedArticle post={featuredPost} label={featuredLabel} actionLabel={featuredActionLabel} />
+  <BlogArchiveBrowser posts={browseModel.articles} categories={browseModel.categories} tags={browseModel.tags} description={archiveDescription} actionLabel={articleActionLabel} />
 </div>

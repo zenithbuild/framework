@@ -52,7 +52,7 @@ export interface DocumentationViewModel {
   next: DocumentationReaderLink | null;
 }
 
-const DOCUMENTATION_EDIT_BASE = "https://github.com/zenithbuild/framework/blob/master/";
+const DOCUMENTATION_EDIT_BASE = "https://github.com/zenithbuild/framework/blob/integration/v1/";
 
 /**
  * v1 docs code panels (handoff "Docs article"): wrap each rendered <pre data-language> in a dark

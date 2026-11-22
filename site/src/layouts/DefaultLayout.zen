@@ -19,7 +19,6 @@ interface Props {
     heroDescriptionRef?: any;
     heroActionsRef?: any;
     heroSupportRef?: any;
-    searchIndex?: any;
 }
 
 const defaultLayoutTitle = (props as Props).title ?? "Home";
@@ -41,7 +40,6 @@ const defaultLayoutHeroTitleRef = (props as Props).heroTitleRef;
 const defaultLayoutHeroDescriptionRef = (props as Props).heroDescriptionRef;
 const defaultLayoutHeroActionsRef = (props as Props).heroActionsRef;
 const defaultLayoutHeroSupportRef = (props as Props).heroSupportRef;
-const defaultLayoutSearchIndex = (props as Props).searchIndex;
 
 const navigationShellRef = ref<HTMLElement>();
 const navigationLogoTargetRef = ref<HTMLElement>();
@@ -85,8 +83,8 @@ zenMount((ctx) => {
     <meta name="twitter:title" content={defaultLayoutDocumentTitle} />
     <meta name="twitter:description" content={defaultLayoutMetaDescription} />
     <meta name="twitter:image" content={defaultLayoutSocialImageUrl || undefined} />
+    <link rel="alternate" type="application/rss+xml" title="Zenith Blog" href="/blog/rss.xml" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="preload" as="image" href="/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Rajdhani:wght@500;600;700&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -123,16 +121,16 @@ zenMount((ctx) => {
         ref={pageShellRef}
         tabindex="-1"
         data-intro-gated={defaultLayoutIntroEnabled ? "true" : undefined}
-        style={defaultLayoutIntroEnabled ? "opacity:0;visibility:hidden;pointer-events:none;" : undefined}
+
         class="relative z-10 w-full overflow-x-hidden bg-background"
     >
         <div class="relative z-10 w-full overflow-x-hidden">
             <slot />
         </div>
     </main>
-    <div ref={footerShellRef} data-intro-gated={defaultLayoutIntroEnabled ? "true" : undefined} style={defaultLayoutIntroEnabled ? "opacity:0;visibility:hidden;pointer-events:none;" : undefined}>
+    <div ref={footerShellRef} data-intro-gated={defaultLayoutIntroEnabled ? "true" : undefined}>
         <Footer content={defaultLayoutFooterContent} />
     </div>
-    <SearchModal searchIndex={defaultLayoutSearchIndex} />
+    <SearchModal />
 </body>
 </html>

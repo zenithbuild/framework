@@ -1,5 +1,4 @@
 <script lang="ts">
-import Links from "./Links.zen";
 import ThemeToggle from "./ThemeToggle.zen";
 import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
 import Icon from "@/components/site-v1/Icon.zen";
@@ -27,8 +26,6 @@ interface NavigationWindow extends Window {
 }
 
 const navigationProps = props as Props;
-const navigationContent = navigationProps.content || {};
-const navigationMainLinks = Array.isArray(navigationContent.mainLinks) ? navigationContent.mainLinks : [];
 const navigationCurrentPath = navigationProps.currentPath || "/";
 const navigationIntroGated = navigationProps.introGated === true;
 const localNavigationShellRef = ref<HTMLElement>();
@@ -44,26 +41,6 @@ const forwardedNavigationShellRef = navigationProps.shellRef;
 const forwardedNavigationLogoTargetRef = navigationProps.logoTargetRef;
 const forwardedNavigationLinksRef = navigationProps.linksRef;
 const forwardedNavigationActionsRef = navigationProps.actionsRef;
-
-function findLinkByHref(links: NavLink[], href: string, fallbackLabel: string) {
-  const foundLink = links.find((link) => link && link.href === href);
-  if (foundLink) {
-    return foundLink;
-  }
-
-  return {
-    label: fallbackLabel,
-    href,
-  };
-}
-
-const navHomeLink = findLinkByHref(navigationMainLinks, "/", "Home");
-const navDocsLink = findLinkByHref(navigationMainLinks, "/docs", "Docs");
-const navHowLink = findLinkByHref(navigationMainLinks, "/#how-it-works", "How it works");
-const navPerformanceLink = findLinkByHref(navigationMainLinks, "/performance", "Performance");
-const navBlogLink = findLinkByHref(navigationMainLinks, "/blog", "Blog");
-const navGitHubLink = findLinkByHref(navigationMainLinks, "https://github.com/zenithbuild/framework", "GitHub");
-const navStartLink = findLinkByHref(navigationMainLinks, "/docs/getting-started", "Get started");
 
 // Labels are literal and layout-critical styles are mirrored by static slot classes
 // (site-v1-components.css): Zenith applies attribute/text expressions on hydrate, not in SSR HTML.
@@ -132,54 +109,51 @@ zenMount((ctx) => {
 
 <header
   ref={localNavigationShellRef}
-  data-intro-gated="true"
+  data-intro-gated={navigationIntroGated ? "true" : undefined}
   data-nav-shell="true"
-  style={navigationIntroGated ? "opacity:0;visibility:hidden;pointer-events:none;" : undefined}
   class="fixed inset-x-0 top-0 z-50 border-b border-border bg-background text-foreground"
   on:keydown={handleNavigationKeydown}
 >
   <nav class="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 md:h-[72px] md:px-8" aria-label="Primary">
     <div class="flex items-center gap-6 lg:gap-10">
       <span
-        ref={localNavigationLogoTargetRef}
-        data-nav-logo-target="true"
         class="nav-logo-slot inline-flex h-10 shrink-0 items-center"
       >
-        <Links
-          href={navHomeLink.href}
-          ariaLabel="Zenith home"
+        <a
+          href="/" data-zen-link="true"
+          aria-label="Zenith home"
           class="group flex min-h-11 items-center gap-2 rounded-full v1-focus"
         >
-          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full"><ZenithNavigationMark /></span>
+          <span ref={localNavigationLogoTargetRef} data-nav-logo-target="true" class="grid h-10 w-10 shrink-0 place-items-center rounded-full"><ZenithNavigationMark /></span>
           <span class="font-heading text-[20px] font-semibold leading-6 text-foreground md:hidden lg:inline lg:text-[22px]">Zenith</span>
-        </Links>
+        </a>
       </span>
 
       <div ref={localNavigationLinksRef} class="nav-links-slot hidden items-center gap-5 md:flex lg:gap-7">
-        <Links href={navDocsLink.href} ariaCurrent={isActivePath(navDocsLink.href) ? "page" : undefined} class={navLinkClass(navDocsLink.href)}>Docs</Links>
-        <Links href={navHowLink.href} class={navLinkClass(navHowLink.href)}>How it works</Links>
-        <Links href={navPerformanceLink.href} ariaCurrent={isActivePath(navPerformanceLink.href) ? "page" : undefined} class={navLinkClass(navPerformanceLink.href)}>Performance</Links>
-        <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={navLinkClass(navBlogLink.href)}>Blog</Links>
+        <a href="/docs" data-zen-link="true" aria-current={isActivePath("/docs") ? "page" : undefined} class={navLinkClass("/docs")}>Docs</a>
+        <a href="/#how-it-works" class={navLinkClass("/#how-it-works")}>How it works</a>
+        <a href="/performance" data-zen-link="true" aria-current={isActivePath("/performance") ? "page" : undefined} class={navLinkClass("/performance")}>Performance</a>
+        <a href="/blog" data-zen-link="true" aria-current={isActivePath("/blog") ? "page" : undefined} class={navLinkClass("/blog")}>Blog</a>
       </div>
     </div>
 
     <div ref={localNavigationActionsRef} class="flex items-center justify-end gap-2 lg:gap-[10px]" data-nav-actions="true">
-      <SearchTrigger scope="global" label="Search" class="relative h-9! w-12 justify-center px-0! border-border-strong! text-muted-foreground after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] lg:w-auto lg:justify-start lg:px-4!" />
+      <SearchTrigger scope="global" label="Search" class="relative h-11! w-12 justify-center px-0! border-border-strong! text-muted-foreground lg:w-auto lg:justify-start lg:px-4!" />
       <span data-nav-theme-toggle="true" class="inline-flex">
         <ThemeToggle />
       </span>
       <span class="nav-cta-slot hidden items-center gap-2 md:inline-flex lg:gap-[10px]">
-      <Links
-        href={navGitHubLink.href}
+      <a
+        href="https://github.com/zenithbuild/framework"
         target="_blank"
         rel="noopener noreferrer"
-        ariaLabel="GitHub (opens in a new tab)"
+        aria-label="GitHub (opens in a new tab)"
         class="hidden min-h-11 items-center gap-2 rounded-full px-3 text-[14px] font-medium leading-[18px] text-primary hover:bg-muted v1-focus md:inline-flex lg:px-[14px]"
       >
         <span class="hidden lg:inline">GitHub</span>
         <Icon name="github" />
-      </Links>
-      <Links href={navStartLink.href} class="hidden min-h-11 items-center rounded-full bg-primary px-[14px] text-[14px] font-medium leading-[18px] text-primary-foreground transition-colors hover:bg-primary-hover-bg hover:text-primary-hover-fg v1-focus md:inline-flex">Get started</Links>
+      </a>
+      <a href="/docs/getting-started" data-zen-link="true" class="hidden min-h-11 items-center rounded-full bg-primary px-[14px] text-[14px] font-medium leading-[18px] text-primary-foreground transition-colors hover:bg-primary-hover-bg hover:text-primary-hover-fg v1-focus md:inline-flex">Get started</a>
       </span>
       <button
         ref={mobileNavigationTriggerRef}
@@ -188,7 +162,7 @@ zenMount((ctx) => {
         aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={mobileOpen ? "true" : "false"}
         aria-controls="mobile-navigation"
-        class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-card text-foreground after:absolute after:-inset-0.5 after:content-[''] v1-focus md:hidden"
+        class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-strong bg-card text-foreground v1-focus md:hidden"
         on:click={toggleMobileMenu}
       >
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -206,12 +180,12 @@ zenMount((ctx) => {
     class={mobileOpen ? "border-t border-border bg-background px-4 pb-6 pt-2 md:hidden" : "hidden"}
   >
     <nav class="mx-auto grid w-full" aria-label="Mobile primary">
-      <Links href={navDocsLink.href} ariaCurrent={isActivePath(navDocsLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>Docs</Links>
-      <Links href={navHowLink.href} class={mobileLinkBase} onClick={closeMobileMenu}>How it works</Links>
-      <Links href={navPerformanceLink.href} ariaCurrent={isActivePath(navPerformanceLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>Performance</Links>
-      <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>Blog</Links>
-      <Links href={navGitHubLink.href} target="_blank" rel="noopener noreferrer" class={mobileLinkBase} onClick={closeMobileMenu}>GitHub</Links>
-      <Links href={navStartLink.href} class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-[15px] font-medium text-primary-foreground v1-focus" onClick={closeMobileMenu}>Get started</Links>
+      <a href="/docs" data-zen-link="true" aria-current={isActivePath("/docs") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Docs</a>
+      <a href="/#how-it-works" class={mobileLinkBase} on:click={closeMobileMenu}>How it works</a>
+      <a href="/performance" data-zen-link="true" aria-current={isActivePath("/performance") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Performance</a>
+      <a href="/blog" data-zen-link="true" aria-current={isActivePath("/blog") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Blog</a>
+      <a href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" class={mobileLinkBase} on:click={closeMobileMenu}>GitHub</a>
+      <a href="/docs/getting-started" data-zen-link="true" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-[15px] font-medium text-primary-foreground v1-focus" on:click={closeMobileMenu}>Get started</a>
     </nav>
   </div>
   </div>

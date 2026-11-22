@@ -1,16 +1,13 @@
 <script server lang="ts">
 import { siteContent } from "../../content/index";
 import { createPageMetadata } from "../../content/site/metadata";
-import { loadSearchIndex } from "../../server/searchIndexLoader";
 
 export const load = async (ctx) => {
   const metadata = createPageMetadata("/performance");
-  const searchIndex = await loadSearchIndex();
   // PageSpeed is pointed at this site only when an https origin is configured (no invented target).
   const target = metadata.canonicalUrl ? new URL("/", metadata.canonicalUrl).href : "";
   return ctx.data({
     metadata,
-    searchIndex,
     pageSpeedTarget: target,
     site: { navigation: siteContent.navigation, footer: siteContent.footer },
   });
@@ -48,7 +45,7 @@ function perfTabKeys(event: KeyboardEvent) {
 
 </script>
 
-<DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/performance" searchIndex={data.searchIndex}>
+<DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/performance">
   <div data-v1-performance="true" class="bg-background pt-16 text-foreground md:pt-[73px]">
     <header class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 pb-8 pt-10 md:px-10 md:pb-10 md:pt-16 lg:px-20">
       <p class="v1-eyebrow">Performance</p>

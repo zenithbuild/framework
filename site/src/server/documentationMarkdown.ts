@@ -40,8 +40,9 @@ export function renderDocumentationMarkdown(markdown: string, documentTitle = ""
     const count = headingCounts.get(baseId) || 0;
     const id = count === 0 ? baseId : `${baseId}-${count + 1}`;
     headingCounts.set(baseId, count + 1);
-    if (depth === 2 || depth === 3) headings.push({ id, text, level: depth });
-    return `<h${depth} id="${id}" class="scroll-mt-28">${renderedText}</h${depth}>\n`;
+    const level = depth === 1 && documentTitle ? 2 : depth;
+    if (level === 2 || level === 3) headings.push({ id, text, level });
+    return `<h${level} id="${id}" class="scroll-mt-28">${renderedText}</h${level}>\n`;
   };
 
   renderer.link = function ({ href, title, tokens }: Tokens.Link) {

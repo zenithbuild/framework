@@ -2,9 +2,11 @@ export const PROVEN_SOFT_NAV_ROUTE_ENTRIES = [
   "/",
   "/about",
   "/blog",
-  "/blog/building-zenith-0-8",
+  "/performance",
+  "/how-it-works/compiler",
+  "/showcase",
   "/docs",
-  "/docs/getting-started",
+
 ] as const;
 
 export type SiteLinkClass =
@@ -68,7 +70,8 @@ export function isProvenSoftNavRouteEntry(href: string | null | undefined): bool
     return false;
   }
 
-  return PROVEN_ROUTE_ENTRY_SET.has(normalizeRouteEntryHref(hrefValue));
+  const path = normalizeRouteEntryHref(hrefValue);
+  return PROVEN_ROUTE_ENTRY_SET.has(path) || /^\/(?:docs|blog)\/[a-z0-9-]+(?:\/[a-z0-9-]+)?$/.test(path);
 }
 
 export function classifySiteHref(href: string | null | undefined): SiteLinkClass {

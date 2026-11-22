@@ -34,28 +34,28 @@ function ctaToggleLog() {
       <figure data-cta-terminal="true" data-log-expanded={ctaLogExpanded ? "true" : "false"} class="cta-terminal v1-code-panel flex min-w-0 flex-col rounded-2xl">
         <p class="border-b border-code-border px-4 py-[10px] text-[12px] leading-4 text-code-muted">terminal</p>
         <div id="full-log" data-log-region="true" role="region" aria-label="Terminal output" tabindex="0" class="overflow-x-auto p-4 font-mono text-[12px] leading-5 text-code-fg md:text-[14px] md:leading-6 v1-focus">
-          <span data-log-extra="true" class="block whitespace-pre">$ bun create zenith@latest my-app</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Choose a starter template</span>
-          <span data-log-extra="true" class="block whitespace-pre">│  CSS</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Add ESLint for code linting?</span>
-          <span data-log-extra="true" class="block whitespace-pre">│  Yes</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Add Prettier for code formatting?</span>
-          <span data-log-extra="true" class="block whitespace-pre">│  Yes</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Add TypeScript path alias (@/*)?</span>
-          <span data-log-extra="true" class="block whitespace-pre">│  Yes</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Project created</span>
-          <span data-log-extra="true" class="block whitespace-pre">◇  Dependencies installed</span>
-          <span data-log-extra="true" class="block whitespace-pre">✓ Done!!</span>
-          <span data-log-extra="true" class="block whitespace-pre">&nbsp;</span>
-          <span class="block whitespace-pre">$ cd my-app</span>
-          <span class="block whitespace-pre">$ bun run dev</span>
-          <span class="block whitespace-pre">[zenith] • DEV    Starting dev server…</span>
-          <span class="block whitespace-pre">[zenith] • BUILD  Initial build (id=0)</span>
-          <span class="block whitespace-pre">[zenith] • CSS    ready (/__zenith_dev/styles.css?buildId=0)</span>
-          <span class="block whitespace-pre text-code-success">[zenith] ✓ OK     http://127.0.0.1:3000</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">$ bun create zenith@latest my-app</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Choose a starter template</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  CSS</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add ESLint for code linting?</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add Prettier for code formatting?</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add TypeScript path alias (@/*)?</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Project created</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Dependencies installed</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">✓ Done!!</span>
+          <span data-log-extra="true" class="block whitespace-pre-wrap break-words">&nbsp;</span>
+          <span class="block whitespace-pre-wrap break-words">$ cd my-app</span>
+          <span class="block whitespace-pre-wrap break-words">$ bun run dev</span>
+          <span class="block whitespace-pre-wrap break-words">[zenith] • DEV    Starting dev server…</span>
+          <span class="block whitespace-pre-wrap break-words">[zenith] • BUILD  Initial build (id=0)</span>
+          <span class="block whitespace-pre-wrap break-words">[zenith] • CSS    ready (/__zenith_dev/styles.css?buildId=0)</span>
+          <span class="block whitespace-pre-wrap break-words text-code-success">[zenith] ✓ OK     http://127.0.0.1:3000</span>
         </div>
         <div class="border-t border-code-border px-4 py-[10px]">
-          <button type="button" data-log-toggle="true" aria-expanded={ctaLogExpanded ? "true" : "false"} aria-controls="full-log" class="hero-control min-h-11! md:min-h-8! text-[14px]! font-mono font-normal!" on:click={ctaToggleLog}>{ctaLogExpanded ? "Hide full log ▴" : "Show full log ▾"}</button>
+          <button type="button" data-log-toggle="true" aria-expanded={ctaLogExpanded ? "true" : "false"} aria-controls="full-log" class="hero-control min-h-11! text-[14px]! font-mono font-normal!" on:click={ctaToggleLog}>{ctaLogExpanded ? "Hide full log ▴" : "Show full log ▾"}</button>
         </div>
       </figure>
       <p class="text-[13px] leading-5 text-muted-foreground">Output from create-zenith 1.3.21 (published). On a cold cache, the install step also prints "Resolving dependencies" lines.</p>

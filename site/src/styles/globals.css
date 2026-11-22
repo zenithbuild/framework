@@ -256,13 +256,12 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-primary;
   }
   body {
     @apply bg-background text-foreground;
   }
 
-  html[data-zenith-intro-state="pending"]:has([data-home-intro-root]) [data-intro-gated],
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) [data-intro-gated],
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) [data-intro-gated],
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) [data-intro-gated],
@@ -274,7 +273,6 @@
     pointer-events: none;
   }
 
-  html[data-zenith-intro-state="pending"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) body,
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) body,
@@ -290,7 +288,6 @@
     display: none !important;
   }
 
-  html[data-zenith-intro-state="pending"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="loading"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="revealingMark"]:has([data-home-intro-root]) [data-intro-loader],
   html[data-zenith-intro-state="markRevealed"]:has([data-home-intro-root]) [data-intro-loader],
@@ -302,7 +299,7 @@
     visibility: visible;
   }
 
-  html[data-zenith-intro-state="pending"]:has([data-home-intro-root]) [data-intro-loader] {
+  [data-intro-loader]:not([data-intro-phase]), [data-intro-loader][data-intro-phase="pending"] {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;

@@ -1,5 +1,4 @@
 <script lang="ts">
-import Links from "../../ui/Links.zen";
 import ZenithLogoMark from "@/components/ZenithLogoMark.zen";
 
 interface Props {
@@ -11,34 +10,34 @@ const footerNavContent = (props as Props).content;
 
 <div class="flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
   <div class="flex max-w-[360px] flex-col gap-3">
-    <Links href="/" class="flex min-h-11 w-max items-center gap-2 v1-focus" ariaLabel="Zenith home">
+    <a href="/" data-zen-link="true" class="flex min-h-11 w-max items-center gap-2 v1-focus" aria-label="Zenith home">
       <span class="grid h-10 w-10 place-items-center rounded-full border border-border bg-card shadow-[0_10px_15px_rgba(117,27,184,0.1)]"><span class="block h-[29px] w-[29px]"><ZenithLogoMark /></span></span>
       <span class="font-heading text-[22px] font-semibold leading-6 text-foreground">{footerNavContent.nav.brand.label}</span>
-    </Links>
+    </a>
     <p class="text-[15px] leading-6 text-muted-foreground">{footerNavContent.nav.brand.description}</p>
   </div>
   <div class="grid grid-cols-2 gap-6 md:flex md:gap-6">
-    <nav aria-labelledby="footer-group-0" class="footer-links-slot flex w-[150px] flex-col items-start gap-0">
-      <h2 id="footer-group-0" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">{footerNavContent.nav.groups[0].title}</h2>
-      <Links href={footerNavContent.nav.groups[0].links[0].href} class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[0].links[0].label}</Links>
-      <Links href={footerNavContent.nav.groups[0].links[1].href} class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[0].links[1].label}</Links>
-      <Links href={footerNavContent.nav.groups[0].links[2].href} class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[0].links[2].label}</Links>
+    <nav aria-labelledby="footer-group-0" class="footer-links-slot flex min-w-0 flex-col items-start gap-0">
+      <h2 id="footer-group-0" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">Product</h2>
+      <a href="/#how-it-works" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">How it works</a>
+      <a href="/performance" data-zen-link="true" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Performance</a>
+      <a href="/#why-zenith" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Why Zenith</a>
     </nav>
-    <nav aria-labelledby="footer-group-1" class="footer-links-slot flex w-[150px] flex-col items-start gap-0">
-      <h2 id="footer-group-1" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">{footerNavContent.nav.groups[1].title}</h2>
-      <Links href={footerNavContent.nav.groups[1].links[0].href} class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[1].links[0].label}</Links>
-      <Links href={footerNavContent.nav.groups[1].links[1].href} class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[1].links[1].label}</Links>
-      <Links href={footerNavContent.nav.groups[1].links[2].href} target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[1].links[2].label}</Links>
-      <Links href={footerNavContent.nav.groups[1].links[3].href} target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[1].links[3].label}</Links>
+    <nav aria-labelledby="footer-group-1" class="footer-links-slot flex min-w-0 flex-col items-start gap-0">
+      <h2 id="footer-group-1" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">Learn</h2>
+      <a href="/docs" data-zen-link="true" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Docs</a>
+      <a href="/blog" data-zen-link="true" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Blog</a>
+      <a href="https://github.com/zenithbuild/framework/blob/integration/v1/CHANGELOG.md" target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Changelog</a>
+      <a href="https://github.com/zenithbuild/framework/milestones" target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">Roadmap</a>
     </nav>
-    <nav aria-labelledby="footer-group-2" class="footer-links-slot flex w-[150px] flex-col items-start gap-0">
-      <h2 id="footer-group-2" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">{footerNavContent.nav.groups[2].title}</h2>
-      <Links href={footerNavContent.nav.groups[2].links[0].href} target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[2].links[0].label}</Links>
-      <Links href={footerNavContent.nav.groups[2].links[1].href} target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[2].links[1].label}</Links>
+    <nav aria-labelledby="footer-group-2" class="footer-links-slot flex min-w-0 flex-col items-start gap-0">
+      <h2 id="footer-group-2" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">Source</h2>
+      <a href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">GitHub</a>
+      <a href="https://github.com/zenithbuild/framework/blob/integration/v1/LICENSE" target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">MIT License</a>
     </nav>
-    <nav aria-labelledby="footer-group-3" class="footer-links-slot flex w-[150px] flex-col items-start gap-0">
-      <h2 id="footer-group-3" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">{footerNavContent.nav.groups[3].title}</h2>
-      <Links href={footerNavContent.nav.groups[3].links[0].href} target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 items-center md:min-h-8">{footerNavContent.nav.groups[3].links[0].label}</Links>
+    <nav aria-labelledby="footer-group-3" class="footer-links-slot flex min-w-0 flex-col items-start gap-0">
+      <h2 id="footer-group-3" class="font-mono text-[12px] leading-4 tracking-[0.16em] uppercase text-muted-foreground mb-1 min-h-4 md:mb-2">Community</h2>
+      <a href="https://x.com/zenithbuild" target="_blank" rel="noopener noreferrer" class="text-[15px] leading-5 text-foreground underline-offset-4 hover:underline v1-focus inline-flex min-h-11 min-w-11 items-center">X</a>
     </nav>
   </div>
 </div>
