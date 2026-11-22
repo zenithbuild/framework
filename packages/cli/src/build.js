@@ -16,7 +16,7 @@ import {
 } from './build/compiler-runtime.js';
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
-import { writeProductionPageManifests, writePublicResourceManifest } from './production-route-manifests.js';
+import { pageUsesServerMetadata, writeProductionPageManifests, writePublicResourceManifest } from './production-route-manifests.js';
 import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
@@ -191,9 +191,7 @@ export async function build(options) {
         'write_resource_manifest',
         async () => {
             const routes = await writeResourceRouteManifest(routeMetadataDir, manifest, basePath);
-            const hasServerPages = envelopes.some(({ ir }) =>
-                !ir.prerender && (ir.server_script || ir.has_scoped_server_data)
-            );
+            const hasServerPages = envelopes.some((page) => !page.ir.prerender && pageUsesServerMetadata(page));
             await writePublicResourceManifest(staticOutputDir, basePath, routes, hasServerPages);
         }
     );

@@ -23,13 +23,17 @@ function publicPage(route) {
     };
 }
 
+export function pageUsesServerMetadata({ ir }) {
+    return Boolean(ir.server_script || ir.has_scoped_server_data || ir.has_guard || ir.has_load || ir.has_action);
+}
+
 export async function writeProductionPageManifests(staticDir, privateDir, envelopes) {
     const name = 'router-manifest.json';
     let manifest;
     try {
         manifest = JSON.parse(await readFile(join(staticDir, 'assets', name), 'utf8'));
     } catch (error) {
-        const needsServerRoutes = envelopes.some(({ ir }) => ir.server_script || ir.has_scoped_server_data);
+        const needsServerRoutes = envelopes.some(pageUsesServerMetadata);
         if (error.code === 'ENOENT' && !needsServerRoutes) return;
         throw error;
     }
@@ -65,6 +69,7 @@ export async function writePublicResourceManifest(staticDir, basePath, resources
     await writeManifest(staticDir, 'resource-manifest.json', {
         base_path: basePath,
         requires_server_metadata: hasServerPages || routes.length > 0,
+        requires_server_pages: hasServerPages,
         routes
     });
 }

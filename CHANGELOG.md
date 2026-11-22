@@ -15,13 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Check the release tag before CI and use the verified commit throughout npm publishing and recovery. Verify all 15 package dist-tags together and retry only those awaiting propagation.
-- Document which hosted targets have passed adapter conformance tests and check the supported target list against the CLI (JUD-97, JUD-98).
+- Print a build notice that hosted adapters have passed conformance tests and add a CI check for drift in the supported target list (JUD-97, JUD-98).
 - Extract `_coerceText` and `_createContextualFragment` into `packages/runtime/src/render-utils.js` so `render.js` and `fragment-patch.js` no longer import each other. `render.js` and `hydrate.js` keep the same exports, and the concatenated runtime template still contains each helper once (JUD-11).
 
 ### Fixed
 
 - Production page bundles omit reactive source spans (`source.file`, positions, and snippets) from `__zenith_refs`, `__zenith_events`, and compacted payload tables. Dev-stable builds (`--dev-stable-assets`) still emit full spans for overlays. Absolute build-machine paths and source snippets no longer ship in production client JS (JUD-90).
-- Production browser manifests carry route and asset metadata. Page and resource handlers and server binding plans are packaged with the server. Local previews of server routes use those private files.
+- Production browser manifests carry route and asset metadata. Page and resource handlers and server binding plans are packaged with the server. Local preview verifies the matching private page and resource routes and returns 503 when required metadata is incomplete.
 - Remove leftover route debug logging and a stray debug script from the CLI package (JUD-91, JUD-92).
 - Update the deepmerge, glob and minimatch resolutions used by the release workspace (#247).
 - Restore frozen Bun installs and use supported macOS ARM and Linux runners for package and browser checks (#252, #261).

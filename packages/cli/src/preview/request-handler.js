@@ -113,7 +113,7 @@ export function createPreviewRequestHandler(options) {
     }
     const { serverDir: serverModuleBaseDir, routeDir: routeMetadataDir, bindingPlan: bindingPlanPath } = routeFiles;
     const routeState = mergePreviewScopedServerRoutes(
-      await loadRouteSurfaceState(routeMetadataDir, configuredBasePath),
+      routeFiles.routeState ?? await loadRouteSurfaceState(routeMetadataDir, configuredBasePath),
       await loadPreviewScopedServerRoutes(serverModuleBaseDir)
     );
     const { basePath, pageRoutes, resourceRoutes } = routeState;
