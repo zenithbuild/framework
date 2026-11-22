@@ -350,8 +350,12 @@ pub(crate) fn emit_output_phase(request: BundlerOutputPhaseRequest<'_>) -> Resul
             });
         }
         router_manifest.routes.sort_by(|a, b| a.path.cmp(&b.path));
-        let router_manifest_json = serde_json::to_string(&router_manifest)
-            .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
+        let router_manifest_json = if output_mode.is_dev_stable() {
+            serde_json::to_string(&router_manifest)
+        } else {
+            router_manifest.public_json()
+        }
+        .map_err(|e| format!("failed to serialize router manifest: {e}"))?;
         write_file(
             &emitted_root.join("assets/router-manifest.json"),
             &router_manifest_json,
