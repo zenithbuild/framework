@@ -14,7 +14,7 @@ const pipeTabCompileRef = ref<HTMLButtonElement>();
 const pipeTabBundleRef = ref<HTMLButtonElement>();
 const pipeTabRunRef = ref<HTMLButtonElement>();
 
-state pipelineStage = "build";
+state pipelineStage = "compile";
 state pipelineOpen = "compile";
 
 function pipeSelect(next: PipeStage) {
@@ -45,7 +45,7 @@ function pipeToggle(stage: PipeStage) {
 }
 </script>
 
-<section id="how-it-works" ref={pipeRootRef} data-pipeline-root="true" data-active-stage={pipelineStage} aria-labelledby="how-it-works-title" class="pipeline-root bg-background px-4 py-12 md:px-10 md:py-14 lg:px-20">
+<section id="how-it-works" ref={pipeRootRef} data-pipeline-root="true" data-active-stage={pipelineStage} aria-labelledby="how-it-works-title" class="pipeline-root border-t border-border bg-background px-4 py-12 md:px-10 md:py-14 lg:px-20">
   <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-5 md:gap-6">
     <div class="flex items-end justify-between gap-3">
       <div class="flex flex-col gap-[10px]">

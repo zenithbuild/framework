@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun scripts/build-public-content.ts && zenith dev",
+    "dev": "bun scripts/dev.ts",
     "build": "bun scripts/build-public-content.ts && zenith build && node scripts/package-vercel-functions.mjs",
     "preview": "zenith preview",
     "test": "bun test"

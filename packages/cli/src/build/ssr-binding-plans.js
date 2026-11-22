@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { collectInteractiveDataBindings } from './ssr-data-paths.js';
 
 // Preserve compiler-owned marker identity in a private sidecar. Client code is
 // excluded: this plan applies only to pages whose expressions need request data.
@@ -7,9 +8,12 @@ export async function writeSsrBindingPlans(distDir, envelopes) {
     const plans = {};
     for (const envelope of envelopes) {
         const ir = envelope.ir;
-        if (envelope.router !== false) continue;
         if (ir.prerender || !(ir.server_script || ir.has_scoped_server_data)) continue;
-        if (ir.hoisted?.imports?.length || ir.signals?.length || ir.hoisted?.state?.length || ir.hoisted?.code?.some((code) => String(code).trim())) continue;
+        if (envelope.router !== false || ir.hoisted?.imports?.length || ir.signals?.length || ir.hoisted?.state?.length || ir.hoisted?.code?.some((code) => String(code).trim())) {
+            const projected = collectInteractiveDataBindings(ir);
+            if (projected.length) plans[envelope.route] = projected;
+            continue;
+        }
         const bindings = new Map((ir.expression_bindings || []).map((binding) => [binding.marker_index, binding]));
         const rows = [];
         for (const marker of ir.marker_bindings || []) {

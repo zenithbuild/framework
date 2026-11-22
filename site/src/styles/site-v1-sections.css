@@ -10,13 +10,13 @@
   .pipeline-root .pipeline-desktop { display: flex; align-items: flex-start; }
   .pipeline-root .pipeline-accordion { display: none; }
 }
-.pipeline-tablist { position: relative; display: flex; width: 264px; flex-shrink: 0; flex-direction: column; gap: 8px; }
+.pipeline-tablist { position: relative; display: flex; width: min(300px, 26vw); flex-shrink: 0; flex-direction: column; gap: 8px; }
 .pipeline-tab {
   position: relative;
   z-index: 1;
   display: flex;
-  height: 68px;
-  width: 264px;
+  height: 64px;
+  width: min(300px, 26vw);
   align-items: center;
   gap: 14px;
   /* Interactive outline: border-strong (>=3:1, build gate 8); plain border is for dividers only. */
@@ -31,8 +31,8 @@
 @media (hover: hover) { .pipeline-tab:hover .pipeline-tab-name { color: var(--foreground); } }
 .pipeline-num {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   place-items: center;
   border: 1px solid var(--border);
@@ -48,21 +48,21 @@
   background: var(--stage-soft);
   color: var(--foreground);
 }
-/* The rail highlight moves by transform only (stageSwitchTl S3). 68px tab + 8px gap = 76px pitch. */
+/* The rail highlight moves by transform only (stageSwitchTl S3). 64px tab + 8px gap. */
 .pipeline-highlight {
   position: absolute;
   left: 0;
   top: 0;
-  height: 68px;
-  width: 264px;
+  height: 64px;
+  width: min(300px, 26vw);
   border: 2px solid var(--stage-accent);
   border-radius: 12px;
   background: var(--card);
   pointer-events: none;
 }
-[data-active-stage="compile"] .pipeline-highlight { transform: translateY(76px); }
-[data-active-stage="bundle"] .pipeline-highlight { transform: translateY(152px); }
-[data-active-stage="run"] .pipeline-highlight { transform: translateY(228px); }
+[data-active-stage="compile"] .pipeline-highlight { transform: translateY(72px); }
+[data-active-stage="bundle"] .pipeline-highlight { transform: translateY(144px); }
+[data-active-stage="run"] .pipeline-highlight { transform: translateY(216px); }
 
 .pipeline-panels { display: grid; min-width: 0; flex: 1 1 0%; }
 .pipeline-panel {
@@ -71,7 +71,7 @@
   border: 1.5px solid var(--stage-accent);
   border-radius: 14px;
   background: var(--card);
-  padding: 28px;
+  padding: 20px 24px;
   visibility: hidden;
   opacity: 0;
 }
@@ -79,10 +79,10 @@
 [data-active-stage="compile"] [data-stage-panel="compile"],
 [data-active-stage="bundle"] [data-stage-panel="bundle"],
 [data-active-stage="run"] [data-stage-panel="run"],
-[data-pipeline-root]:not([data-active-stage]) [data-stage-panel="build"] { visibility: visible; opacity: 1; }
+[data-pipeline-root]:not([data-active-stage]) [data-stage-panel="compile"] { visibility: visible; opacity: 1; }
 .pipeline-stage-link { color: var(--stage-accent); }
 
-.pipeline-acc-item { border: 1px solid var(--border-strong); border-radius: 12px; padding: 12px 14px; }
+.pipeline-acc-item { border: 1px solid var(--border-strong); border-radius: 12px; padding: 4px 14px; }
 .pipeline-acc-item[data-open="true"] { border: 1.5px solid var(--stage-accent); background: var(--card); }
 .pipeline-acc-button { display: flex; min-height: 44px; width: 100%; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border-radius: 8px; }
 .pipeline-acc-panel { padding-top: 12px; }
@@ -112,4 +112,22 @@
 .compiler-field-gold { --field-accent: var(--brand-gold, #e5ae00); --field-soft: var(--brand-gold-soft); }
 @media (min-width: 1024px) {
   .compiler-toc { position: sticky; top: 97px; }
+}
+
+.pipeline-pin {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  margin-inline-start: 8px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+[data-compact-code="true"][data-code-expanded="false"] .pipeline-code-line:nth-child(n + 6) { display: none; }
+.stage-code-toggle { min-height: 44px; }
+.stage-code-toggle[hidden] { display: none; }
+@media (min-width: 1280px) {
+  .pipeline-panel { min-height: 376px; }
 }

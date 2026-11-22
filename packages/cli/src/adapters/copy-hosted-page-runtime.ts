@@ -112,6 +112,13 @@ export async function copyHostedPageRuntime(
     const serverDir = join(coreOutput, 'server');
     await mkdir(targetDir, { recursive: true });
 
+    const bindingsPath = join(serverDir, 'ssr-bindings.json');
+    try {
+        await cp(bindingsPath, join(targetDir, 'ssr-bindings.json'));
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
     for (const name of HOSTED_PAGE_RUNTIME_DIRS) {
         await cp(join(serverDir, name), join(targetDir, name), {
             recursive: true,

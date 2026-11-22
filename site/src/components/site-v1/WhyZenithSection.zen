@@ -45,6 +45,13 @@ const WHY_SOURCE = "https://github.com/zenithbuild/framework/blob/dea39f22";
         <div class="flex min-w-0 flex-col gap-2">
           <h3 class="font-heading text-[22px] font-semibold leading-7 md:text-[26px] md:leading-8">A click handler has to be a function</h3>
           <p class="text-[16px] leading-[26px] text-muted-foreground"><code class="v1-inline-code">{"on:click={handler}"}</code> is checked while the file compiles.</p>
+          <figure class="v1-code-panel mt-2 min-w-0 rounded-xl p-4 font-mono text-[13px] leading-5 md:p-5 md:text-sm md:leading-6">
+            <figcaption class="mb-3 flex flex-wrap items-center justify-between gap-2"><span class="font-medium text-code-error">Build failed</span><span class="text-xs text-code-muted">integration/v1 @ dea39f22</span></figcaption>
+            <p class="text-code-error">ZEN-EVT-STRING-HANDLER</p>
+            <p>Event attributes do not accept string handlers.</p>
+            <p class="mt-2 break-words">Found: <code>on:click="doThing"</code></p>
+            <p class="mt-3 text-code-success">Use <code>on:event=&#123;handler&#125;</code> with a function-valued expression.</p>
+          </figure>
           <div class="flex flex-wrap items-center gap-x-2 gap-y-[6px]"><span class="v1-tag v1-tag-gold">event_bindings</span><Links href={WHY_SOURCE + "/packages/compiler/zenith_compiler/src/parser_elements.rs"} target="_blank" rel="noopener noreferrer" class="v1-link">parser_elements.rs →</Links></div>
         </div>
       </div>

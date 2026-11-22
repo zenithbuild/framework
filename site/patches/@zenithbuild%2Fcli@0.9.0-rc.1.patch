@@ -45,12 +45,12 @@ index 7b851962010cc0bd1df0d2802d3cbd14f5b93483..ed8a67be401b88c634ee4ce612aa837a
          const bindings = new Map((ir.expression_bindings || []).map((binding) => [binding.marker_index, binding]));
          const rows = [];
          for (const marker of ir.marker_bindings || []) {
-diff --git a/node_modules/@zenithbuild/cli/dist/build/ssr-data-paths.js b/dist/build/ssr-data-paths.js
+diff --git a/dist/build/ssr-data-paths.js b/dist/build/ssr-data-paths.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..50a2825a6cfb85d24ac93ad9a963a13a3660735c
+index 0000000000000000000000000000000000000000..1a44f6fab9a86eed6e55a09e5d857e3b56559727
 --- /dev/null
 +++ b/dist/build/ssr-data-paths.js
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,93 @@
 +import { loadTypeScriptApi } from './compiler-runtime.js';
 +const SAFE_ATTRS = new Set(['alt', 'aria-label', 'content', 'datetime', 'href', 'rel', 'title']);
 +const blocked = new Set(['__proto__', 'prototype', 'constructor']);
@@ -106,9 +106,11 @@ index 0000000000000000000000000000000000000000..50a2825a6cfb85d24ac93ad9a963a13a
 +                if (!ts.isIdentifier(variable.name))
 +                    continue;
 +                const name = variable.name.text;
-+                const value = projection(ts, variable.initializer, scope);
++                const scopedConst = name.startsWith('__') && immutable.has(name);
++                const propsMap = name === 'props' && variable.initializer && ts.isObjectLiteralExpression(variable.initializer);
++                const value = scopedConst || propsMap ? projection(ts, variable.initializer, scope) : null;
 +                scope.set(name, value);
-+                if (!name.startsWith('__') || !immutable.has(name))
++                if (!scopedConst)
 +                    continue;
 +                if (names.has(name))
 +                    duplicates.add(name);

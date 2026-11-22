@@ -27,14 +27,18 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     key: "compile", number: 2, name: "Compile", subtitle: "CompilerOutput tables",
-    tags: [{ label: "signals", tone: "blue" }, { label: "expression_bindings", tone: "gold" }, { label: "marker_bindings", tone: "gold" }],
-    codeLabel: "bundler checks before it accepts the tables · bundler_contracts.rs:50-104",
+    tags: [],
+    codeLabel: "CompilerOutput · index.zen",
     code: [
-      [["gold", "expression_bindings"], ["fg", ".len == "], ["purple", "expressions"], ["fg", ".len"]],
-      [["gold", "marker_bindings"], ["fg", ".len     == "], ["purple", "expressions"], ["fg", ".len"]],
-      [["blue", "signals"], ["fg", "[i].state_index             < "], ["muted", "hoisted.state"], ["fg", ".len"]],
-      [["gold", "expression_bindings"], ["fg", "[i].marker_index < "], ["purple", "expressions"], ["fg", ".len"]],
-      [["gold", "expression_bindings"], ["fg", "[i].signal_index < "], ["blue", "signals"], ["fg", ".len"]],
+      [["blue", "signals: ["]],
+      [["fg", "  { id, kind, state_index }"]],
+      [["muted", "]"]],
+      [["gold", "event_bindings: ["]],
+      [["fg", "  { index, event, selector }"]],
+      [["muted", "]"]],
+      [["gold", "expression_bindings: ["]],
+      [["fg", "  { marker_index, signal_index, … }"]],
+      [["muted", "]"]],
     ],
     aside: ["The compiler returns one ", { code: "CompilerOutput" }, " per compiled input."],
     link: { label: "Compiler →", href: "/how-it-works/compiler" },
@@ -66,9 +70,12 @@ export function stageByKey(key: string): PipelineStage {
 /** `compact` collapses alignment runs of spaces (mobile wraps the lines, so column alignment is moot). */
 export function stageCodeHtml(stage: PipelineStage, compact = false): string {
   const shape = (text: string, index: number) => (compact && index > 0 ? text.replace(/ {2,}/g, " ") : text);
-  return stage.code
-    .map((line) => `<span class="pipeline-code-line">${line.map(([tone, text], index) => `<span class="tone-${tone}">${escapeHtml(shape(text, index))}</span>`).join("")}</span>`)
-    .join("");
+  return stage.code.map((line, lineIndex) => {
+    const tokens = line.map(([tone, text], index) => `<span class="tone-${tone}">${escapeHtml(shape(text, index))}</span>`).join("");
+    const pin = stage.key === "compile" && lineIndex % 3 === 0
+      ? `<span aria-hidden="true" class="pipeline-pin tone-${line[0][0]}">${lineIndex / 3 + 1}</span>` : "";
+    return `<span class="pipeline-code-line">${tokens}${pin}</span>`;
+  }).join("");
 }
 
 export function stageAsideHtml(stage: PipelineStage): string {

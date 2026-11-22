@@ -54,7 +54,7 @@ describe("route-transition lifecycle", () => {
         { timeout: 30_000 },
       );
       await activateStageTab(page, "compile");
-      expect(await page.locator("#pipeline-panel-compile").textContent()).toContain("bundler_contracts.rs:50-104");
+      expect(await page.locator("#pipeline-panel-compile").textContent()).toContain("CompilerOutput · index.zen");
 
       for (let visit = 0; visit < 2; visit += 1) {
         await page.locator("[data-nav-shell='true'] a[href='/blog']").first().click();

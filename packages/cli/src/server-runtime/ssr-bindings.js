@@ -37,13 +37,14 @@ function applyMarker(html, marker, value) {
         const attr = marker.attr === 'className' ? 'class' : marker.attr;
         if (!/^[A-Za-z_:][\w:.-]*$/.test(attr) || /^on/i.test(attr)) throw new Error('[Zenith:SSR] Invalid compiler attribute marker.');
         const pattern = new RegExp(`\\s${escapeRegex(attr)}(?:\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+))?(?=\\s|$)`, 'gi');
-        let next = attrs.replace(pattern, '');
+        const closing = /\/\s*$/.test(attrs) ? ' /' : '';
+        let next = attrs.replace(/\/\s*$/, '').replace(pattern, '');
         if (BOOLEAN_ATTRIBUTES.has(attr)) {
             if (value) next += ` ${attr}`;
         } else if (value != null && value !== false && value !== '') {
             next += ` ${attr}="${escapeHtml(value)}"`;
         }
-        return `<${tagName}${next}>`;
+        return `<${tagName}${next}${closing}>`;
     });
 }
 
@@ -56,8 +57,18 @@ export async function materializeSsrBindings({ html, planPath, routePath, payloa
         throw error;
     }
     const routeData = payload?.route && payload?.scoped ? payload.route : payload;
-    for (const { marker, expression, scopedDataKey } of plans[routePath] || []) {
+    for (const { marker, expression, scopedDataKey, path } of plans[routePath] || []) {
         const data = scopedDataKey ? payload?.scoped?.[scopedDataKey] || {} : routeData;
+        if (path) {
+            let value = data;
+            for (const key of path) {
+                value = value != null && Object.hasOwn(value, key) ? value[key] : undefined;
+            }
+            if (typeof value !== 'string' && typeof value !== 'number') continue;
+            if (marker.attr === 'href' && !/^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|[?#])/i.test(String(value).trim())) continue;
+            html = applyMarker(html, marker, value);
+            continue;
+        }
         // Only compiler-authored expressions become code. Request values remain
         // function arguments, exactly as in the client expression evaluator.
         const evaluate = new Function('data', 'ssr', 'ssr_data', 'params', '__ctx', `"use strict"; return (${expression});`);

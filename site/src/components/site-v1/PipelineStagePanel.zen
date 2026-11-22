@@ -14,21 +14,26 @@ const stagePanelCode = stageCodeHtml(stagePanelData, stagePanelMobile);
 const stagePanelAside = stageAsideHtml(stagePanelData);
 const stagePanelTags = stageTagsHtml(stagePanelData);
 const stagePanelHasTags = stagePanelData.tags.length > 0;
+const stageCompactCode = stagePanelMobile && stagePanelData.key === "compile";
+const stageCodeId = `stage-code-${stagePanelMobile ? "mobile" : "desktop"}-${stagePanelData.key}`;
+state stageCodeExpanded = false;
+function toggleStageCode() { stageCodeExpanded = !stageCodeExpanded; }
 </script>
 
-<div data-stage-body={stagePanelData.key} class={stagePanelMobile ? "flex flex-col gap-4 pb-2" : "flex h-full flex-col gap-5"}>
+<div data-stage-body={stagePanelData.key} class={stagePanelMobile ? "flex flex-col gap-3 pb-2" : "flex h-full flex-col gap-4"}>
   <div class={stagePanelMobile ? "hidden" : "flex flex-wrap items-center justify-between gap-3"}>
     <div class="flex items-center gap-3">
       <span aria-hidden="true" class="h-7 w-1 rounded-[2px] bg-[var(--stage-accent)]"></span>
       <h3 class="font-heading text-[24px] font-semibold leading-7 tracking-[-0.01em] text-foreground">{stagePanelTitle}</h3>
     </div>
-    <p class={stagePanelHasTags ? "flex flex-wrap gap-2" : "font-mono text-[13px] leading-4 text-muted-foreground"} unsafeHTML={stagePanelHasTags ? stagePanelTags : stagePanelData.subtitle}></p>
+    <p class={stagePanelHasTags ? "flex flex-wrap gap-2" : "font-mono text-[13px] leading-4 text-muted-foreground"} unsafeHTML={stagePanelHasTags ? stagePanelTags : stagePanelData.key === "compile" ? "Same counter, same pins" : stagePanelData.subtitle}></p>
   </div>
-  <div class={stagePanelMobile ? "flex flex-col gap-4" : "flex flex-col gap-5 min-[1440px]:flex-row min-[1440px]:gap-6"}>
+  <div class={stagePanelMobile ? "flex flex-col gap-3" : "flex flex-col gap-5 min-[1440px]:flex-row min-[1440px]:gap-6"}>
     <p class={stagePanelMobile ? "text-[16px] leading-[26px] text-foreground" : "hidden"} unsafeHTML={stagePanelAside}></p>
-    <figure class={stagePanelMobile ? "v1-code-panel flex flex-col gap-[6px] px-[14px] py-4" : "v1-code-panel flex min-w-0 flex-1 flex-col gap-[6px] px-6 py-[22px] min-[1440px]:min-h-[236px]"}>
+    <figure data-compact-code={stageCompactCode ? "true" : undefined} data-code-expanded={stageCodeExpanded ? "true" : "false"} class={stagePanelMobile ? "v1-code-panel flex flex-col gap-1 px-[18px] py-4" : "v1-code-panel flex min-w-0 flex-1 flex-col gap-[6px] px-6 py-[22px] min-[1440px]:min-h-[236px]"}>
       <figcaption class="text-[12px] leading-4 text-code-muted">{stagePanelData.codeLabel}</figcaption>
-      <pre class={stagePanelMobile ? "pipeline-code whitespace-pre-wrap pt-2 text-[13px] leading-[22px]" : "pipeline-code overflow-x-auto pt-2 text-[14px] leading-6"}><code unsafeHTML={stagePanelCode}></code></pre>
+      <pre id={stageCodeId} class={stagePanelMobile ? "pipeline-code overflow-x-auto whitespace-pre pt-1 text-sm leading-6" : "pipeline-code overflow-x-auto pt-2 text-[14px] leading-6"}><code unsafeHTML={stagePanelCode}></code></pre>
+      <button type="button" class="stage-code-toggle v1-focus self-center rounded-lg px-3 text-sm font-medium" hidden={stageCompactCode ? undefined : true} aria-controls={stageCodeId} aria-expanded={stageCodeExpanded ? "true" : "false"} on:click={toggleStageCode}>{stageCodeExpanded ? "Show fewer lines" : "Show all"}</button>
     </figure>
     <div class={stagePanelMobile ? "flex" : "flex flex-col gap-[14px] min-[1440px]:w-[240px] min-[1440px]:shrink-0"}>
       <p class={stagePanelMobile ? "hidden" : "text-[17px] leading-7 text-foreground"} unsafeHTML={stagePanelAside}></p>

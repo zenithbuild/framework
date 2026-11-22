@@ -1,15 +1,21 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { loadSearchIndex } from "../src/server/searchIndexLoader";
 import { discoverLocalDocumentationEntries } from "../src/server/localDocumentationSource";
 import { loadGitBlogPosts } from "../src/server/gitBlogSource";
 import { sitemapXml } from "../src/server/publicFeeds";
 
+async function replaceFile(destination: URL, value: string) {
+  const temporary = new URL(destination.href + "." + process.pid + ".tmp");
+  await writeFile(temporary, value);
+  await rename(temporary, destination);
+}
+
 const generated = new URL("../src/content/generated/", import.meta.url);
 await mkdir(generated, { recursive: true });
 const [docs, posts] = await Promise.all([discoverLocalDocumentationEntries(), loadGitBlogPosts()]);
 await Promise.all([
-  writeFile(new URL("docs.json", generated), JSON.stringify(docs)),
-  writeFile(new URL("posts.json", generated), JSON.stringify(posts)),
+  replaceFile(new URL("docs.json", generated), JSON.stringify(docs)),
+  replaceFile(new URL("posts.json", generated), JSON.stringify(posts)),
 ]);
 
 const output = new URL("../src/public/", import.meta.url);
@@ -19,6 +25,6 @@ const [search, sitemap] = await Promise.all([
   Array.fromAsync(sitemapXml()),
 ]);
 await Promise.all([
-  writeFile(new URL("search-index.json", output), JSON.stringify(search)),
-  writeFile(new URL("sitemap.xml", output), sitemap.join("")),
+  replaceFile(new URL("search-index.json", output), JSON.stringify(search)),
+  replaceFile(new URL("sitemap.xml", output), sitemap.join("")),
 ]);
