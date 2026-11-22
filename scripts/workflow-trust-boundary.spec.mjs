@@ -125,6 +125,26 @@ test('OIDC token permission is limited to npm publish jobs', () => {
     }
 });
 
+test('release CI and every publish checkout use the commit verified in preflight', () => {
+    const publish = readWorkflow('publish.yml');
+    const preflight = getJobBlock(publish, 'preflight');
+    assert.match(preflight, /format\('refs\/tags\/\{0\}', inputs\.release_tag\)/);
+    assert.match(preflight, /git rev-parse HEAD/);
+    const ci = getJobBlock(publish, 'ci');
+    assert.match(ci, /needs: preflight/);
+    assert.match(ci, /checkout_ref: \$\{\{ needs\.preflight\.outputs\.release_sha \}\}/);
+    assert.match(getJobBlock(publish, 'publish_platforms'), /needs: \[preflight, ci\]/);
+
+    for (const job of ['publish_platforms', 'publish_release', 'verify_registry']) {
+        assert.match(getJobBlock(publish, job), /ref: \$\{\{ needs\.preflight\.outputs\.release_sha \}\}/);
+    }
+    assert.match(getJobBlock(publish, 'verify_registry'), /verify-npm-registry\.mjs framework /);
+    const reusable = readWorkflow('reusable-ci.yml');
+    for (const job of ['core', 'integration', 'smoke']) {
+        assert.match(getJobBlock(reusable, job), /ref: \$\{\{ inputs\.checkout_ref \}\}/);
+    }
+});
+
 test('release and publish jobs fail closed before downstream release steps', () => {
     const publish = readWorkflow('publish.yml');
     assert.match(publish, /platform_stage:[\s\S]*needs:\s*\[preflight, publish_platforms\]/);

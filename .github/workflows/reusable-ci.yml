@@ -2,6 +2,11 @@ name: reusable-ci
 
 on:
   workflow_call:
+    inputs:
+      checkout_ref:
+        description: Immutable release commit when called by the publisher
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -13,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.checkout_ref }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -100,6 +106,8 @@ jobs:
         shard_index: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -201,6 +209,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
 
       - uses: actions/setup-node@v4
         with:

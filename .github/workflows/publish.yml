@@ -24,12 +24,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/reusable-ci.yml
-    secrets: inherit
-
   preflight:
-    needs: ci
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.release_version.outputs.release_version }}
@@ -39,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -74,7 +70,11 @@ jobs:
           fi
 
           git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
-          release_sha="$(git rev-parse "${TAG_NAME}^{commit}")"
+          release_sha="$(git rev-parse --verify "refs/tags/${TAG_NAME}^{commit}")"
+          if [[ "$(git rev-parse HEAD)" != "$release_sha" ]]; then
+            echo "The checked-out commit differs from tag $TAG_NAME." >&2
+            exit 1
+          fi
 
           if [[ "${TAG_NAME}" == *-beta.* ]]; then
             dist_tag="beta"
@@ -95,23 +95,29 @@ jobs:
 
       - name: Assert tag is on correct branch
         env:
-          GITHUB_SHA: ${{ steps.release_version.outputs.release_sha }}
-          GITHUB_REF_NAME: ${{ steps.release_version.outputs.release_tag }}
+          RELEASE_SHA: ${{ steps.release_version.outputs.release_sha }}
+          RELEASE_TAG: ${{ steps.release_version.outputs.release_tag }}
           TARGET_BRANCH: ${{ steps.release_version.outputs.target_branch }}
-        run: node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
+        run: GITHUB_SHA="$RELEASE_SHA" GITHUB_REF_NAME="$RELEASE_TAG" node scripts/assert-tag-on-branch.mjs "$TARGET_BRANCH"
 
       - name: Verify every release and native package name exists on npm
         shell: bash
         run: ./scripts/publish-packages.sh --preflight-only
 
+  ci:
+    needs: preflight
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      checkout_ref: ${{ needs.preflight.outputs.release_sha }}
+
   publish_platforms:
     name: Publish Platform Packages
-    needs: preflight
+    needs: [preflight, ci]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          - runner: macos-15
             package_kind: bundler
             package_dir: packages/bundler-darwin-arm64
             rust_target: aarch64-apple-darwin
@@ -131,7 +137,7 @@ jobs:
             package_dir: packages/bundler-win32-x64
             rust_target: x86_64-pc-windows-msvc
             platform_key: win32-x64
-          - runner: macos-14
+          - runner: macos-15
             package_kind: compiler
             package_dir: packages/compiler-darwin-arm64
             rust_target: aarch64-apple-darwin
@@ -158,6 +164,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -332,6 +340,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -395,6 +405,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preflight.outputs.release_sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -407,7 +419,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
         run: |
           set -euo pipefail
-          ./scripts/verify-npm-registry.mjs release "${RELEASE_VERSION}" "${DIST_TAG}" framework-release-verification.json
+          ./scripts/verify-npm-registry.mjs framework "${RELEASE_VERSION}" "${DIST_TAG}" framework-release-verification.json
 
       - uses: actions/upload-artifact@v4
         with:

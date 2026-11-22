@@ -3,10 +3,13 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
+import { createRequire } from 'node:module';
 import { build } from '../dist/build.js';
 import { createDevServer } from '../dist/dev-server.js';
 import { createPreviewServer } from '../dist/preview.js';
 import { createProjectImageApi, prepareProjectImages, projectUsesImages } from '../dist/project-images.js';
+
+const cliVersion = createRequire(import.meta.url)('../package.json').version;
 
 jest.setTimeout(45000);
 let root;
@@ -29,7 +32,7 @@ test('missing package fails before compilation/output mutation when <Image> is u
     await writeFile(join(outDir, 'keep.txt'), 'preserved');
     await writeFile(join(root, 'package-lock.json'), '{}');
     await writeFile(join(root, 'pages', 'index.zen'), '<main><Image src="https://example.com/a.png" alt="A" /></main>');
-    await expect(build({ pagesDir: join(root, 'pages'), outDir })).rejects.toThrow('npm i -D @zenithbuild/image@0.9.0-rc.0');
+    await expect(build({ pagesDir: join(root, 'pages'), outDir })).rejects.toThrow(`npm i -D @zenithbuild/image@${cliVersion}`);
     expect(await readFile(join(outDir, 'keep.txt'), 'utf8')).toBe('preserved');
     expect(existsSync(join(root, '.zenith-output'))).toBe(false);
 });
@@ -47,7 +50,7 @@ test('a public raster alone does not require the package and is copied verbatim'
     const outDir = join(root, 'dist');
     await build({ pagesDir: join(root, 'pages'), outDir, logger: { ...quietLogger, info } });
     expect(await readFile(join(outDir, 'favicon.PNG'), 'utf8')).toBe('not a real raster; must not reach Sharp');
-    expect(info).toHaveBeenCalledWith(expect.stringContaining('bun add -d @zenithbuild/image@0.9.0-rc.0'));
+    expect(info).toHaveBeenCalledWith(expect.stringContaining(`bun add -d @zenithbuild/image@${cliVersion}`));
     expect(existsSync(join(outDir, '_zenith', 'image', 'package.json'))).toBe(false);
 });
 
