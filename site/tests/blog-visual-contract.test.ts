@@ -56,6 +56,6 @@ describe("Blog landing visual contract", () => {
     expect(rows).toContain("<article");
     expect(rows).toContain("escapeHtml(post.path)");
     expect(rows).toContain("escapeHtml(post.displayPublishedAt)");
-    expect(rows).toContain("aria-pressed=");
+    expect(rows).toContain('aria-current="page"');
   });
 });

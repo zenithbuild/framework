@@ -24,8 +24,9 @@ export function archiveCategories(categories: string[], current: string): string
     const active = label === current;
     const color = active ? "bg-foreground text-background" : "border border-border-strong bg-background text-foreground";
     const safeLabel = escapeHtml(label);
-    const field = label === "All" ? "" : ` name="category" value="${safeLabel}"`;
-    return `<button type="submit"${field} class="v1-button px-4 ${color}" data-category="${safeLabel}" aria-pressed="${active}">${safeLabel}</button>`;
+    const href = label === "All" ? "/blog" : "/blog?category=" + encodeURIComponent(label);
+    const currentPage = active ? ' aria-current="page"' : "";
+    return `<a href="${href}" data-zen-link="true" data-category="${safeLabel}"${currentPage} class="v1-button px-4 ${color}">${safeLabel}</a>`;
   }).join("");
 }
 
