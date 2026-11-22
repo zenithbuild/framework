@@ -43,7 +43,7 @@ describe("grid column utility syntax", () => {
 
   test("restored layouts keep their multi-column tracks", () => {
     const read = (path: string) => readFileSync(resolve(srcRoot, path), "utf8");
-    expect(read("components/BlogArticle.zen")).toContain("lg:grid-cols-[minmax(0,48rem)_15rem]");
+    expect(read("components/BlogArticle.zen")).toContain("lg:grid-cols-[minmax(0,45rem)_minmax(11rem,13.75rem)]");
     expect(read("components/FeatureShowcase.zen")).toContain("md:grid-cols-[8rem_minmax(0,1fr)]");
     const about = read("pages/about/index.zen");
     expect(about).toContain("sm:grid-cols-[3rem_1fr]");

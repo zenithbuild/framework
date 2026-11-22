@@ -1,0 +1,189 @@
+diff --git a/dist/adapters/copy-hosted-page-runtime.js b/dist/adapters/copy-hosted-page-runtime.js
+index fb2a03ec851f82f8b2ecb6a9724e80e46f64c8f7..69e769650965d45ddf25fd6b4b00f3a9baf8c1b8 100644
+--- a/dist/adapters/copy-hosted-page-runtime.js
++++ b/dist/adapters/copy-hosted-page-runtime.js
+@@ -86,6 +86,14 @@ async function copyHostedScopedServerDataRuntime(coreOutput, targetDir) {
+ export async function copyHostedPageRuntime(coreOutput, targetDir, options = {}) {
+     const serverDir = join(coreOutput, 'server');
+     await mkdir(targetDir, { recursive: true });
++    const bindingsPath = join(serverDir, 'ssr-bindings.json');
++    try {
++        await cp(bindingsPath, join(targetDir, 'ssr-bindings.json'));
++    }
++    catch (error) {
++        if (error.code !== 'ENOENT')
++            throw error;
++    }
+     for (const name of HOSTED_PAGE_RUNTIME_DIRS) {
+         await cp(join(serverDir, name), join(targetDir, name), {
+             recursive: true,
+diff --git a/dist/build/ssr-binding-plans.js b/dist/build/ssr-binding-plans.js
+index 7b851962010cc0bd1df0d2802d3cbd14f5b93483..ed8a67be401b88c634ee4ce612aa837ac9ecf3b6 100644
+--- a/dist/build/ssr-binding-plans.js
++++ b/dist/build/ssr-binding-plans.js
+@@ -1,17 +1,20 @@
+ import { mkdir, writeFile } from 'node:fs/promises';
+ import { join } from 'node:path';
++import { collectInteractiveDataBindings } from './ssr-data-paths.js';
+ // Preserve compiler-owned marker identity in a private sidecar. Client code is
+ // excluded: this plan applies only to pages whose expressions need request data.
+ export async function writeSsrBindingPlans(distDir, envelopes) {
+     const plans = {};
+     for (const envelope of envelopes) {
+         const ir = envelope.ir;
+-        if (envelope.router !== false)
+-            continue;
+         if (ir.prerender || !(ir.server_script || ir.has_scoped_server_data))
+             continue;
+-        if (ir.hoisted?.imports?.length || ir.signals?.length || ir.hoisted?.state?.length || ir.hoisted?.code?.some((code) => String(code).trim()))
++        if (envelope.router !== false || ir.hoisted?.imports?.length || ir.signals?.length || ir.hoisted?.state?.length || ir.hoisted?.code?.some((code) => String(code).trim())) {
++            const projected = collectInteractiveDataBindings(ir);
++            if (projected.length)
++                plans[envelope.route] = projected;
+             continue;
++        }
+         const bindings = new Map((ir.expression_bindings || []).map((binding) => [binding.marker_index, binding]));
+         const rows = [];
+         for (const marker of ir.marker_bindings || []) {
+diff --git a/node_modules/@zenithbuild/cli/dist/build/ssr-data-paths.js b/dist/build/ssr-data-paths.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a2825a6cfb85d24ac93ad9a963a13a3660735c
+--- /dev/null
++++ b/dist/build/ssr-data-paths.js
+@@ -0,0 +1,91 @@
++import { loadTypeScriptApi } from './compiler-runtime.js';
++const SAFE_ATTRS = new Set(['alt', 'aria-label', 'content', 'datetime', 'href', 'rel', 'title']);
++const blocked = new Set(['__proto__', 'prototype', 'constructor']);
++const identifier = /^[A-Za-z_$][\w$]*$/;
++function member(owner, name) {
++    if (!owner || blocked.has(name))
++        return null;
++    return owner instanceof Map ? owner.get(name) : [...owner, name];
++}
++function projection(ts, node, scope) {
++    if (!node)
++        return null;
++    if (ts.isParenthesizedExpression(node))
++        return projection(ts, node.expression, scope);
++    if (ts.isIdentifier(node))
++        return scope.get(node.text);
++    if (ts.isPropertyAccessExpression(node))
++        return member(projection(ts, node.expression, scope), node.name.text);
++    if (ts.isElementAccessExpression(node) && ts.isNumericLiteral(node.argumentExpression)) {
++        return member(projection(ts, node.expression, scope), node.argumentExpression.text);
++    }
++    if (!ts.isObjectLiteralExpression(node))
++        return null;
++    const fields = new Map();
++    for (const property of node.properties) {
++        if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name))
++            return null;
++        fields.set(property.name.text, projection(ts, property.initializer, scope));
++    }
++    return fields;
++}
++// The compiler scopes each component instance separately. Only its emitted,
++// immutable aliases can carry a request-data projection into another instance.
++export function collectInteractiveDataBindings(ir) {
++    if (ir.has_scoped_server_data)
++        return [];
++    const ts = loadTypeScriptApi();
++    if (!ts)
++        return [];
++    const immutable = new Set((ir.hoisted?.declarations || [])
++        .map((text) => /^const\s+([\w$]+)\s*[:=]/.exec(text.trim())?.[1]).filter(Boolean));
++    const names = new Map([['data', []]]);
++    const duplicates = new Set();
++    for (const source of ir.hoisted?.code || []) {
++        const block = ts.createSourceFile('setup.js', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
++        if (block.parseDiagnostics.length)
++            continue;
++        const scope = new Map(names);
++        for (const statement of block.statements) {
++            if (!ts.isVariableStatement(statement))
++                continue;
++            for (const variable of statement.declarationList.declarations) {
++                if (!ts.isIdentifier(variable.name))
++                    continue;
++                const name = variable.name.text;
++                const value = projection(ts, variable.initializer, scope);
++                scope.set(name, value);
++                if (!name.startsWith('__') || !immutable.has(name))
++                    continue;
++                if (names.has(name))
++                    duplicates.add(name);
++                names.set(name, value);
++            }
++        }
++    }
++    for (const name of duplicates)
++        names.delete(name);
++    const rows = [];
++    const bindings = new Map((ir.expression_bindings || []).map((binding) => [binding.marker_index, binding]));
++    for (const marker of ir.marker_bindings || []) {
++        if (marker.kind !== 'text' && !(marker.kind === 'attr' && SAFE_ATTRS.has(marker.attr)))
++            continue;
++        const binding = bindings.get(marker.index);
++        if (!binding || binding.signal_index != null || binding.scoped_data_key || binding.component_instance != null)
++            continue;
++        let expr = String(binding.compiled_expr || binding.literal || '').trim();
++        if (expr.startsWith('(') && expr.endsWith(')'))
++            expr = expr.slice(1, -1).trim();
++        const parts = expr.replace(/\[(\d+)\]/g, '.$1').split('.');
++        if (!identifier.test(parts[0]) || !parts.slice(1).every((part) => identifier.test(part) || /^\d+$/.test(part)))
++            continue;
++        let path = names.get(parts[0]);
++        for (const part of parts.slice(1))
++            path = member(path, part);
++        if (Array.isArray(path) && path.length) {
++            const { kind, attr, selector } = marker;
++            rows.push({ marker: { kind, attr, selector }, path });
++        }
++    }
++    return rows;
++}
+diff --git a/dist/server-runtime/ssr-bindings.js b/dist/server-runtime/ssr-bindings.js
+index 816716a98b42416a0ac8632aa05506d35198efae..d06b0060a7fd7a73818d212e7283f5e6a84a9063 100644
+--- a/dist/server-runtime/ssr-bindings.js
++++ b/dist/server-runtime/ssr-bindings.js
+@@ -41,7 +41,8 @@ function applyMarker(html, marker, value) {
+         if (!/^[A-Za-z_:][\w:.-]*$/.test(attr) || /^on/i.test(attr))
+             throw new Error('[Zenith:SSR] Invalid compiler attribute marker.');
+         const pattern = new RegExp(`\\s${escapeRegex(attr)}(?:\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]+))?(?=\\s|$)`, 'gi');
+-        let next = attrs.replace(pattern, '');
++        const closing = /\/\s*$/.test(attrs) ? ' /' : '';
++        let next = attrs.replace(/\/\s*$/, '').replace(pattern, '');
+         if (BOOLEAN_ATTRIBUTES.has(attr)) {
+             if (value)
+                 next += ` ${attr}`;
+@@ -49,7 +50,7 @@ function applyMarker(html, marker, value) {
+         else if (value != null && value !== false && value !== '') {
+             next += ` ${attr}="${escapeHtml(value)}"`;
+         }
+-        return `<${tagName}${next}>`;
++        return `<${tagName}${next}${closing}>`;
+     });
+ }
+ export async function materializeSsrBindings({ html, planPath, routePath, payload, params = {} }) {
+@@ -63,8 +64,20 @@ export async function materializeSsrBindings({ html, planPath, routePath, payloa
+         throw error;
+     }
+     const routeData = payload?.route && payload?.scoped ? payload.route : payload;
+-    for (const { marker, expression, scopedDataKey } of plans[routePath] || []) {
++    for (const { marker, expression, scopedDataKey, path } of plans[routePath] || []) {
+         const data = scopedDataKey ? payload?.scoped?.[scopedDataKey] || {} : routeData;
++        if (path) {
++            let value = data;
++            for (const key of path) {
++                value = value != null && Object.hasOwn(value, key) ? value[key] : undefined;
++            }
++            if (typeof value !== 'string' && typeof value !== 'number')
++                continue;
++            if (marker.attr === 'href' && !/^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|[?#])/i.test(String(value).trim()))
++                continue;
++            html = applyMarker(html, marker, value);
++            continue;
++        }
+         // Only compiler-authored expressions become code. Request values remain
+         // function arguments, exactly as in the client expression evaluator.
+         const evaluate = new Function('data', 'ssr', 'ssr_data', 'params', '__ctx', `"use strict"; return (${expression});`);

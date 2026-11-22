@@ -1,4 +1,4 @@
-import { discoverLocalDocumentationEntries } from "./localDocumentationSource";
+import { publishedDocumentation } from "./publishedSources";
 import {
   collectDocumentationTags,
   compareDocumentationEntries,
@@ -124,5 +124,5 @@ export async function loadDocumentationDetailFromLookup(
 }
 
 async function loadLocalDocumentationEntries(): Promise<DocumentationDetail[]> {
-  return (await discoverLocalDocumentationEntries()).sort(compareDocumentationEntries);
+  return [...await publishedDocumentation()].sort(compareDocumentationEntries);
 }

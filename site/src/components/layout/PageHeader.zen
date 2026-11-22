@@ -13,8 +13,8 @@ export interface Props {
 
 const incoming = props as Props;
 const pageHeaderEyebrow = incoming.eyebrow || "Zenith";
-const pageHeaderTitle = incoming.title || "Zenith";
-const pageHeaderDescription = incoming.description || "";
+const pageHeaderTitle = incoming.title;
+const pageHeaderDescription = incoming.description;
 const pageHeaderAsideLabel = incoming.asideLabel || "";
 const pageHeaderAsideText = incoming.asideText || "";
 const pageHeaderRootRef = ref<HTMLElement>();

@@ -47,9 +47,9 @@ function perfTabKeys(event: KeyboardEvent) {
 
 <DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/performance">
   <div data-v1-performance="true" class="bg-background pt-16 text-foreground md:pt-[73px]">
-    <header class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 pb-8 pt-10 md:px-10 md:pb-10 md:pt-16 lg:px-20">
+    <header class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 pb-8 pt-10 md:px-10 md:pb-10 md:pt-20 lg:px-20">
       <p class="v1-eyebrow">Performance</p>
-      <h1 class="font-heading text-[44px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[64px] md:leading-[64px]">Performance</h1>
+      <h1 class="font-heading text-[48px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[clamp(4rem,7.23vw,6.5rem)] md:leading-[0.9231]">Performance</h1>
       <p class="text-[18px] leading-7 text-muted-foreground md:text-[20px] md:leading-[30px]">Measuring starts at launch. This page stays blank until the first PageSpeed run.</p>
     </header>
     <div class="mx-auto flex w-full max-w-[1440px] flex-col items-start gap-4 px-4 pb-20 md:px-10 md:pb-28 lg:px-20">

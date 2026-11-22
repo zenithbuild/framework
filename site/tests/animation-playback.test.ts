@@ -151,15 +151,13 @@ describe("route transition playback", () => {
   }, 660_000);
 });
 
-describe("v1 home without a preloader", () => {
-  // Build gate 3 (handoff §6): no preloader on Home. The intro label phases never run, so the old
-  // label-flash regression cannot occur; this asserts the replacement contract instead.
-  test("never enters the branded intro phases and shows the hero H1 immediately", async () => {
+describe("reduced-motion home entry", () => {
+  test("shows the hero and skips the animated sequence", async () => {
     const { chromium } = await import("playwright");
     const server = await startDevServer();
     try {
       const browser = await chromium.launch({ headless: true });
-      const page = await browser.newPage();
+      const page = await browser.newPage({ reducedMotion: "reduce" });
       const errors: string[] = [];
       page.on("pageerror", (err) => errors.push(err.message));
       await page.addInitScript(() => {

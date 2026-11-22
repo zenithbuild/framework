@@ -34,7 +34,7 @@ const compilerEditHref = "https://github.com/zenithbuild/framework/blob/master/s
         </ol>
         <span class="rounded-full bg-brand-blue-soft px-[10px] py-[2px] font-mono text-[12px] uppercase leading-[18px] tracking-[0.16em] text-foreground">Stage 2 of 4<span class="sr-only"> Compiler</span></span>
       </nav>
-      <h1 class="font-heading text-[44px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[64px] md:leading-[64px]">Compiler</h1>
+      <h1 class="font-heading text-[48px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[clamp(4rem,7.23vw,6.5rem)] md:leading-[0.9231]">Compiler</h1>
 
       <figure id="before-and-after" aria-label="Before and after output" data-hero-state="compiled" class="v1-code-panel grid min-w-0 grid-cols-1 scroll-mt-28 overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div class="min-w-0 overflow-x-auto px-4 py-4 md:px-5 md:py-[18px]"><HeroSourceCode /></div>

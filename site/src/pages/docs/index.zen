@@ -9,6 +9,7 @@ export const load = async (ctx) => {
   if (!firstArticle) return ctx.deny(404);
   return ctx.data({
     pageTitle: "Documentation",
+    heading: "The public contract, close to the code.",
     pageDescription: "Start with Zenith, learn the .zen component model, and follow the canonical routing, reactivity, DOM, and deployment contracts.",
     metadata: createPageMetadata("/docs"),
     firstArticlePath: firstArticle.path,
@@ -40,7 +41,7 @@ const docsDeliveryRef = ref<HTMLElement>();
   <div ref={docsRootRef} data-page-shell="docs" class="bg-background text-foreground">
     <PageHeader
       eyebrow="Zenith documentation"
-      title="The public contract, close to the code."
+      title={data.heading}
       description="Learn the compiler-owned component model, explicit reactive primitives, server route boundaries, and the tooling that keeps authored intent traceable."
       asideLabel="Current train"
       asideText="These demo docs follow the repository’s canonical Zenith agent, DOM, routing, and Tailwind contracts for the 0.8 package line."

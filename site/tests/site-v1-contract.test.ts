@@ -147,6 +147,6 @@ describe("v1 Docs article", () => {
     expect(article).toContain('aria-controls="docs-sections"');
     expect(article).toContain("Edit this page on GitHub");
     expect(article).toContain('data-docs-next-step="true"');
-    expect(read("src/server/documentationViewModel.ts")).toContain("https://github.com/zenithbuild/framework/blob/master/");
+    expect(read("src/server/documentationViewModel.ts")).toContain("https://github.com/zenithbuild/framework/blob/integration/v1/");
   });
 });

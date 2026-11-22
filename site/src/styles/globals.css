@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 @import "./docs.css";
 @import "./site-v1.css";
 @import "./site-v1-components.css";
@@ -98,9 +99,9 @@
   --orb-glow: #e9d2ff;
 
   /* Fonts */
-  --zen-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --zen-font-sans: "Roboto", Arial, sans-serif;
   --zen-font-heading: "Bricolage Grotesque", system-ui, sans-serif;
-  --zen-font-display: "Rajdhani", "Bricolage Grotesque", sans-serif;
+  --zen-font-display: "Bricolage Grotesque", system-ui, sans-serif;
   --zen-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
@@ -488,3 +489,9 @@
   }
 
 }
+
+:where(.font-heading, .font-display, .v1-h2, .v1-h3) {
+  font-optical-sizing: none;
+  font-variation-settings: "opsz" 14, "wdth" 100;
+}
+html.dark { color-scheme: dark; }

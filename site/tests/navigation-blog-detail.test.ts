@@ -38,7 +38,8 @@ describe("shared navigation interaction contract", () => {
     expect(navigation).toContain('aria-controls="mobile-navigation"');
     expect(navigation).toContain('aria-expanded={mobileOpen ? "true" : "false"}');
     expect(navigation).toContain("mobileNavigationTriggerRef.current?.focus()");
-    expect(navigation).toContain("href={navPerformanceLink.href}");
+    expect(navigation).toContain('href="/performance" data-zen-link="true"');
+    expect(navigation).toContain('on:click={closeMobileMenu}');
     expect(navigation).not.toContain("NavDropdown");
     expect(navigation).not.toContain("on:pointerleave");
   });
@@ -91,8 +92,8 @@ describe("Blog detail reader contract", () => {
     expect(toc).toContain("getBoundingClientRect().top");
     expect(article).toContain("lg:sticky lg:top-24");
     expect(article).toContain('data-reader-article-end="blog"');
-    expect(article).toContain("image ? undefined : \"display: none;\"");
-    expect(article).toContain("post.readingTime ? undefined : \"display: none;\"");
+    expect(article).toContain("image ? undefined : \"display:none\"");
+    expect(article).toContain("blogArticleReadingTime ? undefined : \"display:none\"");
     expect(toc).not.toContain("querySelector");
     expect(toc).not.toContain("addEventListener");
     expect(toc).toContain('zenOn(win, "scroll"');

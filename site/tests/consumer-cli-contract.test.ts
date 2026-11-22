@@ -14,8 +14,8 @@ const sitePackage = JSON.parse(
 
 describe("site consumer CLI contract", () => {
   test("normal framework commands resolve through the installed Zenith CLI", () => {
-    expect(sitePackage.scripts?.dev).toBe("zenith dev");
-    expect(sitePackage.scripts?.build).toBe("zenith build");
+    expect(sitePackage.scripts?.dev).toMatch(/(?:^|&& )zenith dev$/);
+    expect(sitePackage.scripts?.build).toMatch(/(?:^|&& )zenith build(?:$| &&)/);
     expect(sitePackage.scripts?.preview).toBe("zenith preview");
 
     const scripts = Object.values(sitePackage.scripts || {}).join("\n");

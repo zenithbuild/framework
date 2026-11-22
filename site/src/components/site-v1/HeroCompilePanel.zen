@@ -25,6 +25,8 @@ const hpErrorPathRef = ref<SVGPathElement>(); const hpErrorMarkRef = ref<SVGText
 
 state heroState = "compiled";
 state heroTab = "source";
+state heroSourceExpanded = false;
+function toggleSourceLines() { heroSourceExpanded = !heroSourceExpanded; }
 state heroLiveText = "";
 
 function hpEmit(name: string, detail: Record<string, unknown>) {
@@ -99,8 +101,8 @@ zenMount((ctx) => {
 });
 </script>
 
-<div ref={hpPanelRef} data-hero-panel="true" data-hero-state={heroState} data-hero-tab={heroTab} class="hero-panel w-full min-w-0 overflow-hidden rounded-lg bg-code-bg text-code-fg">
-  <p data-hero-caption="true" class="hero-panel-caption truncate px-5 text-sm font-medium leading-[50px]">Compile each page into HTML and tables.</p>
+<div ref={hpPanelRef} data-hero-panel="true" data-hero-state={heroState} data-hero-tab={heroTab} data-source-expanded={heroSourceExpanded ? "true" : "false"} class="hero-panel w-full min-w-0 overflow-hidden rounded-lg bg-code-bg text-code-fg">
+  <p data-hero-caption="true" class="hero-panel-caption truncate px-5 text-sm font-medium leading-[48px]">Compile each page into HTML and tables.</p>
 
   <div class="hero-panel-tabs flex border-b border-code-border px-2" role="tablist" aria-label="Compile example">
     <button ref={hpTabSourceRef} id="hero-tab-source" type="button" role="tab" aria-controls="hero-panel-source" aria-selected={heroTab === "source" ? "true" : "false"} tabindex={heroTab === "source" ? "0" : "-1"} class="hero-tab" on:click={() => hpSelectTab("source")} on:keydown={(event) => hpTabKeys(event, "source")}>Source</button>
@@ -136,6 +138,7 @@ zenMount((ctx) => {
     <p data-hero-legend-error="true" data-hero-fail-only="true" class="flex items-center gap-[6px] text-code-error"><span aria-hidden="true" class="hero-legend-pin border-code-error">2</span><span>{'on:click="doThing"'}</span><span class="font-sans text-[13px]">→</span><span>ZEN-EVT-STRING-HANDLER</span></p>
   </div>
 
+  <button type="button" data-expand-source="true" aria-controls="hero-panel-source" aria-expanded={heroSourceExpanded ? "true" : "false"} class="hero-expand-source v1-focus font-sans text-sm font-medium text-code-fg" on:click={toggleSourceLines}>{heroSourceExpanded ? "Show fewer lines" : "Show all 12 lines"}</button>
   <div data-hero-controls="true" class="hero-panel-controls flex items-center gap-2">
     <button ref={hpTriggerRef} type="button" data-hero-trigger="true" aria-disabled={heroState === "failed" ? "true" : "false"} class="hero-control hero-trigger" on:click={hpPressTrigger}><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-error"></span>Show the string-handler error</button>
     <button type="button" data-hero-reset="true" aria-disabled={heroState === "failed" ? "false" : "true"} class="hero-control hero-reset" on:click={hpPressReset}>Reset</button>

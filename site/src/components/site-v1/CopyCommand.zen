@@ -48,7 +48,7 @@ function resetCopyStatus() {
   <span aria-hidden="true" class="copy-reset-clock" data-copy-clock={copyStatus} on:animationend={resetCopyStatus}></span>
   <div class="flex w-full min-w-0 items-center gap-[10px] md:gap-[14px]">
     <span aria-hidden="true" class="copy-num">{copyStep}</span>
-    <div class="copy-box flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-full border border-border-strong bg-card py-1.5 pl-5 pr-1.5">
+    <div class="copy-box flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-full border border-border-strong bg-card pl-5 pr-1.5">
       <code class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-[13px] leading-[18px] text-foreground md:text-sm md:leading-6">
         <span aria-hidden="true" class="copy-dollar text-muted-foreground">$</span>
         <span data-copy-text="true" class="truncate">{copyCommandText}</span>
@@ -57,7 +57,7 @@ function resetCopyStatus() {
         type="button"
         data-copy-trigger="true"
         aria-label={copyVariant === "step" ? "Copy command" : undefined}
-        class="copy-button relative inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border-strong bg-secondary px-3.5 py-[7px] text-sm font-medium leading-[18px] text-secondary-foreground transition-colors hover:bg-primary-hover-bg hover:text-primary-hover-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        class="copy-button relative inline-flex min-h-[34px] min-w-11 after:absolute after:inset-x-0 after:-inset-y-[5px] shrink-0 items-center justify-center gap-2 rounded-full border border-border-strong bg-secondary px-3.5 py-[7px] text-sm font-medium leading-[18px] text-secondary-foreground transition-colors hover:bg-primary-hover-bg hover:text-primary-hover-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         on:click={copyCommand}
       >
         <span data-copy-label="true" class="copy-label"><span class="copy-when-idle">Copy</span><span class="copy-when-copied text-success">Copied</span></span>

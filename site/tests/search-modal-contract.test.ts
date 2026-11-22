@@ -43,8 +43,8 @@ describe("SearchModal component contract", () => {
     expect(modalSource.includes("zenDocument")).toBe(true);
   });
 
-  test("uses zenWindow for window access", () => {
-    expect(modalSource.includes("zenWindow")).toBe(true);
+  test("uses the window shortcut in the search trigger", () => {
+    expect(triggerSource.includes("zenWindow")).toBe(true);
   });
 
   test("does not use querySelector in script", () => {
@@ -80,8 +80,9 @@ describe("SearchModal component contract", () => {
     expect(modalSource.includes("data-search-empty-state")).toBe(true);
   });
 
-  test("has preview pane", () => {
-    expect(modalSource.includes("data-search-preview")).toBe(true);
+  test("keeps results in a single list", () => {
+    expect(modalSource).toContain('role="listbox"');
+    expect(modalSource).not.toContain("data-search-preview");
   });
 
   test("has results list", () => {
@@ -113,7 +114,7 @@ describe("SearchModal component contract", () => {
     expect(modalSource.includes("on:click")).toBe(true);
     expect(modalSource.includes("on:input")).toBe(true);
     expect(modalSource.includes("on:keydown")).toBe(true);
-    expect(modalSource.includes("on:pointerenter")).toBe(true);
+    expect(modalSource.includes("on:pointermove")).toBe(true);
   });
 
   test("uses Tailwind tokens (no raw hex colors)", () => {
@@ -130,8 +131,9 @@ describe("SearchModal component contract", () => {
     expect(modalSource.includes('"blog"')).toBe(true);
   });
 
-  test("mobile responsive (hidden sm:block for preview pane)", () => {
-    expect(modalSource.includes("sm:block")).toBe(true);
+  test("fills the mobile viewport and caps the desktop panel", () => {
+    expect(modalSource).toContain("h-dvh w-full");
+    expect(modalSource).toContain("md:max-w-[720px]");
   });
 
   test("file is under 500 lines", () => {
@@ -203,26 +205,14 @@ describe("Search integration into pages", () => {
     expect(navSource.includes('scope="global"')).toBe(true);
   });
 
-  test("DefaultLayout renders SearchModal", () => {
-    expect(layoutSource.includes("SearchModal")).toBe(true);
-    expect(layoutSource.includes("searchIndex")).toBe(true);
-  });
-
-  test("Home page passes searchIndex to layout", () => {
-    expect(homeSource.includes("searchIndex")).toBe(true);
-    expect(homeSource.includes("loadSearchIndex")).toBe(true);
-  });
-
-  test("Blog index page passes searchIndex and has blog-scoped trigger", () => {
-    expect(blogIndexSource.includes("searchIndex")).toBe(true);
-    expect(blogIndexSource.includes("loadSearchIndex")).toBe(true);
-    expect(blogIndexSource.includes('scope="blog"')).toBe(true);
-  });
-
-  test("Docs index page passes searchIndex and has docs-scoped trigger", () => {
-    expect(docsIndexSource.includes("searchIndex")).toBe(true);
-    expect(docsIndexSource.includes("loadSearchIndex")).toBe(true);
-    expect(docsIndexSource.includes('scope="docs"')).toBe(true);
+  test("opens shared search and retrieves the published index on demand", () => {
+    expect(layoutSource).toContain("<SearchModal />");
+    expect(modalSource).toContain("void loadModalRecords()");
+    expect(readSource("src/components/search/fetchSearchIndex.ts")).toContain('fetch("/search-index.json"');
+    for (const page of [homeSource, blogIndexSource, docsIndexSource]) {
+      expect(page).not.toContain("loadSearchIndex");
+      expect(page).not.toContain("<SearchTrigger");
+    }
   });
 });
 
@@ -301,8 +291,8 @@ describe("SearchModal runtime binding regression", () => {
   test("filter controls use conditional rendering and real option markup", () => {
     const scriptEnd = modalSource.indexOf("</script>");
     const markup = modalSource.slice(scriptEnd);
-    expect(markup.includes('modalScope === "docs" && modalDocsFilters')).toBe(true);
-    expect(markup.includes('modalScope === "blog" && modalBlogFilters')).toBe(true);
+    expect(markup.includes('modalScope === "docs" && modalPayload?.docsFilters')).toBe(true);
+    expect(markup.includes('modalScope === "blog" && modalPayload?.blogFilters')).toBe(true);
     expect(markup.includes('modalFilterSection !== "All"')).toBe(true);
     expect(markup.includes('data-filter-trigger="section"')).toBe(true);
     expect(markup.includes('data-filter-name="section"')).toBe(true);

@@ -19,10 +19,10 @@ import Icon from "@/components/site-v1/Icon.zen";
 
 <DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/showcase">
   <div data-v1-showcase="true" class="bg-background pt-16 text-foreground md:pt-[73px]">
-    <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-4 pb-20 pt-10 md:px-10 md:pb-28 md:pt-16 lg:px-20">
+    <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-4 pb-20 pt-10 md:px-10 md:pb-28 md:pt-20 lg:px-20">
       <header class="flex flex-col gap-4">
         <p class="v1-eyebrow">Showcase</p>
-        <h1 class="font-heading text-[44px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[64px] md:leading-[64px]">Showcase</h1>
+        <h1 class="font-heading text-[48px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[clamp(4rem,7.23vw,6.5rem)] md:leading-[0.9231]">Showcase</h1>
       </header>
       <section aria-labelledby="showcase-empty-title" class="flex w-full flex-col items-start gap-4">
         <h2 id="showcase-empty-title" class="font-heading text-[24px] font-semibold leading-7">No showcase projects are listed yet.</h2>

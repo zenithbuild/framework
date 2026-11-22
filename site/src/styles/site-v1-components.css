@@ -12,14 +12,14 @@
   }
   .v1-h2 {
     font-family: var(--zen-font-heading);
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 600;
-    line-height: 36px;
+    line-height: 32px;
     letter-spacing: -0.01em;
     color: var(--foreground);
   }
   @media (min-width: 768px) {
-    .v1-h2 { font-size: 48px; line-height: 52px; letter-spacing: -0.02em; }
+    .v1-h2 { font-size: 40px; line-height: 44px; }
   }
   .v1-h3 {
     font-family: var(--zen-font-heading);

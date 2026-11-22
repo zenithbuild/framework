@@ -26,7 +26,7 @@ const homeCopyLiveRef = ref<HTMLElement>();
 </script>
 
 <DefaultLayout title={data.page.title} description={data.page.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/" introEnabled={true}>
-    <div data-home-content-shell="true" data-v1-home="true" class="relative bg-background pt-16 text-foreground md:pt-[73px]">
+    <div data-home-content-shell="true" data-v1-home="true" class="relative bg-background pt-[65px] text-foreground md:pt-[73px]">
         <HomeHero copyLiveRef={homeCopyLiveRef} />
         <PipelineSection />
         <WhyZenithSection />

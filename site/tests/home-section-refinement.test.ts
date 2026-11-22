@@ -27,7 +27,7 @@ describe("Home section refinement", () => {
     }
     expect(indexSource.includes("<AboutSection />")).toBe(false);
     expect(indexSource.includes("<PrecisionRail />")).toBe(false);
-    expect(indexSource.includes("introEnabled={false}")).toBe(true);
+    expect(indexSource.includes("introEnabled={true}")).toBe(true);
     expect(indexSource.includes('data-zenith-intro-state="pending"')).toBe(false);
   });
 

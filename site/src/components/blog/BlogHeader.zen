@@ -7,8 +7,8 @@ export interface Props {
 }
 
 const incoming = props as Props;
-const blogHeaderTitle = incoming.title || "Notes from the framework.";
-const blogHeaderDescription = incoming.description || "";
+const blogHeaderTitle = incoming.title;
+const blogHeaderDescription = incoming.description;
 </script>
 
 <header data-blog-header="true" class="bg-background pt-16 text-foreground md:pt-[73px]">

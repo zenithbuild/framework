@@ -16,9 +16,10 @@ describe("site link policy", () => {
       "/",
       "/about",
       "/blog",
-      "/blog/building-zenith-0-8",
+      "/performance",
+      "/how-it-works/compiler",
+      "/showcase",
       "/docs",
-      "/docs/getting-started",
     ]);
   });
 
@@ -51,6 +52,9 @@ describe("site link policy", () => {
     expect(isProvenSoftNavRouteEntry("/about")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/blog")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/changelog")).toBe(false);
+    expect(isProvenSoftNavRouteEntry("/docs/contracts/ir-envelope")).toBe(true);
+    expect(isProvenSoftNavRouteEntry("/blog/tooling-that-answers-to-the-compiler")).toBe(true);
+    expect(isProvenSoftNavRouteEntry("/blog/rss.xml")).toBe(false);
     expect(isProvenSoftNavRouteEntry("/docs")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/docs/getting-started")).toBe(true);
     expect(isProvenSoftNavRouteEntry("/about#routing")).toBe(false);

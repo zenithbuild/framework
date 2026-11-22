@@ -93,19 +93,14 @@ describe("Blog landing browse model", () => {
     expect(describeBlogArchiveFilters("Routing", "Security")).toBe("Routing · Security");
   });
 
-  test("keeps the landing surface semantic and search explicitly presentation-only", () => {
-    const surface = readFileSync(resolve(import.meta.dir, "../src/components/BlogLanding.zen"), "utf8");
-    const header = readFileSync(resolve(import.meta.dir, "../src/components/blog/BlogHeader.zen"), "utf8");
-    const archive = readFileSync(resolve(import.meta.dir, "../src/components/blog/BlogArchiveBrowser.zen"), "utf8");
-
-    expect((header.match(/<h1[\s>]/g) || [])).toHaveLength(1);
-    expect(surface).toContain("posts={browseModel.articles}");
-    expect(archive).toContain("blogArchiveRenderRows");
-    expect(archive).toContain('data-blog-search="presentation-only"');
-    expect(archive).toContain('placeholder="Search articles"');
-    expect(archive).toContain("readonly");
-    expect(archive).toContain('data-blog-filter-trigger="category"');
-    expect(archive).toContain('data-blog-filter-trigger="tag"');
-    expect(archive).toContain('state blogArchiveSelectedCategory = "All"');
+  test("renders the archive with category controls and shared site search", () => {
+    const read = (file: string) => readFileSync(resolve(import.meta.dir, "../src/components", file), "utf8");
+    expect((read("blog/BlogHeader.zen").match(/<h1[\s>]/g) || [])).toHaveLength(1);
+    expect(read("BlogLanding.zen")).toContain("posts={browseModel.articles}");
+    const archive = read("blog/BlogArchiveBrowser.zen");
+    expect(archive).toContain("renderArchiveRows(category, tag)");
+    expect(archive).toContain("on:click={chooseCategory}");
+    expect(archive).not.toContain("readonly");
+    expect(read("blog/blogArchiveMarkup.ts")).toContain("aria-pressed=");
   });
 });
