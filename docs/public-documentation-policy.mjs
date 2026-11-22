@@ -14,7 +14,7 @@ export const PUBLIC_DOCUMENTATION_SECTIONS = Object.freeze([
   { title: "Server and Data", slug: "server-and-data", order: 4, description: "Load data, protect routes, and keep server execution as the security boundary." },
   { title: "Styling and UI", slug: "styling-and-ui", order: 5, description: "Use Tailwind, public assets, presence, and accessible interface patterns." },
   { title: "Build and Tooling", slug: "build-and-tooling", order: 6, description: "Work with the CLI, compiler, bundler, configuration, diagnostics, and editor tools." },
-  { title: "Deployment", slug: "deployment", order: 7, description: "Choose and verify the supported production output and adapter targets." },
+  { title: "Deployment", slug: "deployment", order: 7, description: "Choose production output for a static site, a Node server, or a built-in serverless layout, and read each target's verification status." },
   { title: "Advanced", slug: "advanced", order: 8, description: "Study framework boundaries, extension policy, security gates, and advanced patterns." },
 ]);
 
