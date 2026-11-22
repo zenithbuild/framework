@@ -40,10 +40,11 @@ export async function writeResourceRouteManifest(staticDir, routeManifest, baseP
     return routes;
 }
 
-export async function loadResourceRouteManifest(distDir, fallbackBasePath = '/') {
+export async function loadResourceRouteManifest(distDir, fallbackBasePath = '/', strict = false) {
     const manifestPath = join(distDir, 'assets', 'resource-manifest.json');
     try {
         const parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
+        if (strict && !Array.isArray(parsed?.routes)) throw new Error('Invalid resource route manifest');
         return {
             basePath: typeof parsed?.base_path === 'string' ? parsed.base_path : fallbackBasePath,
             routes: (Array.isArray(parsed?.routes) ? parsed.routes : [])
@@ -51,7 +52,8 @@ export async function loadResourceRouteManifest(distDir, fallbackBasePath = '/')
                 .filter(Boolean)
                 .sort((left, right) => compareRouteSpecificity(left.path, right.path))
         };
-    } catch {
+    } catch (error) {
+        if (strict) throw error;
         return {
             basePath: fallbackBasePath,
             routes: []

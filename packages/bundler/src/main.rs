@@ -459,3 +459,5 @@ fn run() -> Result<(), String> {
 
 #[cfg(test)]
 mod bundler_main_tests;
+#[cfg(test)]
+mod bundler_source_policy_tests;

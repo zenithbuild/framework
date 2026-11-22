@@ -1,7 +1,7 @@
 import { createPreviewServer } from '../dist/preview.js';
 import { build } from '../dist/build.js';
 import { jest } from '@jest/globals';
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createTestProject, httpGet, localOrigin } from './helpers/dev-server-fixtures.js';
 
@@ -32,6 +32,20 @@ describe('Preview static routing', () => {
         expect(res.body).toContain('<!DOCTYPE html>');
         // Preview should NOT inject HMR
         expect(res.body).not.toContain('__zenith_hmr');
+    });
+
+    test('a copied client-only directory cannot preview routes that need server metadata', async () => {
+        project = await createTestProject(['index.zen']);
+        const copy = join(project.root, 'copied-output');
+        await mkdir(join(copy, 'assets'), { recursive: true });
+        await writeFile(join(copy, 'index.html'), '<main>Route content</main>');
+        await writeFile(join(copy, 'assets', 'resource-manifest.json'), JSON.stringify({
+            base_path: '/', requires_server_metadata: true, routes: []
+        }));
+        preview = await createPreviewServer({ distDir: copy, projectRoot: project.root, port: 0 });
+        const response = await httpGet(localOrigin(preview.port) + '/');
+        expect(response.status).toBe(503);
+        expect(response.body).not.toContain('Route content');
     });
 
     test('returns 404 for missing files', async () => {

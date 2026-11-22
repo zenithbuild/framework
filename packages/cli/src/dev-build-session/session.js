@@ -1,5 +1,6 @@
 import { prepareProjectImages } from '../project-images.js';
-import { resolve } from 'node:path';
+import { rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import { buildComponentRegistry } from '../resolve-components.js';
 import { normalizeBasePath } from '../base-path.js';
@@ -128,11 +129,17 @@ export function createDevBuildSession(options) {
     ) {
         const orderedEnvelopes = bundlerOptions.envelopesOverride
             || orderEnvelopes(pageManifestEntries(), resolvedPagesDir, state.envelopeByFile);
-        if (!orderedEnvelopes || orderedEnvelopes.length === 0) {
+        if (!orderedEnvelopes) {
             throw new Error('Dev rebuild cache is incomplete; full rebuild required.');
         }
 
         await clearPublicAssetOutputs(startupProfile);
+        if (orderedEnvelopes.length === 0) {
+            // Resource-only projects have no page bundle. Discard metadata from a previous page build.
+            await rm(join(outDir, 'assets', 'router-manifest.json'), { force: true });
+            await writeSsrBindingPlans(outDir, []);
+            return { assets: await collectAssets(outDir), envelopeCount: 0 };
+        }
 
         await startupProfile.measureAsync(
             'run_bundler',
