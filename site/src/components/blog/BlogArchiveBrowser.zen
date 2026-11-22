@@ -27,13 +27,13 @@ function readFilters() {
   tag = tags.find((value) => value.toLowerCase() === (params.get("tag") || "").toLowerCase()) || "All";
 }
 
-function chooseCategory(event: MouseEvent) {
-  const button = (event.target as Element | null)?.closest("button[data-category]");
-  if (!button) return;
-  category = button.getAttribute("data-category") || "All";
-  tag = "All";
+function chooseCategory(event: SubmitEvent) {
+  const next = event.submitter?.getAttribute("data-category");
   const win = zenWindow();
-  if (!win) return;
+  if (!win || !next) return;
+  event.preventDefault();
+  category = next;
+  tag = "All";
   const url = new URL(win.location.href);
   if (category === "All") url.searchParams.delete("category");
   else url.searchParams.set("category", category);
@@ -52,7 +52,7 @@ zenMount((ctx) => {
 <section data-blog-archive="true" aria-labelledby="all-articles" class="mx-auto w-full max-w-[1440px] px-4 pb-16 pt-12 md:px-10 md:pb-24 md:pt-[72px] lg:px-20">
   <h2 id="all-articles" class="font-heading text-[32px] font-semibold leading-10 tracking-tight">All articles</h2>
   <div class="mt-5 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
-    <div aria-label="Filter by category" role="group" class="flex flex-wrap gap-2" on:click={chooseCategory} unsafeHTML={renderCategoryPills(category)}></div>
+    <form action="/blog" method="get" aria-label="Filter by category" role="group" class="flex flex-wrap gap-2" on:submit={chooseCategory} unsafeHTML={renderCategoryPills(category)}></form>
     <p data-blog-result-count="true" aria-live="polite" class="font-mono text-xs text-muted-foreground">{articleCount(category, tag)} {articleCount(category, tag) === 1 ? "article" : "articles"}</p>
   </div>
   <div data-blog-results="true" unsafeHTML={renderArchiveRows(category, tag)}></div>

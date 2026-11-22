@@ -99,7 +99,8 @@ describe("Blog landing browse model", () => {
     expect(read("BlogLanding.zen")).toContain("posts={browseModel.articles}");
     const archive = read("blog/BlogArchiveBrowser.zen");
     expect(archive).toContain("renderArchiveRows(category, tag)");
-    expect(archive).toContain("on:click={chooseCategory}");
+    expect(archive).toContain('<form action="/blog" method="get"');
+    expect(archive).toContain("on:submit={chooseCategory}");
     expect(archive).not.toContain("readonly");
     expect(read("blog/blogArchiveMarkup.ts")).toContain("aria-pressed=");
   });

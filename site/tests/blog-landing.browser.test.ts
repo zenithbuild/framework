@@ -20,7 +20,10 @@ describe("Blog landing page", () => {
       const first = await page.locator("[data-blog-featured], [data-blog-archive]").first().getAttribute("data-blog-featured");
       expect(first).not.toBeNull();
       const filters = page.getByRole("group", { name: "Filter by category" });
+      expect(await filters.getAttribute("action")).toBe("/blog");
+      expect(await filters.getByRole("button", { name: "All", exact: true }).getAttribute("name")).toBeNull();
       for (const label of ["Framework", "Routing"]) {
+        expect(await filters.getByRole("button", { name: label, exact: true }).getAttribute("value")).toBe(label);
         await filters.getByRole("button", { name: label, exact: true }).click();
         await page.waitForURL((url) => url.searchParams.get("category") === label);
         await page.waitForFunction(() => document.querySelectorAll("[data-blog-article-row]").length === 1);
@@ -40,6 +43,15 @@ describe("Blog landing page", () => {
       await filters.getByRole("button", { name: "All", exact: true }).click();
       await page.waitForFunction(() => document.querySelectorAll("[data-blog-article-row]").length === 4);
       expect(new URL(page.url()).searchParams.has("category")).toBe(false);
+
+      // Exercise the browser's form action before a restored page can handle submissions.
+      await page.evaluate(() => {
+        window.addEventListener("submit", (event) => event.stopImmediatePropagation(), { capture: true, once: true });
+      });
+      await filters.getByRole("button", { name: "Routing", exact: true }).click();
+      await page.waitForURL((url) => url.searchParams.get("category") === "Routing");
+      await filters.getByRole("button", { name: "Routing", pressed: true, exact: true }).waitFor();
+      expect(await rows.count()).toBe(1);
       expect(errors).toEqual([]);
     } finally {
       await browser.close();

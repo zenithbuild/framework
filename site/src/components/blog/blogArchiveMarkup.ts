@@ -23,7 +23,9 @@ export function archiveCategories(categories: string[], current: string): string
   return categories.map((label) => {
     const active = label === current;
     const color = active ? "bg-foreground text-background" : "border border-border-strong bg-background text-foreground";
-    return `<button type="button" class="v1-button px-4 ${color}" data-category="${escapeHtml(label)}" aria-pressed="${active}">${escapeHtml(label)}</button>`;
+    const safeLabel = escapeHtml(label);
+    const field = label === "All" ? "" : ` name="category" value="${safeLabel}"`;
+    return `<button type="submit"${field} class="v1-button px-4 ${color}" data-category="${safeLabel}" aria-pressed="${active}">${safeLabel}</button>`;
   }).join("");
 }
 
