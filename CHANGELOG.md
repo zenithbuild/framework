@@ -10,11 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Verify the release tag before the CI matrix starts and use its commit throughout npm publishing and recovery.
+- Check the release tag before CI and use the verified commit throughout npm publishing and recovery. Verify all 15 package dist-tags together and retry only those awaiting propagation.
+- Document which hosted targets have passed adapter conformance tests and check the supported target list against the CLI (JUD-97, JUD-98).
 - Extract `_coerceText` and `_createContextualFragment` into `packages/runtime/src/render-utils.js` so `render.js` and `fragment-patch.js` no longer import each other. `render.js` and `hydrate.js` keep the same exports, and the concatenated runtime template still contains each helper once (JUD-11).
 
 ### Fixed
 
+- Remove leftover route debug logging and a stray debug script from the CLI package (JUD-91, JUD-92).
+- Update the deepmerge, glob and minimatch resolutions used by the release workspace (#247).
+- Restore frozen Bun installs and use supported macOS ARM and Linux runners for package and browser checks (#252, #261).
 - Emit each shared imported CSS module once across routes, preserving scoped styles and a later route's base-before-override order when the routes agree. When two routes import the same files in opposite orders, the earlier route wins and the build warns with the routes and files involved (JUD-128).
 
 ## [0.9.0-rc.0] - TBD
