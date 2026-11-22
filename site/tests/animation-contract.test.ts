@@ -10,6 +10,7 @@ function readSource(path: string) {
 }
 
 const introSource = readSource("src/components/IntroLoader.zen");
+const artworkSource = readSource("src/components/transition/transitionArtwork.ts");
 const heroSource = readSource("src/components/Hero.zen");
 const motionSource = readSource("src/components/motion/MotionController.zen");
 const navigationSource = readSource("src/components/ui/Navigation.zen");
@@ -19,42 +20,26 @@ const transitionTimingSource = readSource("src/components/transition/transitionT
 const transitionSource = readSource("src/components/route-transition/RouteTransition.zen");
 
 describe("Zenith animation contract", () => {
-  test("reveals the real mark through a stable clipping mask without 3D rotation on the logo", () => {
-    expect(introSource.includes('data-intro-logo-mask="true"')).toBe(true);
-    expect(introSource.includes("clipPath")).toBe(true);
-    expect(introSource.includes("inset(0 100% 0 0)")).toBe(true);
-    expect(introSource.includes("inset(0 0% 0 0)")).toBe(true);
-    // Logo mask must not use 3D rotation
-    const maskSection = introSource.substring(
-      introSource.indexOf("data-intro-logo-mask"),
-      introSource.indexOf("data-intro-logo-mask") + 200,
-    );
-    expect(maskSection.includes("rotateX")).toBe(false);
-    expect(maskSection.includes("rotateY")).toBe(false);
-    // Label text-flip may use rotationX and transformPerspective — that is intentional
-    expect(introSource.includes("rotationX")).toBe(true);
-    expect(introSource.includes("transformPerspective")).toBe(true);
+  test("keeps rotation on the masked words and scales the mark in place", () => {
+    expect(introSource).toContain('mask: "words"');
+    expect(introSource).toContain("rotationX: -48");
+    expect(introSource).toContain("transformPerspective");
+    expect(artworkSource).toContain(".to(art.mark, { autoAlpha: 0, scale: 0.9");
+    expect(artworkSource).not.toContain("rotationX");
   });
 
-  test("uses official Flip state capture and the rendered navigation target", () => {
-    expect(introSource.includes('from "gsap/Flip"')).toBe(true);
-    expect(introSource.includes("gsap.registerPlugin(Flip, SplitText)")).toBe(true);
-    expect(introSource.includes("Flip.getState(markTraveler")).toBe(true);
-    expect(introSource.includes("Flip.fit(markTraveler, logoTarget")).toBe(true);
-    expect(introSource.includes("Flip.from(firstState")).toBe(true);
-    expect(introSource.includes("Flip.isFlipping(markTraveler)")).toBe(true);
-    expect(introSource.includes("getBoundingClientRect")).toBe(false);
+  test("keeps the intro independent of navigation logo position", () => {
+    expect(introSource).not.toContain('from "gsap/Flip"');
+    expect(introSource).not.toContain("navigationLogo");
+    expect(introSource).not.toContain("appendChild");
+    expect(introSource).toContain("getTransitionIdentity(composition, mark)");
   });
 
-  test("uses one shared visual and reveals the destination before hiding the traveler", () => {
-    expect(navigationMarkSource.includes('data-shared-nav-mark="true"')).toBe(true);
-    expect(introSource.includes("<ZenithNavigationMark />")).toBe(true);
-    expect(navigationSource.includes("<ZenithNavigationMark />")).toBe(true);
-
-    const destinationVisible = introSource.indexOf("gsap.set(logoTarget, { autoAlpha: 1 });", introSource.indexOf("function settleLogo"));
-    const travelerHidden = introSource.indexOf("gsap.set(markTraveler, { autoAlpha: 0 });", introSource.indexOf("function settleLogo"));
-    expect(destinationVisible).toBeGreaterThan(-1);
-    expect(travelerHidden).toBeGreaterThan(destinationVisible);
+  test("uses the same mark asset in the nav and both centered overlays", () => {
+    expect(navigationMarkSource).toContain('data-shared-nav-mark="true"');
+    for (const source of [introSource, transitionSource, navigationSource]) {
+      expect(source).toContain("<ZenithNavigationMark />");
+    }
   });
 
   test("splits only the hero title into clipped lines and reverts cleanly", () => {
@@ -64,20 +49,14 @@ describe("Zenith animation contract", () => {
     expect(introSource.includes('mask: "lines"')).toBe(true);
     expect(introSource.includes("autoSplit: true")).toBe(true);
     expect(introSource.includes("split.lines")).toBe(true);
-    expect(introSource.includes("heroSplit.revert()")).toBe(true);
-    expect(introSource.includes("heroSplit.kill()")).toBe(true);
+    expect(introSource.includes("heroSplit?.revert()")).toBe(true);
+    expect(introSource.includes("heroLineTween?.kill()")).toBe(true);
   });
 
-  test("keeps the corrected intro label and timeline order", () => {
-    const primeIndex = introSource.indexOf('"Prime trusted runtime"');
-    const compileIndex = introSource.indexOf('"Compile route graph"');
-    const placeIndex = introSource.indexOf('"Place Zenith mark"');
-
-    expect(primeIndex).toBeGreaterThan(-1);
-    expect(compileIndex).toBeGreaterThan(primeIndex);
-    expect(placeIndex).toBeGreaterThan(compileIndex);
-    expect(introSource.includes("phrase = phrases[1]")).toBe(true);
-    expect(introSource.includes("phrase = phrases[2]")).toBe(true);
+  test("flips the two intro phrases in order before the artwork exits", () => {
+    expect(introSource).toContain('["Prime trusted runtime", "Compile route graph"]');
+    expect(introSource).toContain("if (index + 1 < phrases.length) playPhrase(index + 1)");
+    expect(introSource).toContain("else playArtworkExit()");
   });
 
   test("keeps replay and HMR initialization idempotent", () => {
@@ -88,9 +67,10 @@ describe("Zenith animation contract", () => {
     expect(introSource.includes("__zenithIntroTimelineActive")).toBe(true);
     expect(introSource.includes("__zenithIntroPlayed")).toBe(true);
     expect(introSource.includes("__zenithIntroStarted")).toBe(true);
-    expect(introSource.includes("Flip.killFlipsOf(markTraveler, false)")).toBe(true);
+    expect(introSource).toContain("timeline?.kill()");
     expect(introSource.includes('matchMedia("(prefers-reduced-motion: reduce)")')).toBe(true);
-    expect(introSource.includes('if (ownsTimeline && introPhase !== "complete") completeImmediately()')).toBe(true);
+    expect(introSource).toContain("if (finished) return;");
+    expect(introSource).toContain("ctx.cleanup(");
   });
 
   test("shares selector-free ScrollTrigger setup with scoped cleanup", () => {
@@ -182,16 +162,11 @@ describe("shared transition composition", () => {
     expect(transitionIdentitySource.includes("overflow-hidden")).toBe(true);
   });
 
-  test("intro labels use larger typography than route labels", () => {
-    // Intro label class is set in IntroLoader.zen
-    expect(introSource.includes("text-2xl")).toBe(true);
-    expect(introSource.includes("sm:text-3xl")).toBe(true);
-    // Route label class is set in RouteTransition.zen
-    expect(transitionSource.includes("text-xl")).toBe(true);
-    expect(transitionSource.includes("sm:text-2xl")).toBe(true);
-    // Both use the same font family
-    expect(introSource.includes("font-heading")).toBe(true);
-    expect(transitionSource.includes("font-heading")).toBe(true);
+  test("uses the same responsive font and tracking for both transition labels", () => {
+    expect(transitionIdentitySource).toContain("font-heading text-xl font-medium tracking-tight");
+    expect(transitionIdentitySource).toContain("sm:text-2xl");
+    expect(introSource).not.toContain("label.className");
+    expect(transitionSource).not.toContain("label.className");
   });
 });
 
@@ -205,8 +180,8 @@ describe("text-flip and readability timing", () => {
   });
 
   test("label timing uses shared constants with readable hold phases", () => {
-    expect(introSource.includes("labelEntrance")).toBe(true);
-    expect(introSource.includes("labelExit")).toBe(true);
+    expect(introSource.includes("introWordIn")).toBe(true);
+    expect(introSource.includes("introWordOut")).toBe(true);
     expect(introSource.includes("introPhraseHold")).toBe(true);
     expect(transitionSource.includes("labelEntrance")).toBe(true);
     expect(transitionSource.includes("labelExit")).toBe(true);
@@ -219,8 +194,12 @@ describe("text-flip and readability timing", () => {
     expect(transitionTimingSource.includes('chars > 8')).toBe(true);
   });
 
-  test("label entrance and exit durations are at least 0.7s for readability", () => {
-    expect(transitionTimingSource.includes("labelEntrance: 0.72")).toBe(true);
-    expect(transitionTimingSource.includes("labelExit: 0.72")).toBe(true);
+  test("holds the complete intro phrase between its masked entrance and exit", () => {
+    const enter = introSource.indexOf("duration: transitionTiming.introWordIn");
+    const hold = introSource.indexOf("duration: transitionTiming.introPhraseHold");
+    const exit = introSource.indexOf("duration: transitionTiming.introWordOut");
+    expect(enter).toBeGreaterThan(-1);
+    expect(hold).toBeGreaterThan(enter);
+    expect(exit).toBeGreaterThan(hold);
   });
 });

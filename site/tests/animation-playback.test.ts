@@ -177,7 +177,7 @@ describe("reduced-motion home entry", () => {
       );
       const states = await page.evaluate(() => (window as unknown as { __introStates: string[] }).__introStates);
       expect(states.includes("markRevealed")).toBe(false);
-      expect(states.includes("movingLogo")).toBe(false);
+      expect(states.includes("artworkExit")).toBe(false);
       const heading = page.locator("[data-hero-h1='true']");
       expect(await heading.isVisible()).toBe(true);
       expect(await heading.getAttribute("data-route-title")).toBe(null);

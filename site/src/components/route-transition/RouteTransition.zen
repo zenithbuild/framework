@@ -5,27 +5,9 @@ import { on, off } from "@zenithbuild/router";
 import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
 import TransitionIdentity from "@/components/transition/TransitionIdentity.zen";
 
-const transitionTiming = {
-  artworkIn: 0.42, ringStagger: 0.07, markStagger: 0.06,
-  labelEntrance: 0.28, labelHoldShort: 0.12, labelHoldMedium: 0.2, labelHoldLong: 0.28,
-  labelExit: 0.24, labelWordStagger: 0.03,
-  artworkOut: 0.36, ringExitStagger: 0.04,
-  overlayMaskAway: 0.32, destinationEntrance: 0.44, backdropFade: 0.26, overlayFade: 0.12,
-} as const;
-
-function labelTierFor(text: string): "short" | "medium" | "long" {
-  const trimmed = text.trim();
-  if (trimmed.length > 16 || trimmed.split(/\s+/).length > 4) return "long";
-  if (trimmed.length > 8) return "medium";
-  return "short";
-}
-
-function labelHoldFor(text: string): number {
-  const tier = labelTierFor(text);
-  if (tier === "short") return transitionTiming.labelHoldShort;
-  if (tier === "medium") return transitionTiming.labelHoldMedium;
-  return transitionTiming.labelHoldLong;
-}
+import { transitionTiming } from "../transition/transitionTiming";
+import { labelHoldFor } from "../transition/transitionTiming";
+import { getTransitionIdentity, enterArtwork, exitArtwork, revealThroughOverlay } from "../transition/transitionArtwork";
 
 type RouteGroup = "home" | "marketing" | "blog-index" | "blog-article" | "docs-index" | "docs-article" | "unknown";
 
@@ -107,23 +89,13 @@ zenMount((ctx) => {
   const pageShell = transitionProps.pageShellRef.current || null;
   if (!win || !doc || !localOverlay || !localBackdrop || !localComposition || !localMark || !pageShell) return;
 
-  // zen-allow:dom-query — query shared composition elements from parent-owned wrapper
-  const glow = localComposition.querySelector<HTMLElement>('[data-transition-glow="true"]');
-  const ringOuter = localComposition.querySelector<HTMLElement>('[data-transition-ring="outer"]');
-  const ringMid = localComposition.querySelector<HTMLElement>('[data-transition-ring="middle"]');
-  const ringInner = localComposition.querySelector<HTMLElement>('[data-transition-ring="inner"]');
-  const markRing = localComposition.querySelector<HTMLElement>('[data-transition-mark-ring="true"]');
-  const markCore = localComposition.querySelector<HTMLElement>('[data-transition-mark-core="true"]');
-  const labelFrame = localComposition.querySelector<HTMLElement>('[data-transition-label-frame="true"]');
-  const label = localComposition.querySelector<HTMLElement>('[data-transition-label="true"]');
-  if (label) label.className = 'font-heading text-xl font-medium tracking-tight text-foreground sm:text-2xl';
-  const rings = [ringOuter, ringMid, ringInner].filter(Boolean) as HTMLElement[];
-  if (!glow || rings.length < 3 || !markRing || !markCore || !labelFrame || !label) return;
+  const identityParts = getTransitionIdentity(localComposition, localMark);
+  if (!identityParts) return;
 
   let layer = win.__zenithRouteTransitionLayer;
   if (layer?.overlay.isConnected && layer.overlay !== localOverlay) localOverlay.remove();
   else {
-    layer = { overlay: localOverlay, backdrop: localBackdrop, composition: localComposition, glow, rings, markRing, markCore, mark: localMark, labelFrame, label };
+    layer = { overlay: localOverlay, backdrop: localBackdrop, composition: localComposition, ...identityParts };
     win.__zenithRouteTransitionLayer = layer;
     doc?.documentElement.appendChild(localOverlay);
   }
@@ -321,11 +293,9 @@ zenMount((ctx) => {
       timeline
         .addLabel("exitCurrentPage").add(animatePageExit(), 0)
         .addLabel("coverViewport").to(backdrop, { autoAlpha: 1, duration: 0.3 }, 0.3)
-        .addLabel("artworkEnter")
-        .to(layerGlow, { autoAlpha: 1, scale: 1, duration: transitionTiming.artworkIn }, 0.5)
-        .to(layerRings, { autoAlpha: 1, scale: 1, duration: transitionTiming.artworkIn, stagger: transitionTiming.ringStagger }, 0.5)
-        .to([layerMarkRing, layerMarkCore], { autoAlpha: 1, scale: 1, duration: transitionTiming.artworkIn, stagger: transitionTiming.markStagger }, 0.54)
-        .to(mark, { autoAlpha: 1, scale: 1, duration: transitionTiming.artworkIn }, 0.56)
+        .addLabel("artworkEnter");
+      enterArtwork(timeline, layer, 0.5);
+      timeline
         .addLabel("labelEnter")
         .to(split ? split.words : [], { autoAlpha: 1, yPercent: 0, rotationX: 0, duration: transitionTiming.labelEntrance, stagger: transitionTiming.labelWordStagger }, 0.62)
         .addLabel("labelHold").to({}, { duration: holdDuration })
@@ -373,18 +343,8 @@ zenMount((ctx) => {
         .addLabel("labelExit")
         .to(split ? split.words : [], { autoAlpha: 0, yPercent: -105, rotationX: 42, duration: transitionTiming.labelExit, stagger: transitionTiming.labelWordStagger, ease: "power3.in" }, 0)
         .call(() => { gsap.set(layerLabel, { autoAlpha: 0 }); disposeSplit(); layerLabel.textContent = ""; });
-      // Phase 2: Artwork exit — rings, glow, mark resolve AFTER label clears
-      timeline
-        .addLabel("artworkExit", ">")
-        .to(layerRings, { autoAlpha: 0, scale: 1.15, duration: transitionTiming.artworkOut, stagger: transitionTiming.ringExitStagger }, "artworkExit")
-        .to(layerGlow, { autoAlpha: 0, scale: 1.1, duration: transitionTiming.artworkOut + 0.02 }, "artworkExit+=0.02")
-        .to([layerMarkRing, layerMarkCore], { autoAlpha: 0, scale: 0.2, duration: transitionTiming.artworkOut - 0.06, ease: "power2.in" }, "artworkExit")
-        .to(mark, { autoAlpha: 0, scale: 0.9, duration: transitionTiming.artworkOut - 0.06 }, "artworkExit");
-      // Phase 3: Reveal gate — overlay masks away ONLY after ALL artwork resolves
-      timeline
-        .addLabel("overlayReveal", ">")
-        .to(overlay, { clipPath: "inset(100% 0% 0% 0%)", duration: transitionTiming.overlayMaskAway, ease: "power3.inOut" }, "overlayReveal")
-        .to(backdrop, { autoAlpha: 0, duration: transitionTiming.backdropFade }, "overlayReveal");
+      exitArtwork(timeline, layer);
+      revealThroughOverlay(timeline, overlay, backdrop);
       // Phase 4: Destination entrance — page becomes visible AFTER overlay clears
       timeline
         .addLabel("destinationEnter", ">")

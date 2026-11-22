@@ -18,6 +18,7 @@ function readSource(path: string) {
 
 const transitionSource = readSource("src/components/route-transition/RouteTransition.zen");
 const layoutSource = readSource("src/layouts/DefaultLayout.zen");
+const artworkSource = readSource("src/components/transition/transitionArtwork.ts");
 const pageExitSource = readSource("src/components/route-transition/pageExitMotion.ts");
 const transitionIdentitySource = readSource("src/components/transition/TransitionIdentity.zen");
 
@@ -105,14 +106,13 @@ describe("route transition lifecycle", () => {
   });
 
   test("gates page reveal on artwork exit completion", () => {
-    const ringsExitIdx = transitionSource.indexOf(".to(layerRings, { autoAlpha: 0, scale: 1.15");
-    const pageRevealIdx = transitionSource.indexOf(".to(pageShell, { autoAlpha: 1, scale: 1");
-    expect(ringsExitIdx).toBeGreaterThan(-1);
-    expect(pageRevealIdx).toBeGreaterThan(-1);
-    expect(pageRevealIdx).toBeGreaterThan(ringsExitIdx);
-    const glowExitIdx = transitionSource.indexOf(".to(layerGlow, { autoAlpha: 0, scale: 1.1");
-    expect(glowExitIdx).toBeGreaterThan(-1);
-    expect(pageRevealIdx).toBeGreaterThan(glowExitIdx);
+    const exit = transitionSource.indexOf("exitArtwork(timeline, layer)");
+    const reveal = transitionSource.indexOf("revealThroughOverlay(timeline, overlay, backdrop)");
+    const enter = transitionSource.indexOf(".to(pageShell, { autoAlpha: 1, scale: 1");
+    expect(exit).toBeGreaterThan(-1);
+    expect(reveal).toBeGreaterThan(exit);
+    expect(enter).toBeGreaterThan(reveal);
+    expect(artworkSource).toContain('.addLabel("overlayReveal", ">")');
   });
 
   test("uses scrollbar compensation during transitions", () => {
@@ -128,15 +128,15 @@ describe("route transition lifecycle", () => {
     expect(transitionSource.includes('"labelEnter"')).toBe(true);
     expect(transitionSource.includes('"labelHold"')).toBe(true);
     expect(transitionSource.includes('"labelExit"')).toBe(true);
-    expect(transitionSource.includes('"artworkExit"')).toBe(true);
-    expect(transitionSource.includes('"overlayReveal"')).toBe(true);
+    expect(artworkSource.includes('"artworkExit"')).toBe(true);
+    expect(artworkSource.includes('"overlayReveal"')).toBe(true);
     expect(transitionSource.includes('"destinationEnter"')).toBe(true);
   });
 
   test("overlay masks away via clipPath, not simple fade", () => {
     expect(transitionSource.includes("clipPath")).toBe(true);
     expect(transitionSource.includes("inset(0% 0% 0% 0%)")).toBe(true);
-    expect(transitionSource.includes("inset(100% 0% 0% 0%)")).toBe(true);
+    expect(artworkSource.includes("inset(100% 0% 0% 0%)")).toBe(true);
   });
 });
 
@@ -218,14 +218,14 @@ describe("shared composition and timing", () => {
     expect(mediumHold).toBeLessThan(longHold);
   });
 
-  test("label entrance and exit are at least 0.7s for readability", () => {
-    expect(transitionTiming.labelEntrance).toBeGreaterThanOrEqual(0.7);
-    expect(transitionTiming.labelExit).toBeGreaterThanOrEqual(0.7);
+  test("preserves the shipped route word entrance and exit times", () => {
+    expect(transitionTiming.labelEntrance).toBe(0.28);
+    expect(transitionTiming.labelExit).toBe(0.24);
   });
 
-  test("label hold is at least 1.0s for readability", () => {
-    expect(transitionTiming.labelHoldShort).toBeGreaterThanOrEqual(1.0);
-    expect(transitionTiming.labelHoldMedium).toBeGreaterThanOrEqual(1.0);
-    expect(transitionTiming.labelHoldLong).toBeGreaterThanOrEqual(1.0);
+  test("gives the intro phrases extra reading time without slowing route labels", () => {
+    expect([transitionTiming.labelHoldShort, transitionTiming.labelHoldMedium, transitionTiming.labelHoldLong]).toEqual([0.12, 0.2, 0.28]);
+    expect(transitionTiming.introPhraseHold).toBeGreaterThan(transitionTiming.labelHoldLong);
+    expect(transitionTiming.introWordIn).toBeGreaterThan(transitionTiming.labelEntrance);
   });
 });

@@ -34,9 +34,6 @@ const defaultLayoutHeroActionsRef = (props as Props).heroActionsRef;
 const defaultLayoutHeroSupportRef = (props as Props).heroSupportRef;
 
 const navigationShellRef = ref<HTMLElement>();
-const navigationLogoTargetRef = ref<HTMLElement>();
-const navigationLinksRef = ref<HTMLElement>();
-const navigationActionsRef = ref<HTMLElement>();
 const pageShellRef = ref<HTMLElement>();
 const footerShellRef = ref<HTMLElement>();
 const structuredDataRef = ref<HTMLScriptElement>();
@@ -84,17 +81,11 @@ zenMount((ctx) => {
         content={defaultLayoutNavigationContent}
         currentPath={defaultLayoutCurrentPath}
         shellRef={navigationShellRef}
-        logoTargetRef={navigationLogoTargetRef}
-        linksRef={navigationLinksRef}
-        actionsRef={navigationActionsRef}
         introGated={defaultLayoutIntroEnabled}
     />
     <IntroLoader
         enabled={defaultLayoutIntroEnabled}
         navigationShellRef={navigationShellRef}
-        navigationLogoTargetRef={navigationLogoTargetRef}
-        navigationLinksRef={navigationLinksRef}
-        navigationActionsRef={navigationActionsRef}
         pageShellRef={pageShellRef}
         footerShellRef={footerShellRef}
         heroEyebrowRef={defaultLayoutHeroEyebrowRef}

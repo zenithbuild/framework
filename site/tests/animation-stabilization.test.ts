@@ -11,6 +11,7 @@ function readSource(path: string) {
 
 const introSource = readSource("src/components/IntroLoader.zen");
 const transitionSource = readSource("src/components/route-transition/RouteTransition.zen");
+const artworkSource = readSource("src/components/transition/transitionArtwork.ts");
 const navigationSource = readSource("src/components/ui/Navigation.zen");
 const globalsSource = readSource("src/styles/globals.css");
 const scrollbarSource = readSource("src/components/route-transition/scrollbarCompensation.ts");
@@ -100,70 +101,39 @@ describe("overlay isolation", () => {
   });
 });
 
-describe("intro SVG exit animation", () => {
-  test("decorative ring elements are queried from shared composition", () => {
-    expect(introSource.includes("decorRingOuter")).toBe(true);
-    expect(introSource.includes("decorRingMid")).toBe(true);
-    expect(introSource.includes("decorRingInner")).toBe(true);
+describe("shared transition artwork exit", () => {
+  test("both overlays animate the same three rings and the mark", () => {
+    for (const ring of ["outer", "middle", "inner"]) {
+      expect(artworkSource).toContain(`[data-transition-ring="${ring}"]`);
+    }
+    expect(introSource).toContain("exitArtwork(timeline, art)");
+    expect(transitionSource).toContain("exitArtwork(timeline, layer)");
+    expect(artworkSource).toContain("stagger: transitionTiming.ringExitStagger");
+    expect(artworkSource).toContain(".to(art.mark, { autoAlpha: 0, scale: 0.9");
   });
 
-  test("svgExit phase is defined in the intro state machine", () => {
-    expect(introSource.includes('"svgExit"')).toBe(true);
-    expect(introSource.includes("animateSvgExit")).toBe(true);
-    expect(introSource.includes("svgExitTimeline")).toBe(true);
+  test("keeps the backdrop opaque until the intro artwork finishes", () => {
+    expect(introSource).toContain('setDocumentState("artworkExit")');
+    expect(globalsSource).toContain('data-zenith-intro-state="artworkExit"');
+    expect(introSource).toContain("onComplete: revealContent");
+    expect(introSource).toContain("revealThroughOverlay(timeline, loader, backdrop)");
+    expect(artworkSource).toContain('.addLabel("overlayReveal", ">")');
+    expect(artworkSource).toContain('duration: transitionTiming.backdropFade }, "overlayReveal"');
   });
 
-  test("svgExit phase is recognized in CSS", () => {
-    expect(globalsSource.includes('data-zenith-intro-state="svgExit"')).toBe(true);
+  test("releases the destination after the route label and artwork exit", () => {
+    const words = transitionSource.indexOf(".to(split ? split.words : [], { autoAlpha: 0, yPercent: -105");
+    const artwork = transitionSource.indexOf("exitArtwork(timeline, layer)");
+    const reveal = transitionSource.indexOf("revealThroughOverlay(timeline, overlay, backdrop)");
+    expect(words).toBeGreaterThan(-1);
+    expect(artwork).toBeGreaterThan(words);
+    expect(reveal).toBeGreaterThan(artwork);
   });
 
-  test("page reveal is gated on SVG exit completion", () => {
-    const svgExitIdx = introSource.indexOf("function animateSvgExit");
-    const revealContentInExit = introSource.indexOf("onComplete: revealContent", svgExitIdx);
-    expect(revealContentInExit).toBeGreaterThan(-1);
-    const settleLogoIdx = introSource.indexOf("function settleLogo");
-    const svgExitCall = introSource.indexOf("animateSvgExit()", settleLogoIdx);
-    expect(svgExitCall).toBeGreaterThan(-1);
-  });
-
-  test("decorative rings animate out with coordinated sequence, not simultaneous fade", () => {
-    const svgExitIdx = introSource.indexOf("function animateSvgExit");
-    const exitSection = introSource.substring(svgExitIdx, svgExitIdx + 600);
-    expect(exitSection.includes("scale: 1.1")).toBe(true);
-    expect(exitSection.includes("scale: 0.5")).toBe(true);
-    expect(exitSection.includes("scale: 0.25")).toBe(true);
-    expect(exitSection.includes("0.04")).toBe(true);
-    expect(exitSection.includes("0.08")).toBe(true);
-  });
-
-  test("SVG exit timeline is killed on cleanup", () => {
-    expect(introSource.includes("svgExitTimeline.kill()")).toBe(true);
-    expect(introSource.includes("svgExitTimeline = null")).toBe(true);
-  });
-});
-
-describe("route transition artwork exit", () => {
-  test("entering phase has artwork exit before page reveal", () => {
-    const labelExitIdx = transitionSource.indexOf(".to(split ? split.words : [], { autoAlpha: 0, yPercent: -105");
-    const pageRevealIdx = transitionSource.indexOf(".to(pageShell, { autoAlpha: 1, scale: 1");
-    expect(labelExitIdx).toBeGreaterThan(-1);
-    expect(pageRevealIdx).toBeGreaterThan(labelExitIdx);
-
-    const ringsExitIdx = transitionSource.indexOf(".to(layerRings, { autoAlpha: 0, scale: 1.15");
-    expect(ringsExitIdx).toBeGreaterThan(-1);
-    expect(pageRevealIdx).toBeGreaterThan(ringsExitIdx);
-  });
-
-  test("overlay remains opaque through artwork exit phase", () => {
-    const backdropFadeIdx = transitionSource.indexOf('.to(backdrop, { autoAlpha: 0');
-    expect(backdropFadeIdx).toBeGreaterThan(-1);
-    const ringsExitIdx = transitionSource.indexOf('.to(layerRings, { autoAlpha: 0, scale: 1.15');
-    expect(ringsExitIdx).toBeGreaterThan(-1);
-    expect(backdropFadeIdx).toBeGreaterThan(ringsExitIdx);
-  });
-
-  test("transition mark fades out during artwork resolution", () => {
-    expect(transitionSource.includes('.to(mark, { autoAlpha: 0')).toBe(true);
+  test("cancels active intro tweens and releases gated elements", () => {
+    expect(introSource).toContain("timeline?.kill()");
+    expect(introSource).toContain("heroLineTween?.kill()");
+    expect(introSource).toContain("setGateAccess(gates, false)");
   });
 });
 
@@ -195,7 +165,8 @@ describe("flicker prevention", () => {
 
   test("reduced motion bypasses elaborate SVG animation in intro", () => {
     expect(introSource.includes('matchMedia("(prefers-reduced-motion: reduce)")')).toBe(true);
-    expect(introSource.includes("completeImmediately()")).toBe(true);
+    expect(introSource).toContain("motionPreference.matches");
+    expect(introSource).toContain('zenOn(motionPreference, "change"');
   });
 
   test("reduced motion bypasses route transition animation", () => {
@@ -207,12 +178,13 @@ describe("flicker prevention", () => {
   test("no addEventListener in transition or intro, querySelector only with zen-allow annotation", () => {
     expect(transitionSource.includes("zen-allow:dom-query")).toBe(true);
     expect(transitionSource.includes("addEventListener")).toBe(false);
-    expect(introSource.includes("zen-allow:dom-query")).toBe(true);
+    expect(introSource).not.toContain("querySelector");
+    expect(artworkSource).toContain("wrapper.querySelector");
     expect(introSource.includes("addEventListener")).toBe(false);
   });
 
   test("HMR idempotency — intro checks for duplicate timeline", () => {
     expect(introSource.includes("__zenithIntroTimelineActive")).toBe(true);
-    expect(introSource.includes("duplicateTimeline")).toBe(true);
+    expect(introSource).toContain("if (win.__zenithIntroTimelineActive) return;");
   });
 });
