@@ -318,6 +318,11 @@ impl RouterManifest {
                     "has_load": route.has_load,
                     "has_scoped_server_data": route.has_scoped_server_data,
                 });
+                if route.prerender {
+                    if let Some(data) = &route.ssr_data {
+                        public["ssr_data"] = data.clone();
+                    }
+                }
                 if !route.image_materialization.is_empty() {
                     public["image_materialization"] =
                         serde_json::to_value(&route.image_materialization)?;

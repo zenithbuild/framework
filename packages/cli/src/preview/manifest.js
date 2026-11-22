@@ -75,10 +75,14 @@ export async function resolvePreviewRouteFiles(distDir, projectRoot, config) {
   try {
     publicManifest = JSON.parse(await readFile(join(distDir, 'assets', 'resource-manifest.json'), 'utf8'));
   } catch (error) {
-    if (error.code === 'ENOENT') return legacy;
+    if (error.code === 'ENOENT') {
+      return legacy;
+    }
     throw error;
   }
-  if (typeof publicManifest.requires_server_metadata !== 'boolean') return legacy;
+  if (typeof publicManifest.requires_server_metadata !== 'boolean') {
+    return legacy;
+  }
 
   const candidates = [packagedServer];
   if (resolve(distDir) === resolveConfigOutDir(projectRoot, config)) {

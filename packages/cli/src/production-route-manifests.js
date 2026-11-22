@@ -14,6 +14,7 @@ function publicPage(route) {
         html: route.html,
         page_asset: route.page_asset,
         prerender: route.prerender,
+        ...(route.prerender && route.ssr_data != null ? { ssr_data: route.ssr_data } : {}),
         has_guard: route.has_guard,
         has_load: route.has_load,
         has_action: route.has_action,
@@ -24,7 +25,14 @@ function publicPage(route) {
 
 export async function writeProductionPageManifests(staticDir, privateDir, envelopes) {
     const name = 'router-manifest.json';
-    const manifest = JSON.parse(await readFile(join(staticDir, 'assets', name), 'utf8'));
+    let manifest;
+    try {
+        manifest = JSON.parse(await readFile(join(staticDir, 'assets', name), 'utf8'));
+    } catch (error) {
+        const needsServerRoutes = envelopes.some(({ ir }) => ir.server_script || ir.has_scoped_server_data);
+        if (error.code === 'ENOENT' && !needsServerRoutes) return;
+        throw error;
+    }
     const byPath = new Map(envelopes.map(({ route, ir }) => [route, ir]));
     const routes = manifest.routes.map((route) => {
         const ir = byPath.get(route.path);
