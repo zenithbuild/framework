@@ -44,11 +44,11 @@ const modalFiltersRef = ref<HTMLElement>();
 let modalPreviouslyFocused: HTMLElement | null = null;
 let modalSavedOverflow = "";
 
-function modalFilteredRecords(): SearchRecord[] { return applySearchFilters(modalPayload?.records || [], modalScope, { section: modalFilterSection, category: modalFilterCategory, tag: modalFilterTag, author: modalFilterAuthor, sort: modalFilterSort }); }
-function modalResults(): SearchResult[] {
-  const query = modalQuery.trim();
+function modalFilteredRecords(payload: SearchIndexPayload | null): SearchRecord[] { return applySearchFilters(payload?.records || [], modalScope, { section: modalFilterSection, category: modalFilterCategory, tag: modalFilterTag, author: modalFilterAuthor, sort: modalFilterSort }); }
+function modalResults(payload = modalPayload, value = modalQuery): SearchResult[] {
+  const query = value.trim();
   if (query.length === 1) return [];
-  const records = modalFilteredRecords();
+  const records = modalFilteredRecords(payload);
   if (query || modalScope !== "global") return searchRecords(records, query, modalScope);
   const latest = records.filter((record) => record.scope === "blog").sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""))[0];
   return [records.find((record) => record.path === "/docs/getting-started"),
@@ -390,10 +390,10 @@ zenMount((ctx) => {
     {modalLoading ? <p role="status" class="px-3.5 py-3 text-sm text-muted-foreground">Loading search…</p> : undefined}
     {modalLoadFailed ? <button type="button" on:click={loadModalRecords} class="min-h-11 px-3.5 text-sm text-primary v1-focus">Search could not load. Try again</button> : undefined}
     {modalQuery.trim().length === 1 ? <p class="px-3.5 py-3 text-sm text-muted-foreground">Type at least two characters to search.</p> : undefined}
-    {modalPayload && modalQuery.trim().length > 1 && modalResultCount() === 0 ? <p data-search-empty-state="true" class="px-3.5 py-3 text-sm text-muted-foreground">No results for “{modalQuery}”. Try another term.</p> : undefined}
+    {modalPayload && modalQuery.trim().length > 1 && modalResults(modalPayload, modalQuery).length === 0 ? <p data-search-empty-state="true" class="px-3.5 py-3 text-sm text-muted-foreground">No results for “{modalQuery}”. Try another term.</p> : undefined}
     <div ref={modalListRef} id="search-results" data-search-results="true" role="listbox" aria-label="Search results" class="mt-3 min-h-0 flex-1 overflow-y-auto" on:click={handleResultsClick} on:pointermove={handleResultsHover}>
       <p aria-hidden="true" class="px-3.5 py-2 font-mono text-xs tracking-widest text-muted-foreground">{modalQuery.trim().length > 1 ? "Results" : modalQuery.trim() ? "" : "Suggested"}</p>
-      {modalResults().map((result, index) => {
+      {modalResults(modalPayload, modalQuery).map((result, index) => {
         const rec = result.record;
         const selected = index === (modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex);
         return <a id={"search-option-" + index} role="option" aria-selected={selected ? "true" : "false"} tabindex="-1" href={rec.path} data-zen-link="true" data-search-result-item="true" data-index={index}
@@ -404,7 +404,7 @@ zenMount((ctx) => {
         </a>;
       })}
     </div>
-    <p data-search-result-count="true" aria-live="polite" class="sr-only">{modalResultCount()} {modalResultCount() === 1 ? "result" : "results"}</p>
+    <p data-search-result-count="true" aria-live="polite" class="sr-only">{modalResults(modalPayload, modalQuery).length} {modalResults(modalPayload, modalQuery).length === 1 ? "result" : "results"}</p>
     <div aria-hidden="true" class="order-2 mt-auto hidden items-center gap-4 border-t border-border pt-3 text-xs text-muted-foreground md:flex"><span>↑ ↓ &nbsp; Move</span><span>Enter &nbsp; Open</span><span>Esc &nbsp; Close</span><span>/ &nbsp; Open search</span></div>
   </div>
 </div>

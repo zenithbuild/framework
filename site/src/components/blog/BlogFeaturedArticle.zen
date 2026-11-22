@@ -1,4 +1,5 @@
 <script lang="ts">
+import { featuredTags } from "./blogArchiveMarkup";
 import type { BlogPost } from "@/server/postSource";
 
 export interface Props {
@@ -16,6 +17,8 @@ const category = post?.category?.title || "";
 const date = post?.displayPublishedAt || "";
 const readingTime = post?.readingTime || "";
 const author = post?.author?.name || "";
+const tagList = featuredTags(post?.tags || []);
+const updated = post?.displayUpdatedAt || "";
 const postTitle = post?.title || "";
 const postExcerpt = post?.excerpt || "";
 const postPath = post?.path || "/blog";
@@ -32,10 +35,8 @@ const postPath = post?.path || "/blog";
     </div>
     <aside class="flex min-w-0 flex-col items-start gap-3">
       <p class="v1-eyebrow">Tagged</p>
-      <ul class="flex flex-wrap gap-2">
-        {(post?.tags || []).map((tag) => <li class="rounded-full bg-brand-gold-soft px-3 py-1 font-mono text-xs text-foreground">{tag}</li>)}
-      </ul>
-      <p class="text-sm text-muted-foreground" style={post?.displayUpdatedAt ? undefined : "display: none;"}>Updated {post?.displayUpdatedAt}</p>
+      <ul class="flex flex-wrap gap-2" unsafeHTML={tagList}></ul>
+      <p class="text-sm text-muted-foreground" style={updated ? undefined : "display:none"}>Updated {updated}</p>
       <img src={imageSrc || undefined} alt={imageAlt} width={image?.width} height={image?.height} class="w-full rounded-lg object-contain" style={imageSrc ? undefined : "display: none;"} />
     </aside>
   </article>

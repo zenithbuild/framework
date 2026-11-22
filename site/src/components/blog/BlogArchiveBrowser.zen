@@ -1,4 +1,5 @@
 <script lang="ts">
+import { archiveCategories, archiveRows, matchingPosts } from "./blogArchiveMarkup";
 import type { BlogPost } from "@/server/postSource";
 
 interface Props {
@@ -14,9 +15,9 @@ const tags = archive.tags || [];
 state category = "All";
 state tag = "All";
 
-function visiblePosts() {
-  return posts.filter((post) => (category === "All" || post.category.title === category) && (tag === "All" || post.tags.includes(tag)));
-}
+function renderCategoryPills(current: string) { return archiveCategories(categories, current); }
+function renderArchiveRows(current: string, activeTag: string) { return archiveRows(posts, current, activeTag); }
+function articleCount(current: string, activeTag: string) { return matchingPosts(posts, current, activeTag).length; }
 
 function readFilters() {
   const win = zenWindow();
@@ -51,25 +52,10 @@ zenMount((ctx) => {
 <section data-blog-archive="true" aria-labelledby="all-articles" class="mx-auto w-full max-w-[1440px] px-4 pb-16 pt-12 md:px-10 md:pb-24 md:pt-[72px] lg:px-20">
   <h2 id="all-articles" class="font-heading text-[32px] font-semibold leading-10 tracking-tight">All articles</h2>
   <div class="mt-5 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
-    <div aria-label="Filter by category" role="group" class="flex flex-wrap gap-2" on:click={chooseCategory}>
-      {categories.map((label) => <button type="button" data-category={label} aria-pressed={category === label ? "true" : "false"} class={category === label ? "v1-button bg-foreground px-4 text-background" : "v1-button border border-border-strong bg-background px-4 text-foreground"}>{label}</button>)}
-    </div>
-    <p data-blog-result-count="true" aria-live="polite" class="font-mono text-xs text-muted-foreground">{visiblePosts().length} {visiblePosts().length === 1 ? "article" : "articles"}</p>
+    <div aria-label="Filter by category" role="group" class="flex flex-wrap gap-2" on:click={chooseCategory} unsafeHTML={renderCategoryPills(category)}></div>
+    <p data-blog-result-count="true" aria-live="polite" class="font-mono text-xs text-muted-foreground">{articleCount(category, tag)} {articleCount(category, tag) === 1 ? "article" : "articles"}</p>
   </div>
-  <div data-blog-results="true">
-    {visiblePosts().map((post) => <article data-blog-article-row="true" data-blog-category={post.category.title} class="border-b border-border">
-      <a href={post.path} data-zen-link="true" class="group grid min-w-0 gap-3 rounded-sm py-5 v1-focus md:grid-cols-[minmax(110px,176px)_minmax(0,1fr)_auto] md:gap-6 md:py-7">
-        <time datetime={post.publishedAt} class="font-mono text-xs leading-5 text-muted-foreground">{post.displayPublishedAt}</time>
-        <div class="min-w-0">
-          <h3 class="font-heading text-xl font-semibold leading-7 text-foreground group-hover:underline">{post.title}</h3>
-          <p class="mt-2 max-w-[64ch] text-sm leading-6 text-muted-foreground">{post.excerpt}</p>
-          <p class="mt-2 text-xs text-muted-foreground">By {post.author.name}</p>
-          <span class="mt-2 block break-all font-mono text-xs text-muted-foreground">{post.path}</span>
-        </div>
-        <div class="flex flex-wrap items-start gap-2 md:flex-col md:items-end"><span class="rounded-full bg-brand-blue-soft px-3 py-1 font-mono text-xs text-foreground">{post.category.title}</span><span class="font-mono text-xs leading-6 text-muted-foreground">{post.readingTime}</span></div>
-      </a>
-    </article>)}
-  </div>
-  {visiblePosts().length === 0 ? <p data-blog-empty-state="true" class="py-8 text-muted-foreground">No published articles match these filters. <a class="v1-link" href="/blog">Show all articles</a></p> : undefined}
+  <div data-blog-results="true" unsafeHTML={renderArchiveRows(category, tag)}></div>
+  <p data-blog-empty-state="true" class="py-8 text-muted-foreground" style={articleCount(category, tag) ? "display:none" : undefined}>No published articles match these filters. <a class="v1-link" href="/blog">Show all articles</a></p>
   <a href="https://github.com/zenithbuild/framework/blob/integration/v1/CHANGELOG.md" class="v1-link mt-10 inline-flex min-h-11 items-center">Open changelog →</a>
 </section>

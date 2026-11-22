@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "zenith dev",
-    "build": "zenith build",
+    "dev": "bun scripts/build-public-content.ts && zenith dev",
+    "build": "bun scripts/build-public-content.ts && zenith build",
     "preview": "zenith preview",
     "test": "bun test"
   },
