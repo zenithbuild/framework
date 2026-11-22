@@ -7,8 +7,8 @@ import TransitionIdentity from "@/components/transition/TransitionIdentity.zen";
 
 const transitionTiming = {
   artworkIn: 0.42, ringStagger: 0.07, markStagger: 0.06,
-  labelEntrance: 0.72, labelHoldShort: 1.0, labelHoldMedium: 1.3, labelHoldLong: 1.6,
-  labelExit: 0.72, labelWordStagger: 0.06,
+  labelEntrance: 0.28, labelHoldShort: 0.12, labelHoldMedium: 0.2, labelHoldLong: 0.28,
+  labelExit: 0.24, labelWordStagger: 0.03,
   artworkOut: 0.36, ringExitStagger: 0.04,
   overlayMaskAway: 0.32, destinationEntrance: 0.44, backdropFade: 0.26, overlayFade: 0.12,
 } as const;
@@ -31,6 +31,9 @@ type RouteGroup = "home" | "marketing" | "blog-index" | "blog-article" | "docs-i
 
 const transitionRouteIdentities: Record<string, { group: RouteGroup; label: string }> = {
   "/": { group: "home", label: "Home" },
+  "/performance": { group: "marketing", label: "Performance" },
+  "/how-it-works/compiler": { group: "marketing", label: "Compiler" },
+  "/showcase": { group: "marketing", label: "Showcase" },
   "/about": { group: "marketing", label: "About" },
   "/blog": { group: "blog-index", label: "Blog" },
   "/blog/building-zenith-0-8": { group: "blog-article", label: "Building Zenith 0.8" },
@@ -314,7 +317,7 @@ zenMount((ctx) => {
     const holdDuration = labelHoldFor(identity.label);
     await new Promise<void>((resolve) => {
       settlePhase = resolve;
-      timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      timeline = gsap.timeline({ defaults: { ease: "power3.out" } }).timeScale(1.8);
       timeline
         .addLabel("exitCurrentPage").add(animatePageExit(), 0)
         .addLabel("coverViewport").to(backdrop, { autoAlpha: 1, duration: 0.3 }, 0.3)
@@ -397,7 +400,7 @@ zenMount((ctx) => {
   function handleContentSwapped(payloadValue: unknown) {
     const payload = payloadValue as LifecyclePayload;
     const record = win.__zenithRouteTransition;
-    if (record?.active && payload.navigationId === record.navigationId && record.toPath === transitionCurrentPath) resumeDestination(record);
+    if (record?.active && record.phase === "centered" && payload.navigationId === record.navigationId && record.toPath === transitionCurrentPath) resumeDestination(record);
   }
   function handleAbort(payloadValue: unknown) {
     const payload = payloadValue as LifecyclePayload;

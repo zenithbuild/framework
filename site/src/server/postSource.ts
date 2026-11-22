@@ -1,5 +1,5 @@
 import { blogPostContent } from "../content/index";
-import { loadGitBlogPosts } from "./gitBlogSource";
+import { publishedBlogPosts } from "./publishedSources";
 import {
   cleanText,
   decorateBlogHtml,
@@ -156,7 +156,7 @@ export async function loadBlogDetailSource(slug: string): Promise<{
 
 async function loadBlogPosts(): Promise<BlogPost[]> {
   const mode = resolveBlogSourceMode();
-  const posts = mode === "git" ? await loadGitBlogPosts() : loadLocalBlogPosts();
+  const posts = mode === "git" ? await publishedBlogPosts() : loadLocalBlogPosts();
   for (const post of posts) {
     if (!post.slug || normalizeReadableSlug(post.slug) !== post.slug) {
       throw new ContentValidationError(`Blog slug '${post.slug}' is not a canonical readable slug`);

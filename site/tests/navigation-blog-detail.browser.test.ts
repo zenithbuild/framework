@@ -23,28 +23,14 @@ describe("shared navigation and Blog detail", () => {
     try {
       await page.goto(`${origin}/blog/building-zenith-0-8`, { waitUntil: "networkidle" });
 
-      const desktopTrigger = page.locator("[data-nav-dropdown-trigger='true']");
-      const desktopPanel = page.locator("[data-nav-dropdown-panel='true']");
-      await desktopTrigger.click();
-      await desktopPanel.waitFor({ state: "visible" });
-      await desktopTrigger.hover();
-      await desktopPanel.hover();
-      await page.waitForTimeout(250);
-      expect(await desktopPanel.isVisible()).toBe(true);
-      expect(await desktopPanel.getByRole("menuitem").count()).toBe(3);
-      await desktopTrigger.press("Tab");
-      expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("menuitem");
-      await page.keyboard.press("Escape");
-      await desktopPanel.waitFor({ state: "hidden" });
-      expect(await desktopTrigger.evaluate((element) => element === document.activeElement)).toBe(true);
-
-      await desktopTrigger.click();
-      await page.mouse.click(1200, 320);
-      await desktopPanel.waitFor({ state: "hidden" });
-      await desktopTrigger.click();
-      await desktopPanel.getByRole("menuitem", { name: /Documentation/ }).click();
+      // v1 nav (handoff §4): flat desktop links, no Docs dropdown. Docs soft-navigates and is marked current.
+      const primary = page.getByRole("navigation", { name: "Primary" });
+      for (const label of ["Docs", "How it works", "Performance", "Blog", "Get started"]) {
+        expect(await primary.getByRole("link", { name: label, exact: true }).first().isVisible()).toBe(true);
+      }
+      await primary.getByRole("link", { name: "Docs", exact: true }).first().click();
       await page.waitForURL(`${origin}/docs`);
-      expect(await page.locator("[data-nav-dropdown-panel='true']").isVisible()).toBe(false);
+      expect(await page.locator("[data-dropdown-panel], [data-nav-dropdown-panel='true']").count()).toBe(0);
 
       await page.goto(`${origin}/blog/building-zenith-0-8`, { waitUntil: "networkidle" });
       const articleHeadings = page.locator("[data-blog-article='true'] h2, [data-blog-article='true'] h3");
@@ -61,7 +47,11 @@ describe("shared navigation and Blog detail", () => {
         const id = headingIds[index];
         await tocLinks.nth(index).click();
         await page.waitForFunction((expected) => window.location.hash === `#${expected}`, id);
-        expect(await tocLinks.nth(index).getAttribute("aria-current")).toBe("location");
+        await page.waitForFunction((id) => {
+          const heading = document.getElementById(id);
+          const top = heading?.getBoundingClientRect().top || 0;
+          return top >= 64 && top < 180 && document.querySelector(`[data-reader-heading-link="${id}"]`)?.getAttribute("aria-current") === "location";
+        }, id);
         const top = await page.locator(`#${id}`).evaluate((element) => element.getBoundingClientRect().top);
         expect(top).toBeGreaterThanOrEqual(64);
       }
@@ -101,16 +91,13 @@ describe("shared navigation and Blog detail", () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
       const mobileTrigger = page.locator("[data-mobile-nav-trigger='true']");
-      const mobileDocsTrigger = page.locator("[data-mobile-nav-disclosure='docs']");
-      const mobileDocsPanel = page.locator("[data-mobile-nav-panel='docs']");
       await mobileTrigger.click();
-      await mobileDocsTrigger.click();
-      await mobileDocsPanel.waitFor({ state: "visible" });
-      expect(await mobileDocsPanel.getByRole("link").count()).toBe(3);
-      await page.keyboard.press("Escape");
-      await mobileDocsPanel.waitFor({ state: "hidden" });
-      expect(await mobileDocsTrigger.evaluate((element) => element === document.activeElement)).toBe(true);
-      expect(await page.locator("#mobile-navigation").isVisible()).toBe(true);
+      await page.locator("#mobile-navigation").waitFor({ state: "visible" });
+      expect(await mobileTrigger.getAttribute("aria-expanded")).toBe("true");
+      const mobileLinks = page.locator("#mobile-navigation a");
+      expect(await mobileLinks.count()).toBeGreaterThanOrEqual(5);
+      const tapHeights = await mobileLinks.evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+      expect(tapHeights.every((height) => height >= 44)).toBe(true);
       await page.keyboard.press("Escape");
       expect(await page.locator("#mobile-navigation").isVisible()).toBe(false);
       expect(await mobileTrigger.evaluate((element) => element === document.activeElement)).toBe(true);

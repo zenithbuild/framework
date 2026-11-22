@@ -14,8 +14,11 @@ const sitePackage = JSON.parse(
 
 describe("site consumer CLI contract", () => {
   test("normal framework commands resolve through the installed Zenith CLI", () => {
-    expect(sitePackage.scripts?.dev).toBe("zenith dev");
-    expect(sitePackage.scripts?.build).toBe("zenith build");
+    expect(sitePackage.scripts?.dev).toBe("bun scripts/dev.ts");
+    const dev = readFileSync(resolve(import.meta.dir, "../scripts/dev.ts"), "utf8");
+    expect(dev).toContain('resolve("@zenithbuild/cli")');
+    expect(dev).toContain('spawn("node", [cli, "dev"');
+    expect(sitePackage.scripts?.build).toMatch(/(?:^|&& )zenith build(?:$| &&)/);
     expect(sitePackage.scripts?.preview).toBe("zenith preview");
 
     const scripts = Object.values(sitePackage.scripts || {}).join("\n");

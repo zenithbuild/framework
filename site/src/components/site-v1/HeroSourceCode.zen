@@ -1,0 +1,31 @@
+<script lang="ts">
+// Hero source column: css starter templates/css/src/pages/index.zen lines 1–7 and 14 (copy.md §1).
+// Static markup. The valid/edited swap (beat F1) is driven by [data-hero-state] on the panel root (site-v1.css).
+interface Props { pinSignalRef?: any; pinEventRef?: any; pinExprRef?: any; }
+const sourceProps = props as Props;
+const localPinSignalRef = ref<HTMLElement>();
+const localPinEventRef = ref<HTMLElement>();
+const localPinExprRef = ref<HTMLElement>();
+const pinSignalRef = sourceProps.pinSignalRef || localPinSignalRef;
+const pinEventRef = sourceProps.pinEventRef || localPinEventRef;
+const pinExprRef = sourceProps.pinExprRef || localPinExprRef;
+</script>
+
+<div class="flex flex-col gap-[2px] font-mono text-[14px] leading-6 text-code-fg">
+  <p class="hero-swap pb-2 text-[12px] leading-4 text-code-muted">
+    <span data-hero-swap="valid">src/pages/index.zen</span>
+    <span data-hero-swap="edited" class="text-code-error">src/pages/index.zen (edited)</span>
+  </p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 1</span><span class="ml-[8.4px] text-code-gold">&lt;script setup="ts"&gt;</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 2</span><span class="ml-[8.4px]">const count =</span><span data-hero-src="signal" class="hero-anchor ml-[8.4px] rounded-[4px] bg-code-blue-soft px-[3px] text-code-blue">signal(0)</span><span>;</span><span ref={pinSignalRef} data-hero-pin="1" data-hero-rest-only="true" class="ml-[8.4px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] text-[12px] leading-3 border-code-blue text-code-blue">1</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 3</span><span class="ml-[8.4px]"> </span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 4</span><span class="ml-[8.4px]">function</span><span class="ml-[8.4px] text-code-purple">increment</span><span>() &#123;</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 5</span><span class="ml-[8.4px]">    count.set(count.get() + 1);</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 6</span><span class="ml-[8.4px]">&#125;</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted"> 7</span><span class="ml-[8.4px] text-code-gold">&lt;/script&gt;</span></p>
+  <p class="flex items-center whitespace-pre" aria-label="lines 8 to 13 omitted"><span class="w-[26px] shrink-0 text-code-muted">  </span><span class="ml-[8.4px] text-code-muted">⋯</span></p>
+  <p class="flex items-center whitespace-pre"><span data-hero-line14="true" class="w-[26px] shrink-0 text-code-muted">14</span><span class="ml-[8.4px] text-code-gold">&lt;button</span><span class="hero-swap ml-[8.4px]"><span data-hero-swap="valid" data-hero-src="event" class="hero-anchor rounded-[4px] bg-code-gold-soft px-[3px] text-code-gold">on:click=&#123;increment&#125;</span><span data-hero-swap="edited" class="justify-self-start rounded-[4px] bg-code-red-soft px-[3px] text-code-error">on:click="doThing"</span></span><span ref={pinEventRef} data-hero-pin="2" class="ml-[8.4px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] text-[12px] leading-3 hero-pin-event border-code-gold text-code-gold">2</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted">  </span><span class="ml-[8.4px]">        class="button"&gt;</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted">  </span><span class="ml-[8.4px]">  Count:</span><span data-hero-src="expr" class="hero-anchor ml-[8.4px] rounded-[4px] bg-code-gold-soft px-[3px] text-code-gold">&#123;count&#125;</span><span ref={pinExprRef} data-hero-pin="3" data-hero-rest-only="true" class="ml-[8.4px] grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] text-[12px] leading-3 border-code-gold text-code-gold">3</span></p>
+  <p class="flex items-center whitespace-pre"><span class="w-[26px] shrink-0 text-code-muted">  </span><span class="ml-[8.4px] text-code-gold">&lt;/button&gt;</span></p>
+</div>

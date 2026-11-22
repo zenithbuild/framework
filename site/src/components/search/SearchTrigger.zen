@@ -11,11 +11,14 @@ const triggerScope = triggerProps.scope || "global";
 const triggerLabel = triggerProps.label || "Search";
 const triggerVariant = triggerProps.variant || "nav";
 const triggerClassName = typeof triggerProps.class === "string" ? triggerProps.class : "";
+state shortcut = "Ctrl K";
 const triggerRef = ref<HTMLButtonElement>();
 
-const navClass = "inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
-const inlineClass = "inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const navClass = "inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
+const inlineClass = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 const triggerClass = (triggerVariant === "inline" ? inlineClass : navClass) + " " + triggerClassName;
+// v1 nav: icon-only pill below 1024px (48×36 in the Round 4 mobile/tablet frames).
+const triggerLabelClass = triggerVariant === "inline" ? "hidden sm:inline" : "hidden lg:inline";
 
 function openSearchModal() {
   const doc = zenDocument();
@@ -26,8 +29,11 @@ function openSearchModal() {
 zenMount((ctx) => {
   const win = zenWindow();
   if (!win) return;
+  shortcut = /Mac|iPhone|iPad/i.test(win.navigator.platform) ? "⌘K" : "Ctrl K";
   const off = zenOn(win, "keydown", (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    const target = e.target as HTMLElement | null;
+    const typing = target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName || "");
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k" || !typing && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "/") {
       e.preventDefault();
       openSearchModal();
     }
@@ -49,6 +55,6 @@ zenMount((ctx) => {
     <circle cx="11" cy="11" r="7" />
     <path d="M21 21l-4.3-4.3" />
   </svg>
-  <span class="hidden sm:inline">{triggerLabel}</span>
-  <kbd class="hidden font-mono text-[10px] text-muted-foreground/70 sm:inline">⌘K</kbd>
+  <span class={triggerLabelClass}>{triggerLabel}</span>
+  <kbd class={triggerVariant === "inline" ? "hidden font-mono text-[10px] text-muted-foreground/70 sm:inline" : "hidden font-mono text-[12px] font-medium text-muted-foreground lg:inline"}>{shortcut}</kbd>
 </button>

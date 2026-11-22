@@ -1,0 +1,26 @@
+/* CopyCommand variants (JUD-147). Static selectors only: expression attributes hydrate late, so an
+   absent data-copy-status means idle, and the step variant comes from the caller's .copy-step class. */
+.copy-command .copy-when-copied { display: none; }
+.copy-command[data-copy-status="copied"] .copy-when-copied { display: inline-flex; }
+.copy-command[data-copy-status="copied"] .copy-when-idle { display: none; }
+.copy-num { display: none; }
+.copy-command:not([data-copy-status="failed"]) [data-copy-failure] { display: none; }
+
+.copy-step .copy-num {
+  display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 9999px;
+  font-family: var(--font-mono); font-size: 13px; line-height: 16px; color: var(--muted-foreground);
+}
+.copy-step .copy-box { justify-content: space-between; gap: 4px; border-radius: 16px; padding: 4px 4px 4px 12px; min-height: 0; }
+.copy-step .copy-dollar { display: none; }
+.copy-step .copy-button { width: 44px; height: 44px; padding: 0; }
+.copy-step .copy-button::after { content: none; }
+.copy-step .copy-icon { width: 18px; height: 18px; }
+.copy-step .copy-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-width: 768px) {
+  .copy-step .copy-box { gap: 12px; border-radius: 9999px; padding: 6px 6px 6px 20px; }
+  .copy-step .copy-dollar { display: inline; }
+  .copy-step .copy-button { width: auto; height: auto; padding: 7px 14px; }
+  .copy-step .copy-icon { width: 16px; height: 16px; }
+  .copy-step .copy-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+}

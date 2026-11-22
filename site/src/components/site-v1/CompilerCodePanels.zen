@@ -1,0 +1,52 @@
+<script lang="ts">
+// Compiler page code panels (JUD-142): Compile → Bundle intake keys (packages/core/src/schema.ts:5-23
+// @ dea39f22, verbatim) with the ref_bindings drift note (JUD-150), and the ZEN-SCRIPT-MISSING-TS
+// refusal (script_contract.rs:118/128, input zenith_cli/tests/json_contract.rs:170).
+interface Props { part: "intake" | "refuses"; }
+const compilerPanelPart = (props as Props).part;
+</script>
+
+<div data-compiler-panels={compilerPanelPart} class="contents">
+  <figure data-compiler-panel="intake" class={compilerPanelPart === "intake" ? "v1-code-panel flex flex-col text-[12px] leading-[18px]" : "hidden"}>
+    <figcaption class="flex flex-wrap items-center justify-between gap-2 border-b border-code-border px-4 py-3 text-code-muted"><span>Compile → Bundle · packages/core/src/schema.ts:5-23</span><span class="font-medium text-code-fg">requiredTopLevelKeys</span></figcaption>
+    <ul class="flex flex-wrap gap-[6px] px-4 py-4" aria-label="Required top-level keys">
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">ir_version</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">graph_hash</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">graph_edges</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">graph_nodes</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-purple">html</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">expressions</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">hoisted</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">components_scripts</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">component_instances</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">imports</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-muted">modules</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">prerender</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-blue-soft text-code-blue">signals</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-gold-soft text-code-gold">expression_bindings</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-gold-soft text-code-gold">marker_bindings</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-gold-soft text-code-gold">event_bindings</li>
+        <li class="rounded-[4px] px-[6px] py-[2px] bg-code-inline-bg text-code-fg">style_blocks</li>
+    </ul>
+    <div class="flex flex-col gap-1 border-t border-code-border px-4 py-3">
+      <p class="text-code-gold">ref_bindings: a CompilerOutput field (compiler_types.rs:236), not in this list. Drift, tracked as JUD-150.</p>
+      <p class="text-code-muted">modules: added by the CLI to the page IR (relative-helper-modules.js), not by the compiler.</p>
+    </div>
+  </figure>
+
+  <figure data-compiler-panel="refuses" class={compilerPanelPart === "refuses" ? "v1-code-panel flex flex-col text-[13px] leading-5" : "hidden"}>
+    <figcaption class="flex flex-wrap items-center justify-between gap-2 border-b border-code-border px-4 py-3"><span class="flex items-center gap-2 font-medium text-code-fg"><span aria-hidden="true" class="h-2 w-2 rounded-full bg-code-error"></span>build failed</span><span class="text-[12px] text-code-muted">integration/v1 @ dea39f22</span></figcaption>
+    <div class="flex flex-col gap-1 border-b border-code-border px-4 py-3">
+      <p class="text-[12px] text-code-muted">Input · zenith_cli/tests/json_contract.rs:170</p>
+      <p class="overflow-x-auto whitespace-pre text-code-fg">&lt;script&gt;const x = 1&lt;/script&gt;&lt;main&gt;&#123;x&#125;&lt;/main&gt;</p>
+    </div>
+    <div class="flex flex-col gap-2 px-4 py-4">
+      <p class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-code-red-soft px-2 py-[2px] text-[12px] leading-4 text-code-error">error</span><span class="text-code-error">ZEN-SCRIPT-MISSING-TS</span></p>
+      <p class="text-code-fg">Zenith requires TypeScript scripts. Add lang="ts".</p>
+      <p class="text-code-muted">File: …#script…</p>
+      <p class="text-code-muted">Reason: missing lang="ts" annotation on &lt;script&gt;</p>
+      <p class="text-code-success">Example: &lt;script lang="ts"&gt;</p>
+      <p class="text-[12px] text-code-muted">compiler_diagnostics.rs:98-99 · script_contract.rs:118, 128</p>
+    </div>
+  </figure>
+</div>

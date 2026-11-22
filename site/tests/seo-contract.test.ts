@@ -15,6 +15,9 @@ const publicRoutes = [
   "/docs",
   "/docs/getting-started",
   "/about",
+  "/performance",
+  "/how-it-works/compiler",
+  "/showcase",
 ];
 
 function readSource(path: string) {
@@ -25,10 +28,13 @@ function readSource(path: string) {
 const pageFiles = [
   "src/pages/index.zen",
   "src/pages/blog/index.zen",
-  "src/pages/blog/building-zenith-0-8/index.zen",
+  "src/pages/blog/[slug].zen",
   "src/pages/docs/index.zen",
-  "src/pages/docs/getting-started/index.zen",
+  "src/pages/docs/[...slug].zen",
   "src/pages/about/index.zen",
+  "src/pages/performance/index.zen",
+  "src/pages/how-it-works/compiler/index.zen",
+  "src/pages/showcase/index.zen",
 ];
 
 describe("public metadata contract", () => {
@@ -55,7 +61,7 @@ describe("public metadata contract", () => {
 
   test("renders the complete static metadata surface through the shared layout", () => {
     const layout = readSource("src/layouts/DefaultLayout.zen");
-    expect(layout.includes('defaultLayoutCanonicalUrl ? "canonical" : undefined')).toBe(true);
+    expect(layout.includes('<link rel="canonical" href={defaultLayoutMetadata.canonicalUrl}')).toBe(true);
     expect(layout.includes('property="og:title"')).toBe(true);
     expect(layout.includes('property="og:description"')).toBe(true);
     expect(layout.includes('property="og:type"')).toBe(true);
@@ -72,13 +78,13 @@ describe("public metadata contract", () => {
 
 describe("semantic route relationships", () => {
   test("keeps blog and docs navigation crawlable and contextual", () => {
-    const articleRoute = readSource("src/pages/blog/building-zenith-0-8/index.zen");
+    const articleRoute = readSource("src/pages/blog/[slug].zen");
     const articleSurface = readSource("src/components/BlogArticle.zen");
     const docs = readSource("src/components/DocumentationArticle.zen");
     expect(articleRoute.includes("loadBlogDetailSource")).toBe(true);
     expect(articleSurface.includes("<article")).toBe(true);
     expect(articleSurface.includes('href="/blog"')).toBe(true);
-    expect(articleSurface.includes("Back to Blog")).toBe(true);
+    expect(articleSurface.includes('aria-label="Breadcrumb"')).toBe(true);
     expect(articleSurface.includes('aria-label="Article pagination"')).toBe(true);
     expect(docs.includes("<article")).toBe(true);
     expect(docs.includes('aria-label="Breadcrumb"')).toBe(true);

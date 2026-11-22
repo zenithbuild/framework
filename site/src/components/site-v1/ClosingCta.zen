@@ -1,0 +1,67 @@
+<script lang="ts">
+// §4 Closing CTA (JUD-141 / JUD-147). Terminal text is verbatim from copy.md §5 (create-zenith 1.3.21
+// real pseudo-terminal run). Collapsed by default: last 6 lines + "Show full log ▾" (aria-expanded,
+// aria-controls="full-log"). Expanding is user-initiated, so its height change is not CLS.
+import CopyCommand from "./CopyCommand.zen";
+import Icon from "./Icon.zen";
+
+interface Props { copyLiveRef?: any; }
+const ctaCopyLiveRef = (props as Props).copyLiveRef;
+state ctaLogExpanded = false;
+
+function ctaToggleLog() {
+  ctaLogExpanded = !ctaLogExpanded;
+}
+</script>
+
+<section id="get-started" data-v1-cta="true" aria-labelledby="cta-title" class="border-t border-border bg-surface-purple px-4 py-12 md:px-10 md:py-24 lg:px-20">
+  <div class="mx-auto grid w-full max-w-[1280px] gap-6 lg:grid-cols-2 lg:gap-20">
+    <div class="flex min-w-0 flex-col gap-6 lg:gap-8">
+      <h2 id="cta-title" class="font-heading text-[36px] font-semibold leading-10 tracking-[-0.02em] md:text-[64px] md:leading-[64px]">Create the app, then open it.</h2>
+      <div class="flex flex-wrap gap-2">
+        <a href="/docs" class="v1-button v1-button-primary">Read the docs</a>
+        <a href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" class="v1-button v1-button-outline">View on GitHub <Icon name="github" /></a>
+      </div>
+    </div>
+    <div class="flex min-w-0 flex-col gap-4">
+      <ol class="flex flex-col gap-3" aria-label="Commands">
+        <li class="copy-step"><CopyCommand command="bun create zenith@latest my-app" variant="step" step="1" liveRef={ctaCopyLiveRef} /></li>
+        <li class="copy-step"><CopyCommand command="cd my-app" variant="step" step="2" liveRef={ctaCopyLiveRef} /></li>
+        <li class="copy-step"><CopyCommand command="bun run dev" variant="step" step="3" liveRef={ctaCopyLiveRef} /></li>
+      </ol>
+      <p class="text-[16px] leading-[26px] text-foreground">The dev server prints <code class="v1-inline-code">http://127.0.0.1:3000</code> when that port is free.</p>
+      <p class="text-[14px] leading-[22px] text-muted-foreground">The default starter is <code class="v1-inline-code">css</code>. Another starter is <code class="v1-inline-code">bun create zenith my-app --template basic</code> or <code class="v1-inline-code">--template tailwind</code>.</p>
+      <details class="min-w-0 text-sm text-muted-foreground">
+        <summary class="v1-focus flex min-h-11 w-fit cursor-pointer items-center text-primary underline underline-offset-4">View terminal output</summary>
+        <figure data-cta-terminal="true" data-log-expanded={ctaLogExpanded ? "true" : "false"} class="cta-terminal v1-code-panel flex min-w-0 flex-col rounded-2xl">
+          <p class="border-b border-code-border px-4 py-[10px] text-[12px] leading-4 text-code-muted">terminal</p>
+          <div id="full-log" data-log-region="true" role="region" aria-label="Terminal output" tabindex="0" class="overflow-x-auto p-4 font-mono text-[12px] leading-5 text-code-fg md:text-[14px] md:leading-6 v1-focus">
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">$ bun create zenith@latest my-app</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Choose a starter template</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  CSS</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add ESLint for code linting?</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add Prettier for code formatting?</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Add TypeScript path alias (@/*)?</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">│  Yes</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Project created</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">◇  Dependencies installed</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">✓ Done!!</span>
+            <span data-log-extra="true" class="block whitespace-pre-wrap break-words">&nbsp;</span>
+            <span class="block whitespace-pre-wrap break-words">$ cd my-app</span>
+            <span class="block whitespace-pre-wrap break-words">$ bun run dev</span>
+            <span class="block whitespace-pre-wrap break-words">[zenith] • DEV    Starting dev server…</span>
+            <span class="block whitespace-pre-wrap break-words">[zenith] • BUILD  Initial build (id=0)</span>
+            <span class="block whitespace-pre-wrap break-words">[zenith] • CSS    ready (/__zenith_dev/styles.css?buildId=0)</span>
+            <span class="block whitespace-pre-wrap break-words text-code-success">[zenith] ✓ OK     http://127.0.0.1:3000</span>
+          </div>
+          <div class="border-t border-code-border px-4 py-[10px]">
+            <button type="button" data-log-toggle="true" aria-expanded={ctaLogExpanded ? "true" : "false"} aria-controls="full-log" class="hero-control min-h-11! text-[14px]! font-mono font-normal!" on:click={ctaToggleLog}>{ctaLogExpanded ? "Hide full log ▴" : "Show full log ▾"}</button>
+          </div>
+        </figure>
+        <p class="text-[13px] leading-5 text-muted-foreground">Output from create-zenith 1.3.21 (published). On a cold cache, the install step also prints "Resolving dependencies" lines.</p>
+      </details>
+    </div>
+  </div>
+</section>

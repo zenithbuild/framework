@@ -1,0 +1,31 @@
+<script lang="ts">
+// §1 Hero (JUD-138 / JUD-143 / JUD-147). Figma Round 2 frames 124:6155 (desktop) and 124:6629 (mobile).
+// The H1 is the LCP element: plain HTML, never tweened, three fixed lines so a font swap cannot reflow it.
+// Lines break with <br> (inline spans) so LCP measures the whole H1, not three separate block lines.
+import CopyCommand from "./CopyCommand.zen";
+import HeroCompilePanel from "./HeroCompilePanel.zen";
+
+interface Props { copyLiveRef?: any; }
+const heroCopyLiveRef = (props as Props).copyLiveRef;
+</script>
+
+<section id="top" data-v1-hero="true" aria-labelledby="hero-title" class="bg-background px-4 pb-12 pt-7 text-foreground md:px-10 md:pb-20 md:pt-14 xl:px-16 min-[1440px]:px-20">
+  <div class="mx-auto grid w-full max-w-[1280px] min-w-0 gap-5 md:gap-10 xl:grid-cols-[minmax(0,65fr)_minmax(0,89fr)] xl:items-start xl:gap-12">
+    <div data-hero-text="true" class="flex flex-col gap-5 min-w-0 md:gap-6">
+      <div class="flex flex-col gap-[14px] md:gap-4">
+        <p class="v1-eyebrow">Build closer to the platform.</p>
+        <h1 id="hero-title" data-hero-h1="true" class="font-heading text-[clamp(2.5rem,13.34vw,3.25rem)] font-semibold leading-none tracking-[-0.03em] text-foreground md:text-[76px] md:leading-[72px]">
+          <span class="whitespace-nowrap">Ship interfaces</span> <br /><span class="whitespace-nowrap">the compiler</span> <br /><span class="whitespace-nowrap">can trust.</span>
+        </h1>
+      </div>
+      <div class="flex flex-col gap-4 md:gap-5">
+        <p class="w-full max-w-[520px] text-[18px] font-medium leading-[26px] text-foreground md:text-[20px] md:leading-[30px]">You get a project you can open on your computer, with a home page and three more routes already in it.</p>
+        <div data-hero-start="true" class="flex w-full max-w-[520px] flex-col items-start gap-3">
+          <CopyCommand command="bun create zenith@latest" variant="install" liveRef={heroCopyLiveRef} />
+          <a href="/docs" class="v1-button v1-button-secondary relative h-10 min-h-10 w-[124px] border-border bg-secondary px-2 after:absolute after:inset-x-0 after:-inset-y-0.5">Read the docs</a>
+        </div>
+      </div>
+    </div>
+    <div class="hero-panel-frame min-w-0"><HeroCompilePanel /></div>
+  </div>
+</section>

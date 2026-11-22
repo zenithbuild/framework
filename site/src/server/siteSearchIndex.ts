@@ -1,6 +1,6 @@
 import type { BlogPost } from "./postSource";
 import type { DocumentationDetail } from "./documentationSource";
-import { PUBLIC_ROUTE_METADATA } from "../content/site/metadata";
+import { indexablePublicRoutes } from "../content/site/metadata";
 import { stripHtmlTags } from "./postSourceSupport";
 import type {
   BlogSearchFilters,
@@ -34,12 +34,12 @@ function mapBlogPostToRecord(post: BlogPost): SearchRecord {
     description: post.excerpt || post.description,
     bodyText: stripMarkdownBody(post.htmlRendered),
     headings: (post.headings || []).map((h) => ({ id: h.id, text: h.text })),
-    category: post.category?.title,
+    ...(post.category?.title ? { category: post.category.title } : {}),
     tags: post.tags || [],
-    author: post.author?.name,
-    publishedAt: post.publishedAt || undefined,
-    readingTime: post.readingTime || undefined,
-    featured: post.featured || undefined,
+    ...(post.author?.name ? { author: post.author.name } : {}),
+    ...(post.publishedAt ? { publishedAt: post.publishedAt } : {}),
+    ...(post.readingTime ? { readingTime: post.readingTime } : {}),
+    featured: Boolean(post.featured),
     path: post.canonicalPath || post.path,
   };
 }
@@ -52,14 +52,14 @@ function mapDocToRecord(doc: DocumentationDetail): SearchRecord {
     description: doc.description,
     bodyText: stripMarkdownBody(doc.htmlRendered || doc.markdownRaw),
     headings: (doc.headings || []).map((h) => ({ id: h.id, text: h.text })),
-    section: doc.section?.title,
+    ...(doc.section?.title ? { section: doc.section.title } : {}),
     tags: (doc.tags || []).map((t) => t.title),
     path: doc.path,
   };
 }
 
 function mapPageRouteRecords(): SearchRecord[] {
-  return Object.values(PUBLIC_ROUTE_METADATA)
+  return indexablePublicRoutes()
     .filter((route) => route.path !== "/blog/building-zenith-0-8")
     .map((route) => ({
       id: `page:${route.path}`,

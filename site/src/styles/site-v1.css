@@ -1,0 +1,93 @@
+/* Zenith v1 (Round 4 + 4.1) approved tokens and layout states.
+   Values: zenith-design/v1-handoff/tokens.json (proposed/* values are approved). */
+:root {
+  /* v1 approved tokens (handoff tokens.json, proposed/* values are approved) */
+  --border-strong: #7f7d8c;
+  --gold-text: #966800;
+  --success: #007f43;
+  --warning: #a45e00;
+  --info: #2961ce;
+  --primary-hover-bg: #ffc83a;
+  --primary-hover-fg: #452d0a;
+  --code-bg: #161620;
+  --brand-blue: #2867e4;
+  --brand-magenta: #bd2099;
+  --brand-gold: #e5ae00;
+  --brand-purple-soft: #f1e5ff;
+  --brand-blue-soft: #ddecff;
+  --brand-gold-soft: #f7eace;
+  --brand-magenta-soft: #ffe1f4;
+  --brand-red-soft: #ffe2dd;
+  --surface-purple: #faf6ff;
+  --surface-2: #f1eef7;
+
+  /* code panels are always dark (tokens.json color.code-panel) */
+  --code-fg: #efedf4;
+  --code-muted: #a5a3ad;
+  --code-border: #2d2c37;
+  --code-control: #76748a;
+  --code-purple: #ce88f7;
+  --code-blue: #669bff;
+  --code-gold: #ecbd4a;
+  --code-magenta: #ec71c8;
+  --code-success: #52cd86;
+  --code-error: #f75d5c;
+  --code-inline-bg: #24222f;
+  --code-blue-soft: #132341;
+  --code-gold-soft: #312100;
+  --code-red-soft: #3c1714;
+}
+
+.dark {
+  --border-strong: #76748a;
+  --gold-text: #ecbd4a;
+  --success: #52cd86;
+  --warning: #f3b94c;
+  --info: #73a3fc;
+  --primary-hover-bg: #e6b642;
+  --primary-hover-fg: #15151f;
+  --code-bg: #1a1828;
+  --brand-blue: #669bff;
+  --brand-magenta: #ec71c8;
+  --brand-gold: #ecbd4a;
+  --brand-purple-soft: #2a1c3b;
+  --brand-blue-soft: #132341;
+  --brand-gold-soft: #312100;
+  --brand-magenta-soft: #37172d;
+  --brand-red-soft: #3c1714;
+  --surface-purple: #140f1b;
+  --surface-2: #24222f;
+}
+
+@theme inline {
+  --color-border-strong: var(--border-strong);
+  --color-gold-text: var(--gold-text);
+  --color-success: var(--success);
+  --color-code-bg: var(--code-bg);
+  --color-code-fg: var(--code-fg);
+  --color-code-muted: var(--code-muted);
+  --color-code-border: var(--code-border);
+  --color-code-control: var(--code-control);
+  --color-code-purple: var(--code-purple);
+  --color-code-blue: var(--code-blue);
+  --color-code-gold: var(--code-gold);
+  --color-code-magenta: var(--code-magenta);
+  --color-code-success: var(--code-success);
+  --color-code-error: var(--code-error);
+  --color-code-inline-bg: var(--code-inline-bg);
+  --color-code-blue-soft: var(--code-blue-soft);
+  --color-code-gold-soft: var(--code-gold-soft);
+  --color-code-red-soft: var(--code-red-soft);
+  --color-primary-hover-bg: var(--primary-hover-bg);
+  --color-primary-hover-fg: var(--primary-hover-fg);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-magenta: var(--brand-magenta);
+  --color-brand-purple-soft: var(--brand-purple-soft);
+  --color-brand-blue-soft: var(--brand-blue-soft);
+  --color-brand-gold-soft: var(--brand-gold-soft);
+  --color-brand-magenta-soft: var(--brand-magenta-soft);
+  --color-brand-red-soft: var(--brand-red-soft);
+  --color-surface-purple: var(--surface-purple);
+  --color-surface-2: var(--surface-2);
+  --font-mono: var(--zen-font-mono);
+}

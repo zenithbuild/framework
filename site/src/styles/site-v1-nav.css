@@ -1,0 +1,47 @@
+/* v1 nav first-paint mirror (JUD-138). Zenith fills attribute and text expressions on hydrate, so a
+   Links anchor or the search trigger has no class in the SSR HTML. These static, low-priority rules
+   reproduce the hydrated layout so the header does not shift (CLS). Utilities still win after hydrate. */
+@layer components {
+  /* Links (ui/Links.zen) before hydrate: no class attribute yet, so hide the disabled twin and the
+     button overlay, and let the content wrapper flow inline. Once classes land these stop matching. */
+  [data-zen-link-disabled]:not([class]), [data-zen-link-overlay]:not([class]) { display: none; }
+  [data-zen-link-content]:not([class]) { display: contents; }
+  .nav-logo-slot a { display: flex; min-height: 44px; align-items: center; gap: 8px; border-radius: 9999px; }
+  .nav-links-slot a {
+    display: inline-flex; min-height: 44px; align-items: center;
+    border-bottom: 2px solid transparent; font-size: 15px; font-weight: 500; line-height: 20px;
+    color: var(--muted-foreground);
+  }
+  .nav-cta-slot a {
+    display: inline-flex; min-height: 44px; align-items: center; gap: 8px; border-radius: 9999px;
+    padding: 0 12px; font-size: 14px; font-weight: 500; line-height: 18px; color: var(--primary);
+  }
+  .nav-cta-slot > span:last-child a { padding: 0 14px; background: var(--primary); color: var(--primary-foreground); }
+  [data-nav-actions] [data-search-trigger] {
+    position: relative; display: inline-flex; height: 44px; width: 48px; align-items: center; justify-content: center;
+    gap: 8px; border: 1px solid var(--border-strong); border-radius: 9999px; background: var(--card);
+    font-size: 14px; color: var(--muted-foreground);
+  }
+  [data-nav-actions] [data-search-trigger] > span, [data-nav-actions] [data-search-trigger] > kbd { display: none; }
+  @media (min-width: 1024px) {
+    .nav-cta-slot a { padding: 0 14px; }
+    [data-nav-actions] [data-search-trigger] { width: auto; justify-content: flex-start; padding: 0 16px; }
+    [data-nav-actions] [data-search-trigger] > span, [data-nav-actions] [data-search-trigger] > kbd { display: inline; }
+    /* The label is a text expression (empty until hydrate); hold its width with the same word. */
+    [data-nav-actions] [data-search-trigger] > span:empty::before { content: "Search"; }
+  }
+  .footer-links-slot a { display: inline-flex; min-height: 44px; align-items: center; font-size: 15px; line-height: 20px; }
+  /* Closed until hydrate says otherwise: aria-hidden="false" is only set when the menu opens. */
+  .nav-mobile-slot > #mobile-navigation:not([aria-hidden="false"]) { display: none; }
+  .nav-mobile-slot #mobile-navigation nav a {
+    display: flex; min-height: 48px; align-items: center; border-bottom: 1px solid var(--border); padding: 12px 0;
+    font-family: var(--font-heading); font-size: 22px; font-weight: 600; color: var(--foreground);
+  }
+}
+
+[data-nav-theme-toggle] [data-zen-theme-toggle] { position: relative; border-color: var(--border-strong); }
+/* ThemeToggle before hydrate: neither icon has its display style yet, so show only the first (light)
+   icon. Without this both icons sit side by side for a frame and the search pill shifts 8px. */
+[data-zen-theme-toggle] > svg:not([style]) + svg:not([style]) { display: none; }
+
+[data-search-root]:not([data-search-modal="open"]) { display: none; }

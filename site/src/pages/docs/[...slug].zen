@@ -2,7 +2,6 @@
 import { siteContent } from "../../content/index";
 import { createContentMetadata } from "../../content/site/metadata";
 import { loadDocumentationPageSource } from "../../server/documentationPageSource";
-import { loadSearchIndex } from "../../server/searchIndexLoader";
 import { createDocumentationViewModel } from "../../server/documentationViewModel";
 
 export const load = async (ctx) => {
@@ -14,7 +13,6 @@ export const load = async (ctx) => {
   if (!source.document) return ctx.deny(404);
   const document = source.document;
   const view = createDocumentationViewModel(document, source.sections, source.sourceMode);
-  const searchIndex = await loadSearchIndex();
   const metadata = createContentMetadata({
     path: document.path,
     title: document.seoTitle || document.title,
@@ -34,7 +32,6 @@ export const load = async (ctx) => {
     document,
     sections: source.sections,
     sourceMode: source.sourceMode,
-    searchIndex,
     view,
     site: { navigation: siteContent.navigation, footer: siteContent.footer },
   });
@@ -46,6 +43,6 @@ import DefaultLayout from "@/layouts/DefaultLayout.zen";
 import DocumentationArticle from "@/components/DocumentationArticle.zen";
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.document.path} searchIndex={data.searchIndex}>
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath={data.document.path}>
   <DocumentationArticle view={data.view} />
 </DefaultLayout>

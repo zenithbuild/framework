@@ -17,19 +17,18 @@ const contributorsSource = readSource("src/components/ContributorsSection.zen");
 const motionSource = readSource("src/components/motion/MotionGroup.zen");
 
 describe("Home section refinement", () => {
-  test("keeps the framework showcase, precision rail, sponsorship, and contributors as distinct Home sections", () => {
-    expect(indexSource.includes('import FrameworkSurface from "@/components/FrameworkSurface.zen"')).toBe(false);
-    expect(indexSource.includes('import AboutSection from "@/components/AboutSection.zen"')).toBe(true);
-    expect(indexSource.includes('import PrecisionRail from "@/components/PrecisionRail.zen"')).toBe(true);
-    expect(indexSource.includes('import FeatureShowcase from "@/components/FeatureShowcase.zen"')).toBe(true);
-    expect(indexSource.includes('import ContributorsSection from "@/components/ContributorsSection.zen"')).toBe(true);
-    expect(indexSource.includes("<AboutSection />")).toBe(true);
-    expect(indexSource.includes("<PrecisionRail />")).toBe(true);
-    expect(indexSource.includes("<FeatureShowcase sponsorship={data.editorial.sponsorship} />")).toBe(true);
-    expect(indexSource.includes("<ContributorsSection people={data.editorial.people} />")).toBe(true);
-    expect(indexSource.indexOf("<AboutSection />")).toBeLessThan(indexSource.indexOf("<PrecisionRail />"));
-    expect(indexSource.indexOf("<PrecisionRail />")).toBeLessThan(indexSource.indexOf("<FeatureShowcase sponsorship="));
-    expect(indexSource.indexOf("<FeatureShowcase sponsorship=")).toBeLessThan(indexSource.indexOf("<ContributorsSection people="));
+  test("composes the v1 Home from hero, pipeline, Why Zenith, and the closing CTA", () => {
+    // v1 (Round 4 + 4.1 handoff §4) replaces the old Home composition. The previous section components
+    // stay in the repo, unused, until a cleanup pass removes them.
+    const order = ["<HomeHero ", "<PipelineSection />", "<WhyZenithSection />", "<ClosingCta "];
+    order.forEach((tag) => expect(indexSource.includes(tag)).toBe(true));
+    for (let index = 1; index < order.length; index += 1) {
+      expect(indexSource.indexOf(order[index - 1])).toBeLessThan(indexSource.indexOf(order[index]));
+    }
+    expect(indexSource.includes("<AboutSection />")).toBe(false);
+    expect(indexSource.includes("<PrecisionRail />")).toBe(false);
+    expect(indexSource.includes("introEnabled={true}")).toBe(true);
+    expect(indexSource.includes('data-zenith-intro-state="pending"')).toBe(false);
   });
 
   test("shows every public Zenith package once in the accessible rail", () => {

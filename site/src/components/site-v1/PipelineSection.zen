@@ -1,0 +1,142 @@
+<script lang="ts">
+// §2 How it works (JUD-139). Desktop/tablet ≥768: vertical tablist + stacked tabpanels (one grid cell,
+// so switching cannot shift layout). Mobile <768: accordion, one stage open, instant.
+// GSAP hook: stageSwitchTl listens for `pipeline:stagechange` on [data-pipeline-root]; the rail
+// highlight [data-pipeline-highlight] moves by transform only. No ScrollTrigger, pin or scrub.
+import Links from "@/components/ui/Links.zen";
+import PipelineStagePanel from "./PipelineStagePanel.zen";
+
+type PipeStage = "build" | "compile" | "bundle" | "run";
+const PIPE_ORDER: PipeStage[] = ["build", "compile", "bundle", "run"];
+const pipeRootRef = ref<HTMLElement>();
+const pipeTabBuildRef = ref<HTMLButtonElement>();
+const pipeTabCompileRef = ref<HTMLButtonElement>();
+const pipeTabBundleRef = ref<HTMLButtonElement>();
+const pipeTabRunRef = ref<HTMLButtonElement>();
+
+state pipelineStage = "compile";
+state pipelineOpen = "compile";
+
+function pipeSelect(next: PipeStage) {
+  if (pipelineStage === next) return;
+  const previous = pipelineStage;
+  pipelineStage = next;
+  const root = pipeRootRef.current;
+  const win = zenWindow();
+  if (root && win) root.dispatchEvent(new win.CustomEvent("pipeline:stagechange", { bubbles: true, detail: { from: previous, to: next } }));
+}
+
+function pipeTabKeys(event: KeyboardEvent, current: PipeStage) {
+  const index = PIPE_ORDER.indexOf(current);
+  let nextIndex = -1;
+  if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = (index + 1) % 4;
+  if (event.key === "ArrowUp" || event.key === "ArrowLeft") nextIndex = (index + 3) % 4;
+  if (event.key === "Home") nextIndex = 0;
+  if (event.key === "End") nextIndex = 3;
+  if (nextIndex < 0) return;
+  event.preventDefault();
+  pipeSelect(PIPE_ORDER[nextIndex]);
+  [pipeTabBuildRef, pipeTabCompileRef, pipeTabBundleRef, pipeTabRunRef][nextIndex].current?.focus();
+}
+
+function pipeToggle(stage: PipeStage) {
+  // One open at a time; pressing the open header closes it. Focus stays on the header button.
+  pipelineOpen = pipelineOpen === stage ? "" : stage;
+}
+</script>
+
+<section id="how-it-works" ref={pipeRootRef} data-pipeline-root="true" data-active-stage={pipelineStage} aria-labelledby="how-it-works-title" class="pipeline-root border-t border-border bg-background px-4 py-12 md:px-10 md:py-14 lg:px-20">
+  <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-5 md:gap-6">
+    <div class="flex items-end justify-between gap-3">
+      <div class="flex flex-col gap-[10px]">
+        <p class="v1-eyebrow">How it works</p>
+        <h2 id="how-it-works-title" class="v1-h2">Four stages from the file to the page.</h2>
+      </div>
+      <a href="#why-zenith" class="v1-link hidden shrink-0 text-muted-foreground md:inline-flex">Skip section ↓</a>
+    </div>
+
+    <div class="pipeline-desktop gap-6">
+      <div class="pipeline-tablist" role="tablist" aria-label="Pipeline stages" aria-orientation="vertical">
+        <span aria-hidden="true" data-pipeline-highlight="true" data-stage-accent={pipelineStage} class="pipeline-highlight"></span>
+        <button ref={pipeTabBuildRef} id="pipeline-tab-build" type="button" role="tab" data-stage-tab="build" data-stage-accent="build" aria-controls="pipeline-panel-build" aria-selected={pipelineStage === "build" ? "true" : "false"} tabindex={pipelineStage === "build" ? "0" : "-1"} class="pipeline-tab v1-tab" on:click={() => pipeSelect("build")} on:keydown={(event) => pipeTabKeys(event, "build")}>
+          <span aria-hidden="true" class="pipeline-num">1</span>
+          <span class="flex flex-col gap-[2px] text-left"><span class="pipeline-tab-name">Build</span><span class="whitespace-nowrap font-mono text-[12px] leading-4 text-muted-foreground">zenith build</span></span>
+        </button>
+        <button ref={pipeTabCompileRef} id="pipeline-tab-compile" type="button" role="tab" data-stage-tab="compile" data-stage-accent="compile" aria-controls="pipeline-panel-compile" aria-selected={pipelineStage === "compile" ? "true" : "false"} tabindex={pipelineStage === "compile" ? "0" : "-1"} class="pipeline-tab v1-tab" on:click={() => pipeSelect("compile")} on:keydown={(event) => pipeTabKeys(event, "compile")}>
+          <span aria-hidden="true" class="pipeline-num">2</span>
+          <span class="flex flex-col gap-[2px] text-left"><span class="pipeline-tab-name">Compile</span><span class="whitespace-nowrap font-mono text-[12px] leading-4 text-muted-foreground">CompilerOutput tables</span></span>
+        </button>
+        <button ref={pipeTabBundleRef} id="pipeline-tab-bundle" type="button" role="tab" data-stage-tab="bundle" data-stage-accent="bundle" aria-controls="pipeline-panel-bundle" aria-selected={pipelineStage === "bundle" ? "true" : "false"} tabindex={pipelineStage === "bundle" ? "0" : "-1"} class="pipeline-tab v1-tab" on:click={() => pipeSelect("bundle")} on:keydown={(event) => pipeTabKeys(event, "bundle")}>
+          <span aria-hidden="true" class="pipeline-num">3</span>
+          <span class="flex flex-col gap-[2px] text-left"><span class="pipeline-tab-name">Bundle</span><span class="whitespace-nowrap font-mono text-[12px] leading-4 text-muted-foreground">manifest.json</span></span>
+        </button>
+        <button ref={pipeTabRunRef} id="pipeline-tab-run" type="button" role="tab" data-stage-tab="run" data-stage-accent="run" aria-controls="pipeline-panel-run" aria-selected={pipelineStage === "run" ? "true" : "false"} tabindex={pipelineStage === "run" ? "0" : "-1"} class="pipeline-tab v1-tab" on:click={() => pipeSelect("run")} on:keydown={(event) => pipeTabKeys(event, "run")}>
+          <span aria-hidden="true" class="pipeline-num">4</span>
+          <span class="flex flex-col gap-[2px] text-left"><span class="pipeline-tab-name">Run</span><span class="whitespace-nowrap font-mono text-[12px] leading-4 text-muted-foreground">hydrate applies the tables</span></span>
+        </button>
+      </div>
+      <div class="pipeline-panels">
+        <div id="pipeline-panel-build" role="tabpanel" aria-labelledby="pipeline-tab-build" data-stage-panel="build" data-stage-accent="build" class="pipeline-panel">
+          <PipelineStagePanel stage="build" />
+        </div>
+        <div id="pipeline-panel-compile" role="tabpanel" aria-labelledby="pipeline-tab-compile" data-stage-panel="compile" data-stage-accent="compile" class="pipeline-panel">
+          <PipelineStagePanel stage="compile" />
+        </div>
+        <div id="pipeline-panel-bundle" role="tabpanel" aria-labelledby="pipeline-tab-bundle" data-stage-panel="bundle" data-stage-accent="bundle" class="pipeline-panel">
+          <PipelineStagePanel stage="bundle" />
+        </div>
+        <div id="pipeline-panel-run" role="tabpanel" aria-labelledby="pipeline-tab-run" data-stage-panel="run" data-stage-accent="run" class="pipeline-panel">
+          <PipelineStagePanel stage="run" />
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline-accordion flex flex-col gap-2">
+      <div data-stage-item="build" data-stage-accent="build" data-open={pipelineOpen === "build" ? "true" : "false"} class="pipeline-acc-item">
+        <h3>
+          <button id="pipeline-acc-build" type="button" data-stage-toggle="build" aria-expanded={pipelineOpen === "build" ? "true" : "false"} aria-controls="pipeline-acc-panel-build" class="pipeline-acc-button v1-focus" on:click={() => pipeToggle("build")}>
+            <span class="flex min-w-0 items-center gap-[10px]"><span aria-hidden="true" class="pipeline-num">1</span><span class="pipeline-tab-name">Build</span><span class="truncate font-mono text-[12px] leading-4 text-muted-foreground">zenith build</span></span>
+            <span aria-hidden="true" class="text-[14px] leading-4 text-muted-foreground">{pipelineOpen === "build" ? "▴" : "▾"}</span>
+          </button>
+        </h3>
+        <div id="pipeline-acc-panel-build" role="region" aria-labelledby="pipeline-acc-build" data-stage-region="build" class="pipeline-acc-panel" hidden={pipelineOpen === "build" ? undefined : true}>
+          <PipelineStagePanel stage="build" variant="mobile" />
+        </div>
+      </div>
+      <div data-stage-item="compile" data-stage-accent="compile" data-open={pipelineOpen === "compile" ? "true" : "false"} class="pipeline-acc-item">
+        <h3>
+          <button id="pipeline-acc-compile" type="button" data-stage-toggle="compile" aria-expanded={pipelineOpen === "compile" ? "true" : "false"} aria-controls="pipeline-acc-panel-compile" class="pipeline-acc-button v1-focus" on:click={() => pipeToggle("compile")}>
+            <span class="flex min-w-0 items-center gap-[10px]"><span aria-hidden="true" class="pipeline-num">2</span><span class="pipeline-tab-name">Compile</span><span class="truncate font-mono text-[12px] leading-4 text-muted-foreground">CompilerOutput tables</span></span>
+            <span aria-hidden="true" class="text-[14px] leading-4 text-muted-foreground">{pipelineOpen === "compile" ? "▴" : "▾"}</span>
+          </button>
+        </h3>
+        <div id="pipeline-acc-panel-compile" role="region" aria-labelledby="pipeline-acc-compile" data-stage-region="compile" class="pipeline-acc-panel" hidden={pipelineOpen === "compile" ? undefined : true}>
+          <PipelineStagePanel stage="compile" variant="mobile" />
+        </div>
+      </div>
+      <div data-stage-item="bundle" data-stage-accent="bundle" data-open={pipelineOpen === "bundle" ? "true" : "false"} class="pipeline-acc-item">
+        <h3>
+          <button id="pipeline-acc-bundle" type="button" data-stage-toggle="bundle" aria-expanded={pipelineOpen === "bundle" ? "true" : "false"} aria-controls="pipeline-acc-panel-bundle" class="pipeline-acc-button v1-focus" on:click={() => pipeToggle("bundle")}>
+            <span class="flex min-w-0 items-center gap-[10px]"><span aria-hidden="true" class="pipeline-num">3</span><span class="pipeline-tab-name">Bundle</span><span class="truncate font-mono text-[12px] leading-4 text-muted-foreground">manifest.json</span></span>
+            <span aria-hidden="true" class="text-[14px] leading-4 text-muted-foreground">{pipelineOpen === "bundle" ? "▴" : "▾"}</span>
+          </button>
+        </h3>
+        <div id="pipeline-acc-panel-bundle" role="region" aria-labelledby="pipeline-acc-bundle" data-stage-region="bundle" class="pipeline-acc-panel" hidden={pipelineOpen === "bundle" ? undefined : true}>
+          <PipelineStagePanel stage="bundle" variant="mobile" />
+        </div>
+      </div>
+      <div data-stage-item="run" data-stage-accent="run" data-open={pipelineOpen === "run" ? "true" : "false"} class="pipeline-acc-item">
+        <h3>
+          <button id="pipeline-acc-run" type="button" data-stage-toggle="run" aria-expanded={pipelineOpen === "run" ? "true" : "false"} aria-controls="pipeline-acc-panel-run" class="pipeline-acc-button v1-focus" on:click={() => pipeToggle("run")}>
+            <span class="flex min-w-0 items-center gap-[10px]"><span aria-hidden="true" class="pipeline-num">4</span><span class="pipeline-tab-name">Run</span><span class="truncate font-mono text-[12px] leading-4 text-muted-foreground">hydrate applies the tables</span></span>
+            <span aria-hidden="true" class="text-[14px] leading-4 text-muted-foreground">{pipelineOpen === "run" ? "▴" : "▾"}</span>
+          </button>
+        </h3>
+        <div id="pipeline-acc-panel-run" role="region" aria-labelledby="pipeline-acc-run" data-stage-region="run" class="pipeline-acc-panel" hidden={pipelineOpen === "run" ? undefined : true}>
+          <PipelineStagePanel stage="run" variant="mobile" />
+        </div>
+      </div>
+    </div>
+    <Links href="/how-it-works/compiler" class="v1-link">See how it works →</Links>
+  </div>
+</section>

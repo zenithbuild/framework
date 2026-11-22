@@ -20,7 +20,18 @@ export class DocumentationContentError extends Error {
   }
 }
 
-export async function discoverLocalDocumentationEntries(): Promise<DocumentationDetail[]> {
+let cachedEntries: Promise<DocumentationDetail[]> | undefined;
+
+export function discoverLocalDocumentationEntries(): Promise<DocumentationDetail[]> {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) return readEntries();
+  cachedEntries ??= readEntries().catch((error) => {
+    cachedEntries = undefined;
+    throw error;
+  });
+  return cachedEntries;
+}
+
+async function readEntries(): Promise<DocumentationDetail[]> {
   const candidates = (await listMarkdownFiles(DOCS_ROOT_URL))
     .filter(isPublicDocumentationPath)
     .sort((left, right) => left.localeCompare(right));
@@ -82,7 +93,7 @@ async function loadDocumentationFile(relativePath: string): Promise<Documentatio
 
   const order = requiredPositiveInteger(parsed.data.order, sourcePath, "order");
   const route = deriveDocumentationRoute(relativePath, sourcePath);
-  const rendered = renderDocumentationMarkdown(parsed.content.trimStart(), title);
+  const rendered = renderDocumentationMarkdown(parsed.content.trimStart(), title, route.path);
   const section: DocumentationSection = {
     slug: configuredSection.slug,
     title: configuredSection.title,

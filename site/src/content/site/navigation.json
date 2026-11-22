@@ -1,38 +1,38 @@
 {
   "mainLinks": [
     {
-      "label": "Home",
-      "href": "/"
-    },
-    {
       "label": "Docs",
       "href": "/docs"
+    },
+    {
+      "label": "How it works",
+      "href": "/#how-it-works"
+    },
+    {
+      "label": "Performance",
+      "href": "/performance"
     },
     {
       "label": "Blog",
       "href": "/blog"
     },
     {
-      "label": "About",
-      "href": "/about"
-    },
-    {
       "label": "GitHub",
       "href": "https://github.com/zenithbuild/framework"
+    },
+    {
+      "label": "Get started",
+      "href": "/docs/getting-started"
     }
   ],
   "footerLinks": [
     {
-      "label": "Twitter",
-      "href": "https://twitter.com/zenithbuild"
+      "label": "X",
+      "href": "https://x.com/zenithbuild"
     },
     {
       "label": "GitHub",
       "href": "https://github.com/zenithbuild/framework"
-    },
-    {
-      "label": "About",
-      "href": "/about"
     }
   ]
 }

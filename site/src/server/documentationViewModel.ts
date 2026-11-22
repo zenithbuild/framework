@@ -42,12 +42,29 @@ export interface DocumentationViewModel {
   sectionDescription: string;
   sectionSlug: string;
   htmlRendered: string;
+  /** "Edit this page on GitHub" target; empty when the document has no repository source path. */
+  editUrl: string;
   breadcrumbs: DocumentationReaderBreadcrumb[];
   sections: DocumentationReaderSection[];
   headings: DocumentationReaderHeading[];
   tags: string[];
   previous: DocumentationReaderLink | null;
   next: DocumentationReaderLink | null;
+}
+
+const DOCUMENTATION_EDIT_BASE = "https://github.com/zenithbuild/framework/blob/integration/v1/";
+
+/**
+ * v1 docs code panels (handoff "Docs article"): wrap each rendered <pre data-language> in a dark
+ * panel with a language header and a Copy button. The button is static HTML; DocumentationArticle
+ * handles clicks by delegation, so no per-block script runs.
+ */
+export function decorateDocumentationCode(html: string): string {
+  return html.replace(/<pre data-language="([^"]*)">([\s\S]*?)<\/pre>/g, (_match, language: string, body: string) =>
+    '<figure class="docs-code" data-docs-code="true">'
+    + '<figcaption class="docs-code-head"><span>' + language + '</span>'
+    + '<button type="button" class="docs-code-copy" data-docs-copy="true" aria-label="Copy code">Copy</button></figcaption>'
+    + '<pre data-language="' + language + '">' + body + "</pre></figure>");
 }
 
 export function createDocumentationViewModel(
@@ -68,7 +85,8 @@ export function createDocumentationViewModel(
     sectionTitle: document.section.title,
     sectionDescription: currentGroup?.section.description || document.section.description || "",
     sectionSlug: document.section.slug,
-    htmlRendered: document.htmlRendered || "",
+    htmlRendered: decorateDocumentationCode(document.htmlRendered || ""),
+    editUrl: document.sourcePath ? `${DOCUMENTATION_EDIT_BASE}${document.sourcePath}` : "",
     breadcrumbs: [
       { label: "Docs", path: "/docs", current: false },
       { label: document.section.title, path: document.section.path, current: false },

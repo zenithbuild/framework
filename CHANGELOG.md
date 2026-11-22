@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Emit automatic modulepreload hints for initial-route dependencies (JUD-129).
 
+### Changed
+
+- Rebuild the site to the approved v1 design: new nav and footer, a Home with the compile-panel hero, a four-stage pipeline, Why Zenith and a closing CTA, plus `/performance` (launch card only, no scores yet), `/how-it-works/compiler`, and a parked `/showcase` that is noindex and left out of nav, footer and search. The Home has no preloader. The hero H1 is the LCP element, and first-paint styles stay static so layout does not shift before hydration (JUD-138, JUD-139, JUD-140, JUD-141, JUD-142, JUD-143, JUD-144, JUD-145, JUD-146, JUD-147, JUD-148, JUD-149).
+
 ### Fixed
 
 - Production page bundles omit reactive source spans (`source.file`, positions, and snippets) from `__zenith_refs`, `__zenith_events`, and compacted payload tables. Dev-stable builds (`--dev-stable-assets`) still emit full spans for overlays. Absolute build-machine paths and source snippets no longer ship in production client JS (JUD-90).

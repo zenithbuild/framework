@@ -1,5 +1,6 @@
 export default {
-    target: 'node',
+    target: process.env.VERCEL ? 'vercel' : 'node',
+    outDir: process.env.VERCEL ? '.vercel/output' : 'dist',
     pagesDir: 'src/pages',
     typescriptDefault: true,
     embeddedMarkupExpressions: true,

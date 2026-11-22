@@ -16,8 +16,8 @@ export interface Props {
 }
 
 const incoming = props as Props;
-const blogContent = incoming.content || {};
-const blogIntro = blogContent.intro || {};
+const blogContent = incoming.content;
+const blogIntro = blogContent.intro;
 const blogArchive = blogContent.archive || {};
 const labels = blogContent.labels || {};
 const featuredPost = incoming.featuredPost || null;
@@ -36,8 +36,8 @@ function safeString(value: any): string {
 }
 
 const pageEyebrow = safeString(blogIntro.eyebrow) || "Zenith Blog";
-const pageTitle = safeString(blogIntro.title) || "Notes from the framework.";
-const pageDescription = safeString(blogIntro.description);
+const pageTitle = blogIntro.title;
+const pageDescription = blogIntro.description;
 const archiveDescription = safeString(blogArchive.description);
 const featuredLabel = safeString(labels.featuredEyebrow) || "Featured article";
 const featuredActionLabel = safeString(labels.featuredActionLabel) || "Read featured article";
@@ -46,6 +46,6 @@ const articleActionLabel = safeString(labels.postActionLabel) || "Read article";
 
 <div data-page-shell="blog" class="bg-background text-foreground">
   <BlogHeader eyebrow={pageEyebrow} title={pageTitle} description={pageDescription} postCount={browseModel.articles.length} />
-  <BlogArchiveBrowser posts={browseModel.articles} categories={browseModel.categories} tags={browseModel.tags} description={archiveDescription} actionLabel={articleActionLabel} />
   <BlogFeaturedArticle post={featuredPost} label={featuredLabel} actionLabel={featuredActionLabel} />
+  <BlogArchiveBrowser posts={browseModel.articles} categories={browseModel.categories} tags={browseModel.tags} description={archiveDescription} actionLabel={articleActionLabel} />
 </div>

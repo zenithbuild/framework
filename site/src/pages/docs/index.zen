@@ -2,20 +2,18 @@
 import { siteContent } from "../../content/index";
 import { createPageMetadata } from "../../content/site/metadata";
 import { loadDocumentationLandingSource } from "../../server/documentationPageSource";
-import { loadSearchIndex } from "../../server/searchIndexLoader";
 
 export const load = async (ctx) => {
   const source = await loadDocumentationLandingSource();
   const firstArticle = source.sections[0]?.entries[0];
   if (!firstArticle) return ctx.deny(404);
-  const searchIndex = await loadSearchIndex();
   return ctx.data({
     pageTitle: "Documentation",
+    heading: "The public contract, close to the code.",
     pageDescription: "Start with Zenith, learn the .zen component model, and follow the canonical routing, reactivity, DOM, and deployment contracts.",
     metadata: createPageMetadata("/docs"),
     firstArticlePath: firstArticle.path,
     sections: source.sections,
-    searchIndex,
     site: { navigation: siteContent.navigation, footer: siteContent.footer },
   });
 };
@@ -26,7 +24,6 @@ import DefaultLayout from "@/layouts/DefaultLayout.zen";
 import PageHeader from "@/components/layout/PageHeader.zen";
 import DocsTopicCard from "@/components/docs/DocsTopicCard.zen";
 import CodePanel from "@/components/CodePanel.zen";
-import SearchTrigger from "@/components/search/SearchTrigger.zen";
 import Callout from "@/components/Callout.zen";
 import Links from "@/components/ui/Links.zen";
 import MotionController from "@/components/motion/MotionController.zen";
@@ -40,16 +37,15 @@ const docsDeliveryRef = ref<HTMLElement>();
 
 </script>
 
-<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/docs" searchIndex={data.searchIndex}>
+<DefaultLayout title={data.pageTitle} description={data.pageDescription} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/docs">
   <div ref={docsRootRef} data-page-shell="docs" class="bg-background text-foreground">
     <PageHeader
       eyebrow="Zenith documentation"
-      title="The public contract, close to the code."
+      title={data.heading}
       description="Learn the compiler-owned component model, explicit reactive primitives, server route boundaries, and the tooling that keeps authored intent traceable."
       asideLabel="Current train"
       asideText="These demo docs follow the repository’s canonical Zenith agent, DOM, routing, and Tailwind contracts for the 0.8 package line."
     />
-    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8"><SearchTrigger scope="docs" label="Search docs" variant="inline" /></div>
 
     <section ref={docsStartRef} data-motion-section="docs-start" id="getting-started" aria-labelledby="getting-started-title" class="border-b border-border bg-muted px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
       <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-12 md:grid-cols-12 lg:gap-x-12">

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { gsap } from "gsap";
+import { classifySiteHref, mergeLinkRel } from "./siteLinkPolicy";
 import { twMerge } from "tailwind-merge";
 
 export interface Props {
@@ -29,114 +30,6 @@ export interface Props {
   onHoverOut?: (event: PointerEvent) => void;
   onFocus?: (event: FocusEvent) => void;
   onBlur?: (event: FocusEvent) => void;
-}
-
-const provenSoftNavRouteEntries = [
-  "/",
-  "/about",
-  "/blog",
-  "/blog/building-zenith-0-8",
-  "/docs",
-  "/docs/getting-started",
-];
-const provenRouteEntrySet = new Set<string>(provenSoftNavRouteEntries);
-
-function normalizeRouteEntryHref(href: string | null | undefined): string {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (hrefValue.length === 0) {
-    return "";
-  }
-
-  const pathname = hrefValue.split("#", 1)[0].split("?", 1)[0];
-  if (pathname.length === 0) {
-    return "";
-  }
-
-  if (pathname === "/") {
-    return "/";
-  }
-
-  const trimmed = pathname.replace(/\/+$/, "");
-  return trimmed.length > 0 ? trimmed : "/";
-}
-
-function isExternalHref(href: string | null | undefined) {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (hrefValue.length === 0) {
-    return false;
-  }
-
-  return /^(?:[a-z][a-z\d+\-.]*:|\/\/)/i.test(hrefValue);
-}
-
-function isHashHref(href: string | null | undefined) {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (hrefValue.length === 0) {
-    return false;
-  }
-
-  return hrefValue.startsWith("#") || hrefValue.includes("#");
-}
-
-function isInternalHref(href: string | null | undefined) {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (hrefValue.length === 0) {
-    return false;
-  }
-
-  return hrefValue.startsWith("/") && !hrefValue.startsWith("//");
-}
-
-function isProvenSoftNavRouteEntry(href: string | null | undefined) {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (!isInternalHref(hrefValue) || hrefValue.includes("?") || hrefValue.includes("#")) {
-    return false;
-  }
-
-  return provenRouteEntrySet.has(normalizeRouteEntryHref(hrefValue));
-}
-
-function classifySiteHref(href: string | null | undefined) {
-  const hrefValue = typeof href === "string" ? href.trim() : "";
-  if (hrefValue.length === 0) {
-    return "invalid";
-  }
-
-  if (isExternalHref(hrefValue)) {
-    return "external";
-  }
-
-  if (isHashHref(hrefValue)) {
-    return "hash";
-  }
-
-  if (isProvenSoftNavRouteEntry(hrefValue)) {
-    return "proven-route-entry";
-  }
-
-  if (isInternalHref(hrefValue)) {
-    return "internal-fallback";
-  }
-
-  return "external";
-}
-
-function mergeLinkRel(target: string | null | undefined, rel: string | null | undefined) {
-  const targetValue = typeof target === "string" ? target.trim() : "";
-  const relValue = typeof rel === "string" ? rel.trim() : "";
-  if (targetValue !== "_blank") {
-    return relValue;
-  }
-
-  const tokens = new Set(
-    relValue
-      .split(/\s+/)
-      .map((token) => token.trim())
-      .filter((token) => token.length > 0),
-  );
-  tokens.add("noopener");
-  tokens.add("noreferrer");
-  return Array.from(tokens).join(" ");
 }
 
 const siteLinkProps = props as Props;
@@ -379,15 +272,17 @@ zenMount((ctx) => {
   >
     <span
       ref={siteLinkAnchorOverlayRef}
+      data-zen-link-overlay="true"
       aria-hidden="true"
       class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
       style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
     ></span>
-    <div class={siteLinkContentClass}><slot /></div>
+    <div data-zen-link-content="true" class={siteLinkContentClass}><slot /></div>
   </a>
 
   <span
     ref={siteLinkDisabledRef}
+    data-zen-link-disabled="true"
     class={siteLinkResolvedClass}
     style={siteLinkShouldUseDisabledState ? undefined : "display: none;"}
     id={siteLinkShouldUseDisabledState ? siteLinkId || undefined : undefined}
@@ -403,10 +298,11 @@ zenMount((ctx) => {
   >
     <span
       ref={siteLinkDisabledOverlayRef}
+      data-zen-link-overlay="true"
       aria-hidden="true"
       class={siteLinkSurface === "button" ? `pointer-events-none absolute inset-0 z-0 rounded-[inherit] will-change-transform ${siteLinkOverlayClass}` : "hidden"}
       style={siteLinkSurface === "button" ? "transform: scaleY(0); transform-origin: 50% 100%;" : undefined}
     ></span>
-    <div class={siteLinkContentClass}><slot /></div>
+    <div data-zen-link-content="true" class={siteLinkContentClass}><slot /></div>
   </span>
 </span>

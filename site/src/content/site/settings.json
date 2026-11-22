@@ -1,11 +1,11 @@
 {
   "defaultSeoTitle": "ZenithBuild",
   "defaultSeoDescription": "Zenith is a compiler-first UI framework with explicit reactive primitives, server-owned routing boundaries, and native tooling.",
-  "siteUrl": "",
+  "siteUrl": "https://zenithbuild.xyz",
   "socialImage": {
     "src": "/logo.png",
-    "width": 1200,
-    "height": 630,
+    "width": 1024,
+    "height": 1024,
     "alt": "ZenithBuild"
   },
   "socialLinks": [

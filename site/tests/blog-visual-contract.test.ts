@@ -12,12 +12,12 @@ describe("Blog landing visual contract", () => {
     const archive = source("src/components/blog/BlogArchiveBrowser.zen");
     const featured = source("src/components/blog/BlogFeaturedArticle.zen");
 
-    expect(header).toContain("mx-auto grid w-full max-w-7xl");
-    expect(header).toContain("px-4 pb-12 pt-32");
-    expect(archive).toContain("border-b border-border bg-background");
-    expect(featured).toContain("rounded-lg border border-border bg-card");
-    expect(archive).toContain("border-t border-border");
-    expect(`${header}${featured}${archive}`).toContain("focus-visible:outline-ring");
+    expect(header).toContain("max-w-[1440px]");
+    expect(header).toContain("md:pt-20");
+    expect(archive).toContain("border-b border-border");
+    expect(featured).toContain("rounded-2xl border border-border bg-card");
+    expect(archive).toContain("aria-labelledby=");
+    expect(source("src/components/blog/blogArchiveMarkup.ts")).toContain("v1-focus");
     expect(`${header}${featured}${archive}`).not.toMatch(/#[0-9a-f]{3,8}/i);
     expect(`${header}${featured}${archive}`).not.toContain("gradient");
   });
@@ -30,7 +30,7 @@ describe("Blog landing visual contract", () => {
     expect(surface).toContain("BlogHeader");
     expect(surface).toContain("BlogArchiveBrowser");
     expect(surface).toContain("BlogFeaturedArticle");
-    expect(surface.indexOf("<BlogArchiveBrowser")).toBeLessThan(surface.indexOf("<BlogFeaturedArticle"));
+    expect(surface.indexOf("<BlogFeaturedArticle")).toBeLessThan(surface.indexOf("<BlogArchiveBrowser"));
     expect(surface).not.toContain("BlogDiscoveryBar");
     expect(surface).not.toContain("BlogArticleList");
     expect(surface).not.toContain("BlogBrowseRail");
@@ -46,26 +46,16 @@ describe("Blog landing visual contract", () => {
     expect(content).toContain('"eyebrow": "Zenith Blog"');
   });
 
-  test("keeps search honest while category and tag controls are fully interactive", () => {
-    const featured = source("src/components/blog/BlogFeaturedArticle.zen");
+  test("renders real category filters, dates and article destinations", () => {
     const archive = source("src/components/blog/BlogArchiveBrowser.zen");
-
-    expect(archive).toContain('data-blog-search="presentation-only"');
-    expect(archive).toContain("readonly");
-    expect(archive).toContain("state blogArchiveOpenMenu");
-    expect(archive).toContain("state blogArchiveSelectedCategory");
-    expect(archive).toContain("state blogArchiveSelectedTag");
-    expect(archive).toContain('zenOn(doc, "pointerdown"');
-    expect(archive).toContain("on:click={blogArchiveToggleCategory}");
-    expect(archive).toContain("on:keydown={blogArchiveHandleCategoryKeydown}");
-    expect(archive).toContain('role=\"menuitemradio\"');
-    expect(archive).not.toContain("on:pointerleave");
-    expect(archive).not.toContain("setTimeout");
-    expect(archive).not.toContain("querySelector");
+    const rows = source("src/components/blog/blogArchiveMarkup.ts");
+    expect(archive).toContain("renderCategoryPills(category)");
+    expect(archive).toContain('zenOn(win, "popstate", readFilters)');
+    expect(archive).not.toContain("readonly");
     expect(archive).not.toContain("addEventListener");
-    expect(featured).toContain("<article");
-    expect(featured).toContain("href={postPath}");
-    expect(archive).toContain("<article");
-    expect(archive).toContain("blogArchiveEscapeHtml(post.path)");
+    expect(rows).toContain("<article");
+    expect(rows).toContain("escapeHtml(post.path)");
+    expect(rows).toContain("escapeHtml(post.displayPublishedAt)");
+    expect(rows).toContain('aria-current="page"');
   });
 });

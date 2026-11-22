@@ -1,0 +1,76 @@
+<script server lang="ts">
+import { siteContent } from "../../content/index";
+import { createPageMetadata } from "../../content/site/metadata";
+
+export const load = async (ctx) => {
+  const metadata = createPageMetadata("/performance");
+  // PageSpeed is pointed at this site only when an https origin is configured (no invented target).
+  const target = metadata.canonicalUrl ? new URL("/", metadata.canonicalUrl).href : "";
+  return ctx.data({
+    metadata,
+    pageSpeedTarget: target,
+    site: { navigation: siteContent.navigation, footer: siteContent.footer },
+  });
+};
+</script>
+
+<script setup="ts">
+// Performance (JUD-145): launch card only (build gate 6). Never publish a number that has no run
+// file behind it; every value stays "—" until the first recorded PageSpeed run. Figma 155:11034 / 155:11074.
+import DefaultLayout from "@/layouts/DefaultLayout.zen";
+import Icon from "@/components/site-v1/Icon.zen";
+
+const perfTabMobileRef = ref<HTMLButtonElement>();
+const perfTabDesktopRef = ref<HTMLButtonElement>();
+const perfTarget = data.pageSpeedTarget || "";
+state perfFormFactor = "mobile";
+
+function perfPageSpeedHref(formFactor: string) {
+  // TODO(verify): pagespeed.web.dev `form_factor` query parameter, confirm before launch.
+  if (!perfTarget) return "https://pagespeed.web.dev/";
+  return `https://pagespeed.web.dev/analysis?url=${encodeURIComponent(perfTarget)}&form_factor=${formFactor}`;
+}
+
+function perfSelect(next: string) {
+  perfFormFactor = next;
+}
+
+function perfTabKeys(event: KeyboardEvent) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const next = event.key === "Home" ? "mobile" : event.key === "End" ? "desktop" : perfFormFactor === "mobile" ? "desktop" : "mobile";
+  perfFormFactor = next;
+  (next === "mobile" ? perfTabMobileRef : perfTabDesktopRef).current?.focus();
+}
+
+</script>
+
+<DefaultLayout title={data.metadata.title} description={data.metadata.description} metadata={data.metadata} navigationContent={data.site.navigation} footerContent={data.site.footer} currentPath="/performance">
+  <div data-v1-performance="true" class="bg-background pt-16 text-foreground md:pt-[73px]">
+    <header class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 pb-8 pt-10 md:px-10 md:pb-10 md:pt-20 lg:px-20">
+      <p class="v1-eyebrow">Performance</p>
+      <h1 class="font-heading text-[48px] font-semibold leading-[48px] tracking-[-0.03em] md:text-[clamp(4rem,7.23vw,6.5rem)] md:leading-[0.9231]">Performance</h1>
+      <p class="text-[18px] leading-7 text-muted-foreground md:text-[20px] md:leading-[30px]">Measuring starts at launch. This page stays blank until the first PageSpeed run.</p>
+    </header>
+    <div class="mx-auto flex w-full max-w-[1440px] flex-col items-start gap-4 px-4 pb-20 md:px-10 md:pb-28 lg:px-20">
+      <div role="tablist" aria-label="Device" class="inline-flex gap-[2px] rounded-full bg-muted p-[3px]">
+        <button ref={perfTabMobileRef} id="perf-tab-mobile" type="button" role="tab" aria-selected={perfFormFactor === "mobile" ? "true" : "false"} aria-controls="perf-panel" tabindex={perfFormFactor === "mobile" ? "0" : "-1"} class="perf-tab v1-tab" on:click={() => perfSelect("mobile")} on:keydown={perfTabKeys}>Mobile</button>
+        <button ref={perfTabDesktopRef} id="perf-tab-desktop" type="button" role="tab" aria-selected={perfFormFactor === "desktop" ? "true" : "false"} aria-controls="perf-panel" tabindex={perfFormFactor === "desktop" ? "0" : "-1"} class="perf-tab v1-tab" on:click={() => perfSelect("desktop")} on:keydown={perfTabKeys}>Desktop</button>
+      </div>
+      <section id="perf-panel" role="tabpanel" aria-labelledby={perfFormFactor === "mobile" ? "perf-tab-mobile" : "perf-tab-desktop"} data-perf-launch-card="true" class="flex w-full flex-col gap-4 rounded-[14px] border border-border bg-card p-5 md:p-6">
+        <h2 class="font-heading text-[24px] font-semibold leading-7 md:text-[28px] md:leading-8">Measuring starts at launch</h2>
+        <p class="text-[16px] font-medium leading-6">No page-load or build-speed number is published here yet.</p>
+        <dl class="flex flex-col">
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Method</dt><dd class="text-foreground">PageSpeed Insights on this site, Mobile selected by default, link opened in a new tab. No run is recorded in the repo.</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Environment</dt><dd class="text-foreground">—</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Build</dt><dd class="text-foreground">—</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Commit</dt><dd class="text-foreground">—</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Date</dt><dd class="text-foreground">—</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Device profile</dt><dd class="text-foreground">—</dd></div>
+          <div class="flex flex-col gap-1 border-t border-border py-[10px] text-[14px] leading-5 md:flex-row md:gap-6"><dt class="font-medium text-foreground md:w-[120px] md:shrink-0">Runs</dt><dd class="text-foreground">—</dd></div>
+        </dl>
+        <a data-perf-pagespeed="true" href={perfPageSpeedHref(perfFormFactor)} target="_blank" rel="noopener noreferrer" class="v1-button v1-button-outline self-start whitespace-normal text-[14px]">Run PageSpeed Insights on this site (opens in a new tab) <Icon name="external" /></a>
+      </section>
+    </div>
+  </div>
+</DefaultLayout>

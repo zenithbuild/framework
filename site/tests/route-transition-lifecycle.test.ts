@@ -13,13 +13,13 @@ async function waitForTransition(page: import("playwright").Page) {
   );
 }
 
-async function activateHeroTab(page: import("playwright").Page, name: string) {
-  const tab = page.getByRole("tab", { name, exact: true }).first();
+// v1 home: the pipeline tablist (desktop viewport) is the stateful Home control under test.
+async function activateStageTab(page: import("playwright").Page, stage: string) {
+  const tab = page.locator(`[data-pipeline-root='true'] [data-stage-tab='${stage}']`);
   await tab.click();
   await page.waitForFunction(
-    (tabName) => [...document.querySelectorAll("[data-home-hero='true'] [role='tab']")]
-      .some((candidate) => candidate.textContent?.trim() === tabName && candidate.getAttribute("aria-selected") === "true"),
-    name,
+    (key) => document.querySelector("[data-pipeline-root='true']")?.getAttribute("data-active-stage") === key,
+    stage,
   );
   expect(await tab.getAttribute("aria-selected")).toBe("true");
 }
@@ -38,7 +38,7 @@ describe("route-transition lifecycle", () => {
   test("keeps Home controls live through SPA returns, Back, and repeated visits", async () => {
     const { chromium } = await import("playwright");
     const browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage();
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -53,24 +53,22 @@ describe("route-transition lifecycle", () => {
         undefined,
         { timeout: 30_000 },
       );
-      await activateHeroTab(page, "State");
-      await page.waitForFunction(() => document.querySelector("#workbench-panel code")?.textContent?.includes("state open = false"));
-      expect(await page.locator("#workbench-panel code").textContent()).toContain("state open = false");
+      await activateStageTab(page, "compile");
+      expect(await page.locator("#pipeline-panel-compile").textContent()).toContain("CompilerOutput · index.zen");
 
       for (let visit = 0; visit < 2; visit += 1) {
         await page.locator("[data-nav-shell='true'] a[href='/blog']").first().click();
         await page.waitForURL(`${origin}/blog`);
         await waitForTransition(page);
-        await page.locator("[data-nav-shell='true'] a[href='/']").nth(1).click();
+        await page.locator("[data-nav-shell='true'] a[href='/']").first().click();
         await page.waitForURL(`${origin}/`);
         await waitForTransition(page);
 
         await page.waitForFunction(() => getComputedStyle(document.querySelector("main")!).pointerEvents === "auto");
-        expect(await page.locator("[data-home-hero='true']").count()).toBe(1);
-        expect(await page.locator("[data-home-hero='true'] [role='tablist'][aria-label='Zenith examples']").count()).toBe(1);
-        await activateHeroTab(page, "Server");
-        await page.waitForFunction(() => document.querySelector("#workbench-panel code")?.textContent?.includes("export const guard"));
-        expect(await page.locator("#workbench-panel code").textContent()).toContain("export const guard");
+        expect(await page.locator("[data-v1-hero='true']").count()).toBe(1);
+        expect(await page.locator("[data-pipeline-root='true'] [role='tablist'][aria-label='Pipeline stages']").count()).toBe(1);
+        await activateStageTab(page, "bundle");
+        expect(await page.locator("#pipeline-panel-bundle").textContent()).toContain("manifest.json");
       }
 
       await page.locator("[data-nav-shell='true'] a[href='/blog']").first().click();
@@ -80,14 +78,17 @@ describe("route-transition lifecycle", () => {
       await page.waitForURL(`${origin}/`);
       await waitForTransition(page);
 
-      const eventsTab = page.getByRole("tab", { name: "Events", exact: true }).first();
-      await eventsTab.focus();
+      // The previous transition's "complete" phase can still be showing when Back starts, so wait for
+      // the Home hero itself to be mounted and laid out before pressing it.
+      // Back can start its transition ~2s later, and the shell is inert while it enters.
+      await page.waitForFunction(() => document.querySelector("[data-hero-panel='true']")?.getAttribute("data-hero-connectors") === "ready"
+        && document.querySelector("[data-route-transition='true']")?.getAttribute("data-route-transition-phase") === "complete"
+        && getComputedStyle(document.querySelector("main")!).pointerEvents === "auto", undefined, { timeout: 30_000 });
+      const trigger = page.locator("[data-hero-trigger='true']");
+      await trigger.focus();
       await page.keyboard.press("Enter");
-      await page.waitForFunction(() => [...document.querySelectorAll("[data-home-hero='true'] [role='tab']")]
-        .some((candidate) => candidate.textContent?.trim() === "Events" && candidate.getAttribute("aria-selected") === "true"));
-      await page.waitForFunction(() => document.querySelector("#workbench-panel code")?.textContent?.includes("on:hoverin"));
-      expect(await eventsTab.getAttribute("aria-selected")).toBe("true");
-      expect(await page.locator("#workbench-panel code").textContent()).toContain("on:hoverin");
+      await page.waitForFunction(() => document.querySelector("[data-hero-panel='true']")?.getAttribute("data-hero-state") === "failed");
+      expect(await trigger.getAttribute("aria-disabled")).toBe("true");
 
       const themeToggle = page.getByRole("button", { name: /theme/i });
       const themeBefore = await themeToggle.getAttribute("aria-label");

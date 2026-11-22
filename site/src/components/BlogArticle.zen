@@ -39,10 +39,6 @@ function blogArticleEscapeHtml(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
-function blogArticleRenderTags(tags: string[]): string {
-  return tags.map((tag) => '<span class="border-l border-border pl-3">' + blogArticleEscapeHtml(tag) + "</span>").join("");
-}
-
 function blogArticleRenderRelatedPosts(posts: BlogPost[]): string {
   return posts.map((post) => [
     '<article class="border-b border-border">',
@@ -57,34 +53,22 @@ function blogArticleRenderRelatedPosts(posts: BlogPost[]): string {
 </script>
 
 <div data-page-shell="blog-article" data-reader-page="true" class="bg-background text-foreground">
-  <header class="border-b border-border bg-background px-4 pb-14 pt-28 sm:px-6 sm:pb-16 sm:pt-32 lg:px-8 lg:pb-20 lg:pt-36">
-    <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-8 md:grid-cols-12 lg:gap-x-12">
-      <div class="col-span-4 md:col-span-3">
-        <a href="/blog" class="inline-flex min-h-11 items-center font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Back to Blog</a>
-        <p class="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{blogArticleCategory}</p>
-      </div>
-      <div class="col-span-4 md:col-span-8 md:col-start-4">
-        <h1 data-route-title="true" class="max-w-4xl text-balance font-heading text-5xl font-semibold leading-[0.94] text-foreground sm:text-6xl lg:text-7xl">{post.title}</h1>
-        <p class="mt-7 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">{post.excerpt}</p>
-        <div class="mt-7 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          <span style={blogArticleDate ? undefined : "display: none;"}>{blogArticleDate}</span>
-          <span style={post.readingTime ? undefined : "display: none;"}>{post.readingTime}</span>
-          <span style={blogArticleAuthor ? undefined : "display: none;"}>By {blogArticleAuthor}</span>
+  <div class="mx-auto w-full max-w-[1440px] px-4 pb-20 pt-[88px] sm:px-8 md:pt-[113px] lg:px-[6%] xl:pr-[min(9.72vw,140px)] xl:pl-[min(13.89vw,200px)]">
+    <div class="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,45rem)_minmax(11rem,13.75rem)] lg:items-start lg:justify-between lg:gap-x-12 lg:gap-y-12">
+      <header class="flex min-w-0 flex-col items-start gap-5 lg:col-start-1">
+        <nav aria-label="Breadcrumb" class="flex min-h-11 flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          <a href="/blog" data-zen-link="true" class="inline-flex min-h-11 items-center text-primary v1-focus">Blog</a>
+          <span aria-hidden="true">/</span><span>{blogArticleCategory}</span>
+        </nav>
+        <h1 data-route-title="true" class="font-heading text-[38px] font-semibold leading-[1] tracking-[-0.03em] text-foreground md:text-[52px]">{post.title}</h1>
+        <div class="flex flex-wrap gap-x-2 gap-y-0.5 leading-6 text-muted-foreground">
+          <span class="font-medium text-foreground">{blogArticleAuthor}</span>
+          <span style={blogArticleDate ? undefined : "display:none"}>· Published {blogArticleDate}</span>
+          <span style={post.displayUpdatedAt && post.displayUpdatedAt !== blogArticleDate ? undefined : "display:none"}>· Updated {post.displayUpdatedAt}</span>
+          <span style={blogArticleReadingTime ? undefined : "display:none"}>· {blogArticleReadingTime}</span>
         </div>
-        <div class="mt-5 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground" style={post.tags.length > 0 ? undefined : "display: none;"} unsafeHTML={blogArticleRenderTags(post.tags)}></div>
-      </div>
-    </div>
-  </header>
-
-  <div class="border-b border-border px-4 py-10 sm:px-6 lg:px-8" style={image ? undefined : "display: none;"}>
-    <div class="mx-auto w-full max-w-7xl overflow-hidden rounded-lg border border-border bg-muted">
-      <img src={image ? image.url : undefined} alt={image ? image.alt : ""} width={image ? image.width : undefined} height={image ? image.height : undefined} class="aspect-[16/7] h-auto w-full object-cover" />
-    </div>
-  </div>
-
-  <section class="px-4 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
-    <div class="mx-auto grid w-full max-w-6xl gap-10 lg:grid-cols-[minmax(0,48rem)_15rem] lg:items-start lg:gap-16">
-      <aside aria-labelledby="blog-on-this-page" class="border-y border-border py-5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:border-y-0 lg:border-l lg:py-0 lg:pl-5" style={blogArticleHeadings.length > 0 ? undefined : "display: none;"}>
+      </header>
+      <aside aria-labelledby="blog-on-this-page" class="min-w-0 border-y border-border py-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-16 lg:border-y-0 lg:p-0" style={blogArticleHeadings.length > 0 ? undefined : "display:none"}>
         <ReaderToc
           headings={post.headings}
           articleRef={blogArticleArticleRef}
@@ -93,12 +77,15 @@ function blogArticleRenderRelatedPosts(posts: BlogPost[]): string {
           surface="blog"
         />
       </aside>
-      <article data-blog-article="true" class="min-w-0 lg:col-start-1 lg:row-start-1">
-        <div ref={blogArticleArticleRef} class="content-richtext max-w-3xl" unsafeHTML={post.htmlRendered}></div>
+      <article data-blog-article="true" class="min-w-0 lg:col-start-1 lg:row-start-2">
+        <figure data-blog-cover class="mb-8 overflow-hidden rounded-[14px] border border-border bg-muted" style={image ? undefined : "display:none"}>
+          <img src={image ? image.url : undefined} alt={image ? image.alt : ""} width={image ? image.width : undefined} height={image ? image.height : undefined} class="aspect-[16/7] w-full object-cover" />
+        </figure>
+        <div ref={blogArticleArticleRef} class="content-richtext w-full" unsafeHTML={post.htmlRendered}></div>
         <span ref={blogArticleEndRef} data-reader-article-end="blog" class="block h-px" aria-hidden="true"></span>
       </article>
     </div>
-  </section>
+  </div>
 
   <section aria-labelledby="related-articles" class="border-t border-border bg-muted px-4 py-16 sm:px-6 lg:px-8 lg:py-20" style={blogArticleRelated.length > 0 ? undefined : "display: none;"}>
     <div class="mx-auto grid w-full max-w-7xl grid-cols-4 gap-x-6 gap-y-10 md:grid-cols-12 lg:gap-x-12">

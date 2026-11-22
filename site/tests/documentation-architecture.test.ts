@@ -87,6 +87,13 @@ describe("reader-first documentation order", () => {
 });
 
 describe("documentation Markdown rendering", () => {
+  test("publishes relative Markdown links as site routes with their section fragments", () => {
+    const { html } = renderDocumentationMarkdown("[Next](./navigation.md#routing) [Parent](../getting-started.md) [Outside](../../private.md)", "Links", "/docs/contracts/router");
+    expect(html).toContain('href="/docs/contracts/navigation#routing"');
+    expect(html).toContain('href="/docs/getting-started"');
+    expect(html).not.toContain('href="/private"');
+  });
+
   test("renders GFM structures and derives headings from the rendered pass", () => {
     const source = [
       "## Same heading",

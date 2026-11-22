@@ -1,8 +1,7 @@
 <script lang="ts">
-import Links from "./Links.zen";
-import NavDropdown from "./NavDropdown.zen";
 import ThemeToggle from "./ThemeToggle.zen";
 import ZenithNavigationMark from "@/components/ZenithNavigationMark.zen";
+import Icon from "@/components/site-v1/Icon.zen";
 import SearchTrigger from "@/components/search/SearchTrigger.zen";
 
 interface NavLink {
@@ -27,8 +26,6 @@ interface NavigationWindow extends Window {
 }
 
 const navigationProps = props as Props;
-const navigationContent = navigationProps.content || {};
-const navigationMainLinks = Array.isArray(navigationContent.mainLinks) ? navigationContent.mainLinks : [];
 const navigationCurrentPath = navigationProps.currentPath || "/";
 const navigationIntroGated = navigationProps.introGated === true;
 const localNavigationShellRef = ref<HTMLElement>();
@@ -36,7 +33,6 @@ const localNavigationLogoTargetRef = ref<HTMLElement>();
 const localNavigationLinksRef = ref<HTMLElement>();
 const localNavigationActionsRef = ref<HTMLElement>();
 const mobileNavigationTriggerRef = ref<HTMLButtonElement>();
-const mobileDocsTriggerRef = ref<HTMLButtonElement>();
 const navigationShellRef = localNavigationShellRef;
 const navigationLogoTargetRef = localNavigationLogoTargetRef;
 const navigationLinksRef = localNavigationLinksRef;
@@ -46,26 +42,12 @@ const forwardedNavigationLogoTargetRef = navigationProps.logoTargetRef;
 const forwardedNavigationLinksRef = navigationProps.linksRef;
 const forwardedNavigationActionsRef = navigationProps.actionsRef;
 
-function findLinkByHref(links: NavLink[], href: string, fallbackLabel: string) {
-  const foundLink = links.find((link) => link && link.href === href);
-  if (foundLink) {
-    return foundLink;
-  }
-
-  return {
-    label: fallbackLabel,
-    href,
-  };
-}
-
-const navHomeLink = findLinkByHref(navigationMainLinks, "/", "Home");
-const navDocsLink = findLinkByHref(navigationMainLinks, "/docs", "Docs");
-const navBlogLink = findLinkByHref(navigationMainLinks, "/blog", "Blog");
-const navAboutLink = findLinkByHref(navigationMainLinks, "/about", "About");
-const navGitHubLink = findLinkByHref(navigationMainLinks, "https://github.com/zenithbuild/framework", "GitHub");
-
-const navLinkBase = "border-b py-1 font-mono text-[11px] uppercase tracking-[0.18em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
-const mobileLinkBase = "border-b border-border py-4 font-heading text-2xl font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
+// Labels are literal and layout-critical styles are mirrored by static slot classes
+// (site-v1-components.css): Zenith applies attribute/text expressions on hydrate, not in SSR HTML.
+// v1 nav (handoff §4 Nav): 15/20 medium muted links, current page in foreground with a primary
+// underline. Hover is not drawn in Figma: minimal token hover (foreground text), flagged for UI.
+const navLinkBase = "inline-flex min-h-11 items-center border-b-2 text-[15px] font-medium leading-5 transition-colors v1-focus";
+const mobileLinkBase = "flex min-h-12 items-center border-b border-border py-3 font-heading text-[22px] font-semibold text-foreground v1-focus";
 
 function normalizePath(pathname: string) {
   if (pathname === "/") return "/";
@@ -73,6 +55,7 @@ function normalizePath(pathname: string) {
 }
 
 function isActivePath(href: string) {
+  if (href.includes("#")) return false;
   const current = normalizePath(navigationCurrentPath);
   const target = normalizePath(href);
   return target === "/" ? current === "/" : current === target || current.startsWith(`${target}/`);
@@ -81,35 +64,21 @@ function isActivePath(href: string) {
 function navLinkClass(href: string) {
   return isActivePath(href)
     ? `${navLinkBase} border-primary text-foreground`
-    : `${navLinkBase} border-transparent text-muted-foreground hover:border-border hover:text-foreground`;
+    : `${navLinkBase} border-transparent text-muted-foreground hover:text-foreground`;
 }
 
 state mobileOpen = false;
-state mobileDocsOpen = false;
 
 function toggleMobileMenu() {
   mobileOpen = !mobileOpen;
-  if (!mobileOpen) mobileDocsOpen = false;
 }
 
 function closeMobileMenu() {
   mobileOpen = false;
-  mobileDocsOpen = false;
-}
-
-function toggleMobileDocs() {
-  mobileDocsOpen = !mobileDocsOpen;
 }
 
 function handleNavigationKeydown(event: KeyboardEvent) {
-  if (event.key !== "Escape") return;
-  if (mobileDocsOpen) {
-    event.preventDefault();
-    mobileDocsOpen = false;
-    mobileDocsTriggerRef.current?.focus();
-    return;
-  }
-  if (!mobileOpen) return;
+  if (event.key !== "Escape" || !mobileOpen) return;
   event.preventDefault();
   mobileOpen = false;
   mobileNavigationTriggerRef.current?.focus();
@@ -136,67 +105,55 @@ zenMount((ctx) => {
   });
 });
 
-const documentationDropdownItems = [
-  {
-    label: "Documentation",
-    href: "/docs",
-    description: "Browse the framework concepts and reference map."
-  },
-  {
-    label: "Getting started",
-    href: "/docs/getting-started",
-    description: "Install Zenith and build a first explicit component."
-  },
-  {
-    label: "Events and refs",
-    href: "/docs/getting-started#events-and-refs",
-    description: "Use canonical bindings and DOM ownership patterns."
-  }
-];
 </script>
 
 <header
   ref={localNavigationShellRef}
-  data-intro-gated="true"
+  data-intro-gated={navigationIntroGated ? "true" : undefined}
   data-nav-shell="true"
-  style={navigationIntroGated ? "opacity:0;visibility:hidden;pointer-events:none;" : undefined}
-  class="fixed inset-x-0 top-0 z-50 border-b border-border/70 bg-background/95 text-foreground backdrop-blur-xl"
+  class="fixed inset-x-0 top-0 z-50 border-b border-border bg-background text-foreground"
   on:keydown={handleNavigationKeydown}
 >
-  <nav class="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="Primary">
-    <span
-      ref={localNavigationLogoTargetRef}
-      data-nav-logo-target="true"
-      class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-    >
-      <Links
-        href={navHomeLink.href}
-        ariaLabel="Zenith home"
-        class="group grid h-10 w-10 place-items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+  <nav class="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 md:h-[72px] md:px-8" aria-label="Primary">
+    <div class="flex items-center gap-6 lg:gap-10">
+      <span
+        class="nav-logo-slot inline-flex h-10 shrink-0 items-center"
       >
-        <ZenithNavigationMark />
-      </Links>
-    </span>
+        <a
+          href="/" data-zen-link="true"
+          aria-label="Zenith home"
+          class="group flex min-h-11 items-center gap-2 rounded-full v1-focus"
+        >
+          <span ref={localNavigationLogoTargetRef} data-nav-logo-target="true" class="grid h-10 w-10 shrink-0 place-items-center rounded-full"><ZenithNavigationMark /></span>
+          <span class="font-heading text-[20px] font-semibold leading-6 text-foreground md:hidden lg:inline lg:text-[22px]">Zenith</span>
+        </a>
+      </span>
 
-    <div ref={localNavigationLinksRef} class="hidden items-center gap-7 lg:flex">
-      <Links href={navHomeLink.href} ariaCurrent={isActivePath(navHomeLink.href) ? "page" : undefined} class={navLinkClass(navHomeLink.href)}>{navHomeLink.label}</Links>
-      <NavDropdown label="Docs" items={documentationDropdownItems} active={isActivePath(navDocsLink.href)} />
-      <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={navLinkClass(navBlogLink.href)}>{navBlogLink.label}</Links>
-      <Links href={navAboutLink.href} ariaCurrent={isActivePath(navAboutLink.href) ? "page" : undefined} class={navLinkClass(navAboutLink.href)}>{navAboutLink.label}</Links>
+      <div ref={localNavigationLinksRef} class="nav-links-slot hidden items-center gap-5 md:flex lg:gap-7">
+        <a href="/docs" data-zen-link="true" aria-current={isActivePath("/docs") ? "page" : undefined} class={navLinkClass("/docs")}>Docs</a>
+        <a href="/#how-it-works" class={navLinkClass("/#how-it-works")}>How it works</a>
+        <a href="/performance" data-zen-link="true" aria-current={isActivePath("/performance") ? "page" : undefined} class={navLinkClass("/performance")}>Performance</a>
+        <a href="/blog" data-zen-link="true" aria-current={isActivePath("/blog") ? "page" : undefined} class={navLinkClass("/blog")}>Blog</a>
+      </div>
     </div>
 
-    <div ref={localNavigationActionsRef} class="flex items-center justify-end gap-3" data-nav-actions="true">
-      <SearchTrigger scope="global" label="Search" />
-      <Links
-        href={navGitHubLink.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="hidden rounded-full border border-border bg-card px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:inline-flex"
-      >
-        {navGitHubLink.label}
-      </Links>
+    <div ref={localNavigationActionsRef} class="flex items-center justify-end gap-2 lg:gap-[10px]" data-nav-actions="true">
+      <SearchTrigger scope="global" label="Search" class="relative h-11! w-12 justify-center px-0! border-border-strong! text-muted-foreground lg:w-auto lg:justify-start lg:px-4!" />
       <span data-nav-theme-toggle="true" class="inline-flex">
         <ThemeToggle />
+      </span>
+      <span class="nav-cta-slot hidden items-center gap-2 md:inline-flex lg:gap-[10px]">
+      <a
+        href="https://github.com/zenithbuild/framework"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="GitHub (opens in a new tab)"
+        class="hidden min-h-11 items-center gap-2 rounded-full px-3 text-[14px] font-medium leading-[18px] text-primary hover:bg-muted v1-focus md:inline-flex lg:px-[14px]"
+      >
+        <span class="hidden lg:inline">GitHub</span>
+        <Icon name="github" />
+      </a>
+      <a href="/docs/getting-started" data-zen-link="true" class="hidden min-h-11 items-center rounded-full bg-primary px-[14px] text-[14px] font-medium leading-[18px] text-primary-foreground transition-colors hover:bg-primary-hover-bg hover:text-primary-hover-fg v1-focus md:inline-flex">Get started</a>
       </span>
       <button
         ref={mobileNavigationTriggerRef}
@@ -205,7 +162,7 @@ const documentationDropdownItems = [
         aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={mobileOpen ? "true" : "false"}
         aria-controls="mobile-navigation"
-        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring lg:hidden"
+        class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-strong bg-card text-foreground v1-focus md:hidden"
         on:click={toggleMobileMenu}
       >
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -215,37 +172,21 @@ const documentationDropdownItems = [
     </div>
   </nav>
 
+  <div class="nav-mobile-slot md:hidden">
   <div
     id="mobile-navigation"
     aria-hidden={mobileOpen ? "false" : "true"}
     inert={mobileOpen ? undefined : true}
-    class={mobileOpen ? "border-t border-border bg-background px-4 pb-6 pt-2 sm:px-6 lg:hidden" : "hidden"}
+    class={mobileOpen ? "border-t border-border bg-background px-4 pb-6 pt-2 md:hidden" : "hidden"}
   >
-    <nav class="mx-auto grid w-full max-w-7xl" aria-label="Mobile primary">
-      <Links href={navHomeLink.href} ariaCurrent={isActivePath(navHomeLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navHomeLink.label}</Links>
-      <div class="border-b border-border">
-        <button
-          ref={mobileDocsTriggerRef}
-          type="button"
-          data-mobile-nav-disclosure="docs"
-          aria-expanded={mobileDocsOpen ? "true" : "false"}
-          aria-controls="mobile-docs-navigation"
-          class="flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left font-heading text-2xl font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-          on:click={toggleMobileDocs}
-        >
-          <span>{navDocsLink.label}</span>
-          <svg class={mobileDocsOpen ? "h-4 w-4 rotate-180" : "h-4 w-4"} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-          </svg>
-        </button>
-        <div id="mobile-docs-navigation" data-mobile-nav-panel="docs" aria-hidden={mobileDocsOpen ? "false" : "true"} inert={mobileDocsOpen ? undefined : true} class={mobileDocsOpen ? "grid pb-4" : "hidden"}>
-          <Links href={documentationDropdownItems[0].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[0].label}</Links>
-          <Links href={documentationDropdownItems[1].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[1].label}</Links>
-          <Links href={documentationDropdownItems[2].href} class="min-h-11 rounded-md px-3 py-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={closeMobileMenu}>{documentationDropdownItems[2].label}</Links>
-        </div>
-      </div>
-      <Links href={navBlogLink.href} ariaCurrent={isActivePath(navBlogLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navBlogLink.label}</Links>
-      <Links href={navAboutLink.href} ariaCurrent={isActivePath(navAboutLink.href) ? "page" : undefined} class={mobileLinkBase} onClick={closeMobileMenu}>{navAboutLink.label}</Links>
+    <nav class="mx-auto grid w-full" aria-label="Mobile primary">
+      <a href="/docs" data-zen-link="true" aria-current={isActivePath("/docs") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Docs</a>
+      <a href="/#how-it-works" class={mobileLinkBase} on:click={closeMobileMenu}>How it works</a>
+      <a href="/performance" data-zen-link="true" aria-current={isActivePath("/performance") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Performance</a>
+      <a href="/blog" data-zen-link="true" aria-current={isActivePath("/blog") ? "page" : undefined} class={mobileLinkBase} on:click={closeMobileMenu}>Blog</a>
+      <a href="https://github.com/zenithbuild/framework" target="_blank" rel="noopener noreferrer" class={mobileLinkBase} on:click={closeMobileMenu}>GitHub</a>
+      <a href="/docs/getting-started" data-zen-link="true" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 text-[15px] font-medium text-primary-foreground v1-focus" on:click={closeMobileMenu}>Get started</a>
     </nav>
+  </div>
   </div>
 </header>
