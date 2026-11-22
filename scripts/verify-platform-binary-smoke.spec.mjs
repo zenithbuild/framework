@@ -116,7 +116,8 @@ test('publish workflow can recover an existing release tag without moving it', (
     assert.match(workflow, /workflow_dispatch:/);
     assert.match(workflow, /release_tag:/);
     assert.match(workflow, /git fetch --force origin "refs\/tags\/\$\{TAG_NAME\}:refs\/tags\/\$\{TAG_NAME\}"/);
-    assert.match(workflow, /release_sha="\$\(git rev-parse "\$\{TAG_NAME\}\^\{commit\}"\)"/);
-    assert.match(workflow, /GITHUB_SHA:\s*\$\{\{ steps\.release_version\.outputs\.release_sha \}\}/);
+    assert.match(workflow, /release_sha="\$\(git rev-parse --verify "refs\/tags\/\$\{TAG_NAME\}\^\{commit\}"\)"/);
+    assert.match(workflow, /RELEASE_SHA:\s*\$\{\{ steps\.release_version\.outputs\.release_sha \}\}/);
+    assert.match(workflow, /GITHUB_SHA="\$RELEASE_SHA" GITHUB_REF_NAME="\$RELEASE_TAG" node scripts\/assert-tag-on-branch\.mjs/);
     assert.match(workflow, /RELEASE_SHA:\s*\$\{\{ needs\.preflight\.outputs\.release_sha \}\}/);
 });
