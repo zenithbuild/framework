@@ -26,6 +26,7 @@ describe("v1 Home interactions", () => {
     try {
       await page.goto(`${origin}/`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => document.querySelector("[data-hero-panel='true']")?.getAttribute("data-hero-connectors") === "ready");
+      await page.waitForFunction(() => document.documentElement.dataset.zenithIntroState === "complete");
       expect(await heroState(page)).toBe("compiled");
       expect(await page.locator("[data-hero-live='true']").textContent()).toBe("");
 
@@ -64,7 +65,8 @@ describe("v1 Home interactions", () => {
       expect(await page.locator("[data-pipeline-root='true']").getAttribute("data-active-stage")).toBe("build");
       expect(await page.locator("#pipeline-panel-build").isVisible()).toBe(true);
 
-      // Terminal toggle.
+      // The Round 2 steps keep the recorded terminal output available on demand.
+      await page.getByText("View terminal output", { exact: true }).click();
       const toggle = page.locator("[data-log-toggle='true']");
       expect(await toggle.getAttribute("aria-expanded")).toBe("false");
       expect(await page.locator("[data-log-extra='true']").first().isVisible()).toBe(false);

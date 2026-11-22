@@ -22,7 +22,7 @@ const heroCopyLiveRef = (props as Props).copyLiveRef;
         <p class="w-full max-w-[520px] text-[18px] font-medium leading-[26px] text-foreground md:text-[20px] md:leading-[30px]">You get a project you can open on your computer, with a home page and three more routes already in it.</p>
         <div data-hero-start="true" class="flex w-full max-w-[520px] flex-col items-start gap-3">
           <CopyCommand command="bun create zenith@latest" variant="install" liveRef={heroCopyLiveRef} />
-          <a href="/docs" class="v1-button v1-button-secondary relative h-10 min-h-10 w-[124px] px-2 after:absolute after:inset-x-0 after:-inset-y-0.5">Read the docs</a>
+          <a href="/docs" class="v1-button v1-button-secondary relative h-10 min-h-10 w-[124px] border-border bg-secondary px-2 after:absolute after:inset-x-0 after:-inset-y-0.5">Read the docs</a>
         </div>
       </div>
     </div>

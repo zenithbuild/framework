@@ -1,6 +1,5 @@
 <script lang="ts">
 import { fetchSearchIndex } from "./fetchSearchIndex";
-import { navigate } from "@zenithbuild/router";
 import type { SearchIndexPayload, SearchRecord, SearchResult, SearchScopeConfig, SearchFilterOption } from "@/server/searchTypes";
 import {
   tokenizeSearchQuery,
@@ -50,15 +49,10 @@ function modalResults(payload: SearchIndexPayload | null, value: string): Search
   if (query.length === 1) return [];
   const records = modalFilteredRecords(payload);
   if (query || modalScope !== "global") return searchRecords(records, query, modalScope);
-  const latest = records.filter((record) => record.scope === "blog").sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""))[0];
+  const latest = records.filter((record) => record.scope === "blog").sort((a, b) => (Date.parse(b.publishedAt || "") || 0) - (Date.parse(a.publishedAt || "") || 0))[0];
   return [records.find((record) => record.path === "/docs/getting-started"),
     records.find((record) => record.path === "/docs/install-compatibility"), latest]
     .filter((record): record is SearchRecord => Boolean(record)).map((record) => ({ record, score: 0, snippets: [] }));
-}
-function modalCurrentResult(): SearchResult | null {
-  const r = modalResults(modalPayload, modalQuery);
-  const idx = modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex;
-  return r[idx] || null;
 }
 function modalResultCount(): number { return modalResults(modalPayload, modalQuery).length; }
 
@@ -102,18 +96,13 @@ function closeModal() {
 function handleQueryInput(event: Event) { modalQuery = (event.target as HTMLInputElement).value; modalSelectedIndex = 0; modalHoveredIndex = -1; }
 function moveDown() { const c = modalResultCount(); if (c === 0) return; modalSelectedIndex = Math.min(modalSelectedIndex + 1, c - 1); modalHoveredIndex = -1; scrollIntoView(); }
 function moveUp() { const c = modalResultCount(); if (c === 0) return; modalSelectedIndex = Math.max(modalSelectedIndex - 1, 0); modalHoveredIndex = -1; scrollIntoView(); }
-function scrollIntoView() {
-  queueMicrotask(() => {
-    const list = modalListRef.current; if (!list) return;
-    // zen-allow:dom-query result list uses a delegated event handler and stable data attribute
-    const items = list.querySelectorAll("[data-search-result-item]");
-    const item = items[modalSelectedIndex]; if (item) item.scrollIntoView({ block: "nearest" });
-  });
+function selectedOption(): HTMLAnchorElement | undefined {
+  const list = modalListRef.current;
+  if (!list) return;
+  return Array.from(list.children).find((item) => item.getAttribute("aria-selected") === "true") as HTMLAnchorElement | undefined;
 }
-function openSelected() {
-  const r = modalCurrentResult(); if (!r) return;
-  closeModal(); void navigate(r.record.path);
-}
+function scrollIntoView() { queueMicrotask(() => selectedOption()?.scrollIntoView({ block: "nearest" })); }
+function openSelected() { selectedOption()?.click(); }
 function handleResultsClick(event: Event) {
   const t = event.target as HTMLElement; const item = t.closest("[data-search-result-item]") as HTMLElement | null; if (!item) return;
   const index = Number(item.getAttribute("data-index") || "0"); modalSelectedIndex = index; modalHoveredIndex = index; closeModal();
@@ -238,7 +227,7 @@ zenMount((ctx) => {
       </div>
       <div class="relative mt-3">
         <svg aria-hidden="true" class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-        <input ref={modalInputRef} type="search" role="combobox" data-search-input="true" aria-label="Search" aria-autocomplete="list" aria-controls="search-results" aria-expanded="true" aria-activedescendant={modalCurrentResult() ? "search-option-" + (modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex) : undefined} placeholder="Search…"
+        <input ref={modalInputRef} type="search" role="combobox" data-search-input="true" aria-label="Search" aria-autocomplete="list" aria-controls="search-results" aria-expanded="true" aria-activedescendant={modalResults(modalPayload, modalQuery).length > 0 ? "search-option-" + (modalHoveredIndex >= 0 ? modalHoveredIndex : modalSelectedIndex) : undefined} placeholder="Search…"
           value={modalQuery} class="v1-focus min-h-11 w-full rounded-xl border border-border-strong bg-background pl-11 pr-4 text-base text-foreground placeholder:text-muted-foreground" on:input={handleQueryInput} />
       </div>
       <div ref={modalFiltersRef} class="relative flex flex-wrap items-center gap-2 not-empty:mt-2" on:click={handleFilterBarClick}>

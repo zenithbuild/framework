@@ -73,7 +73,8 @@ function normalizeImage(value: unknown, title: string) {
 
 function validDate(value: unknown): string | null {
   const normalized = cleanText(String(value || ""));
-  return normalized && !Number.isNaN(Date.parse(normalized)) ? normalized : null;
+  const timestamp = Date.parse(normalized);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 async function mapGitBlogFile(filename: string): Promise<BlogPost | null> {

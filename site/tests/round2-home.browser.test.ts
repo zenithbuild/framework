@@ -24,6 +24,8 @@ describe("Round 2 Home", () => {
           return [style.fontFamily.split(",")[0].replaceAll('"', ""), style.fontWeight, style.fontSize, style.lineHeight, style.letterSpacing];
         });
         expect(type).toEqual(["Bricolage Grotesque", "600", mobile ? "52px" : "76px", mobile ? "52px" : "72px", mobile ? "-1.56px" : "-2.28px"]);
+        const firstLine = await heading.locator("span").first().boundingBox();
+        expect(Math.abs((firstLine?.width || 0) - (mobile ? 336 : 475))).toBeLessThan(4);
         const faces = await page.evaluate(() => [...document.fonts].filter((font) => font.status === "loaded").map((font) => font.family.replaceAll('"', "")));
         for (const face of ["Bricolage Grotesque", "Roboto", "IBM Plex Mono"]) expect(faces).toContain(face);
         const panel = await page.locator("[data-hero-panel]").boundingBox();

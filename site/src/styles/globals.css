@@ -491,7 +491,7 @@
 }
 
 :where(.font-heading, .font-display, .v1-h2, .v1-h3) {
-  font-optical-sizing: none;
-  font-variation-settings: "opsz" 14, "wdth" 100;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
 }
 html.dark { color-scheme: dark; }

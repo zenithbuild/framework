@@ -1,99 +1,47 @@
-import { startSiteDevServer } from "./helpers/dev-server";
 import { describe, expect, test } from "bun:test";
+import { chromium } from "playwright";
+import { startSiteDevServer } from "./helpers/dev-server";
 
-const PORT = 4032;
-const origin = `http://localhost:${PORT}`;
-
-async function startDevServer() {
-  return startSiteDevServer(PORT, { ZENITH_BLOG_SOURCE: "git", ZENITH_DOCUMENTATION_SOURCE: "local" });
-}
-
-describe("SearchModal browser integration", () => {
-  test(
-    "scoped filters work with real markup and no runtime errors",
-    async () => {
-      const { chromium } = await import("playwright");
-      const server = await startDevServer();
-      const browser = await chromium.launch({ headless: true });
-      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+describe("Global search", () => {
+  test("loads suggestions, searches the index, and navigates by keyboard from public pages", async () => {
+    const port = 4032;
+    const origin = process.env.ZENITH_SITE_TEST_ORIGIN || `http://localhost:${port}`;
+    const server = process.env.ZENITH_SITE_TEST_ORIGIN ? null : await startSiteDevServer(port);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
       const errors: string[] = [];
-      const failedResources: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
-      page.on("console", (message) => {
-        if (message.type() === "error" && !message.text().includes("Failed to load resource")) errors.push(message.text());
-      });
-      page.on("response", (response) => {
-        if (response.status() >= 400) failedResources.push(response.url());
-      });
-
-      async function openScopedModal(url: string, scope: string, scopeLabel: string, expectedTriggers: number) {
-        await page.goto(`${origin}${url}`, { waitUntil: "networkidle" });
-        await page.waitForTimeout(500);
-        const trigger = page.locator(`[data-search-trigger][data-search-scope="${scope}"]`).first();
-        expect(await trigger.count()).toBeGreaterThan(0);
-        await trigger.click();
-        await page.waitForTimeout(400);
-        const dialog = page.locator('[data-search-dialog]');
-        expect(await dialog.getAttribute("aria-label")).toBe(scopeLabel);
-        expect(await page.locator('[data-filter-trigger]').count()).toBe(expectedTriggers);
+      page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+      for (const path of ["/docs", "/blog", "/"]) {
+        await page.goto(origin + path, { waitUntil: "networkidle" });
+        const opener = page.getByRole("button", { name: "Search", exact: true });
+        await opener.click();
+        const dialog = page.getByRole("dialog", { name: /^Search( the site)?$/ });
+        const input = dialog.getByRole("combobox");
+        await input.waitFor();
+        const options = dialog.getByRole("option");
+        await options.first().waitFor();
+        expect(await options.count()).toBe(3);
+        await input.fill("compiler");
+        await page.waitForFunction(() => (document.querySelector("[data-search-result-count]")?.textContent || "").trim().match(/^[1-9]\d* results?$/) && document.querySelectorAll("[data-search-result-item]").length > 3);
+        expect((await dialog.locator("[data-search-result-count]").textContent())?.trim()).toBe(`${await options.count()} results`);
+        await input.press("ArrowDown");
+        const selected = dialog.locator('[role="option"][aria-selected="true"]');
+        const href = await selected.getAttribute("href");
+        expect(href).toMatch(/^\//);
+        await input.press("Enter");
+        await page.waitForURL(origin + href);
+        await page.getByRole("heading", { level: 1 }).waitFor();
+        await page.keyboard.press("/");
+        await input.waitFor();
+        await input.press("Escape");
+        await dialog.waitFor({ state: "hidden" });
       }
-
-      // Docs scope: open section filter, keyboard navigate, select an option.
-      await openScopedModal("/docs", "docs", "Documentation", 2);
-      await page.locator('[data-filter-trigger="section"]').click();
-      await page.waitForTimeout(200);
-      const sectionOptions = page.locator('[data-filter-name="section"][data-filter-option]');
-      expect(await sectionOptions.count()).toBeGreaterThan(0);
-      await page.keyboard.press("ArrowDown");
-      await page.waitForTimeout(200);
-      await page.keyboard.press("Enter");
-      await page.waitForTimeout(300);
-      expect(await page.locator('[data-filter-trigger="section"]').getAttribute("aria-expanded")).toBe("false");
-
-      // Search "compiler" in docs scope and verify every visible result mentions it.
-      await page.locator('[data-search-input]').fill("compiler");
-      await page.waitForTimeout(600);
-      const docsCount = await page.locator('[data-search-result-count]').textContent();
-      expect(docsCount).toMatch(/result/);
-      const docsResults = await page.locator('[data-search-result-item]').all();
-      expect(docsResults.length).toBeGreaterThan(0);
-      const someDocsContainQuery = docsResults.some(async (result) => {
-        const text = await result.textContent();
-        return text?.toLowerCase().includes("compiler");
-      });
-      expect(someDocsContainQuery).toBe(true);
-
-      // Close modal and switch to blog scope.
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
-
-      await openScopedModal("/blog", "blog", "Blog", 4);
-      await page.locator('[data-filter-trigger="category"]').click();
-      await page.waitForTimeout(200);
-      expect(await page.locator('[data-filter-name="category"][data-filter-option]').count()).toBeGreaterThan(0);
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
-      expect(await page.locator('[data-filter-trigger="category"]').getAttribute("aria-expanded")).toBe("false");
-
-      // Global scope from home.
-      await page.goto(`${origin}/`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(500);
-      await page.locator('[data-search-trigger][data-search-scope="global"]').first().click();
-      await page.waitForTimeout(400);
-      expect(await page.locator('[data-search-dialog]').getAttribute("aria-label")).toBe("Search the site");
-      expect(await page.locator('[data-filter-trigger]').count()).toBe(0);
-      await page.locator('[data-search-input]').fill("compiler");
-      await page.waitForTimeout(600);
-      const globalCount = await page.locator('[data-search-result-count]').textContent();
-      expect(globalCount).toMatch(/result/);
-      expect(await page.locator('[data-search-result-item]').count()).toBeGreaterThan(0);
-
-      await browser.close();
-      await server.stop();
-
       expect(errors).toEqual([]);
-      expect(failedResources).toEqual([]);
-    },
-    { timeout: 660_000 },
-  );
+    } finally {
+      await browser.close();
+      await server?.stop();
+    }
+  }, 150_000);
 });

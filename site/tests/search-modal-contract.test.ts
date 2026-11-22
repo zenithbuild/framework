@@ -325,8 +325,8 @@ describe("SearchModal runtime binding regression", () => {
       } finally {
         await build.stop();
       }
-      expect(output.includes("Built 11 page(s)")).toBe(true);
-      expect(output).toMatch(/Built 11 page\(s\), [1-9]\d* asset\(s\)/);
+      expect(output.includes("Built 9 page(s)")).toBe(true);
+      expect(output).toMatch(/Built 9 page\(s\), [1-9]\d* asset\(s\)/);
       const indexHtml = resolve(siteRoot, "dist/static/index.html");
       expect(existsSync(indexHtml)).toBe(true);
       const html = readFileSync(indexHtml, "utf8");

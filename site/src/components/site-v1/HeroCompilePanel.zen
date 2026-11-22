@@ -140,6 +140,7 @@ zenMount((ctx) => {
 
   <button type="button" data-expand-source="true" aria-controls="hero-panel-source" aria-expanded={heroSourceExpanded ? "true" : "false"} class="hero-expand-source v1-focus relative after:absolute after:inset-x-0 after:-inset-y-[3px] font-sans text-sm font-medium text-code-fg" on:click={toggleSourceLines}>{heroSourceExpanded ? "Show fewer lines" : "Show all 12 lines"}</button>
   <div data-hero-controls="true" class="hero-panel-controls flex items-center gap-2">
+    <span aria-hidden="true" class="hero-output-label rounded-full bg-code-inline-bg px-3 text-[13px] font-medium leading-7">Output</span>
     <button ref={hpTriggerRef} type="button" data-hero-trigger="true" aria-disabled={heroState === "failed" ? "true" : "false"} class="hero-control hero-trigger" on:click={hpPressTrigger}><span aria-hidden="true" class="h-[6px] w-[6px] rounded-full bg-code-error"></span>Show the string-handler error</button>
     <button type="button" data-hero-reset="true" aria-disabled={heroState === "failed" ? "false" : "true"} class="hero-control hero-reset" on:click={hpPressReset}>Reset</button>
   </div>
