@@ -83,6 +83,7 @@ fn leaking_payload() -> serde_json::Value {
             "graph_nodes": [{ "id": "page", "hoist_id": "mod_home" }],
             "html": "<!DOCTYPE html><html><head></head><body><main><button>Save</button><span>Hello</span></main></body></html>",
             "expressions": ["count"],
+            "server_script": {"source": "export const load = () => 'private_route_fixture';", "source_path": UNIX_SOURCE_FILE, "prerender": false, "has_guard": false, "has_load": true},
             "hoisted": {
                 "state": [{ "key": "rootRef", "value": "null" }]
             },
@@ -163,6 +164,7 @@ fn assert_dist_omits_build_machine_source(out_dir: &Path) {
         "judahbsullivan",
         "zenith-jud90-leak",
         "secret.txt",
+        "private_route_fixture",
         "/home/",
         r"C:\Users",
         "C:/Users",
@@ -176,7 +178,7 @@ fn assert_dist_omits_build_machine_source(out_dir: &Path) {
             .extension()
             .and_then(|value| value.to_str())
             .unwrap_or("");
-        if extension == "js" || extension == "html" {
+        if matches!(extension, "js" | "html" | "json") {
             for needle in needles {
                 assert!(
                     !text.contains(needle),

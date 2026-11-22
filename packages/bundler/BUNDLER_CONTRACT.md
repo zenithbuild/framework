@@ -87,6 +87,9 @@ source column, an empty `__zenith_payload_files` list, and no snippet column.
 Dev-stable builds (`--dev-stable-assets`) keep full spans, including `file`
 and `snippet`, for editor overlays. Hydration accepts a missing `source`.
 
+Production router manifests carry public route and asset metadata. The CLI
+packages page and resource handlers and server binding plans with the server.
+
 ---
 
 ## 3. Expression Array Contract

@@ -302,6 +302,33 @@ pub(crate) struct RouterManifest {
     pub(crate) routes: Vec<RouterRouteEntry>,
 }
 
+impl RouterManifest {
+    pub(crate) fn public_json(&self) -> serde_json::Result<String> {
+        let routes: Vec<_> = self
+            .routes
+            .iter()
+            .map(|route| {
+                let mut public = serde_json::json!({
+                    "path": route.path,
+                    "output": route.output,
+                    "html": route.html,
+                    "page_asset": route.page_asset,
+                    "prerender": route.prerender,
+                    "has_guard": route.has_guard,
+                    "has_load": route.has_load,
+                    "has_scoped_server_data": route.has_scoped_server_data,
+                });
+                if !route.image_materialization.is_empty() {
+                    public["image_materialization"] =
+                        serde_json::to_value(&route.image_materialization)?;
+                }
+                Ok(public)
+            })
+            .collect::<serde_json::Result<Vec<_>>>()?;
+        serde_json::to_string(&serde_json::json!({ "base_path": self.base_path, "routes": routes }))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RouterRouteEntry {
