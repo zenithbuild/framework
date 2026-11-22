@@ -17,8 +17,10 @@ function renderSectionCards(sections: DocumentationSectionGroup[]) {
   return sections.map((group) => {
     const count = Array.isArray(group.entries) ? group.entries.length : 0;
     const href = group.entries[0]?.path || "/docs";
+    // These two deep links already point to dedicated sections on the landing page.
+    const id = ["getting-started", "deployment"].includes(group.section.slug) ? "" : ' id="' + escapeHtml(group.section.slug) + '"';
     return [
-      '<a data-docs-section-card="true" href="' + escapeHtml(href) + '" class="group flex min-h-64 flex-col rounded-lg border border-border bg-card p-6 text-card-foreground transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">',
+      '<a data-docs-section-card="true"' + id + ' href="' + escapeHtml(href) + '" class="group flex min-h-64 scroll-mt-28 flex-col rounded-lg border border-border bg-card p-6 text-card-foreground transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">',
       '<p class="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">' + count + " " + (count === 1 ? "article" : "articles") + "</p>",
       '<h4 class="mt-8 font-heading text-2xl font-semibold uppercase leading-none tracking-tight text-foreground">' + escapeHtml(group.section.title) + "</h4>",
       '<p class="mt-5 text-sm leading-7 text-muted-foreground">' + escapeHtml(group.section.description) + "</p>",

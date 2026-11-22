@@ -27,12 +27,14 @@ describe("Global search", () => {
         await page.waitForFunction(() => (document.querySelector("[data-search-result-count]")?.textContent || "").trim().match(/^[1-9]\d* results?$/) && document.querySelectorAll("[data-search-result-item]").length > 3);
         expect((await dialog.locator("[data-search-result-count]").textContent())?.trim()).toBe(`${await options.count()} results`);
         await input.press("ArrowDown");
+        expect(await dialog.locator('[role="option"][aria-selected="true"]').getAttribute("id")).toBe("search-option-1");
+        await input.press("ArrowUp");
         const selected = dialog.locator('[role="option"][aria-selected="true"]');
         const href = await selected.getAttribute("href");
-        expect(href).toMatch(/^\//);
+        expect(href).toBe("/docs/contracts/compiler-boundary");
         await input.press("Enter");
         await page.waitForURL(origin + href);
-        await page.getByRole("heading", { level: 1 }).waitFor();
+        await page.getByRole("heading", { level: 1, name: "Compiler Boundary Contract", exact: true }).waitFor();
         await page.keyboard.press("/");
         await input.waitFor();
         await input.press("Escape");

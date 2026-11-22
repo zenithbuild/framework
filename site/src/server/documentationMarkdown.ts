@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { Marked, Renderer, type Tokens } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { normalizeReadableSlug } from "../content/slugContract";
@@ -13,7 +14,15 @@ export interface RenderedDocumentationMarkdown {
   headings: DocumentationHeading[];
 }
 
-export function renderDocumentationMarkdown(markdown: string, documentTitle = ""): RenderedDocumentationMarkdown {
+function publishedDocumentationHref(href: string, documentPath: string): string {
+  if (!documentPath) return href;
+  const file = /^((?:(?:\.{1,2}|[a-z0-9-]+)\/)*[a-z0-9-]+)\.md([?#].*)?$/i.exec(href);
+  if (!file) return href;
+  const path = posix.join(posix.dirname(documentPath), file[1]);
+  return path.startsWith("/docs/") ? path + (file[2] || "") : "";
+}
+
+export function renderDocumentationMarkdown(markdown: string, documentTitle = "", documentPath = ""): RenderedDocumentationMarkdown {
   const headings: DocumentationHeading[] = [];
   const headingCounts = new Map<string, number>();
   const renderer = new Renderer();
@@ -47,9 +56,10 @@ export function renderDocumentationMarkdown(markdown: string, documentTitle = ""
 
   renderer.link = function ({ href, title, tokens }: Tokens.Link) {
     const label = this.parser.parseInline(tokens);
-    if (!isSafeDocumentationUrl(href)) return label;
+    const target = publishedDocumentationHref(href, documentPath);
+    if (!isSafeDocumentationUrl(target)) return label;
     const titleAttribute = title ? ` title="${escapeHtml(title)}"` : "";
-    return `<a href="${escapeHtml(href)}"${titleAttribute}>${label}</a>`;
+    return `<a href="${escapeHtml(target)}"${titleAttribute}>${label}</a>`;
   };
 
   renderer.image = ({ href, title, text }: Tokens.Image) => {

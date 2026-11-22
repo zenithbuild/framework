@@ -93,7 +93,7 @@ async function loadDocumentationFile(relativePath: string): Promise<Documentatio
 
   const order = requiredPositiveInteger(parsed.data.order, sourcePath, "order");
   const route = deriveDocumentationRoute(relativePath, sourcePath);
-  const rendered = renderDocumentationMarkdown(parsed.content.trimStart(), title);
+  const rendered = renderDocumentationMarkdown(parsed.content.trimStart(), title, route.path);
   const section: DocumentationSection = {
     slug: configuredSection.slug,
     title: configuredSection.title,

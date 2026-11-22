@@ -47,7 +47,11 @@ describe("shared navigation and Blog detail", () => {
         const id = headingIds[index];
         await tocLinks.nth(index).click();
         await page.waitForFunction((expected) => window.location.hash === `#${expected}`, id);
-        expect(await tocLinks.nth(index).getAttribute("aria-current")).toBe("location");
+        await page.waitForFunction((id) => {
+          const heading = document.getElementById(id);
+          const top = heading?.getBoundingClientRect().top || 0;
+          return top >= 64 && top < 180 && document.querySelector(`[data-reader-heading-link="${id}"]`)?.getAttribute("aria-current") === "location";
+        }, id);
         const top = await page.locator(`#${id}`).evaluate((element) => element.getBoundingClientRect().top);
         expect(top).toBeGreaterThanOrEqual(64);
       }
