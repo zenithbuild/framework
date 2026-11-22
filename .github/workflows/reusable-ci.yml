@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +92,7 @@ jobs:
           bash ./scripts/ci-core.sh
 
   integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -197,7 +197,7 @@ jobs:
           exit "$retry_exit"
 
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

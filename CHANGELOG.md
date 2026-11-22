@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Extract `_coerceText` and `_createContextualFragment` into `packages/runtime/src/render-utils.js` so `render.js` and `fragment-patch.js` no longer import each other. `render.js` and `hydrate.js` keep the same exports, and the concatenated runtime template still contains each helper once (JUD-11).
 
+### Fixed
+
+- Emit each shared imported CSS module once across routes, preserving scoped styles and a later route's base-before-override order when the routes agree. When two routes import the same files in opposite orders, the earlier route wins and the build warns with the routes and files involved (JUD-128).
+
 ## [0.9.0-rc.0] - TBD
 
 ### Changed
