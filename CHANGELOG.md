@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-## [0.9.0-rc.1] - TBD
+## [0.9.0-rc.1] - 2026-11-22
+
+### Added
+
+- Emit automatic modulepreload hints for initial-route dependencies (JUD-129).
 
 ### Changed
 
@@ -16,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Production page bundles omit reactive source spans (`source.file`, positions, and snippets) from `__zenith_refs`, `__zenith_events`, and compacted payload tables. Dev-stable builds (`--dev-stable-assets`) still emit full spans for overlays. Absolute build-machine paths and source snippets no longer ship in production client JS (JUD-90).
+- Production browser manifests carry route and asset metadata. Page and resource handlers and server binding plans are packaged with the server. Local previews of server routes use those private files.
 - Remove leftover route debug logging and a stray debug script from the CLI package (JUD-91, JUD-92).
 - Update the deepmerge, glob and minimatch resolutions used by the release workspace (#247).
 - Restore frozen Bun installs and use supported macOS ARM and Linux runners for package and browser checks (#252, #261).

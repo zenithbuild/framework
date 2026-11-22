@@ -213,6 +213,7 @@ export async function writeServerOutput({
     imagePackage = null,
     coreOutputDir,
     staticDir,
+    routeMetadataDir = staticDir,
     projectRoot,
     config,
     basePath = '/',
@@ -229,12 +230,12 @@ export async function writeServerOutput({
     let routerManifest = { routes: [] };
     try {
         routerManifest = JSON.parse(
-            await readFile(join(staticDir, 'assets', 'router-manifest.json'), 'utf8')
+            await readFile(join(routeMetadataDir, 'assets', 'router-manifest.json'), 'utf8')
         );
     } catch {
         routerManifest = { routes: [] };
     }
-    const resourceManifest = await loadResourceRouteManifest(staticDir, basePath);
+    const resourceManifest = await loadResourceRouteManifest(routeMetadataDir, basePath);
 
     const pageManifestByPath = new Map(
         (Array.isArray(pageManifest) ? pageManifest : [])
@@ -259,7 +260,13 @@ export async function writeServerOutput({
     await mkdir(serverDir, { recursive: true });
     await copyRuntimeFiles(serverDir, imagePackage);
     await packageImageRuntime(serverDir, imagePackage);
-    await copyOptionalFile(join(staticDir, '_zenith', 'ssr-bindings.json'), join(serverDir, 'ssr-bindings.json'));
+    await copyOptionalFile(join(routeMetadataDir, '_zenith', 'ssr-bindings.json'), join(serverDir, 'ssr-bindings.json'));
+    if (routeMetadataDir !== staticDir) {
+        const previewAssets = join(serverDir, 'preview', 'assets');
+        await mkdir(previewAssets, { recursive: true });
+        await copyOptionalFile(join(routeMetadataDir, 'assets', 'router-manifest.json'), join(previewAssets, 'router-manifest.json'));
+        await copyOptionalFile(join(routeMetadataDir, 'assets', 'resource-manifest.json'), join(previewAssets, 'resource-manifest.json'));
+    }
     const serverGlobalMiddlewareMetadata = await writeGlobalMiddlewarePackage({
         projectRoot,
         serverDir,

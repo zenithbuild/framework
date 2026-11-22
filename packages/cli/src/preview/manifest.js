@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { resolveConfigOutDir } from '../config.js';
+import { fileExists } from './paths.js';
 import { normalizeBasePath } from '../base-path.js';
 import { loadResourceRouteManifest } from '../resource-manifest.js';
 import {
@@ -60,6 +62,39 @@ export async function loadRouteSurfaceState(distDir, fallbackBasePath = '/') {
       resourceRoutes: Array.isArray(resourceState.routes) ? resourceState.routes : []
     };
   }
+}
+
+export async function resolvePreviewRouteFiles(distDir, projectRoot, config) {
+  const packagedServer = join(dirname(distDir), 'server');
+  const legacy = {
+    serverDir: packagedServer,
+    routeDir: distDir,
+    bindingPlan: join(distDir, '_zenith', 'ssr-bindings.json')
+  };
+  let publicManifest;
+  try {
+    publicManifest = JSON.parse(await readFile(join(distDir, 'assets', 'resource-manifest.json'), 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return legacy;
+    }
+    throw error;
+  }
+  if (typeof publicManifest.requires_server_metadata !== 'boolean') {
+    return legacy;
+  }
+
+  const candidates = [packagedServer];
+  if (resolve(distDir) === resolveConfigOutDir(projectRoot, config)) {
+    candidates.push(join(projectRoot, '.zenith-output', 'server'));
+  }
+  for (const serverDir of candidates) {
+    const routeDir = join(serverDir, 'preview');
+    if (await fileExists(join(routeDir, 'assets', 'resource-manifest.json'))) {
+      return { serverDir, routeDir, bindingPlan: join(serverDir, 'ssr-bindings.json') };
+    }
+  }
+  return publicManifest.requires_server_metadata ? null : legacy;
 }
 
 export const matchRoute = matchManifestRoute;
