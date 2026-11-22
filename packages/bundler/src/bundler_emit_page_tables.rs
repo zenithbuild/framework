@@ -156,43 +156,6 @@ fn insert_marker(slots: &mut [Option<MarkerBinding>], marker: MarkerBinding) -> 
     Ok(())
 }
 
-fn intern_source_file_index(
-    file: &str,
-    source_files: &mut Vec<String>,
-    source_file_indices: &mut BTreeMap<String, usize>,
-) -> usize {
-    if let Some(index) = source_file_indices.get(file).copied() {
-        return index;
-    }
-    let index = source_files.len();
-    source_files.push(file.to_string());
-    source_file_indices.insert(file.to_string(), index);
-    index
-}
-
-fn encode_compact_source_span(
-    source: Option<&CompilerSourceSpan>,
-    source_files: &mut Vec<String>,
-    source_file_indices: &mut BTreeMap<String, usize>,
-) -> serde_json::Value {
-    let Some(span) = source else {
-        return serde_json::Value::Null;
-    };
-
-    let file_index = intern_source_file_index(&span.file, source_files, source_file_indices);
-    let mut row = vec![
-        serde_json::json!(file_index),
-        serde_json::json!(span.start.line),
-        serde_json::json!(span.start.column),
-        serde_json::json!(span.end.line),
-        serde_json::json!(span.end.column),
-    ];
-    if let Some(snippet) = span.snippet.as_ref() {
-        row.push(serde_json::json!(snippet));
-    }
-    serde_json::Value::Array(row)
-}
-
 fn is_default_expression_row_value(index: usize, value: &serde_json::Value) -> bool {
     if index == 4 {
         return matches!(value, serde_json::Value::Array(items) if items.is_empty());
@@ -209,12 +172,16 @@ fn marker_kind_code(kind: &MarkerKind) -> u8 {
     }
 }
 
+/// Production payload tables.
+///
+/// Source spans are omitted: `__zenith_payload_files` is empty, the source
+/// column is null, and snippet columns are not emitted. Dev-stable builds do
+/// not use this path; they serialize full spans for overlays.
 pub(crate) fn render_compacted_page_payload_tables_js(
     markers: &[MarkerBinding],
     runtime_expression_bindings: &[serde_json::Value],
 ) -> Result<String, String> {
-    let mut source_files = Vec::<String>::new();
-    let mut source_file_indices = BTreeMap::<String, usize>::new();
+    let source_files = Vec::<String>::new();
 
     let mut compact_expression_rows =
         Vec::<serde_json::Value>::with_capacity(runtime_expression_bindings.len());
@@ -230,11 +197,7 @@ pub(crate) fn render_compacted_page_payload_tables_js(
                 .as_ref()
                 .map(|value| serde_json::json!(value))
                 .unwrap_or(serde_json::Value::Null),
-            encode_compact_source_span(
-                binding.source.as_ref(),
-                &mut source_files,
-                &mut source_file_indices,
-            ),
+            serde_json::Value::Null,
             binding
                 .state_index
                 .map(serde_json::Value::from)
@@ -289,11 +252,7 @@ pub(crate) fn render_compacted_page_payload_tables_js(
             serde_json::json!(marker.index),
             serde_json::json!(marker_kind_code(&marker.kind)),
             serde_json::json!(marker.selector),
-            encode_compact_source_span(
-                marker.source.as_ref(),
-                &mut source_files,
-                &mut source_file_indices,
-            ),
+            serde_json::Value::Null,
             marker
                 .attr
                 .as_ref()
@@ -385,4 +344,77 @@ pub(crate) fn render_compacted_page_payload_tables_js(
     js.push_str("const __zenith_markers = __zenith_payload_marker_rows.map(__zim);\n");
 
     Ok(js)
+}
+
+/// Event rows written into client page JS.
+///
+/// Dev-stable keeps `source` for overlays. Production drops it so absolute
+/// build paths and snippets never reach the bundle.
+pub(crate) fn event_bindings_for_output(
+    events: &[EventBinding],
+    include_source: bool,
+) -> Vec<EventBinding> {
+    if include_source {
+        return events.to_vec();
+    }
+    events
+        .iter()
+        .cloned()
+        .map(|mut binding| {
+            binding.source = None;
+            binding
+        })
+        .collect()
+}
+
+pub(crate) fn map_runtime_ref_bindings(
+    ir: &CompilerIr,
+    include_source: bool,
+) -> Result<Vec<RuntimeRefBinding>, String> {
+    let mut out = Vec::new();
+    for binding in &ir.ref_bindings {
+        let Some(state_index) = resolve_ref_state_index(&ir.hoisted.state, &binding.identifier)
+        else {
+            return Err(format!(
+                "failed to resolve ref binding '{}' to hoisted state key",
+                binding.identifier
+            ));
+        };
+        out.push(RuntimeRefBinding {
+            index: binding.index,
+            state_index,
+            selector: binding.selector.clone(),
+            source: if include_source {
+                binding.source.clone()
+            } else {
+                None
+            },
+        });
+    }
+    Ok(out)
+}
+
+fn resolve_ref_state_index(bindings: &[CompilerStateBinding], identifier: &str) -> Option<usize> {
+    if identifier.is_empty() {
+        return None;
+    }
+
+    for (index, binding) in bindings.iter().enumerate() {
+        if binding.key == identifier {
+            return Some(index);
+        }
+    }
+
+    let suffix = format!("_{}", identifier);
+    let mut match_index: Option<usize> = None;
+    for (index, binding) in bindings.iter().enumerate() {
+        if binding.key.ends_with(&suffix) {
+            if match_index.is_some() {
+                return None;
+            }
+            match_index = Some(index);
+        }
+    }
+
+    match_index
 }

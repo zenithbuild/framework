@@ -40,7 +40,7 @@ The CLI does **not**:
 | `zenith plugin list` | List official plugins from CLI-bundled registry metadata |
 | `zenith plugin search <term>` | Search official plugin metadata (no network crawl) |
 | `zenith plugin info <name\|alias>` | Show registry metadata and local `package.json` `zenith` block if installed |
-| `zenith adapter list` | List official adapters and built-in deployment targets |
+| `zenith adapter list` | List built-in host targets and deployment targets |
 
 ---
 
@@ -60,6 +60,16 @@ export default {
 | `router` | `boolean` | `false` | If `true`, CLI injects client router script and uses manifest at runtime |
 | `basePath` | `string` | `'/'` | Prefixes public app URLs, assets, router endpoints, and framework endpoints |
 | `target` | `string` | `'static'` | Selects the deployment adapter and final output layout |
+
+Supported deployment targets:
+
+- `static`
+- `static-export`
+- `vercel-static`
+- `netlify-static`
+- `vercel`
+- `netlify`
+- `node`
 
 **Router is opt-in only.** If absent or `false`:
 - No router script injected

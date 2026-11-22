@@ -4,7 +4,7 @@ import type { CommandContext } from '../shared/context.js';
 
 export function runAdapterList(ctx: CommandContext): number {
     const entries = listExtensions('adapter');
-    ctx.logger.print('Official adapters:');
+    ctx.logger.print('Host targets (built-in):');
     for (const entry of entries) {
         const label = entry.displayName ?? entry.name;
         const alias = entry.alias ? ` (${entry.alias})` : '';

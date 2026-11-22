@@ -145,7 +145,15 @@ fn compact_page_payload_tables_emit_canonical_inflate_scaffold() {
 
     let scaffold = render_compacted_page_payload_tables_js(&markers, &runtime_expression_bindings)
         .expect("compact page table scaffold should render");
-    assert!(scaffold.contains("const __zenith_payload_files = ["));
+    assert!(scaffold.contains("const __zenith_payload_files = [];"));
+    assert!(
+        !scaffold.contains("src/pages/index.zen"),
+        "production compacted tables must not emit source.file"
+    );
+    assert!(
+        !scaffold.contains("{count}"),
+        "production compacted tables must not emit source snippets"
+    );
     assert!(scaffold.contains("const __zenith_payload_expression_rows = ["));
     assert!(scaffold.contains("const __zenith_payload_marker_rows = ["));
     assert!(scaffold

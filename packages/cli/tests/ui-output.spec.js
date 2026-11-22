@@ -49,9 +49,10 @@ describe('cli ui output', () => {
             expect(output).toContain('[zenith] • BUILD');
             expect(output).toContain('[zenith] ✓ OK');
             expect(output).toContain('[zenith] • BUILD  Output: ./dist');
+            expect(output).not.toContain('[DEBUG] Route');
             const normalized = output
                 .split('\n')
-                .filter((line) => line.length > 0 && !line.startsWith('[DEBUG] Route '))
+                .filter((line) => line.length > 0)
                 .join('\n');
             expect(normalized).toMatch(/\[zenith\] • BUILD  Building…/);
             expect(normalized).toMatch(/\[zenith\] ✓ OK\s+Built 1 page\(s\), \d+ asset\(s\)/);

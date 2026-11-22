@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-22.04, windows-latest, macos-14, macos-15-intel]
+        runner: [ubuntu-22.04, windows-latest, macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -42,7 +42,7 @@ jobs:
           bun run --cwd packages/bundler build
       - name: Execute vendor consumer regressions on the host
         run: cargo test --locked --manifest-path packages/bundler/Cargo.toml --test vendor_module_semantics
-      - name: Install and execute packed 0.9.0-rc.0 consumers outside the checkout
+      - name: Install and execute packed train consumers outside the checkout
         run: node scripts/smoke-cross-os.mjs --packed
       - name: Exercise relocated Node SSR and real image transformations
         run: |

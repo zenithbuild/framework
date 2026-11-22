@@ -51,7 +51,7 @@ Use semantic image markup with useful alternative text and reserve dimensions wh
 In 0.9, the `<Image>` component still ships in `@zenithbuild/cli`, and image optimization (Sharp) ships in the optional `@zenithbuild/image` package. Projects that use `<Image>` must install the package at the exact same version as `@zenithbuild/cli`:
 
 ```bash
-npm install -D @zenithbuild/image@0.9.0-rc.0
+npm install -D @zenithbuild/image@0.9.0-rc.1
 ```
 
 > To install a 0.9.0 release candidate, use its exact version (as above) or the `train` tag (`@zenithbuild/image@train`). Either way, it must exactly match your `@zenithbuild/cli` version.

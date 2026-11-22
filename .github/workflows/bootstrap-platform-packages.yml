@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          - runner: macos-15
             package_kind: bundler
             package_name: bundler-darwin-arm64
             package_dir: packages/bundler-darwin-arm64
@@ -46,7 +46,7 @@ jobs:
             package_dir: packages/bundler-win32-x64
             rust_target: x86_64-pc-windows-msvc
             platform_key: win32-x64
-          - runner: macos-14
+          - runner: macos-15
             package_kind: compiler
             package_name: compiler-darwin-arm64
             package_dir: packages/compiler-darwin-arm64

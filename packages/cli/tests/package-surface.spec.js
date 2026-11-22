@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -6,6 +6,34 @@ import { join } from 'node:path';
 const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST_ROOT = join(PACKAGE_ROOT, 'dist');
 const PACKAGE_JSON = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+const STRAY_DEBUG_SCRIPT = 'debug-script.js';
+const STRAY_BUN_EXEC = "~/.bun/bin/bun run build";
+
+function listFiles(directory) {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    const files = [];
+    for (const entry of entries) {
+        const fullPath = join(directory, entry.name);
+        if (entry.isDirectory()) {
+            files.push(...listFiles(fullPath));
+            continue;
+        }
+        files.push(fullPath);
+    }
+    return files;
+}
+
+function publishedPackPaths() {
+    const result = spawnSync('npm', ['pack', '--dry-run', '--json', '.'], {
+        cwd: PACKAGE_ROOT,
+        encoding: 'utf8'
+    });
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout);
+    return Array.isArray(payload) && payload[0]?.files
+        ? payload[0].files.map((entry) => entry.path)
+        : [];
+}
 
 describe('cli package surface', () => {
     test('exports map keys stay unchanged', () => {
@@ -33,19 +61,23 @@ describe('cli package surface', () => {
     });
 
     test('tarball excludes src files', () => {
-        const result = spawnSync('npm', ['pack', '--dry-run', '--json', '.'], {
-            cwd: PACKAGE_ROOT,
-            encoding: 'utf8'
-        });
-
-        expect(result.status).toBe(0);
-        const payload = JSON.parse(result.stdout);
-        const files = Array.isArray(payload) && payload[0]?.files
-            ? payload[0].files.map((entry) => entry.path)
-            : [];
+        const files = publishedPackPaths();
 
         expect(files).toContain('dist/index.js');
         expect(files).toContain('dist/index.d.ts');
         expect(files.some((filePath) => String(filePath).startsWith('src/'))).toBe(false);
+    });
+
+    test('published package excludes stray debug-script.js', () => {
+        expect(existsSync(join(PACKAGE_ROOT, 'src', STRAY_DEBUG_SCRIPT))).toBe(false);
+        expect(existsSync(join(DIST_ROOT, STRAY_DEBUG_SCRIPT))).toBe(false);
+
+        const distFiles = listFiles(DIST_ROOT);
+        expect(distFiles.some((filePath) => filePath.endsWith(`/${STRAY_DEBUG_SCRIPT}`))).toBe(false);
+        const strayExec = distFiles.filter((filePath) => readFileSync(filePath, 'utf8').includes(STRAY_BUN_EXEC));
+        expect(strayExec).toEqual([]);
+
+        const files = publishedPackPaths();
+        expect(files.some((filePath) => String(filePath).endsWith(STRAY_DEBUG_SCRIPT))).toBe(false);
     });
 });

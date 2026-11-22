@@ -1,6 +1,7 @@
 import { prepareProjectImages, writeImagePackageMarker } from './project-images.js';
 import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { hostedTargetVerificationNotice } from './adapters/hosted-target-notice.js';
 import { resolveBuildAdapter } from './adapters/resolve-adapter.js';
 import { normalizeBasePath } from './base-path.js';
 import { rewriteSoftNavigationHrefBasePathInHtmlFiles } from './base-path-html.js';
@@ -15,7 +16,7 @@ import {
 } from './build/compiler-runtime.js';
 import { buildPageEnvelopes } from './build/page-loop.js';
 import { deriveProjectRootFromPagesDir, ensureZenithTypeDeclarations } from './build/type-declarations.js';
-import { injectImageMaterializationIntoRouterManifest } from './router-server-metadata.js';
+import { pageUsesServerMetadata, writeProductionPageManifests, writePublicResourceManifest } from './production-route-manifests.js';
 import { copyPublicAssets, deriveReservedPublicAssetPaths } from './public-assets.js';
 import { supportsTargetRouteCheck } from './route-check-support.js';
 import { createStartupProfiler } from './startup-profile.js';
@@ -67,12 +68,17 @@ export async function build(options) {
     const { buildImageArtifacts, createImageRuntimePayload, injectImageRuntimePayloadIntoHtmlFiles } = imagePackage.api;
     const coreOutputDir = join(projectRoot, '.zenith-output');
     const staticOutputDir = join(coreOutputDir, 'static');
+    const routeMetadataDir = join(coreOutputDir, 'route-metadata');
     const imageStageDir = join(coreOutputDir, 'image-materialization-stage');
     const srcDir = resolve(pagesDir, '..');
     const compilerBin = createCompilerToolchain({ projectRoot, logger });
     const bundlerBin = createBundlerToolchain({ projectRoot, logger });
     const compilerTotals = createCompilerTotals();
     const { target, adapter, mode } = resolveBuildAdapter(config);
+    const hostedNotice = hostedTargetVerificationNotice(target);
+    if (hostedNotice && logger && typeof logger.build === 'function') {
+        logger.build(hostedNotice);
+    }
     const basePath = normalizeBasePath(config.basePath || '/');
     const routeCheckEnabled = supportsTargetRouteCheck(target);
     const routerEnabled = config.router === true;
@@ -175,15 +181,19 @@ export async function build(options) {
         await startupProfile.measureAsync(
             'inject_image_materialization_manifest',
             async () => {
-                await injectImageMaterializationIntoRouterManifest(staticOutputDir, envelopes);
-                await writeSsrBindingPlans(staticOutputDir, envelopes);
+                await writeProductionPageManifests(staticOutputDir, routeMetadataDir, envelopes);
+                await writeSsrBindingPlans(routeMetadataDir, envelopes);
             },
             { envelopes: envelopes.length }
         );
     }
     await startupProfile.measureAsync(
         'write_resource_manifest',
-        () => writeResourceRouteManifest(staticOutputDir, manifest, basePath)
+        async () => {
+            const routes = await writeResourceRouteManifest(routeMetadataDir, manifest, basePath);
+            const hasServerPages = envelopes.some((page) => !page.ir.prerender && pageUsesServerMetadata(page));
+            await writePublicResourceManifest(staticOutputDir, basePath, routes, hasServerPages);
+        }
     );
     await startupProfile.measureAsync(
         'rewrite_soft_navigation_base_path',
@@ -231,6 +241,7 @@ export async function build(options) {
         () => writeServerOutput({
             coreOutputDir,
             staticDir: staticOutputDir,
+            routeMetadataDir,
             imagePackage,
             projectRoot,
             config,

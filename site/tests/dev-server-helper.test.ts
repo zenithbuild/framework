@@ -66,7 +66,8 @@ test("site harness defaults to the actual checkout CLI", async () => {
   try {
     await new Promise<void>((resolve) => command.proc.once("close", () => resolve()));
     expect(command.proc.exitCode).toBe(0);
-    expect(command.logs().stdout).toContain("zenith 0.9.0-rc.0");
+    const version = (await Bun.file(new URL("../../TRAIN_VERSION", import.meta.url)).text()).trim();
+    expect(command.logs().stdout.trim()).toBe("zenith " + version);
     expect(command.proc.spawnargs[1]).toContain("packages");
     expect(command.proc.spawnargs[1]).toContain("cli");
     expect(command.proc.spawnargs[1]).toContain("dist");

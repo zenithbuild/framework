@@ -6,9 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [0.9.0-rc.1] - 2026-11-22
+
+### Added
+
+- Emit automatic modulepreload hints for initial-route dependencies (JUD-129).
+
 ### Changed
 
+- Check the release tag before CI and use the verified commit throughout npm publishing and recovery. Verify all 15 package dist-tags together and retry only those awaiting propagation.
+- Print a build notice that hosted adapters have passed conformance tests and add a CI check for drift in the supported target list (JUD-97, JUD-98).
 - Extract `_coerceText` and `_createContextualFragment` into `packages/runtime/src/render-utils.js` so `render.js` and `fragment-patch.js` no longer import each other. `render.js` and `hydrate.js` keep the same exports, and the concatenated runtime template still contains each helper once (JUD-11).
+
+### Fixed
+
+- Production page bundles omit reactive source spans (`source.file`, positions, and snippets) from `__zenith_refs`, `__zenith_events`, and compacted payload tables. Dev-stable builds (`--dev-stable-assets`) still emit full spans for overlays. Absolute build-machine paths and source snippets no longer ship in production client JS (JUD-90).
+- Production browser manifests carry route and asset metadata. Page and resource handlers and server binding plans are packaged with the server. Local preview verifies the matching private page and resource routes and returns 503 when required metadata is incomplete.
+- Remove leftover route debug logging and a stray debug script from the CLI package (JUD-91, JUD-92).
+- Update the deepmerge, glob and minimatch resolutions used by the release workspace (#247).
+- Restore frozen Bun installs and use supported macOS ARM and Linux runners for package and browser checks (#252, #261).
+- Emit each shared imported CSS module once across routes, preserving scoped styles and a later route's base-before-override order when the routes agree. When two routes import the same files in opposite orders, the earlier route wins and the build warns with the routes and files involved (JUD-128).
 
 ## [0.9.0-rc.0] - TBD
 

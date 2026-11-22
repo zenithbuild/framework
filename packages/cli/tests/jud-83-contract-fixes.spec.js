@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { jest } from '@jest/globals';
+import { createRequire } from 'node:module';
 import { ZENITH_TARGETS } from '@zenithbuild/core/config';
 import { build } from '../dist/build.js';
 import { KNOWN_TARGETS } from '../dist/adapters/adapter-types.js';
@@ -11,6 +12,8 @@ import { resolveBuildAdapter } from '../dist/adapters/resolve-adapter.js';
 import { rewriteConfigSpecifiers, rewriteConfigSpecifiersInDir } from '../dist/package-image-runtime.js';
 import { createProjectImageApi, imagePackageMarkerPath, prepareProjectImages } from '../dist/project-images.js';
 import { installImagePackage } from './helpers/image-package.js';
+
+const cliVersion = createRequire(import.meta.url)('../package.json').version;
 
 jest.setTimeout(60000);
 
@@ -205,7 +208,7 @@ describe('missing package error', () => {
         await writeFile(join(root, 'pages', 'blog', 'post.zen'), '<main><Image src="/b.png" alt="B" /></main>');
         await writeFile(join(root, 'pages', 'about.zen'), '<main>no image</main>');
         await expect(build({ pagesDir: join(root, 'pages'), outDir: join(root, 'dist') })).rejects.toThrow(
-            'requires @zenithbuild/image@0.9.0-rc.0 because <Image> is used in pages/blog/post.zen, pages/index.zen. Run npm i -D @zenithbuild/image@0.9.0-rc.0'
+            `requires @zenithbuild/image@${cliVersion} because <Image> is used in pages/blog/post.zen, pages/index.zen. Run npm i -D @zenithbuild/image@${cliVersion}`
         );
     });
 });

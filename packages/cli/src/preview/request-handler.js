@@ -1,6 +1,6 @@
 import { createProjectImageApi } from '../project-images.js';
 import { readFile } from 'node:fs/promises';
-import { dirname, extname, join } from 'node:path';
+import { extname, join } from 'node:path';
 import { appLocalRedirectLocation, imageEndpointPath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { materializeSsrBindings } from '../server-runtime/ssr-bindings.js';
 import { readRequestBodyBuffer } from '../request-body.js';
@@ -9,7 +9,7 @@ import { clientFacingRouteMessage, logServerException, sanitizeRouteResult } fro
 import { resolveRequestRoute } from '../server/resolve-request-route.js';
 import { STATIC_MIME_TYPES } from '../static-mime.js';
 import { loadPreviewGlobalMiddlewareSource } from '../global-middleware-runtime-source.js';
-import { loadRouteSurfaceState } from './manifest.js';
+import { loadRouteSurfaceState, resolvePreviewRouteFiles } from './manifest.js';
 import { injectSsrPayload } from './payload.js';
 import { fileExists, resolveWithinDist, toStaticFilePath } from './paths.js';
 import { executeServerRoute, routeIdFromSourcePath } from './server-runner.js';
@@ -100,9 +100,20 @@ export function createPreviewRequestHandler(options) {
 
   return async function previewRequestHandler(req, res) {
     const url = new URL(req.url, serverOrigin());
-    const serverModuleBaseDir = join(dirname(distDir), 'server');
+    let routeFiles;
+    try {
+      routeFiles = await resolvePreviewRouteFiles(distDir, projectRoot, config);
+    } catch (error) {
+      logServerException('preview route metadata could not be read', error);
+    }
+    if (!routeFiles) {
+      res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end('Server route metadata is unavailable.');
+      return;
+    }
+    const { serverDir: serverModuleBaseDir, routeDir: routeMetadataDir, bindingPlan: bindingPlanPath } = routeFiles;
     const routeState = mergePreviewScopedServerRoutes(
-      await loadRouteSurfaceState(distDir, configuredBasePath),
+      routeFiles.routeState ?? await loadRouteSurfaceState(routeMetadataDir, configuredBasePath),
       await loadPreviewScopedServerRoutes(serverModuleBaseDir)
     );
     const { basePath, pageRoutes, resourceRoutes } = routeState;
@@ -397,7 +408,7 @@ export function createPreviewRequestHandler(options) {
       }
       if (ssrPayload) {
         try {
-          html = await materializeSsrBindings({ html, payload: ssrPayload, params: resolved.params, routePath: resolved.route.path, planPath: join(distDir, '_zenith', 'ssr-bindings.json') });
+          html = await materializeSsrBindings({ html, payload: ssrPayload, params: resolved.params, routePath: resolved.route.path, planPath: bindingPlanPath });
         } catch (error) {
           respondWithMiddlewareSourceError(res, error);
           return;

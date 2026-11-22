@@ -82,6 +82,16 @@ There is no separate `assetPrefix` config. Public framework asset URLs follow `b
 - `netlify` emits a deploy root with `publish/`, `functions/`, `netlify.toml`, and generated `_redirects` that force server-classified routes through packaged functions.
 - `node` emits a standalone Node artifact rooted at `outDir` with `index.js`, `package.json`, `manifest.json`, `static/`, and `server/`.
 
+Supported deployment targets:
+
+- `static`
+- `static-export`
+- `vercel-static`
+- `netlify-static`
+- `vercel`
+- `netlify`
+- `node`
+
 Server-capable target contract:
 
 - Route classification stays upstream in the manifest and server package layers.
@@ -105,7 +115,7 @@ Current limitations:
 - `zenith plugin info <name|alias>` — registry metadata and local `package.json` `zenith` block if installed
 
 ### `zenith adapter`
-- `zenith adapter list` — registry adapters and built-in targets
+- `zenith adapter list` — built-in host targets and deployment target names
 
 ### `zenith dev`
 Starts the development server on `localhost:3000`.
@@ -131,7 +141,7 @@ framework train version. It is optional for JPG/JPEG/PNG/WebP/AVIF assets in
 `public/`, which are copied unoptimized without it:
 
 ```bash
-npm i -D @zenithbuild/image@0.9.0-rc.0
+npm i -D @zenithbuild/image@0.9.0-rc.1
 ```
 
 The 0.9.0 release candidates publish under the npm `train` dist-tag, not `latest`.
