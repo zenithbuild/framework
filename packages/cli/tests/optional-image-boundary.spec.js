@@ -85,6 +85,10 @@ test('no-image build, dev, preview and Node output need no image package or Shar
     }
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('No image dependency');
+    // The preview build writes inside the project watched by the dev server.
+    await dev.close();
+    dev = null;
+
     // Preview uses the flat static directory produced by a static build.
     const staticOut = join(root, 'preview-dist');
     await build({ ...options, outDir: staticOut, config: {} });
