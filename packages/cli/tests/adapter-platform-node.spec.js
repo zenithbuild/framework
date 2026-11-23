@@ -1,61 +1,33 @@
 import { existsSync } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { readFile, rm } from 'node:fs/promises';
 import { requestText } from './helpers/node-http.js';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { jest } from '@jest/globals';
-import { cli } from '../dist/index.js';
 import { installImagePackage } from './helpers/image-package.js';
+import {
+    buildNodeArtifact,
+    cookieHeaderFromResponse,
+    createProject,
+    extractSsrPayload,
+    fetchBytes
+} from './helpers/node-platform-fixtures.js';
+import {
+    assertNoPrecompressedSidecars,
+    expectExactPlain,
+    expectJsonPlain,
+    expectNegotiatedStatic,
+    expectNodeDeliveryArtifacts,
+    expectPlainContains,
+    expectSkippedStatic,
+    rawHttp
+} from './helpers/static-delivery-http.js';
 
 process.env.ZENITH_NO_UI = '1';
 process.env.NO_COLOR = '1';
 process.env.CI = '1';
 
-jest.setTimeout(30000);
-
-async function createProject(files) {
-    const root = join(tmpdir(), `zenith-platform-node-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    for (const [relativePath, contents] of Object.entries(files)) {
-        const absolutePath = join(root, relativePath);
-        await mkdir(join(absolutePath, '..'), { recursive: true });
-        await writeFile(absolutePath, contents, 'utf8');
-    }
-    return root;
-}
-
-async function buildNodeArtifact(root) {
-    await cli(['build'], root);
-    const result = spawnSync('bun', ['install'], { cwd: join(root, 'dist'), encoding: 'utf8' });
-    expect(result.status).toBe(0);
-}
-
-function extractSsrPayload(html) {
-    const payloadMatch = html.match(/window\.__zenith_ssr_data\s*=\s*(\{[\s\S]*?\});/);
-    expect(payloadMatch).toBeTruthy();
-    return JSON.parse(String(payloadMatch[1]));
-}
-
-function cookieHeaderFromResponse(response) {
-    const raw = response.headers.get('set-cookie');
-    if (!raw) {
-        return '';
-    }
-    return raw.split(/,(?=[^;]+=[^;]+)/).map((value) => value.split(';')[0].trim()).join('; ');
-}
-
-async function fetchBytes(url, options = {}) {
-    const response = await fetch(url, {
-        redirect: 'manual',
-        ...options
-    });
-    return {
-        status: response.status,
-        headers: response.headers,
-        body: Buffer.from(await response.arrayBuffer())
-    };
-}
+jest.setTimeout(90000);
 
 describe('node adapter', () => {
     let projectRoot = null;
@@ -470,5 +442,52 @@ describe('node adapter', () => {
                 }
             }
         });
+    });
+
+    test('generated node server negotiates static encoding and leaves dynamic responses plain', async () => {
+        const pad = 'N'.repeat(2048);
+        const marker = 'ssr-live-marker';
+        projectRoot = await createProject({
+            'pages/index.zen': `<main>${pad}</main>\n`,
+            'pages/live.zen': [
+                '<script server lang="ts">',
+                `export const load = async (ctx) => ({ marker: ${JSON.stringify(marker)}, path: ctx.url.pathname });`,
+                '</script>',
+                `<main>${pad}</main>`
+            ].join('\n'),
+            'pages/api/blob.resource.ts': `export async function load(ctx) { return ctx.text(${JSON.stringify(pad)}); }\n`,
+            'public/app.js': `/* ${pad} */\n`,
+            'public/tiny.txt': 'tiny',
+            'public/pixel.png': 'p'.repeat(2048),
+            'zenith.config.js': 'module.exports = { target: "node" };\n'
+        });
+        await buildNodeArtifact(projectRoot);
+        await expectNodeDeliveryArtifacts(join(projectRoot, 'dist'));
+        const mod = await import(pathToFileURL(join(projectRoot, 'dist', 'index.js')).href);
+        preview = await mod.createNodeServer({
+            distDir: join(projectRoot, 'dist'),
+            port: 0,
+            host: '127.0.0.1'
+        });
+        const origin = `http://127.0.0.1:${preview.port}`;
+        const staticDir = join(projectRoot, 'dist', 'static');
+        const html = await readFile(join(staticDir, 'index.html'));
+        expect(html.length).toBeGreaterThanOrEqual(1024);
+        await expectNegotiatedStatic(`${origin}/app.js`, await readFile(join(staticDir, 'app.js')), 'javascript');
+        await expectNegotiatedStatic(`${origin}/`, html, 'html');
+        await expectSkippedStatic(`${origin}/tiny.txt`, await readFile(join(staticDir, 'tiny.txt')), { charset: true });
+        await expectSkippedStatic(`${origin}/pixel.png`, await readFile(join(staticDir, 'pixel.png')));
+        await expectExactPlain(`${origin}/api/blob`, pad);
+        await expectPlainContains(`${origin}/live`, [pad, marker]);
+        await expectJsonPlain(`${origin}/__zenith/route-check?path=${encodeURIComponent(`/?${pad}`)}`, {
+            headers: { 'x-zenith-route-check': '1' },
+            includes: pad
+        });
+        const image = await rawHttp(`${origin}/_zenith/image`, {
+            headers: { 'accept-encoding': 'br, gzip' }
+        });
+        expect(image.headers['content-encoding']).toBeUndefined();
+        expect(JSON.parse(image.body.toString('utf8')).error).toBe('missing_url');
+        await assertNoPrecompressedSidecars(join(projectRoot, 'dist', 'static'));
     });
 });

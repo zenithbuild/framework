@@ -6,33 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { appLocalRedirectLocation, imageEndpointPath, normalizeBasePath, routeCheckPath, stripBasePath } from '../base-path.js';
 import { createTrustedOriginResolver } from '../request-origin.js';
 import { defaultRouteDenyMessage, logServerException, sanitizeRouteResult } from '../server-error.js';
+import { sendStaticFile } from '../static-delivery.js';
 import { executeRouteRequest, renderResourceRouteRequest, renderRouteRequest } from './route-render.js';
 import { resolveRequestRoute } from './resolve-request-route.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PUBLIC_ORIGIN_ENV = 'ZENITH_PUBLIC_ORIGIN';
-
-const MIME_TYPES = {
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'application/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8',
-    '.png': 'image/png',
-    '.jpeg': 'image/jpeg',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml',
-    '.webp': 'image/webp',
-    '.avif': 'image/avif',
-    '.gif': 'image/gif',
-    '.txt': 'text/plain; charset=utf-8',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.otf': 'font/otf',
-    '.webmanifest': 'application/manifest+json'
-};
 
 let runtimeContextPromise = null;
 
@@ -178,17 +158,6 @@ async function sendFetchResponse(res, response, method) {
             res.destroy();
         }
     }
-}
-
-async function sendStaticFile(res, filePath, method) {
-    const body = await readFile(filePath);
-    const contentType = MIME_TYPES[extname(filePath)] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
-    if (String(method || 'GET').toUpperCase() === 'HEAD') {
-        res.end();
-        return;
-    }
-    res.end(body);
 }
 
 function normalizeRouteCheckResult(result, targetUrl, basePath) {
@@ -381,7 +350,7 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
             res.end('404 Not Found');
             return;
         }
-        await sendStaticFile(res, assetPath, req.method);
+        await sendStaticFile(req, res, assetPath);
         return;
     }
 
@@ -409,14 +378,14 @@ async function handleNodeRequest(req, res, context, serverOrigin) {
     if (buildResolved.matched && buildResolved.route) {
         const htmlPath = resolveWithinRoot(context.staticDir, buildResolved.route.html);
         if (htmlPath && await fileExists(htmlPath)) {
-            await sendStaticFile(res, htmlPath, req.method);
+            await sendStaticFile(req, res, htmlPath);
             return;
         }
     }
 
     const fallbackHtmlPath = toStaticFilePath(context.staticDir, canonicalPath);
     if (fallbackHtmlPath && await fileExists(fallbackHtmlPath)) {
-        await sendStaticFile(res, fallbackHtmlPath, req.method);
+        await sendStaticFile(req, res, fallbackHtmlPath);
         return;
     }
 
